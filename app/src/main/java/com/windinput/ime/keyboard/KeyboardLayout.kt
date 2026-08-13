@@ -25,10 +25,20 @@ data class KeyDef(
     val isSpecial: Boolean = false,
 )
 
+enum class KeyboardLayer { LETTERS, SYMBOLS }
+
 object KeyboardLayouts {
 
     private fun charKeys(chars: String): List<KeyDef> =
         chars.map { KeyDef(it.toString(), KeyAction.Text(it)) }
+
+    private fun bottomRow(switchLabel: String): List<KeyDef> = listOf(
+        KeyDef(switchLabel, KeyAction.SwitchSymbols, widthWeight = 1.5f, isSpecial = true),
+        KeyDef("，", KeyAction.Text('，')),
+        KeyDef("空格", KeyAction.Space, widthWeight = 4f),
+        KeyDef("。", KeyAction.Text('。')),
+        KeyDef("⏎", KeyAction.Enter, widthWeight = 1.5f, isSpecial = true),
+    )
 
     /** 内置 qwerty 主布局（26 键） */
     val qwerty: List<List<KeyDef>> = listOf(
@@ -39,12 +49,23 @@ object KeyboardLayouts {
             addAll(charKeys("zxcvbnm"))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
-        listOf(
-            KeyDef("?123", KeyAction.SwitchSymbols, widthWeight = 1.5f, isSpecial = true),
-            KeyDef("，", KeyAction.Text(','), widthWeight = 1f),
-            KeyDef("空格", KeyAction.Space, widthWeight = 4f),
-            KeyDef("。", KeyAction.Text('.'), widthWeight = 1f),
-            KeyDef("⏎", KeyAction.Enter, widthWeight = 1.5f, isSpecial = true),
-        ),
+        bottomRow("?123"),
     )
+
+    /** 符号/数字层（占位集合，正式键位随布局 TOML 化调整） */
+    val symbols: List<List<KeyDef>> = listOf(
+        charKeys("1234567890"),
+        charKeys("@#%&*-+=()"),
+        buildList {
+            add(KeyDef("~", KeyAction.Text('~'), widthWeight = 1.5f))
+            addAll(charKeys("!?:;/'\""))
+            add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
+        },
+        bottomRow("ABC"),
+    )
+
+    fun rows(layer: KeyboardLayer): List<List<KeyDef>> = when (layer) {
+        KeyboardLayer.LETTERS -> qwerty
+        KeyboardLayer.SYMBOLS -> symbols
+    }
 }

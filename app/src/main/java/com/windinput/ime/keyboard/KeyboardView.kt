@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 
@@ -22,7 +23,8 @@ class KeyboardView(context: Context) : View(context) {
 
     var listener: Listener? = null
 
-    private val rows = KeyboardLayouts.qwerty
+    private var layer = KeyboardLayer.LETTERS
+    private val rows get() = KeyboardLayouts.rows(layer)
     private var shifted = false
 
     // ── 占位配色（后续由主题系统提供） ──────────────────────────────
@@ -122,6 +124,9 @@ class KeyboardView(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressedKey = findKey(event.x, event.y)
+                if (pressedKey != null) {
+                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                }
                 if (pressedKey?.action == KeyAction.Backspace) {
                     repeating = true
                     repeatHandler.postDelayed(repeatRunnable, 400)
@@ -160,6 +165,15 @@ class KeyboardView(context: Context) : View(context) {
         when (key.action) {
             KeyAction.Shift -> {
                 shifted = !shifted
+                invalidate()
+            }
+            KeyAction.SwitchSymbols -> {
+                layer = when (layer) {
+                    KeyboardLayer.LETTERS -> KeyboardLayer.SYMBOLS
+                    KeyboardLayer.SYMBOLS -> KeyboardLayer.LETTERS
+                }
+                shifted = false
+                rebuildBounds(width)
                 invalidate()
             }
             else -> {
