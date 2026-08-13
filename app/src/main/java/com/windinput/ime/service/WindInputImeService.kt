@@ -1,15 +1,21 @@
 package com.windinput.ime.service
 
 import android.inputmethodservice.InputMethodService
+import android.text.InputType
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.LinearLayout
+import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.FakeSession
 import com.windinput.ime.core.ImeSession
 import com.windinput.ime.core.UiEvent
+import com.windinput.ime.core.UserConfig
 import com.windinput.ime.keyboard.CandidateBarView
 import com.windinput.ime.keyboard.KeyAction
+import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.KeyboardView
+import com.windinput.ime.keyboard.LayoutRepository
+import java.io.File
 
 /**
  * 输入法服务：Android IME 框架对接层。
@@ -25,17 +31,30 @@ import com.windinput.ime.keyboard.KeyboardView
 class WindInputImeService : InputMethodService(), KeyboardView.Listener, CandidateBarView.Listener {
 
     private var candidateBar: CandidateBarView? = null
+    private var keyboard: KeyboardView? = null
     private val session: ImeSession = FakeSession()
+
+    /** 密码等敏感场景：绕过会话直输（对应桌面 compat 场景语义的最小版） */
+    private var directInput = false
+
+    private lateinit var layoutRepository: LayoutRepository
+    private lateinit var userConfig: UserConfig
 
     override fun onCreate() {
         super.onCreate()
         session.listener = ::onUiEvent
+        val dirs = (application as WindInputApp).dataDirs
+        layoutRepository = LayoutRepository(dirs)
+        userConfig = UserConfig(File(dirs.userDir, "config.toml"))
     }
 
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         candidateBar = CandidateBarView(this).apply { listener = this@WindInputImeService }
-        val keyboard = KeyboardView(this).apply { listener = this@WindInputImeService }
+        keyboard = KeyboardView(this).apply {
+            listener = this@WindInputImeService
+            layoutProvider = layoutRepository::rows
+        }
         val lp = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -52,9 +71,37 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
         session.focusGained()
     }
 
+    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInputView(info, restarting)
+        // 设置项热生效：小文件，每次展开键盘时重读
+        keyboard?.hapticEnabled = userConfig.getBoolean("ui.android.haptic", true)
+        applyEditorScene(info)
+    }
+
     override fun onFinishInput() {
         session.focusLost()
         super.onFinishInput()
+    }
+
+    /** EditorInfo 场景感知：密码框直输、数字/电话框初始切符号层 */
+    private fun applyEditorScene(info: EditorInfo?) {
+        val inputType = info?.inputType ?: 0
+        val clazz = inputType and InputType.TYPE_MASK_CLASS
+        val variation = inputType and InputType.TYPE_MASK_VARIATION
+
+        directInput = clazz == InputType.TYPE_CLASS_TEXT && variation in setOf(
+            InputType.TYPE_TEXT_VARIATION_PASSWORD,
+            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+            InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+        )
+        if (directInput) {
+            session.reset()
+        }
+
+        val numericScene = clazz == InputType.TYPE_CLASS_NUMBER ||
+            clazz == InputType.TYPE_CLASS_PHONE ||
+            clazz == InputType.TYPE_CLASS_DATETIME
+        keyboard?.setLayer(if (numericScene) KeyboardLayer.SYMBOLS else KeyboardLayer.LETTERS)
     }
 
     // ── 会话事件 → 编辑器/候选条 ───────────────────────────────────
@@ -77,7 +124,7 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
     // ── 键盘/候选条回调 ───────────────────────────────────────────
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {
-        if (session.keyPressed(action, shifted)) return
+        if (!directInput && session.keyPressed(action, shifted)) return
         // 会话未吃键：默认行为
         val ic = currentInputConnection ?: return
         when (action) {

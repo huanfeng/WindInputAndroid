@@ -1,0 +1,27 @@
+# 符号/数字层布局（语法说明见 qwerty.toml）
+
+[meta]
+id = "symbols"
+name = "符号"
+
+[[rows]]
+keys = "1234567890"
+
+[[rows]]
+keys = "@#%&*-+=()"
+
+[[rows]]
+key = [
+  { label = "~", text = "~", width = 1.5 },
+  { chars = "!?:;/'\"" },
+  { label = "⌫", action = "backspace", width = 1.5 },
+]
+
+[[rows]]
+key = [
+  { label = "ABC", action = "switch_symbols", width = 1.5 },
+  { label = "，", text = "，" },
+  { label = "空格", action = "space", width = 4.0 },
+  { label = "。", text = "。" },
+  { label = "⏎", action = "enter", width = 1.5 },
+]

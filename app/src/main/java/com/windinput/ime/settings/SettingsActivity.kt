@@ -6,31 +6,47 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.windinput.ime.WindInputApp
+import com.windinput.ime.core.UserConfig
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.io.File
 
 /**
- * 设置入口（Compose + miuix 风格）。
- *
- * 占位阶段：仅提供「启用输入法」引导；正式版由设置清单（settings manifest）
- * 驱动生成页面骨架，与桌面端设置项自动对齐（见 docs/architecture.md §3.3）。
+ * 设置页：由设置清单（settings_manifest.toml）驱动生成。
+ * 值写入用户层 config.toml（与桌面配置域格式一致，Rust 核心接入后直接可读）。
  */
 class SettingsActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val dirs = (application as WindInputApp).dataDirs
+        val userConfig = UserConfig(File(dirs.userDir, "config.toml"))
+        val groups = SettingsManifest.load(dirs)
+            .map { g -> g.copy(items = g.items.filter { it.platform == null || it.platform == "android" }) }
+            .filter { it.items.isNotEmpty() }
+
         setContent {
             MiuixTheme {
                 SettingsScreen(
+                    groups = groups,
+                    config = userConfig,
                     onEnableIme = {
                         startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                     },
@@ -41,17 +57,33 @@ class SettingsActivity : ComponentActivity() {
 }
 
 @Composable
-private fun SettingsScreen(onEnableIme: () -> Unit) {
+private fun SettingsScreen(
+    groups: List<SettingGroup>,
+    config: UserConfig,
+    onEnableIme: () -> Unit,
+) {
+    // 开关状态缓存：key → 当前值（初值 = 用户配置 ?: 清单默认）
+    val toggles = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            for (group in groups) {
+                for (item in group.items) {
+                    if (item.type == "toggle") {
+                        put(item.key, config.getBoolean(item.key, item.defaultValue as? Boolean ?: false))
+                    }
+                }
+            }
+        }
+    }
+
     Scaffold(
-        topBar = {
-            SmallTopAppBar(title = "清风输入法")
-        },
+        topBar = { SmallTopAppBar(title = "清风输入法") },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -67,10 +99,52 @@ private fun SettingsScreen(onEnableIme: () -> Unit) {
                     )
                 }
             }
-            Text(
-                text = "更多设置项将由设置清单驱动生成",
-                modifier = Modifier.padding(16.dp),
-            )
+
+            for (group in groups) {
+                Text(
+                    text = group.title,
+                    modifier = Modifier.padding(start = 4.dp),
+                )
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column {
+                        for (item in group.items) {
+                            when (item.type) {
+                                "toggle" -> ToggleRow(
+                                    item = item,
+                                    checked = toggles[item.key] == true,
+                                    onCheckedChange = { checked ->
+                                        toggles[item.key] = checked
+                                        config.put(item.key, checked)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+@Composable
+private fun ToggleRow(
+    item: SettingItem,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = item.title)
+            item.summary?.let {
+                Text(text = it, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

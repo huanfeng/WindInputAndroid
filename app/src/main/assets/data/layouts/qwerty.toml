@@ -1,0 +1,40 @@
+# 键盘布局定义（TOML，与配置文件家族格式统一）
+#
+# 语法：
+#   [meta]           id/name
+#   [[rows]]         每行一个；二选一：
+#     keys = "..."   简写：每字符展开为一个字符键
+#     key  = [ {..} ] 显式键位数组，字段：
+#       label   显示文本（text/chars 键可省略，缺省用字符本身）
+#       text    字符键的输出字符
+#       chars   简写：连续字符批量展开
+#       action  功能键：shift | backspace | enter | space | switch_symbols
+#       width   相对宽度权重，缺省 1.0
+#
+# 覆盖解析：filesDir/user/layouts/qwerty.toml > filesDir/data/layouts/qwerty.toml > 内置。
+
+[meta]
+id = "qwerty"
+name = "26 键"
+
+[[rows]]
+keys = "qwertyuiop"
+
+[[rows]]
+keys = "asdfghjkl"
+
+[[rows]]
+key = [
+  { label = "⇧", action = "shift", width = 1.5 },
+  { chars = "zxcvbnm" },
+  { label = "⌫", action = "backspace", width = 1.5 },
+]
+
+[[rows]]
+key = [
+  { label = "?123", action = "switch_symbols", width = 1.5 },
+  { label = "，", text = "，" },
+  { label = "空格", action = "space", width = 4.0 },
+  { label = "。", text = "。" },
+  { label = "⏎", action = "enter", width = 1.5 },
+]

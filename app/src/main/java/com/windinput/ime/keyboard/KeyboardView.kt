@@ -23,8 +23,18 @@ class KeyboardView(context: Context) : View(context) {
 
     var listener: Listener? = null
 
+    /** 布局来源，缺省内置；Service 注入 LayoutRepository 后走 TOML + 覆盖解析 */
+    var layoutProvider: (KeyboardLayer) -> List<List<KeyDef>> = KeyboardLayouts::rows
+        set(value) {
+            field = value
+            reloadLayout()
+        }
+
+    /** 按键触觉反馈开关（设置项 keyboard.haptic） */
+    var hapticEnabled = true
+
     private var layer = KeyboardLayer.LETTERS
-    private val rows get() = KeyboardLayouts.rows(layer)
+    private var rows = layoutProvider(layer)
     private var shifted = false
 
     // ── 占位配色（后续由主题系统提供） ──────────────────────────────
@@ -124,7 +134,7 @@ class KeyboardView(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressedKey = findKey(event.x, event.y)
-                if (pressedKey != null) {
+                if (pressedKey != null && hapticEnabled) {
                     performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 }
                 if (pressedKey?.action == KeyAction.Backspace) {
@@ -161,6 +171,23 @@ class KeyboardView(context: Context) : View(context) {
     private fun findKey(x: Float, y: Float): KeyDef? =
         keyBounds.firstOrNull { it.rect.contains(x, y) }?.key
 
+    /** 切换布局层（EditorInfo 场景感知/符号键共用入口） */
+    fun setLayer(newLayer: KeyboardLayer) {
+        if (layer == newLayer) return
+        layer = newLayer
+        shifted = false
+        reloadLayout()
+    }
+
+    private fun reloadLayout() {
+        rows = layoutProvider(layer)
+        requestLayout()
+        if (width > 0) {
+            rebuildBounds(width)
+        }
+        invalidate()
+    }
+
     private fun handleKey(key: KeyDef) {
         when (key.action) {
             KeyAction.Shift -> {
@@ -168,13 +195,12 @@ class KeyboardView(context: Context) : View(context) {
                 invalidate()
             }
             KeyAction.SwitchSymbols -> {
-                layer = when (layer) {
-                    KeyboardLayer.LETTERS -> KeyboardLayer.SYMBOLS
-                    KeyboardLayer.SYMBOLS -> KeyboardLayer.LETTERS
-                }
-                shifted = false
-                rebuildBounds(width)
-                invalidate()
+                setLayer(
+                    when (layer) {
+                        KeyboardLayer.LETTERS -> KeyboardLayer.SYMBOLS
+                        KeyboardLayer.SYMBOLS -> KeyboardLayer.LETTERS
+                    },
+                )
             }
             else -> {
                 listener?.onKeyAction(key.action, shifted)

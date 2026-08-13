@@ -1,0 +1,31 @@
+# 设置清单：驱动设置页生成（方法论同桌面 wind-setting 的 settings_manifest）。
+#
+# [[group]]        分组，title 为组标题
+# [[group.item]]   设置项：
+#   key      配置键（点分路径，写入用户层 config.toml，与桌面配置域对齐）
+#   type     toggle（后续扩展：select/number/action）
+#   title    标题
+#   summary  说明（可选）
+#   default  默认值
+#   platform 平台门控（可选；"android" = 仅安卓，缺省 = 通用）
+#
+# 占位清单：Rust 核心接入后，通用逻辑域设置项(schema/input/keys)将与桌面清单合并。
+
+[[group]]
+title = "键盘"
+
+[[group.item]]
+key = "ui.android.haptic"
+type = "toggle"
+title = "按键震动"
+summary = "点按键盘时的触觉反馈"
+default = true
+platform = "android"
+
+[[group.item]]
+key = "ui.android.key_preview"
+type = "toggle"
+title = "按键气泡"
+summary = "点按时显示按键放大气泡（暂未实现）"
+default = false
+platform = "android"

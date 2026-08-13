@@ -40,8 +40,12 @@ Rust 核心（`wind-android` crate）位于主仓，经 cargo-ndk 编译 `.so` �
 - [x] 架构设计定稿（docs/architecture.md）
 - [x] 主仓前置改造方案（docs/upstream-coordinator-refactor.md，另行执行）
 - [x] APK 骨架：IME 服务 + qwerty 键盘占位（英文透传）+ 设置页占位
+- [x] 会话接口层（ImeSession/UiEvent，UniFFI 落位形状）+ FakeSession 占位链路
+- [x] 数据目录三棵树（data/user/cache）+ assets 版本化拷出
+- [x] 键盘布局 TOML 定义 + 解析 + 用户覆盖（user → data → 内置回退）
+- [x] EditorInfo 场景感知（密码框直输、数字框切符号层）
+- [x] 设置清单驱动的 Compose 设置页（toggle → 用户层 config.toml）
 - [ ] Walking skeleton：wind-android cdylib + UniFFI 最小闭环
-- [ ] 键盘布局系统（TOML 布局定义）
-- [ ] 词库 assets 拷贝 + 端上编译 + 分级加载
-- [ ] 设置清单驱动的 Compose 设置页
+- [ ] 词库 yaml 进 assets + 端上编译 + 分级加载
 - [ ] 主题键盘域节点 + 共享调色板
+- [ ] 长按气泡 / 按键预览 / 更多布局层
