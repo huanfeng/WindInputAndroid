@@ -29,3 +29,25 @@ title = "按键气泡"
 summary = "点按时显示按键放大气泡"
 default = false
 platform = "android"
+
+[[group.item]]
+key = "ui.android.row_height_portrait"
+type = "int"
+title = "键高（竖屏）"
+summary = "单行键位高度，dp"
+default = 56
+min = 40
+max = 72
+step = 2
+platform = "android"
+
+[[group.item]]
+key = "ui.android.row_height_landscape"
+type = "int"
+title = "键高（横屏）"
+summary = "单行键位高度，dp"
+default = 44
+min = 36
+max = 64
+step = 2
+platform = "android"

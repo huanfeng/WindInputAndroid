@@ -1,0 +1,37 @@
+# 数字键盘布局（数字/电话/日期输入框自动切换；语法说明见 qwerty.toml）
+
+[meta]
+id = "number"
+name = "数字键盘"
+
+[[rows]]
+key = [
+  { text = "1" },
+  { text = "2" },
+  { text = "3" },
+  { label = "⌫", action = "backspace" },
+]
+
+[[rows]]
+key = [
+  { text = "4" },
+  { text = "5" },
+  { text = "6" },
+  { text = "-" },
+]
+
+[[rows]]
+key = [
+  { text = "7" },
+  { text = "8" },
+  { text = "9" },
+  { text = "." },
+]
+
+[[rows]]
+key = [
+  { text = "+" },
+  { text = "0" },
+  { text = "," },
+  { label = "⏎", action = "enter" },
+]

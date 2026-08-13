@@ -14,11 +14,13 @@ import android.widget.TextView
 object PanelScaffold {
 
     const val KEYBOARD_ROWS = 4
-    const val ROW_HEIGHT_DP = 56
     const val HEADER_HEIGHT_DP = 40
 
     fun panelHeightPx(context: Context): Int =
-        (KEYBOARD_ROWS * ROW_HEIGHT_DP * context.resources.displayMetrics.density).toInt()
+        (
+            KEYBOARD_ROWS * com.windinput.ime.keyboard.KeyboardDimens.rowHeightDp *
+                context.resources.displayMetrics.density
+            ).toInt()
 
     /**
      * 构建面板骨架。

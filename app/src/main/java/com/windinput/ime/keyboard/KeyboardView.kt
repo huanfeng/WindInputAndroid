@@ -21,6 +21,15 @@ class KeyboardView(context: Context) : View(context) {
 
     interface Listener {
         fun onKeyAction(action: KeyAction, shifted: Boolean)
+
+        /** 空格滑动移光标：delta 为有符号步数（右正左负） */
+        fun onCursorMove(delta: Int)
+
+        /** 退格左滑扩选：选中光标前 count 个字符（实时更新） */
+        fun onBackspaceSelect(count: Int)
+
+        /** 退格滑动抬手：删除当前选区 */
+        fun onBackspaceSwipeDelete()
     }
 
     var listener: Listener? = null
@@ -49,6 +58,10 @@ class KeyboardView(context: Context) : View(context) {
     private var rows = layoutProvider(layer)
     private var shifted = false
 
+    /** 大写锁定（Shift 双击） */
+    private var shiftLocked = false
+    private var lastShiftTapTime = 0L
+
     // ── 占位配色（后续由主题系统提供） ──────────────────────────────
     private val bgColor = 0xFFF0F2F5.toInt()
     private val keyColor = 0xFFFFFFFF.toInt()
@@ -58,10 +71,16 @@ class KeyboardView(context: Context) : View(context) {
     private val hintColor = 0xFF969696.toInt()
 
     private val density = resources.displayMetrics.density
-    private val rowHeightPx = (56 * density).toInt()
+
+    /** 行高动态取自 KeyboardDimens（横竖屏配置由 Service 注入） */
+    private val rowHeightPx get() = (KeyboardDimens.rowHeightDp * density).toInt()
     private val keyGapPx = 3 * density
     private val keyRadiusPx = 8 * density
     private val swipeThresholdPx = 40 * density
+    private val swipeActivatePx = 16 * density
+
+    /** 空格移光标/退格扩选的步进距离 */
+    private val cursorStepPx = 12 * density
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -90,6 +109,14 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 上滑副字符已触发（本次按压后续事件忽略） */
     private var swipeConsumed = false
+
+    /** 空格滑动移光标进行中 */
+    private var spaceSwipeActive = false
+    private var lastStepX = 0f
+
+    /** 退格左滑扩选进行中 */
+    private var backspaceSwipeActive = false
+    private var lastBackspaceCount = 0
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -161,7 +188,7 @@ class KeyboardView(context: Context) : View(context) {
         for ((key, rect) in keyBounds) {
             keyPaint.color = when {
                 key === pressedKey -> keyPressedColor
-                key.action == KeyAction.Shift && shifted -> keyPressedColor
+                key.action == KeyAction.Shift && (shifted || shiftLocked) -> keyPressedColor
                 key.isSpecial -> keySpecialColor
                 else -> keyColor
             }
@@ -185,8 +212,11 @@ class KeyboardView(context: Context) : View(context) {
         if (key.action == KeyAction.Enter && enterLabel != null) {
             return enterLabel!!
         }
+        if (key.action == KeyAction.Shift && shiftLocked) {
+            return "⇪"
+        }
         val action = key.action
-        return if (shifted && action is KeyAction.Text && action.char.isLetter()) {
+        return if ((shifted || shiftLocked) && action is KeyAction.Text && action.char.isLetter()) {
             key.label.uppercase()
         } else {
             key.label
@@ -200,6 +230,10 @@ class KeyboardView(context: Context) : View(context) {
                 downY = event.y
                 swipeConsumed = false
                 repeatFired = false
+                spaceSwipeActive = false
+                backspaceSwipeActive = false
+                lastStepX = event.x
+                lastBackspaceCount = 0
                 val bounds = findBounds(event.x, event.y)
                 pressedKey = bounds?.key
                 pressedRect = bounds?.rect
@@ -228,9 +262,45 @@ class KeyboardView(context: Context) : View(context) {
                     popupManager.updatePopupSelection(event.x)
                     return true
                 }
-                // 上滑副字符：位移超阈值且以纵向为主
                 val dy = downY - event.y
                 val dx = event.x - downX
+
+                // 空格横向滑动：移动光标（步进制，进入后不再出空格）
+                if (key.action == KeyAction.Space) {
+                    if (!spaceSwipeActive && kotlin.math.abs(dx) > swipeActivatePx) {
+                        spaceSwipeActive = true
+                        cancelTimers()
+                        popupManager.dismissAll()
+                        lastStepX = event.x
+                    }
+                    if (spaceSwipeActive) {
+                        val steps = ((event.x - lastStepX) / cursorStepPx).toInt()
+                        if (steps != 0) {
+                            listener?.onCursorMove(steps)
+                            lastStepX += steps * cursorStepPx
+                        }
+                        return true
+                    }
+                }
+
+                // 退格左滑：扩选删除（实时选中光标前 N 字符）
+                if (key.action == KeyAction.Backspace) {
+                    val dxLeft = downX - event.x
+                    if (!backspaceSwipeActive && dxLeft > swipeActivatePx) {
+                        backspaceSwipeActive = true
+                        cancelTimers()
+                    }
+                    if (backspaceSwipeActive) {
+                        val count = (dxLeft / cursorStepPx).toInt().coerceAtLeast(0)
+                        if (count != lastBackspaceCount) {
+                            listener?.onBackspaceSelect(count)
+                            lastBackspaceCount = count
+                        }
+                        return true
+                    }
+                }
+
+                // 上滑副字符：位移超阈值且以纵向为主
                 if (key.swipeUp != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
                     swipeConsumed = true
                     cancelTimers()
@@ -249,9 +319,12 @@ class KeyboardView(context: Context) : View(context) {
                 val popupChoice =
                     if (popupManager.isPopupShown) popupManager.popupSelected() else null
                 val skipTap = repeatFired // 连删已触发过则抬手不再补发单击
+                val wasSpaceSwipe = spaceSwipeActive
+                val wasBackspaceSwipe = backspaceSwipeActive
                 cancelPress()
                 when {
-                    swipeConsumed -> Unit
+                    swipeConsumed || wasSpaceSwipe -> Unit
+                    wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
                     popupChoice != null ->
                         listener?.onKeyAction(KeyAction.Text(popupChoice.first()), shifted = false)
                     key != null && !skipTap -> handleKey(key)
@@ -296,6 +369,7 @@ class KeyboardView(context: Context) : View(context) {
         if (layer == newLayer) return
         layer = newLayer
         shifted = false
+        shiftLocked = false
         reloadLayout()
     }
 
@@ -311,7 +385,17 @@ class KeyboardView(context: Context) : View(context) {
     private fun handleKey(key: KeyDef) {
         when (key.action) {
             KeyAction.Shift -> {
-                shifted = !shifted
+                val now = android.os.SystemClock.uptimeMillis()
+                when {
+                    shiftLocked -> {
+                        shiftLocked = false
+                        shifted = false
+                    }
+                    // 双击（300ms 内二连击）→ 大写锁定
+                    shifted && now - lastShiftTapTime < 300 -> shiftLocked = true
+                    else -> shifted = !shifted
+                }
+                lastShiftTapTime = now
                 invalidate()
             }
             KeyAction.SwitchSymbols -> {
@@ -319,13 +403,14 @@ class KeyboardView(context: Context) : View(context) {
                     when (layer) {
                         KeyboardLayer.LETTERS -> KeyboardLayer.SYMBOLS
                         KeyboardLayer.SYMBOLS -> KeyboardLayer.LETTERS
+                        KeyboardLayer.NUMBER -> KeyboardLayer.LETTERS
                     },
                 )
             }
             else -> {
-                listener?.onKeyAction(key.action, shifted)
-                // 单次 Shift：出字后自动复位（长按锁定为后续能力）
-                if (shifted && key.action is KeyAction.Text) {
+                listener?.onKeyAction(key.action, shifted || shiftLocked)
+                // 单次 Shift：出字后自动复位（锁定态保持）
+                if (shifted && !shiftLocked && key.action is KeyAction.Text) {
                     shifted = false
                     invalidate()
                 }

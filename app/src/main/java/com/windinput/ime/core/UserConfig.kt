@@ -35,6 +35,9 @@ class UserConfig(private val file: File) {
     fun getBoolean(key: String, default: Boolean): Boolean =
         readAll()[key] as? Boolean ?: default
 
+    fun getInt(key: String, default: Int): Int =
+        (readAll()[key] as? Long)?.toInt() ?: default
+
     /**
      * 写回一个键值（读全量 → 改内存 → 重新序列化整文件）。
      * 值仅支持标量（Boolean/Long/Double/String）。

@@ -21,6 +21,7 @@ class LayoutRepository(private val dirs: DataDirs) {
     private val layerToId = mapOf(
         KeyboardLayer.LETTERS to "qwerty",
         KeyboardLayer.SYMBOLS to "symbols",
+        KeyboardLayer.NUMBER to "number",
     )
 
     fun rows(layer: KeyboardLayer): List<List<KeyDef>> {

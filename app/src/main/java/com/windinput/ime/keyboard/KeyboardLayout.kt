@@ -29,7 +29,15 @@ data class KeyDef(
     val longPress: String = "",
 )
 
-enum class KeyboardLayer { LETTERS, SYMBOLS }
+enum class KeyboardLayer { LETTERS, SYMBOLS, NUMBER }
+
+/**
+ * 键盘尺寸（dp）：横竖屏由 Service 按配置注入（twinInt 模式，
+ * 见 docs/android-ime-features.md §10 建议 3）。面板高度随之联动。
+ */
+object KeyboardDimens {
+    var rowHeightDp: Int = 56
+}
 
 object KeyboardLayouts {
 
@@ -76,8 +84,37 @@ object KeyboardLayouts {
         bottomRow("ABC"),
     )
 
+    /** 数字/电话/日期框的计算器式键盘 */
+    val number: List<List<KeyDef>> = listOf(
+        listOf(
+            KeyDef("1", KeyAction.Text('1')),
+            KeyDef("2", KeyAction.Text('2')),
+            KeyDef("3", KeyAction.Text('3')),
+            KeyDef("⌫", KeyAction.Backspace, isSpecial = true),
+        ),
+        listOf(
+            KeyDef("4", KeyAction.Text('4')),
+            KeyDef("5", KeyAction.Text('5')),
+            KeyDef("6", KeyAction.Text('6')),
+            KeyDef("-", KeyAction.Text('-')),
+        ),
+        listOf(
+            KeyDef("7", KeyAction.Text('7')),
+            KeyDef("8", KeyAction.Text('8')),
+            KeyDef("9", KeyAction.Text('9')),
+            KeyDef(".", KeyAction.Text('.')),
+        ),
+        listOf(
+            KeyDef("+", KeyAction.Text('+')),
+            KeyDef("0", KeyAction.Text('0')),
+            KeyDef(",", KeyAction.Text(',')),
+            KeyDef("⏎", KeyAction.Enter, isSpecial = true),
+        ),
+    )
+
     fun rows(layer: KeyboardLayer): List<List<KeyDef>> = when (layer) {
         KeyboardLayer.LETTERS -> qwerty
         KeyboardLayer.SYMBOLS -> symbols
+        KeyboardLayer.NUMBER -> number
     }
 }

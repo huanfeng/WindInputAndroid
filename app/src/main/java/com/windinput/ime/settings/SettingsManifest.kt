@@ -15,6 +15,10 @@ data class SettingItem(
     val summary: String?,
     val defaultValue: Any?,
     val platform: String?,
+    /** int 类型的取值范围与步长 */
+    val min: Int? = null,
+    val max: Int? = null,
+    val step: Int = 1,
 )
 
 data class SettingGroup(
@@ -57,6 +61,9 @@ object SettingsManifest {
                         summary = item.getString("summary"),
                         defaultValue = item.get("default"),
                         platform = item.getString("platform"),
+                        min = item.getLong("min")?.toInt(),
+                        max = item.getLong("max")?.toInt(),
+                        step = item.getLong("step")?.toInt() ?: 1,
                     )
                 },
             )

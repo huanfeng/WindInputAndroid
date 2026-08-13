@@ -1,9 +1,11 @@
 package com.windinput.ime.service
 
+import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
 import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
@@ -19,6 +21,7 @@ import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
 import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
+import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
@@ -89,6 +92,7 @@ class WindInputImeService :
     }
 
     override fun onCreateInputView(): View {
+        applyKeyboardDimens()
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
         barView = BarView(this, candidateListener = this, listener = this)
@@ -122,6 +126,17 @@ class WindInputImeService :
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
+
+    /** 横竖屏独立键高（twinInt 模式）：旋转会触发 onCreateInputView 重建，天然生效 */
+    private fun applyKeyboardDimens() {
+        val portrait =
+            resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+        KeyboardDimens.rowHeightDp = if (portrait) {
+            userConfig.getInt("ui.android.row_height_portrait", 56)
+        } else {
+            userConfig.getInt("ui.android.row_height_landscape", 44)
+        }
+    }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
@@ -179,7 +194,7 @@ class WindInputImeService :
             clazz == InputType.TYPE_CLASS_PHONE ||
             clazz == InputType.TYPE_CLASS_DATETIME
         keyboardWindow?.keyboardView
-            ?.setLayer(if (numericScene) KeyboardLayer.SYMBOLS else KeyboardLayer.LETTERS)
+            ?.setLayer(if (numericScene) KeyboardLayer.NUMBER else KeyboardLayer.LETTERS)
     }
 
     // ── 会话事件 → 编辑器/候选条 ───────────────────────────────────
@@ -232,6 +247,32 @@ class WindInputImeService :
 
     override fun onCandidateSelected(index: Int) {
         session.candidateSelected(index)
+    }
+
+    /** 空格滑动移光标 */
+    override fun onCursorMove(delta: Int) {
+        if (delta == 0) return
+        val keyCode =
+            if (delta > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+        repeat(kotlin.math.abs(delta)) { sendDownUpKeyEvents(keyCode) }
+    }
+
+    /** 退格左滑扩选：实时选中光标前 count 个字符 */
+    override fun onBackspaceSelect(count: Int) {
+        val ic = currentInputConnection ?: return
+        val extracted = ic.getExtractedText(ExtractedTextRequest(), 0) ?: return
+        val end = extracted.startOffset + extracted.selectionEnd
+        val start = (end - count).coerceAtLeast(0)
+        ic.setSelection(start, end)
+    }
+
+    /** 退格滑动抬手：删除选区 */
+    override fun onBackspaceSwipeDelete() {
+        val ic = currentInputConnection ?: return
+        val selected = ic.getSelectedText(0)
+        if (!selected.isNullOrEmpty()) {
+            ic.commitText("", 1)
+        }
     }
 
     // ── 工具栏 ───────────────────────────────────────────────────

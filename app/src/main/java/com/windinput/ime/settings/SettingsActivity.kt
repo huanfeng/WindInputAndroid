@@ -62,13 +62,24 @@ private fun SettingsScreen(
     config: UserConfig,
     onEnableIme: () -> Unit,
 ) {
-    // 开关状态缓存：key → 当前值（初值 = 用户配置 ?: 清单默认）
+    // 状态缓存：key → 当前值（初值 = 用户配置 ?: 清单默认）
     val toggles = remember {
         mutableStateMapOf<String, Boolean>().apply {
             for (group in groups) {
                 for (item in group.items) {
                     if (item.type == "toggle") {
                         put(item.key, config.getBoolean(item.key, item.defaultValue as? Boolean ?: false))
+                    }
+                }
+            }
+        }
+    }
+    val ints = remember {
+        mutableStateMapOf<String, Int>().apply {
+            for (group in groups) {
+                for (item in group.items) {
+                    if (item.type == "int") {
+                        put(item.key, config.getInt(item.key, (item.defaultValue as? Long)?.toInt() ?: 0))
                     }
                 }
             }
@@ -117,12 +128,56 @@ private fun SettingsScreen(
                                         config.put(item.key, checked)
                                     },
                                 )
+                                "int" -> IntRow(
+                                    item = item,
+                                    value = ints[item.key] ?: 0,
+                                    onValueChange = { v ->
+                                        ints[item.key] = v
+                                        config.put(item.key, v.toLong())
+                                    },
+                                )
                             }
                         }
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun IntRow(
+    item: SettingItem,
+    value: Int,
+    onValueChange: (Int) -> Unit,
+) {
+    val min = item.min ?: Int.MIN_VALUE
+    val max = item.max ?: Int.MAX_VALUE
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = item.title)
+            item.summary?.let {
+                Text(text = it, modifier = Modifier.padding(top = 2.dp))
+            }
+        }
+        Text(
+            text = "－",
+            modifier = Modifier
+                .clickable { onValueChange((value - item.step).coerceAtLeast(min)) }
+                .padding(horizontal = 12.dp),
+        )
+        Text(text = value.toString())
+        Text(
+            text = "＋",
+            modifier = Modifier
+                .clickable { onValueChange((value + item.step).coerceAtMost(max)) }
+                .padding(horizontal = 12.dp),
+        )
     }
 }
 
