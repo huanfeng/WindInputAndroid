@@ -58,4 +58,5 @@ dependencies {
     implementation(libs.miuix.icons)
     // TOML 解析（布局/设置清单；正式配置链路由 Rust wind-config 负责）
     implementation(libs.tomlj)
+    implementation(libs.androidx.recyclerview)
 }

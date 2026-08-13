@@ -1,44 +1,71 @@
 package com.windinput.ime.service
 
 import android.inputmethodservice.InputMethodService
+import android.os.SystemClock
 import android.text.InputType
+import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.windinput.ime.WindInputApp
+import com.windinput.ime.core.ClipboardStore
 import com.windinput.ime.core.FakeSession
 import com.windinput.ime.core.ImeSession
+import com.windinput.ime.core.RecentEmojiStore
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
+import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
+import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.KeyboardView
+import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
+import com.windinput.ime.panels.ClipboardWindow
+import com.windinput.ime.panels.EmojiWindow
+import com.windinput.ime.panels.TextEditingWindow
 import java.io.File
 
 /**
  * 输入法服务：Android IME 框架对接层。
  *
- * 生命周期与主仓协议语义的对应（见 docs/architecture.md §3.1）：
- * - onStartInput  ↔ CMD_FOCUS_GAINED
- * - onFinishInput ↔ CMD_FOCUS_LOST
+ * 结构（docs/android-ime-features.md §10 建议 1 的 InputWindow 模式）：
+ *   root = BarView(工具栏↔候选双态) + 面板区(InputWindowManager)
+ *   面板区窗口：键盘 / 文本编辑 / 剪贴板 / 表情，可互换
  *
  * 输入链路：键盘 UI → ImeSession（占位 FakeSession，后由 UniFFI 真实现替换）
- * → UiEvent → 预编辑（setComposingText）/候选条/上屏（commitText）。
- * session.keyPressed 返回 false 时执行默认行为（吃键契约，与桌面同构）。
+ * → UiEvent → 预编辑/候选/上屏。keyPressed 返回 false 时执行默认行为。
  */
-class WindInputImeService : InputMethodService(), KeyboardView.Listener, CandidateBarView.Listener {
+class WindInputImeService :
+    InputMethodService(),
+    KeyboardView.Listener,
+    CandidateBarView.Listener,
+    BarView.ToolbarListener,
+    TextEditingWindow.Listener,
+    ClipboardWindow.Listener,
+    EmojiWindow.Listener {
 
-    private var candidateBar: CandidateBarView? = null
-    private var keyboard: KeyboardView? = null
     private val session: ImeSession = FakeSession()
 
-    /** 密码等敏感场景：绕过会话直输（对应桌面 compat 场景语义的最小版） */
+    /** 密码等敏感场景：绕过会话直输 */
     private var directInput = false
+
+    /** 文本编辑面板的选择模式（方向键扩选） */
+    private var selecting = false
 
     private lateinit var layoutRepository: LayoutRepository
     private lateinit var userConfig: UserConfig
+    private lateinit var clipboardStore: ClipboardStore
+    private lateinit var recentEmojiStore: RecentEmojiStore
+
+    private var barView: BarView? = null
+    private var windowManager: InputWindowManager? = null
+    private var keyboardWindow: KeyboardWindow? = null
+    private var textEditingWindow: TextEditingWindow? = null
+    private var clipboardWindow: ClipboardWindow? = null
+    private var emojiWindow: EmojiWindow? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -46,21 +73,44 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
         val dirs = (application as WindInputApp).dataDirs
         layoutRepository = LayoutRepository(dirs)
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
+        clipboardStore = ClipboardStore(this).also { it.start() }
+        recentEmojiStore = RecentEmojiStore(this)
+    }
+
+    override fun onDestroy() {
+        clipboardStore.stop()
+        super.onDestroy()
     }
 
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        candidateBar = CandidateBarView(this).apply { listener = this@WindInputImeService }
-        keyboard = KeyboardView(this).apply {
-            listener = this@WindInputImeService
-            layoutProvider = layoutRepository::rows
-        }
-        val lp = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT,
+
+        barView = BarView(this, candidateListener = this, toolbarListener = this)
+        root.addView(
+            barView,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
         )
-        root.addView(candidateBar, lp)
-        root.addView(keyboard, lp)
+
+        val panelContainer = FrameLayout(this)
+        root.addView(
+            panelContainer,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+
+        keyboardWindow = KeyboardWindow(listener = this, layoutProvider = layoutRepository::rows)
+        textEditingWindow = TextEditingWindow(listener = this)
+        clipboardWindow = ClipboardWindow(clipboardStore, listener = this)
+        emojiWindow = EmojiWindow(recentEmojiStore, listener = this)
+
+        windowManager = InputWindowManager(panelContainer, keyboardWindow!!).also {
+            it.attachInitial()
+        }
         return root
     }
 
@@ -73,8 +123,10 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        // 设置项热生效：小文件，每次展开键盘时重读
-        keyboard?.hapticEnabled = userConfig.getBoolean("ui.android.haptic", true)
+        keyboardWindow?.keyboardView?.hapticEnabled =
+            userConfig.getBoolean("ui.android.haptic", true)
+        selecting = false
+        windowManager?.showKeyboard()
         applyEditorScene(info)
     }
 
@@ -101,7 +153,8 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
         val numericScene = clazz == InputType.TYPE_CLASS_NUMBER ||
             clazz == InputType.TYPE_CLASS_PHONE ||
             clazz == InputType.TYPE_CLASS_DATETIME
-        keyboard?.setLayer(if (numericScene) KeyboardLayer.SYMBOLS else KeyboardLayer.LETTERS)
+        keyboardWindow?.keyboardView
+            ?.setLayer(if (numericScene) KeyboardLayer.SYMBOLS else KeyboardLayer.LETTERS)
     }
 
     // ── 会话事件 → 编辑器/候选条 ───────────────────────────────────
@@ -116,16 +169,15 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
                     ic?.setComposingText(event.preedit, 1)
                 }
             }
-            is UiEvent.Candidates -> candidateBar?.setCandidates(event.items)
+            is UiEvent.Candidates -> barView?.setCandidates(event.items)
             is UiEvent.CommitText -> ic?.commitText(event.text, 1)
         }
     }
 
-    // ── 键盘/候选条回调 ───────────────────────────────────────────
+    // ── 键盘回调 ─────────────────────────────────────────────────
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {
         if (!directInput && session.keyPressed(action, shifted)) return
-        // 会话未吃键：默认行为
         val ic = currentInputConnection ?: return
         when (action) {
             is KeyAction.Text -> {
@@ -133,7 +185,7 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
                 ic.commitText(ch.toString(), 1)
             }
             KeyAction.Space -> ic.commitText(" ", 1)
-            KeyAction.Backspace -> ic.deleteSurroundingText(1, 0)
+            KeyAction.Backspace -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             KeyAction.Enter -> {
                 if (!sendDefaultEditorAction(true)) {
                     ic.commitText("\n", 1)
@@ -146,5 +198,84 @@ class WindInputImeService : InputMethodService(), KeyboardView.Listener, Candida
 
     override fun onCandidateSelected(index: Int) {
         session.candidateSelected(index)
+    }
+
+    // ── 工具栏 ───────────────────────────────────────────────────
+
+    override fun onToolbarAction(action: BarView.ToolbarAction) {
+        val wm = windowManager ?: return
+        when (action) {
+            BarView.ToolbarAction.EMOJI -> emojiWindow?.let { wm.show(it) }
+            BarView.ToolbarAction.CLIPBOARD -> clipboardWindow?.let { wm.show(it) }
+            BarView.ToolbarAction.TEXT_EDIT -> textEditingWindow?.let { wm.show(it) }
+            BarView.ToolbarAction.HIDE_IME -> requestHideSelf(0)
+        }
+    }
+
+    override fun onBackToKeyboard() {
+        selecting = false
+        windowManager?.showKeyboard()
+    }
+
+    // ── 文本编辑面板 ─────────────────────────────────────────────
+
+    override fun isSelecting(): Boolean = selecting
+
+    override fun onEditAction(action: TextEditingWindow.EditAction) {
+        val ic = currentInputConnection ?: return
+        when (action) {
+            TextEditingWindow.EditAction.UP -> sendArrow(KeyEvent.KEYCODE_DPAD_UP)
+            TextEditingWindow.EditAction.DOWN -> sendArrow(KeyEvent.KEYCODE_DPAD_DOWN)
+            TextEditingWindow.EditAction.LEFT -> sendArrow(KeyEvent.KEYCODE_DPAD_LEFT)
+            TextEditingWindow.EditAction.RIGHT -> sendArrow(KeyEvent.KEYCODE_DPAD_RIGHT)
+            TextEditingWindow.EditAction.HOME -> sendArrow(KeyEvent.KEYCODE_MOVE_HOME)
+            TextEditingWindow.EditAction.END -> sendArrow(KeyEvent.KEYCODE_MOVE_END)
+            TextEditingWindow.EditAction.TOGGLE_SELECT -> selecting = !selecting
+            TextEditingWindow.EditAction.SELECT_ALL -> {
+                ic.performContextMenuAction(android.R.id.selectAll)
+                selecting = false
+            }
+            TextEditingWindow.EditAction.CUT -> {
+                ic.performContextMenuAction(android.R.id.cut)
+                selecting = false
+            }
+            TextEditingWindow.EditAction.COPY -> {
+                ic.performContextMenuAction(android.R.id.copy)
+                selecting = false
+            }
+            TextEditingWindow.EditAction.PASTE -> ic.performContextMenuAction(android.R.id.paste)
+            TextEditingWindow.EditAction.BACKSPACE -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+        }
+    }
+
+    /** 方向/行首行尾键：选择模式下附加 Shift meta 扩选 */
+    private fun sendArrow(keyCode: Int) {
+        val ic = currentInputConnection ?: return
+        val meta = if (selecting) {
+            KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        } else {
+            0
+        }
+        val now = SystemClock.uptimeMillis()
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta))
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, meta))
+    }
+
+    // ── 剪贴板面板 ───────────────────────────────────────────────
+
+    override fun onPasteText(text: String) {
+        currentInputConnection?.commitText(text, 1)
+        windowManager?.showKeyboard()
+    }
+
+    // ── 表情面板 ─────────────────────────────────────────────────
+
+    override fun onEmojiSelected(emoji: String) {
+        currentInputConnection?.commitText(emoji, 1)
+    }
+
+    override fun onEmojiBackspace() {
+        // KEYCODE_DEL 由编辑器按字素删除，代理链正确处理 emoji 代理对
+        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
     }
 }
