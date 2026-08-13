@@ -45,7 +45,11 @@ Rust 核心（`wind-android` crate）位于主仓，经 cargo-ndk 编译 `.so` �
 - [x] 键盘布局 TOML 定义 + 解析 + 用户覆盖（user → data → 内置回退）
 - [x] EditorInfo 场景感知（密码框直输、数字框切符号层）
 - [x] 设置清单驱动的 Compose 设置页（toggle → 用户层 config.toml）
+- [x] InputWindow 窗口框架 + 工具栏↔候选↔剪贴板建议 三态候选条
+- [x] 文本编辑 / 剪贴板历史 / 表情 三个 P0 面板
+- [x] 按键手势体系：长按气泡、按键预览、上滑副字符（TOML 声明）
+- [x] 展开式候选面板、回车键动作标签
 - [ ] Walking skeleton：wind-android cdylib + UniFFI 最小闭环
 - [ ] 词库 yaml 进 assets + 端上编译 + 分级加载
 - [ ] 主题键盘域节点 + 共享调色板
-- [ ] 长按气泡 / 按键预览 / 更多布局层
+- [ ] 九宫格布局、单手模式、横竖屏独立尺寸配置
