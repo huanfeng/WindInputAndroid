@@ -22,6 +22,7 @@ import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
+import com.windinput.ime.keyboard.InputRootView
 import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardDimens
@@ -104,11 +105,13 @@ class WindInputImeService :
 
     override fun onCreateInputView(): View {
         applyKeyboardDimens()
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        // 根视图自理手势条/导航栏避让（IME 窗口不吃系统自动 padding）
+        val root = InputRootView(this)
 
-        barView = BarView(this, candidateListener = this, listener = this)
+        val bar = BarView(this, candidateListener = this, listener = this)
+        barView = bar
         root.addView(
-            barView,
+            bar,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -133,7 +136,21 @@ class WindInputImeService :
         windowManager = InputWindowManager(panelContainer, keyboardWindow!!).also {
             it.attachInitial()
         }
+        root.post {
+            android.util.Log.i(
+                TAG,
+                "inputView: root=${root.width}x${root.height} " +
+                    "bar=${barView?.width}x${barView?.height} " +
+                    "panel=${panelContainer.width}x${panelContainer.height} " +
+                    "kb=${keyboardWindow?.keyboardView?.width}x${keyboardWindow?.keyboardView?.height} " +
+                    "rowDp=${KeyboardDimens.rowHeightDp}",
+            )
+        }
         return root
+    }
+
+    private companion object {
+        const val TAG = "WindIme"
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false

@@ -701,6 +701,8 @@ internal object IntegrityCheckingUniffiLib {
         uniffiCheckContractApiVersion(this)
         uniffiCheckApiChecksums(this)
     }
+    external fun uniffi_wind_android_checksum_func_init_logging(
+    ): Int
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_candidates(
     ): Int
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_hide_candidates(
@@ -754,6 +756,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_func_init_logging(`filter`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun ffi_wind_android_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun ffi_wind_android_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -873,6 +877,9 @@ private fun uniffiCheckContractApiVersion(lib: IntegrityCheckingUniffiLib) {
 }
 @Suppress("UNUSED_PARAMETER")
 private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
+    if (lib.uniffi_wind_android_checksum_func_init_logging() != 1174) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_candidates() != 7095) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1958,4 +1965,19 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         }
     }
 }
+        /**
+         * 初始化 Rust 日志 → logcat（tag: WindRust）。重复调用无害。
+         *
+         * 默认 `info`；调更细可在 Kotlin 侧传 "wind_coordinator=debug" 之类的过滤串。
+         */ fun `initLogging`(`filter`: kotlin.String)
+        = 
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_func_init_logging(
+    
+        
+        FfiConverterString.lower(`filter`),_status)
+}
+    
+    
+
 

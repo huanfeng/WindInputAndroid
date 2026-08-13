@@ -23,6 +23,13 @@
                 android:resource="@xml/method" />
         </service>
 
+        <!-- 输入测试台：模拟器自动化测试用（scripts/emu-test.ps1） -->
+        <activity
+            android:name=".settings.TestPadActivity"
+            android:exported="true"
+            android:label="输入测试台"
+            android:windowSoftInputMode="stateVisible|adjustResize" />
+
         <!-- 设置入口（Compose，miuix 风格） -->
         <activity
             android:name=".settings.SettingsActivity"

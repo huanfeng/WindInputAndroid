@@ -39,6 +39,7 @@ class RustSession(
         fun create(dataDir: File, rustRoot: File): RustSession? {
             return try {
                 rustRoot.mkdirs()
+                uniffi.wind_android.initLogging("info,wind_coordinator=debug")
                 // 泵线程在构造期即可能回调（构造期下发），经可空引用避免竞态
                 var sessionRef: RustSession? = null
                 val core = WindCore(
@@ -59,6 +60,7 @@ class RustSession(
                         }
                     },
                 )
+                Log.i(TAG, "Rust core ready: data=${dataDir.absolutePath}")
                 RustSession(core).also { sessionRef = it }
             } catch (e: Throwable) {
                 Log.e(TAG, "Rust core init failed, falling back to FakeSession", e)
@@ -97,6 +99,12 @@ class RustSession(
     /** 喂键并应用同步结果（commit/组合区）。@return 是否被引擎消费 */
     private fun dispatch(vk: UInt): Boolean {
         val result = core.keyDown(vk)
+        Log.d(
+            TAG,
+            "vk=0x${vk.toString(16)} -> consumed=${result.consumed} " +
+                "commit='${result.commitText}' comp='${result.composition}' " +
+                "changed=${result.compositionChanged}",
+        )
         if (result.commitText.isNotEmpty()) {
             listener?.invoke(UiEvent.CommitText(result.commitText))
         }
