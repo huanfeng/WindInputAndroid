@@ -34,6 +34,9 @@ class ClipboardStore(context: Context) : ClipboardManager.OnPrimaryClipChangedLi
     /** 历史变化通知（面板刷新用） */
     var onChanged: (() -> Unit)? = null
 
+    /** 新复制内容通知（候选条"粘贴建议"用，与 onChanged 独立） */
+    var onNewClip: ((String) -> Unit)? = null
+
     init {
         load()
     }
@@ -56,6 +59,7 @@ class ClipboardStore(context: Context) : ClipboardManager.OnPrimaryClipChangedLi
         val text = clip.getItemAt(0)?.coerceToText(null)?.toString() ?: return
         if (text.isBlank() || text.length > MAX_TEXT_LEN) return
         add(text)
+        onNewClip?.invoke(text)
     }
 
     fun add(text: String) {

@@ -4,12 +4,15 @@
 #   [meta]           id/name
 #   [[rows]]         每行一个；二选一：
 #     keys = "..."   简写：每字符展开为一个字符键
+#     swipe = "..."  简写行可选：位置对齐的上滑副字符（兼作长按气泡）
 #     key  = [ {..} ] 显式键位数组，字段：
-#       label   显示文本（text/chars 键可省略，缺省用字符本身）
-#       text    字符键的输出字符
-#       chars   简写：连续字符批量展开
-#       action  功能键：shift | backspace | enter | space | switch_symbols
-#       width   相对宽度权重，缺省 1.0
+#       label      显示文本（text/chars 键可省略，缺省用字符本身）
+#       text       字符键的输出字符
+#       chars      简写：连续字符批量展开
+#       action     功能键：shift | backspace | enter | space | switch_symbols
+#       width      相对宽度权重，缺省 1.0
+#       swipe_up   上滑输出的副字符
+#       long_press 长按气泡字符集（每字符一项，横移选择）
 #
 # 覆盖解析：filesDir/user/layouts/qwerty.toml > filesDir/data/layouts/qwerty.toml > 内置。
 
@@ -19,22 +22,24 @@ name = "26 键"
 
 [[rows]]
 keys = "qwertyuiop"
+swipe = "1234567890"
 
 [[rows]]
 keys = "asdfghjkl"
+swipe = "@#$%&-+()"
 
 [[rows]]
 key = [
   { label = "⇧", action = "shift", width = 1.5 },
-  { chars = "zxcvbnm" },
+  { chars = "zxcvbnm", swipe = "*\"':;!?" },
   { label = "⌫", action = "backspace", width = 1.5 },
 ]
 
 [[rows]]
 key = [
   { label = "?123", action = "switch_symbols", width = 1.5 },
-  { label = "，", text = "，" },
+  { label = "，", text = "，", long_press = "、！？：；" },
   { label = "空格", action = "space", width = 4.0 },
-  { label = "。", text = "。" },
+  { label = "。", text = "。", long_press = "…～·—％" },
   { label = "⏎", action = "enter", width = 1.5 },
 ]

@@ -26,6 +26,6 @@ platform = "android"
 key = "ui.android.key_preview"
 type = "toggle"
 title = "按键气泡"
-summary = "点按时显示按键放大气泡（暂未实现）"
+summary = "点按时显示按键放大气泡"
 default = false
 platform = "android"

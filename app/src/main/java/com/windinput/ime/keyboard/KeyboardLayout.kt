@@ -23,30 +23,42 @@ data class KeyDef(
     val widthWeight: Float = 1f,
     /** 特殊键（功能键）用不同底色 */
     val isSpecial: Boolean = false,
+    /** 上滑输出的副字符（右上角小字提示） */
+    val swipeUp: Char? = null,
+    /** 长按气泡字符集（每字符一项，横移选择）；空 = 无气泡 */
+    val longPress: String = "",
 )
 
 enum class KeyboardLayer { LETTERS, SYMBOLS }
 
 object KeyboardLayouts {
 
-    private fun charKeys(chars: String): List<KeyDef> =
-        chars.map { KeyDef(it.toString(), KeyAction.Text(it)) }
+    private fun charKeys(chars: String, swipes: String = ""): List<KeyDef> =
+        chars.mapIndexed { i, c ->
+            val swipe = swipes.getOrNull(i)
+            KeyDef(
+                c.toString(),
+                KeyAction.Text(c),
+                swipeUp = swipe,
+                longPress = swipe?.toString() ?: "",
+            )
+        }
 
     private fun bottomRow(switchLabel: String): List<KeyDef> = listOf(
         KeyDef(switchLabel, KeyAction.SwitchSymbols, widthWeight = 1.5f, isSpecial = true),
-        KeyDef("，", KeyAction.Text('，')),
+        KeyDef("，", KeyAction.Text('，'), longPress = "、！？：；"),
         KeyDef("空格", KeyAction.Space, widthWeight = 4f),
-        KeyDef("。", KeyAction.Text('。')),
+        KeyDef("。", KeyAction.Text('。'), longPress = "…～·—％"),
         KeyDef("⏎", KeyAction.Enter, widthWeight = 1.5f, isSpecial = true),
     )
 
-    /** 内置 qwerty 主布局（26 键） */
+    /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
     val qwerty: List<List<KeyDef>> = listOf(
-        charKeys("qwertyuiop"),
-        charKeys("asdfghjkl"),
+        charKeys("qwertyuiop", "1234567890"),
+        charKeys("asdfghjkl", "@#$%&-+()"),
         buildList {
             add(KeyDef("⇧", KeyAction.Shift, widthWeight = 1.5f, isSpecial = true))
-            addAll(charKeys("zxcvbnm"))
+            addAll(charKeys("zxcvbnm", "*\"':;!?"))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
         bottomRow("?123"),

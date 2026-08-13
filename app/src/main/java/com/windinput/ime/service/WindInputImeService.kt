@@ -25,6 +25,7 @@ import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
 import com.windinput.ime.panels.ClipboardWindow
 import com.windinput.ime.panels.EmojiWindow
+import com.windinput.ime.panels.ExpandedCandidatesWindow
 import com.windinput.ime.panels.TextEditingWindow
 import java.io.File
 
@@ -42,10 +43,11 @@ class WindInputImeService :
     InputMethodService(),
     KeyboardView.Listener,
     CandidateBarView.Listener,
-    BarView.ToolbarListener,
+    BarView.Listener,
     TextEditingWindow.Listener,
     ClipboardWindow.Listener,
-    EmojiWindow.Listener {
+    EmojiWindow.Listener,
+    ExpandedCandidatesWindow.Listener {
 
     private val session: ImeSession = FakeSession()
 
@@ -66,6 +68,7 @@ class WindInputImeService :
     private var textEditingWindow: TextEditingWindow? = null
     private var clipboardWindow: ClipboardWindow? = null
     private var emojiWindow: EmojiWindow? = null
+    private var expandedCandidatesWindow: ExpandedCandidatesWindow? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -74,6 +77,9 @@ class WindInputImeService :
         layoutRepository = LayoutRepository(dirs)
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
         clipboardStore = ClipboardStore(this).also { it.start() }
+        clipboardStore.onNewClip = { text ->
+            if (!directInput) barView?.showClipSuggestion(text)
+        }
         recentEmojiStore = RecentEmojiStore(this)
     }
 
@@ -85,7 +91,7 @@ class WindInputImeService :
     override fun onCreateInputView(): View {
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
 
-        barView = BarView(this, candidateListener = this, toolbarListener = this)
+        barView = BarView(this, candidateListener = this, listener = this)
         root.addView(
             barView,
             LinearLayout.LayoutParams(
@@ -107,6 +113,7 @@ class WindInputImeService :
         textEditingWindow = TextEditingWindow(listener = this)
         clipboardWindow = ClipboardWindow(clipboardStore, listener = this)
         emojiWindow = EmojiWindow(recentEmojiStore, listener = this)
+        expandedCandidatesWindow = ExpandedCandidatesWindow(listener = this)
 
         windowManager = InputWindowManager(panelContainer, keyboardWindow!!).also {
             it.attachInitial()
@@ -123,11 +130,29 @@ class WindInputImeService :
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        keyboardWindow?.keyboardView?.hapticEnabled =
-            userConfig.getBoolean("ui.android.haptic", true)
+        keyboardWindow?.keyboardView?.apply {
+            hapticEnabled = userConfig.getBoolean("ui.android.haptic", true)
+            previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
+            enterLabel = enterActionLabel(info)
+        }
         selecting = false
         windowManager?.showKeyboard()
         applyEditorScene(info)
+    }
+
+    /** imeOptions → 回车键动作标签 */
+    private fun enterActionLabel(info: EditorInfo?): String? {
+        if (info == null) return null
+        if (info.actionLabel != null) return info.actionLabel.toString()
+        return when (info.imeOptions and EditorInfo.IME_MASK_ACTION) {
+            EditorInfo.IME_ACTION_GO -> "前往"
+            EditorInfo.IME_ACTION_SEARCH -> "搜索"
+            EditorInfo.IME_ACTION_SEND -> "发送"
+            EditorInfo.IME_ACTION_NEXT -> "下一项"
+            EditorInfo.IME_ACTION_DONE -> "完成"
+            EditorInfo.IME_ACTION_PREVIOUS -> "上一项"
+            else -> null
+        }
     }
 
     override fun onFinishInput() {
@@ -169,7 +194,16 @@ class WindInputImeService :
                     ic?.setComposingText(event.preedit, 1)
                 }
             }
-            is UiEvent.Candidates -> barView?.setCandidates(event.items)
+            is UiEvent.Candidates -> {
+                barView?.setCandidates(event.items)
+                expandedCandidatesWindow?.setCandidates(event.items)
+                // 候选清空时若停留在展开面板，收回键盘
+                if (event.items.isEmpty() &&
+                    windowManager?.current === expandedCandidatesWindow
+                ) {
+                    windowManager?.showKeyboard()
+                }
+            }
             is UiEvent.CommitText -> ic?.commitText(event.text, 1)
         }
     }
@@ -210,6 +244,19 @@ class WindInputImeService :
             BarView.ToolbarAction.TEXT_EDIT -> textEditingWindow?.let { wm.show(it) }
             BarView.ToolbarAction.HIDE_IME -> requestHideSelf(0)
         }
+    }
+
+    override fun onExpandCandidates() {
+        expandedCandidatesWindow?.let { windowManager?.show(it) }
+    }
+
+    override fun onPasteSuggestion(text: String) {
+        currentInputConnection?.commitText(text, 1)
+    }
+
+    override fun onExpandedCandidateSelected(index: Int) {
+        session.candidateSelected(index)
+        windowManager?.showKeyboard()
     }
 
     override fun onBackToKeyboard() {

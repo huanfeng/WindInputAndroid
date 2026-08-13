@@ -13,6 +13,8 @@ import android.view.View
 /**
  * 软键盘主视图：自定义 View + Canvas 绘制（渲染路线见 docs/architecture.md §3.6）。
  *
+ * 手势体系（对齐 fcitx5 KeyDef.Behavior 声明式模型）：
+ * 点按 / 长按气泡（横移选择）/ 长按重复（退格）/ 上滑副字符 / 按键预览。
  * 占位阶段：内置配色常量；正式版配色来自 wind-theme 求值后的调色板（键盘域节点）。
  */
 class KeyboardView(context: Context) : View(context) {
@@ -30,8 +32,18 @@ class KeyboardView(context: Context) : View(context) {
             reloadLayout()
         }
 
-    /** 按键触觉反馈开关（设置项 keyboard.haptic） */
+    /** 按键触觉反馈开关（设置项 ui.android.haptic） */
     var hapticEnabled = true
+
+    /** 按键预览气泡开关（设置项 ui.android.key_preview） */
+    var previewEnabled = false
+
+    /** 回车键动作标签（imeOptions 驱动：发送/搜索/下一项…），null = 缺省 label */
+    var enterLabel: String? = null
+        set(value) {
+            field = value
+            invalidate()
+        }
 
     private var layer = KeyboardLayer.LETTERS
     private var rows = layoutProvider(layer)
@@ -43,11 +55,13 @@ class KeyboardView(context: Context) : View(context) {
     private val keySpecialColor = 0xFFD9DDE3.toInt()
     private val keyPressedColor = 0xFFBBD0F8.toInt()
     private val textColor = 0xFF1E1E1E.toInt()
+    private val hintColor = 0xFF969696.toInt()
 
     private val density = resources.displayMetrics.density
     private val rowHeightPx = (56 * density).toInt()
     private val keyGapPx = 3 * density
     private val keyRadiusPx = 8 * density
+    private val swipeThresholdPx = 40 * density
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -55,22 +69,54 @@ class KeyboardView(context: Context) : View(context) {
         textAlign = Paint.Align.CENTER
         textSize = 20 * density
     }
+    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = hintColor
+        textAlign = Paint.Align.RIGHT
+        textSize = 11 * density
+    }
 
     /** 每次 layout 重算的键位命中区域 */
     private data class KeyBounds(val key: KeyDef, val rect: RectF)
 
     private val keyBounds = mutableListOf<KeyBounds>()
     private var pressedKey: KeyDef? = null
+    private var pressedRect: RectF? = null
 
-    private val repeatHandler = Handler(Looper.getMainLooper())
+    private val popupManager by lazy { KeyPopupManager(this) }
+
+    // 手势状态
+    private var downX = 0f
+    private var downY = 0f
+
+    /** 上滑副字符已触发（本次按压后续事件忽略） */
+    private var swipeConsumed = false
+
+    private val handler = Handler(Looper.getMainLooper())
+
     private var repeating = false
+
+    /** 本次按压中连删已至少触发一次（抬手时不再补发单击） */
+    private var repeatFired = false
+
     private val repeatRunnable = object : Runnable {
         override fun run() {
             val key = pressedKey ?: return
             if (key.action == KeyAction.Backspace) {
+                repeatFired = true
                 listener?.onKeyAction(key.action, shifted)
-                repeatHandler.postDelayed(this, 50)
+                repeatHaptic()
+                handler.postDelayed(this, 50)
             }
+        }
+    }
+
+    private val longPressRunnable = Runnable {
+        val key = pressedKey ?: return@Runnable
+        val rect = pressedRect ?: return@Runnable
+        if (key.longPress.isNotEmpty()) {
+            popupManager.dismissPreview()
+            popupManager.showPopup(rect, key.longPress.map { it.toString() })
+            repeatHaptic()
         }
     }
 
@@ -82,6 +128,11 @@ class KeyboardView(context: Context) : View(context) {
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         rebuildBounds(w)
+    }
+
+    override fun onDetachedFromWindow() {
+        popupManager.dismissAll()
+        super.onDetachedFromWindow()
     }
 
     private fun rebuildBounds(width: Int) {
@@ -118,10 +169,22 @@ class KeyboardView(context: Context) : View(context) {
             val label = displayLabel(key)
             val textY = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2
             canvas.drawText(label, rect.centerX(), textY, textPaint)
+            // 右上角副字符角标
+            key.swipeUp?.let { hint ->
+                canvas.drawText(
+                    hint.toString(),
+                    rect.right - 5 * density,
+                    rect.top + 13 * density,
+                    hintPaint,
+                )
+            }
         }
     }
 
     private fun displayLabel(key: KeyDef): String {
+        if (key.action == KeyAction.Enter && enterLabel != null) {
+            return enterLabel!!
+        }
         val action = key.action
         return if (shifted && action is KeyAction.Text && action.char.isLetter()) {
             key.label.uppercase()
@@ -133,27 +196,65 @@ class KeyboardView(context: Context) : View(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                pressedKey = findKey(event.x, event.y)
-                if (pressedKey != null && hapticEnabled) {
-                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                }
-                if (pressedKey?.action == KeyAction.Backspace) {
-                    repeating = true
-                    repeatHandler.postDelayed(repeatRunnable, 400)
+                downX = event.x
+                downY = event.y
+                swipeConsumed = false
+                repeatFired = false
+                val bounds = findBounds(event.x, event.y)
+                pressedKey = bounds?.key
+                pressedRect = bounds?.rect
+                val key = bounds?.key
+                if (key != null) {
+                    if (hapticEnabled) {
+                        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    }
+                    if (previewEnabled && !key.isSpecial && key.action is KeyAction.Text) {
+                        popupManager.showPreview(bounds.rect, displayLabel(key))
+                    }
+                    if (key.action == KeyAction.Backspace) {
+                        repeating = true
+                        handler.postDelayed(repeatRunnable, 400)
+                    }
+                    if (key.longPress.isNotEmpty()) {
+                        handler.postDelayed(longPressRunnable, 300)
+                    }
                 }
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
-                // 滑出键位即取消（占位行为；滑动输入为二期能力）
-                if (pressedKey != null && findKey(event.x, event.y) !== pressedKey) {
+                val key = pressedKey ?: return true
+                if (swipeConsumed) return true
+                if (popupManager.isPopupShown) {
+                    popupManager.updatePopupSelection(event.x)
+                    return true
+                }
+                // 上滑副字符：位移超阈值且以纵向为主
+                val dy = downY - event.y
+                val dx = event.x - downX
+                if (key.swipeUp != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
+                    swipeConsumed = true
+                    cancelTimers()
+                    popupManager.dismissAll()
+                    listener?.onKeyAction(KeyAction.Text(key.swipeUp), shifted = false)
+                    clearPressed()
+                    return true
+                }
+                // 滑出键位即取消（滑动输入为二期能力）
+                if (findKey(event.x, event.y) !== key && dy < swipeThresholdPx / 2) {
                     cancelPress()
                 }
             }
             MotionEvent.ACTION_UP -> {
                 val key = pressedKey
+                val popupChoice =
+                    if (popupManager.isPopupShown) popupManager.popupSelected() else null
+                val skipTap = repeatFired // 连删已触发过则抬手不再补发单击
                 cancelPress()
-                if (key != null) {
-                    handleKey(key)
+                when {
+                    swipeConsumed -> Unit
+                    popupChoice != null ->
+                        listener?.onKeyAction(KeyAction.Text(popupChoice.first()), shifted = false)
+                    key != null && !skipTap -> handleKey(key)
                 }
             }
             MotionEvent.ACTION_CANCEL -> cancelPress()
@@ -161,15 +262,34 @@ class KeyboardView(context: Context) : View(context) {
         return true
     }
 
-    private fun cancelPress() {
-        pressedKey = null
+    private fun repeatHaptic() {
+        if (hapticEnabled) {
+            performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        }
+    }
+
+    private fun cancelTimers() {
         repeating = false
-        repeatHandler.removeCallbacks(repeatRunnable)
+        handler.removeCallbacks(repeatRunnable)
+        handler.removeCallbacks(longPressRunnable)
+    }
+
+    private fun clearPressed() {
+        pressedKey = null
+        pressedRect = null
         invalidate()
     }
 
-    private fun findKey(x: Float, y: Float): KeyDef? =
-        keyBounds.firstOrNull { it.rect.contains(x, y) }?.key
+    private fun cancelPress() {
+        cancelTimers()
+        popupManager.dismissAll()
+        clearPressed()
+    }
+
+    private fun findBounds(x: Float, y: Float): KeyBounds? =
+        keyBounds.firstOrNull { it.rect.contains(x, y) }
+
+    private fun findKey(x: Float, y: Float): KeyDef? = findBounds(x, y)?.key
 
     /** 切换布局层（EditorInfo 场景感知/符号键共用入口） */
     fun setLayer(newLayer: KeyboardLayer) {
@@ -204,7 +324,7 @@ class KeyboardView(context: Context) : View(context) {
             }
             else -> {
                 listener?.onKeyAction(key.action, shifted)
-                // 单次 Shift：出字后自动复位（占位行为，长按锁定为后续能力）
+                // 单次 Shift：出字后自动复位（长按锁定为后续能力）
                 if (shifted && key.action is KeyAction.Text) {
                     shifted = false
                     invalidate()
