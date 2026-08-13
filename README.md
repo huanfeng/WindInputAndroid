@@ -49,7 +49,7 @@ Rust 核心（`wind-android` crate）位于主仓，经 cargo-ndk 编译 `.so` �
 - [x] 文本编辑 / 剪贴板历史 / 表情 三个 P0 面板
 - [x] 按键手势体系：长按气泡、按键预览、上滑副字符（TOML 声明）
 - [x] 展开式候选面板、回车键动作标签
-- [ ] Walking skeleton：wind-android cdylib + UniFFI 最小闭环
-- [ ] 词库 yaml 进 assets + 端上编译 + 分级加载
+- [x] Walking skeleton：wind-android cdylib + UniFFI + RustSession（wubi86，待模拟器实测）
+- [ ] 词库 yaml 进 assets + 端上编译 + 分级加载（骨架已收 wubi86 主/扩展词库）
 - [ ] 主题键盘域节点 + 共享调色板
 - [ ] 九宫格布局、单手模式、横竖屏独立尺寸配置
