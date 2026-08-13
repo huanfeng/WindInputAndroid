@@ -16,8 +16,8 @@ android {
         applicationId = "com.windinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
     }
 
     buildTypes {
@@ -59,4 +59,7 @@ dependencies {
     // TOML 解析（布局/设置清单；正式配置链路由 Rust wind-config 负责）
     implementation(libs.tomlj)
     implementation(libs.androidx.recyclerview)
+    // UniFFI 生成绑定的运行时依赖（JNA 需 @aar 变体）
+    implementation(libs.jna) { artifact { type = "aar" } }
+    implementation(libs.kotlinx.coroutines)
 }

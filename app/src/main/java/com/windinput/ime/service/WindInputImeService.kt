@@ -11,10 +11,13 @@ import android.view.inputmethod.EditorInfo
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.windinput.ime.WindInputApp
+import com.windinput.ime.core.AssetsInstaller
 import com.windinput.ime.core.ClipboardStore
 import com.windinput.ime.core.FakeSession
 import com.windinput.ime.core.ImeSession
 import com.windinput.ime.core.RecentEmojiStore
+import com.windinput.ime.core.RustCoreLoader
+import com.windinput.ime.core.RustSession
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.keyboard.BarView
@@ -52,7 +55,7 @@ class WindInputImeService :
     EmojiWindow.Listener,
     ExpandedCandidatesWindow.Listener {
 
-    private val session: ImeSession = FakeSession()
+    private lateinit var session: ImeSession
 
     /** 密码等敏感场景：绕过会话直输 */
     private var directInput = false
@@ -75,10 +78,18 @@ class WindInputImeService :
 
     override fun onCreate() {
         super.onCreate()
-        session.listener = ::onUiEvent
         val dirs = (application as WindInputApp).dataDirs
         layoutRepository = LayoutRepository(dirs)
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
+        // Rust 核心可用则用真会话，否则回退占位。首启需保证出厂数据已拷出
+        //（installIfNeeded 幂等，命中版本标记时零 I/O），否则引擎读不到方案。
+        session = if (RustCoreLoader.available) {
+            AssetsInstaller(this, dirs).installIfNeeded()
+            RustSession.create(dirs.dataDir, File(filesDir, "rust")) ?: FakeSession()
+        } else {
+            FakeSession()
+        }
+        session.listener = ::onUiEvent
         clipboardStore = ClipboardStore(this).also { it.start() }
         clipboardStore.onNewClip = { text ->
             if (!directInput) barView?.showClipSuggestion(text)

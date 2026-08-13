@@ -17,7 +17,6 @@ class WindInputApp : Application() {
         thread(name = "assets-install") {
             AssetsInstaller(this, dataDirs).installIfNeeded()
         }
-        // 预留：初始化 Rust 核心（加载 .so、词库缓存检查）
-        // WindCore.initialize(this)
+        // Rust 核心（libwind_android.so）由 IME 服务按需加载（RustCoreLoader）
     }
 }

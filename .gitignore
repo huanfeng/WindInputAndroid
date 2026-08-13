@@ -12,6 +12,9 @@ app/build/
 *.aab
 .kotlin/
 
+# Rust 交叉编译产物（scripts/build-rust.ps1 生成；uniffi 绑定源码则提交）
+app/src/main/jniLibs/
+
 # OMC/会话运行时产物
 .omc/
 .remember/
