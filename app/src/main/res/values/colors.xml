@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 清风蓝，与桌面主题 _base 的 primary 对齐（#4285F4 为桌面基线，图标用现代蓝） -->
+    <color name="ic_launcher_background">#3B82F6</color>
+</resources>
