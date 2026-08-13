@@ -117,7 +117,30 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 | 用户词频/shadow 置顶删除 | 候选长按菜单 |
 | 搜狗 scel 词库导入 | P2；fcitx5 有实现可参考（`data/pinyin/dict/`），wdat 转换在 Rust 做 |
 
-## 8. 明确不做 / 远期评估
+## 8. 小胖输入法（PangIME）专项参考
+
+> 用户指定参考（https://pangime.com/ ）。C 语言核心、Win/Mac/iOS/Android/Linux
+> 全平台的个人开发输入法，定位"打造您自己的专属输入法"——灵活性路线与主流
+> 商业输入法差异明显，与我们的开源/可定制定位高度同频。
+
+### 8.1 独特功能与对我们的启示
+
+| 功能 | 机制 | 对 WindInput Android 的启示 | 建议 |
+|---|---|---|---|
+| **双检索** | 结构化词条 `前缀#后缀#编码#参数`（如 `小胖#输入法#sr#1#0`）：**结合已上屏内容**简化后续输入，用于分离重码、生成上下文简码；支持多前缀、可选段 `我[还]有[一]个`、删除前缀实现替换纠错 | 上下文感知的码表词条是引擎级创新，主流输入法没有。五笔重码分离场景价值高；与桌面 top-commit/简码机制正交 | P3，Rust 引擎侧远期评估（需 committed_text 上下文，协调器已有该状态） |
+| **快速纠错** | 自动发现并改正输入错误，无需用户干预 | 对应桌面拼音 fuzzy/纠错能力的延伸 | 观察其具体行为后评估 |
+| **WebDAV 码表/配置同步** | 官方或**自架服务器**，同步码表与配置 | **直接命中我们的多端同步规划**：WebDAV 自架友好、无云服务依赖、与开源定位一致、客户端实现简单。我们的同步载荷（用户层 config.toml + wind-transfer 导出）天然是文件，WebDAV 是最合理的第一后端 | **P2，采纳为同步方案首选后端** |
+| **txt 开放码表 + 内置码表编辑器 + 网络码表** | 码表明文开放、App 内直接编辑、支持远程码表源 | 我们 yaml/TOML 码表同样开放；"App 内编辑码表/短语"应进设置页规划；网络码表 = 远程词库源订阅 | 编辑器 P2；网络码表 P3 |
+| **AI/语音 = 用户自带 API key** | 接入 openai/讯飞 API，用户自行配置 key，不自研 | 与"不做自研 AI"决策兼容的折中形态：核心永不依赖云，留给愿意配 key 的用户 | P3 可选插件形态，不进核心 |
+| **二次开发接口** | 允许用户定制扩展 | 对应我们的布局/主题/清单 TOML 开放 + 未来 cmdbar 扩展 | 已在路线上 |
+
+### 8.2 与桌面 WindInput 的能力重合
+
+小胖的「以词定字」「命令直通车」「词频调整」「图形化输入统计」桌面 WindInput
+均已具备（wind-coordinator / wind-cmdbar / wind-store / stats），经 Rust 核心
+在 Android 免费获得——印证第 7 节判断。
+
+## 9. 明确不做 / 远期评估
 
 - **AI 类**（讯飞 AI 键/帮写/润色、AI 剪贴板）：不做，与开源轻量定位冲突
 - **云输入/云候选**：不做（隐私定位）
@@ -126,7 +149,7 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 - **翻译/表情包搜索/GIF**：远期评估
 - **滑行输入**：P3，中文场景收益有限
 
-## 9. 对现有框架的三条改造建议（按紧迫度）
+## 10. 对现有框架的三条改造建议（按紧迫度）
 
 1. **InputWindow 窗口管理器**（做剪贴板/表情/文本编辑面板前必须先有）：
    面板区抽象为可互换窗口，候选条常驻其上。建议下一个迭代就做，
@@ -137,7 +160,7 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 3. **横竖屏成对配置**：键高/边距类设置项引入 fcitx5 的 twinInt 模式
    （竖屏值+横屏值成对），设置清单 item 类型预留 `twin_int`。
 
-## 10. 调研来源
+## 11. 调研来源
 
 - 本地：`../ref/fcitx5-android` 源码探索（功能与实现类清单见本文各表）
 - [Gboard 隐藏技巧（HowToGeek）](https://www.howtogeek.com/gboard-has-tons-of-hidden-tricks-you-probably-arent-using/)
@@ -149,3 +172,4 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 - [讯飞输入法功能（小米应用商店）](https://m.app.mi.com/detail/294)
 - [Android Stylus 手写 API](https://developer.android.com/develop/ui/views/touch-and-input/stylus-input/stylus-input-in-text-fields)
 - [IME 集成 Autofill 内联建议](https://developer.android.com/identity/autofill/ime-autofill)
+- [小胖输入法官网](https://pangime.com/)、[双检索机制](https://pangime.com/shuangjiansuo.html)、[功能介绍（ababtools）](https://ababtools.com/?post=6535)
