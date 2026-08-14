@@ -29,26 +29,64 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
 
     interface Listener {
         fun onExpandedCandidateSelected(index: Int)
+
+        /** 滚到接近底部、且核心那边还有更多：请求续取一段 */
+        fun onNeedMoreCandidates()
     }
 
     private companion object {
         const val COLUMNS = 4
+
+        /** 距底部还剩几行就预约续取：留出余量，滚到底之前就到货 */
+        const val PREFETCH_ROWS = 3
     }
 
     private var grid: RecyclerView? = null
     private val adapter = CandidateAdapter { listener.onExpandedCandidateSelected(it) }
 
-    /** 会话候选更新入口（附着与否都先存着） */
+    /** 已请求续取、尚未到货：挡住重复请求 */
+    private var loadingMore = false
+
+    /** 会话候选更新入口（附着与否都先存着）：新一轮候选，回到顶部 */
     fun setCandidates(items: List<String>) {
+        loadingMore = false
         adapter.submit(items)
         grid?.scrollToPosition(0)
     }
 
+    /**
+     * 续取到货：**只通知新增区间**。
+     *
+     * 不用 `notifyDataSetChanged`——那会让 RecyclerView 丢弃全部 ViewHolder 重新绑定，
+     * 用户正在滑动时表现为一顿，而且滚动位置也保不住。
+     */
+    fun appendCandidates(more: List<String>) {
+        loadingMore = false
+        if (more.isEmpty()) return
+        adapter.append(more)
+    }
+
     override fun onCreateView(context: Context): View {
+        val lm = GridLayoutManager(context, COLUMNS)
         grid = RecyclerView(context).apply {
-            layoutManager = GridLayoutManager(context, COLUMNS)
+            layoutManager = lm
             adapter = this@ExpandedCandidatesWindow.adapter
             setBackgroundColor(Color.WHITE)
+            addOnScrollListener(
+                object : RecyclerView.OnScrollListener() {
+                    override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
+                        if (loadingMore || dy <= 0) return
+                        val last = lm.findLastVisibleItemPosition()
+                        val threshold =
+                            this@ExpandedCandidatesWindow.adapter.itemCount -
+                                PREFETCH_ROWS * COLUMNS
+                        if (last >= threshold) {
+                            loadingMore = true
+                            listener.onNeedMoreCandidates()
+                        }
+                    }
+                },
+            )
         }
         // 条区留着（keepsBar），故只占键盘四行的高度，前后总高不变、键盘不跳
         grid!!.layoutParams = android.view.ViewGroup.LayoutParams(
@@ -68,6 +106,13 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         fun submit(newItems: List<String>) {
             items = newItems
             notifyDataSetChanged()
+        }
+
+        /** 追加：只通知新增区间，不动已绑定的 ViewHolder */
+        fun append(more: List<String>) {
+            val from = items.size
+            items = items + more
+            notifyItemRangeInserted(from, more.size)
         }
 
         class Holder(val view: TextView) : RecyclerView.ViewHolder(view)

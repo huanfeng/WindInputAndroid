@@ -208,7 +208,25 @@ class WindInputImeService :
 
         /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
         const val ENGLISH_SCHEMA_ID = "english"
+
+        /**
+         * 每次按键预取的候选条数。
+         *
+         * **这是个性能参数，别随手调大。** 候选全量可达上千条，每条都要跨 JNI
+         * 序列化、再被候选栏 `measureText` 一次，全在主线程上。24 条约够横向候选栏
+         * 铺三屏——用户真滑到那儿了再续取，而绝大多数按键根本不会被滑动。
+         */
+        const val CANDIDATE_PREFETCH = 24
+
+        /** 续取的步长（滚到接近尾部时取下一段） */
+        const val CANDIDATE_CHUNK = 60
     }
+
+    /** 已从核心取到的候选（绝对下标即列表下标，选词直接用它） */
+    private var loadedCandidates: List<String> = emptyList()
+
+    /** 核心侧候选全量总数：`loadedCandidates.size < candidateTotal` 即还有得取 */
+    private var candidateTotal = 0
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
@@ -315,16 +333,27 @@ class WindInputImeService :
         when (event) {
             is UiEvent.Edits -> applyEdits(ic ?: return, event.ops)
             is UiEvent.Candidates -> {
+                // 推送帧只用来画编码栏（编码/短称/页码）；候选列表另行**拉取**——
+                // 帧里的是当页 6~9 条，装不下一条可滚动的长列表。
+                val page = if (event.items.isEmpty()) {
+                    // 帧说没候选就是没候选，不必再往核心跑一趟
+                    com.windinput.ime.core.CandidatePage(emptyList(), 0, 0, 0)
+                } else {
+                    session.candidateWindow(0, CANDIDATE_PREFETCH)
+                }
+                loadedCandidates = page.items
+                candidateTotal = page.total
+
                 barView?.setCandidateFrame(
-                    items = event.items,
+                    items = loadedCandidates,
                     preedit = event.preedit,
                     modeLabel = event.modeLabel,
                     page = event.page,
                     totalPages = event.totalPages,
                 )
-                expandedCandidatesWindow?.setCandidates(event.items)
+                expandedCandidatesWindow?.setCandidates(loadedCandidates)
                 // 候选清空时若停留在展开面板，收回键盘
-                if (event.items.isEmpty() &&
+                if (loadedCandidates.isEmpty() &&
                     windowManager?.current === expandedCandidatesWindow
                 ) {
                     windowManager?.showKeyboard()
@@ -445,6 +474,23 @@ class WindInputImeService :
     }
 
     /**
+     * 候选栏/展开面板滚到接近尾部：向核心续取一段。
+     *
+     * 两个视图共用同一份 [loadedCandidates]（绝对下标即列表下标），所以续取一次
+     * 两边都受益，不会各拉各的。取满即不再请求——视图那边只管发信号，
+     * 「还有没有」的真值在核心，视图自己记一份必然漂移。
+     */
+    override fun onNeedMoreCandidates() {
+        if (loadedCandidates.size >= candidateTotal) return
+        val page = session.candidateWindow(loadedCandidates.size, CANDIDATE_CHUNK)
+        if (page.items.isEmpty()) return
+        loadedCandidates = loadedCandidates + page.items
+        candidateTotal = page.total
+        barView?.appendCandidates(page.items)
+        expandedCandidatesWindow?.appendCandidates(page.items)
+    }
+
+    /**
      * 中英键：中文方案 ↔ 系统英文模式。
      *
      * ⚠ **暂用系统英文模式（字母直出、无候选），而非英文方案。**
@@ -460,9 +506,14 @@ class WindInputImeService :
         val schemas = session.schemas()
         val active = schemas.firstOrNull { it.active }
         if (modeLabel == "英") {
-            // 回到离开前那个中文方案；未记录时找第一个非英文方案，绝不用下标 0
-            val target = lastChineseSchema.takeIf { it >= 0 }
-                ?: schemas.firstOrNull { it.id != ENGLISH_SCHEMA_ID }?.index
+            // 优先问引擎「现在活跃的是哪个方案」：`EngineCmd.English` 改的是**模式**
+            // 不是方案，引擎报的 active 仍是切走前那个中文方案，这是最可靠的真值。
+            // 其次才用离开前记下的下标（核心尚未就绪时记不到）。
+            //
+            // ⚠ 绝不要退化成「列表里第一个非英文方案」：方案按文件名排序，
+            // 装上拼音后第一个非英文是 pinyin——五笔用户切一次英文再切回来就掉进全拼。
+            val target = active?.takeIf { it.id != ENGLISH_SCHEMA_ID }?.index
+                ?: lastChineseSchema.takeIf { it >= 0 }
                 ?: return
             session.runCommand(EngineCmd.SelectSchema(target))
             return

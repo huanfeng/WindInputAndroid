@@ -167,10 +167,35 @@ class RustSession(
         return dispatch(vk)
     }
 
+    /**
+     * 点选候选：按**绝对下标**下发，核心回编辑指令流。
+     *
+     * 此前是「合成页内数字键 1-9」——那把点选限死在前 9 个，第 10 个及以后
+     * 永远点不到，而候选栏的滚动因此也没有意义。
+     */
     override fun candidateSelected(index: Int): Boolean {
-        // 骨架期：页内 1-9 合成数字键（点选上屏与键盘选字同一条主输入路）
-        if (index !in 0..8) return false
-        return dispatch(0x31u + index.toUInt())
+        if (index < 0) return false
+        val result = core.selectCandidate(index.toUInt())
+        if (result.ops.isNotEmpty()) {
+            listener?.invoke(UiEvent.Edits(result.ops.map(::toEditOp)))
+        }
+        return result.consumed
+    }
+
+    override fun candidateWindow(offset: Int, limit: Int): CandidatePage {
+        val t0 = SystemClock.elapsedRealtimeNanos()
+        val w = core.candidates(offset.toUInt(), limit.toUInt())
+        val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
+        // 与 keyDown 同一条标尺：它同样在主线程上同步阻塞，超一帧就得改预取策略
+        if (costUs > FRAME_BUDGET_US) {
+            Log.w(TAG, "候选拉取阻塞主线程 ${costUs}µs（超一帧）offset=$offset limit=$limit")
+        }
+        return CandidatePage(
+            items = w.items,
+            offset = w.offset.toInt(),
+            total = w.total.toInt(),
+            selected = w.selected.toInt(),
+        )
     }
 
     override fun reset() {

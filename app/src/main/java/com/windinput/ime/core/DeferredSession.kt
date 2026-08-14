@@ -101,6 +101,9 @@ class DeferredSession(
     override fun candidateSelected(index: Int): Boolean =
         delegate?.candidateSelected(index) ?: false
 
+    override fun candidateWindow(offset: Int, limit: Int): CandidatePage =
+        delegate?.candidateWindow(offset, limit) ?: CandidatePage(emptyList(), offset, 0, 0)
+
     override fun reset() {
         delegate?.reset()
     }

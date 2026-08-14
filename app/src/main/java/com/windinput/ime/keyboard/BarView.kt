@@ -43,6 +43,9 @@ class BarView(
         /** 展开/收起候选全览（同一个钮往返） */
         fun onToggleExpanded()
 
+        /** 候选栏滚到接近尾部、且核心那边还有更多：请求续取一段 */
+        fun onNeedMoreCandidates()
+
         fun onPasteSuggestion(text: String)
     }
 
@@ -83,7 +86,10 @@ class BarView(
 
     private enum class State { TOOLBAR, CANDIDATES, CLIP_SUGGESTION }
 
-    val candidateBar = CandidateBarView(context).apply { listener = candidateListener }
+    val candidateBar = CandidateBarView(context).apply {
+        listener = candidateListener
+        onNeedMore = { this@BarView.listener.onNeedMoreCandidates() }
+    }
 
     private val density = resources.displayMetrics.density
 
@@ -254,12 +260,22 @@ class BarView(
         }
 
         // 展开态下主行归工具栏管：候选正在下方网格里铺开，条上不再重复一份
-        if (expanded) return
+        if (expanded) {
+            // 但 hasCandidates 已更新——收起时要据此决定回候选态还是工具栏态
+            return
+        }
         if (hasCandidates) {
             applyState(State.CANDIDATES)
         } else if (state == State.CANDIDATES) {
             applyState(State.TOOLBAR)
         }
+    }
+
+    /** 续取到货：只把新的一段交给候选栏（不重量已有项，见 CandidateBarView 的说明） */
+    fun appendCandidates(more: List<String>) {
+        if (more.isEmpty()) return
+        candidateBar.appendCandidates(more)
+        hasCandidates = true
     }
 
     /**

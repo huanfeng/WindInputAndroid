@@ -23,6 +23,13 @@ import android.widget.OverScroller
  *
  * 两者共用同一片触摸区，判据是**位移是否超过 touchSlop**：超过即进入滚动、
  * 本次抬手不选词；未超过才算点选。没有这条，轻微手抖会变成误选词。
+ *
+ * # 为什么分「设置」与「追加」两个入口
+ *
+ * 候选全量可达上千条，宿主按窗口分批取（见 `ImeSession.candidateWindow`）。
+ * 若续取时也走 [setCandidates]，就得把已经量过的那几百条**重新 measureText 一遍**
+ * ——那是主线程上的实打实开销，而且发生在用户正在滑动的时候，最容易掉帧。
+ * [appendCandidates] 只量新来的那一段。
  */
 class CandidateBarView(context: Context) : View(context) {
 
@@ -65,25 +72,59 @@ class CandidateBarView(context: Context) : View(context) {
     private var downX = 0f
     private var dragging = false
 
+    /**
+     * 还有未加载的候选时，滚到接近尾部会回调它（宿主据此续取）。
+     *
+     * 由宿主置为 null 表示"取完了"，本视图不自己记总数——总数的真值在核心那边，
+     * 视图另存一份必然漂移。
+     */
+    var onNeedMore: (() -> Unit)? = null
+
+    /** 已请求续取、尚未到货：挡住重复请求（一次滑动会产生几十个 MOVE 事件） */
+    private var loadingMore = false
+
+    /** 新一轮候选（替换全部） */
     fun setCandidates(items: List<String>) {
         candidates = items
         pressedIndex = -1
+        loadingMore = false
         // 新一轮候选从头看起：保留上一轮的滚动位置会让用户以为候选没更新
         scrollX = 0f
         scroller.forceFinished(true)
-        rebuildBounds()
+        itemBounds.clear()
+        contentWidth = 0f
+        measureFrom(0)
         invalidate()
     }
 
-    private fun rebuildBounds() {
-        itemBounds.clear()
-        var x = 0f
-        for (item in candidates) {
-            val w = textPaint.measureText(item) + itemPaddingH * 2
+    /** 续取到货：**只量新来的这一段**，已有的量过就不再动 */
+    fun appendCandidates(more: List<String>) {
+        loadingMore = false
+        if (more.isEmpty()) return
+        val from = candidates.size
+        candidates = candidates + more
+        measureFrom(from)
+        invalidate()
+    }
+
+    /** 从第 [from] 项起量文字宽度并累加命中区域（内容坐标系） */
+    private fun measureFrom(from: Int) {
+        var x = if (from == 0) 0f else contentWidth
+        for (i in from until candidates.size) {
+            val w = textPaint.measureText(candidates[i]) + itemPaddingH * 2
             itemBounds += RectF(x, 0f, x + w, barHeightPx.toFloat())
             x += w
         }
         contentWidth = x
+    }
+
+    /** 视口右缘距内容尾部不足一屏时续取：留一屏的余量，滑到尽头前就到货 */
+    private fun maybeRequestMore() {
+        val more = onNeedMore ?: return
+        if (loadingMore) return
+        if (scrollX < maxScroll() - width) return
+        loadingMore = true
+        more()
     }
 
     private fun maxScroll(): Float = (contentWidth - width).coerceAtLeast(0f)
@@ -95,6 +136,8 @@ class CandidateBarView(context: Context) : View(context) {
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
             scrollX = scroller.currX.toFloat().coerceIn(0f, maxScroll())
+            // 惯性滑行同样要能触发续取：甩一下就到尾部是最常见的用法
+            maybeRequestMore()
             postInvalidateOnAnimation()
         }
     }
@@ -154,6 +197,7 @@ class CandidateBarView(context: Context) : View(context) {
                 if (dragging) {
                     scrollX = (scrollX + dx).coerceIn(0f, maxScroll())
                     downX = event.x
+                    maybeRequestMore()
                     invalidate()
                 }
             }

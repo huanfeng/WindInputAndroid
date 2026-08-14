@@ -94,6 +94,16 @@ function Tap-Candidate([int]$n) {
     Start-Sleep -Milliseconds 500
 }
 
+# 点第 n 项并把上屏文本读回来（读完清空），供「首屏候选有哪些」这类取样用
+function Tap-CandidateText([int]$n) {
+    Tap-Candidate $n
+    $t = Get-PadText
+    Reset-Pad
+    Tap-Key "a"
+    Start-Sleep -Milliseconds 500
+    return $t
+}
+
 # IME 窗口高度（px）。uiautomator 看不到 IME 窗口，只能从 window inset 取。
 function Get-ImeHeight {
     $line = Adb shell dumpsys window displays 2>$null |
@@ -220,17 +230,38 @@ $script:schemaBefore = Get-ActiveSchema
 # 英文用例中途失败，英文方案就留在那儿了，下次启动仍是英文——于是所有中文用例
 # 连同系统短语一起失败，看起来像功能坏了。测试必须自己把前置条件建起来。
 Write-Host "`n[0] 前置：确保中文方案" -ForegroundColor Yellow
-Reset-Pad
-Tap-Key "a"; Tap-Key "a"; Tap-Key "SPACE"
-if ((Get-PadText) -notmatch '^[一-龥]$') {
-    Write-Host "  当前非中文方案，切回中文" -ForegroundColor DarkYellow
+# 打一次中文探针；出汉字返回该字，否则返回空。
+function Probe-Chinese {
+    Reset-Pad
+    Tap-Key "a"; Tap-Key "a"; Tap-Key "SPACE"
+    $t = Get-PadText
+    if ($t -match '^[一-龥]$') { return $t }
+    return ""
+}
+
+# ⚠ **核心是异步构造的**（DeferredSession），未就绪时按键交还宿主、字母直接上屏。
+# 那个结果（'aa '）与「当前不是中文方案」**完全一样**，此前这里把两者混为一谈：
+# 重装后核心还没起来，[0] 就断定"非中文方案"去点中英键，**把输入法切进了英文**，
+# 于是 [1]~[11] 的中文用例连环失败——失败现象在别处，根因是这一个判据。
+# 先重试等就绪，重试到底仍不出汉字，才认为真是方案/模式不对。
+function Wait-Chinese([int]$tries = 6) {
+    for ($i = 0; $i -lt $tries; $i++) {
+        $t = Probe-Chinese
+        if ($t) { return $t }
+        Start-Sleep -Seconds 2
+    }
+    return ""
+}
+
+$probe = Wait-Chinese
+if (-not $probe) {
+    Write-Host "  等不到中文候选，判定为非中文模式，点中英键切回" -ForegroundColor DarkYellow
     Reset-Pad
     Tap-Key "LANG"
     Start-Sleep -Seconds 4
-    Reset-Pad
-    Tap-Key "a"; Tap-Key "a"; Tap-Key "SPACE"
+    $probe = Wait-Chinese 3
 }
-CheckMatch "已处于中文方案" '^[一-龥]$' (Get-PadText)
+CheckMatch "已处于中文方案" '^[一-龥]$' $probe
 
 Write-Host "`n[1] 五笔组合上屏：aa + 空格" -ForegroundColor Yellow
 Reset-Pad
@@ -373,7 +404,34 @@ if ($missed -eq 0) {
 }
 Reset-Pad
 
-Write-Host "`n[13] 跑完不改变活跃方案" -ForegroundColor Yellow
+Write-Host "`n[13] 候选栏滚动后可选中第 10 个以后的候选" -ForegroundColor Yellow
+# 此前点选靠**合成页内数字键 1-9**，第 10 个及以后永远点不到，候选栏做了滚动也是空转
+# （一帧只有 6~9 条）。现在候选按窗口拉取、按绝对下标选词。
+#
+# 判据刻意宽松——只断言「上屏了一个汉字，且不是首屏那几个」：具体是哪个字取决于
+# 滚动距离与字宽，钉死某个字会变成脆弱用例。要守的是「够得着远处的候选」。
+Reset-Pad
+Tap-Key "a"                       # 单码 a：五笔重码极多，必然远超一屏
+Start-Sleep -Milliseconds 600
+$near = @()
+for ($i = 0; $i -lt 3; $i++) { $near += (Tap-CandidateText $i) }
+# 甩两把把候选栏滚远（起点留出右边距，避开展开钮）
+for ($i = 0; $i -lt 2; $i++) {
+    Adb shell input swipe ([int]($script:geo.W * 0.75)) $script:geo.BarY 60 $script:geo.BarY 120 | Out-Null
+    Start-Sleep -Milliseconds 700
+}
+Adb shell input tap ([int]($script:geo.W * 0.4)) $script:geo.BarY | Out-Null
+Start-Sleep -Milliseconds 700
+$far = Get-PadText
+CheckMatch "滚动后点选出汉字" '^[一-龥]+$' $far
+if ($far -and $near -contains $far) {
+    Write-Host "  FAIL  滚动后选到的仍是首屏候选 '$far'（滚动没生效或仍受页内 9 项限制）" -ForegroundColor Red
+    $script:failed++
+} elseif ($far) {
+    Write-Host "  PASS  选到的是首屏之外的候选 => '$far'（首屏为 $($near -join '/')）" -ForegroundColor Green
+}
+
+Write-Host "`n[14] 跑完不改变活跃方案" -ForegroundColor Yellow
 $schemaAfter = Get-ActiveSchema
 if ($script:schemaBefore -eq "") {
     Write-Host "  SKIP  首次运行，无基线可比" -ForegroundColor DarkGray

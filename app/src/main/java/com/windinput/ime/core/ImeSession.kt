@@ -78,6 +78,23 @@ data class SchemaEntry(
 )
 
 /**
+ * 候选全量的一个窗口。
+ *
+ * [UiEvent.Candidates] 推的是**当页**候选（够画编码栏与页码），装不下一条可滚动的
+ * 长列表。滚动候选栏与展开面板的数据从这里按需拉，见 [ImeSession.candidateWindow]。
+ *
+ * @param offset 窗口起点（原样回送，供校验拿到的是哪一段）
+ * @param total 全量总数：`offset + items.size < total` 即表示还有得取
+ * @param selected 当前高亮的**绝对**下标（空格上屏的目标）
+ */
+data class CandidatePage(
+    val items: List<String>,
+    val offset: Int,
+    val total: Int,
+    val selected: Int,
+)
+
+/**
  * 双拼布局条目（设置页「双拼布局」数据源）。
  *
  * 清单由核心扫描 `schemas/shuangpin` 下的 `.toml` 得出而不是 K 侧写死：用户可以往那个目录
@@ -134,8 +151,18 @@ interface ImeSession {
     /** @return true = 会话消费该键；false = 由调用方执行默认行为 */
     fun keyPressed(action: KeyAction, shifted: Boolean): Boolean
 
-    /** 点选候选。@return true = 已处理 */
+    /** 点选候选，[index] 是**全量里的绝对下标**（不受分页限制）。@return true = 已处理 */
     fun candidateSelected(index: Int): Boolean
+
+    /**
+     * 拉取候选全量的一个窗口。
+     *
+     * ⚠ **别在每次按键都拉一大段**：序列化与候选栏的文字测量都在主线程上，
+     * 全量候选可达上千条。起手拉够铺满一两屏，用户滚到尾部再续取。
+     * 核心侧另有硬上限（`candidate_pull::MAX_WINDOW`），传再大也不会真搬全量。
+     */
+    fun candidateWindow(offset: Int, limit: Int): CandidatePage =
+        CandidatePage(emptyList(), offset, 0, 0)
 
     /** 复位会话状态（清空组合区与候选） */
     fun reset()

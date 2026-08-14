@@ -723,6 +723,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_toast(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_candidates(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_gained(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_lost(
@@ -732,6 +734,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_run_command(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_select_candidate(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_shuangpin_layouts(
     ): Int
@@ -776,6 +780,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_constructor_windcore_new(`dataDir`: RustBuffer.ByValue,`userRoot`: RustBuffer.ByValue,`schema`: RustBuffer.ByValue,`listener`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
+    external fun uniffi_wind_android_fn_method_windcore_candidates(`ptr`: Long,`offset`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_focus_gained(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_focus_lost(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -785,6 +791,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_select_candidate(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -924,6 +932,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_toast() != 36283) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_candidates() != 11241) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_focus_gained() != 55877) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -937,6 +948,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 9691) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 56562) {
@@ -1811,6 +1825,14 @@ public object FfiConverterTypeUiEventListener: FfiConverter<UiEventListener, Lon
 public interface WindCoreInterface {
     
     /**
+     * 拉取候选全量的一个窗口。**纯读**，不改状态，可随时调。
+     *
+     * 别在每次按键都拉一大段：序列化与宿主侧的文字测量都在主线程上。
+     * 起手拉够铺满一两屏即可，用户滚到尾部再续取。
+     */
+    fun `candidates`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow
+    
+    /**
      * 焦点获得（对应 onStartInput）。首次调用时顺带启动后台预热。
      */
     fun `focusGained`()
@@ -1838,6 +1860,14 @@ public interface WindCoreInterface {
      * ——顺序取自引擎管理器，与协调器内部的选择下标同源，K 侧不要自行排序。
      */
     fun `schemas`(): List<SchemaInfo>
+    
+    /**
+     * 按**绝对下标**选词，返回编辑指令流（与 [`Self::key_down`] 同一种形状）。
+     *
+     * 取代此前"合成数字键"的做法——那条路把选词限死在页内 1-9，第 10 个及以后
+     * 永远点不到。
+     */
+    fun `selectCandidate`(`index`: kotlin.UInt): KeyResult
     
     /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
@@ -1973,6 +2003,27 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 拉取候选全量的一个窗口。**纯读**，不改状态，可随时调。
+     *
+     * 别在每次按键都拉一大段：序列化与宿主侧的文字测量都在主线程上。
+     * 起手拉够铺满一两屏即可，用户滚到尾部再续取。
+     */override fun `candidates`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow {
+            return FfiConverterTypeCandidateWindow.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_candidates(
+        it,
+        
+        FfiConverterUInt.lower(`offset`),
+        FfiConverterUInt.lower(`limit`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 焦点获得（对应 onStartInput）。首次调用时顺带启动后台预热。
      */override fun `focusGained`()
         = 
@@ -2049,6 +2100,26 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     UniffiLib.uniffi_wind_android_fn_method_windcore_schemas(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 按**绝对下标**选词，返回编辑指令流（与 [`Self::key_down`] 同一种形状）。
+     *
+     * 取代此前"合成数字键"的做法——那条路把选词限死在页内 1-9，第 10 个及以后
+     * 永远点不到。
+     */override fun `selectCandidate`(`index`: kotlin.UInt): KeyResult {
+            return FfiConverterTypeKeyResult.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_select_candidate(
+        it,
+        
+        FfiConverterUInt.lower(`index`),_status)
 }
     }
     )
@@ -2197,6 +2268,70 @@ public object FfiConverterTypeCandidateUpdate: FfiConverterRustBuffer<CandidateU
             FfiConverterUInt.write(value.`selected`, buf)
             FfiConverterUInt.write(value.`page`, buf)
             FfiConverterUInt.write(value.`totalPages`, buf)
+    }
+}
+
+
+
+/**
+ * 候选全量的一个窗口（滚动候选栏 / 展开面板的数据源）。
+ *
+ * 推送帧 [`CandidateUpdate`] 给的是**当页**候选，够画编码栏与页码，但装不下一条
+ * 可滚动的长列表。宿主要更多时按 `(offset, limit)` 来拉——核心侧另有硬上限，
+ * 见 `wind_coordinator::candidate_pull::MAX_WINDOW`。
+ */
+data class CandidateWindow (
+    var `items`: List<kotlin.String>
+    , 
+    /**
+     * 窗口起点（原样回送）
+     */
+    var `offset`: kotlin.UInt
+    , 
+    /**
+     * **全量**候选总数：宿主据此判断还要不要续取
+     */
+    var `total`: kotlin.UInt
+    , 
+    /**
+     * 当前高亮候选的**绝对**下标（空格上屏的目标）
+     */
+    var `selected`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateWindow> {
+    override fun read(buf: ByteBuffer): CandidateWindow {
+        return CandidateWindow(
+            FfiConverterSequenceString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CandidateWindow) = (
+            FfiConverterSequenceString.allocationSize(value.`items`) +
+            FfiConverterUInt.allocationSize(value.`offset`) +
+            FfiConverterUInt.allocationSize(value.`total`) +
+            FfiConverterUInt.allocationSize(value.`selected`)
+    )
+
+    override fun write(value: CandidateWindow, buf: ByteBuffer) {
+            FfiConverterSequenceString.write(value.`items`, buf)
+            FfiConverterUInt.write(value.`offset`, buf)
+            FfiConverterUInt.write(value.`total`, buf)
+            FfiConverterUInt.write(value.`selected`, buf)
     }
 }
 
