@@ -7,6 +7,7 @@ import android.graphics.RectF
 import android.os.Handler
 import android.os.Looper
 import android.view.HapticFeedbackConstants
+import android.util.Log
 import android.view.MotionEvent
 import android.view.View
 
@@ -18,6 +19,13 @@ import android.view.View
  * 占位阶段：内置配色常量；正式版配色来自 wind-theme 求值后的调色板（键盘域节点）。
  */
 class KeyboardView(context: Context) : View(context) {
+
+    private companion object {
+        const val TAG = "WindKeyboard"
+
+        /** 按下高亮的最小可见时长；约 4 帧，短于此人眼捕捉不到 */
+        const val MIN_HIGHLIGHT_MS = 70L
+    }
 
     interface Listener {
         fun onKeyAction(action: KeyAction, shifted: Boolean)
@@ -101,6 +109,39 @@ class KeyboardView(context: Context) : View(context) {
     private var pressedKey: KeyDef? = null
     private var pressedRect: RectF? = null
 
+    /**
+     * **绘制用**的按下高亮，与手势状态 [pressedKey] 分开。
+     *
+     * 快速点击时 DOWN 与 UP 常落在同一帧内（间隔 < 16ms）：`invalidate()` 只是标脏，
+     * 真正重绘要等下一次 VSYNC，届时 [pressedKey] 已被抬手清空，于是**按下态一帧都没画过**
+     * ——表现就是「点得快就没有按下效果」。故抬手时不立刻清高亮，而是保证它至少可见
+     * [MIN_HIGHLIGHT_MS]（约 4 帧）。
+     */
+    private var highlightKey: KeyDef? = null
+    private var highlightAt = 0L
+
+    /** 高亮实际经历的帧数：自检用，验证按下态确实被绘制过（见 [onDraw]） */
+    private var highlightFrames = 0
+
+    private val clearHighlight = Runnable {
+        finishHighlight()
+        invalidate()
+    }
+
+    /**
+     * 结束高亮并自检。
+     *
+     * 记录**实际绘制帧数**而不是时长：这个 bug 的本质是「标脏了但没轮到重绘」，
+     * 时长达标而帧数为 0 依然是没有按下效果。帧数 ≥1 才算真的画过。
+     */
+    private fun finishHighlight() {
+        if (highlightKey != null && highlightFrames == 0) {
+            Log.w(TAG, "按下高亮一帧未绘制（${android.os.SystemClock.uptimeMillis() - highlightAt}ms）")
+        }
+        highlightKey = null
+        highlightFrames = 0
+    }
+
     private val popupManager by lazy { KeyPopupManager(this) }
 
     // 手势状态
@@ -159,6 +200,9 @@ class KeyboardView(context: Context) : View(context) {
 
     override fun onDetachedFromWindow() {
         popupManager.dismissAll()
+        handler.removeCallbacks(clearHighlight)
+        highlightKey = null
+        highlightFrames = 0
         super.onDetachedFromWindow()
     }
 
@@ -185,9 +229,10 @@ class KeyboardView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(bgColor)
+        if (highlightKey != null) highlightFrames++
         for ((key, rect) in keyBounds) {
             keyPaint.color = when {
-                key === pressedKey -> keyPressedColor
+                key === highlightKey -> keyPressedColor
                 key.action == KeyAction.Shift && (shifted || shiftLocked) -> keyPressedColor
                 key.isSpecial -> keySpecialColor
                 else -> keyColor
@@ -238,6 +283,11 @@ class KeyboardView(context: Context) : View(context) {
                 pressedKey = bounds?.key
                 pressedRect = bounds?.rect
                 val key = bounds?.key
+                // 高亮立刻改指新键（连击时上一键的延迟清除不会误伤：clearHighlight 已撤销）
+                handler.removeCallbacks(clearHighlight)
+                highlightKey = key
+                highlightFrames = 0
+                highlightAt = android.os.SystemClock.uptimeMillis()
                 if (key != null) {
                     if (hapticEnabled) {
                         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
@@ -347,9 +397,21 @@ class KeyboardView(context: Context) : View(context) {
         handler.removeCallbacks(longPressRunnable)
     }
 
+    /**
+     * 清手势状态；高亮另按最小可见时长延迟清除（见 [highlightKey]）。
+     * 已满时长的直接清，未满的补足剩余毫秒——快点慢点都恰好亮一下。
+     */
     private fun clearPressed() {
         pressedKey = null
         pressedRect = null
+        if (highlightKey != null) {
+            val shown = android.os.SystemClock.uptimeMillis() - highlightAt
+            if (shown >= MIN_HIGHLIGHT_MS) {
+                finishHighlight()
+            } else {
+                handler.postDelayed(clearHighlight, MIN_HIGHLIGHT_MS - shown)
+            }
+        }
         invalidate()
     }
 

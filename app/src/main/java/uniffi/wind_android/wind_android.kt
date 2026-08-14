@@ -651,30 +651,42 @@ internal interface UniffiForeignFutureCompleteVoid : com.sun.jna.Callback {
     fun callback(`callbackData`: Long,`result`: UniffiForeignFutureResultVoid.UniffiByValue,)
 }
 internal interface UniffiCallbackInterfaceUiEventListenerMethod0 : com.sun.jna.Callback {
-    fun callback(`uniffiHandle`: Long,`preedit`: RustBuffer.ByValue,`items`: RustBuffer.ByValue,`selected`: Int,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+    fun callback(`uniffiHandle`: Long,`update`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
 internal interface UniffiCallbackInterfaceUiEventListenerMethod1 : com.sun.jna.Callback {
     fun callback(`uniffiHandle`: Long,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
 }
-@Structure.FieldOrder("uniffiFree", "uniffiClone", "onCandidates", "onHideCandidates")
+internal interface UniffiCallbackInterfaceUiEventListenerMethod2 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`status`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+internal interface UniffiCallbackInterfaceUiEventListenerMethod3 : com.sun.jna.Callback {
+    fun callback(`uniffiHandle`: Long,`text`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,)
+}
+@Structure.FieldOrder("uniffiFree", "uniffiClone", "onCandidates", "onHideCandidates", "onStatus", "onToast")
 internal open class UniffiVTableCallbackInterfaceUiEventListener(
     @JvmField internal var `uniffiFree`: UniffiCallbackInterfaceFree? = null,
     @JvmField internal var `uniffiClone`: UniffiCallbackInterfaceClone? = null,
     @JvmField internal var `onCandidates`: UniffiCallbackInterfaceUiEventListenerMethod0? = null,
     @JvmField internal var `onHideCandidates`: UniffiCallbackInterfaceUiEventListenerMethod1? = null,
+    @JvmField internal var `onStatus`: UniffiCallbackInterfaceUiEventListenerMethod2? = null,
+    @JvmField internal var `onToast`: UniffiCallbackInterfaceUiEventListenerMethod3? = null,
 ) : Structure() {
     class UniffiByValue(
         `uniffiFree`: UniffiCallbackInterfaceFree? = null,
         `uniffiClone`: UniffiCallbackInterfaceClone? = null,
         `onCandidates`: UniffiCallbackInterfaceUiEventListenerMethod0? = null,
         `onHideCandidates`: UniffiCallbackInterfaceUiEventListenerMethod1? = null,
-    ): UniffiVTableCallbackInterfaceUiEventListener(`uniffiFree`,`uniffiClone`,`onCandidates`,`onHideCandidates`,), Structure.ByValue
+        `onStatus`: UniffiCallbackInterfaceUiEventListenerMethod2? = null,
+        `onToast`: UniffiCallbackInterfaceUiEventListenerMethod3? = null,
+    ): UniffiVTableCallbackInterfaceUiEventListener(`uniffiFree`,`uniffiClone`,`onCandidates`,`onHideCandidates`,`onStatus`,`onToast`,), Structure.ByValue
 
    internal fun uniffiSetValue(other: UniffiVTableCallbackInterfaceUiEventListener) {
         `uniffiFree` = other.`uniffiFree`
         `uniffiClone` = other.`uniffiClone`
         `onCandidates` = other.`onCandidates`
         `onHideCandidates` = other.`onHideCandidates`
+        `onStatus` = other.`onStatus`
+        `onToast` = other.`onToast`
     }
 
 }
@@ -707,11 +719,21 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_hide_candidates(
     ): Int
+    external fun uniffi_wind_android_checksum_method_uieventlistener_on_status(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_uieventlistener_on_toast(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_gained(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_lost(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_key_down(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_run_command(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_schemas(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_spawn_warmup_once(
     ): Int
     external fun uniffi_wind_android_checksum_constructor_windcore_new(
     ): Int
@@ -740,9 +762,13 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_init_callback_vtable_uieventlistener(`vtable`: UniffiVTableCallbackInterfaceUiEventListener,
     ): Unit
-    external fun uniffi_wind_android_fn_method_uieventlistener_on_candidates(`ptr`: Long,`preedit`: RustBuffer.ByValue,`items`: RustBuffer.ByValue,`selected`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_wind_android_fn_method_uieventlistener_on_candidates(`ptr`: Long,`update`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_uieventlistener_on_hide_candidates(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_uieventlistener_on_status(`ptr`: Long,`status`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_uieventlistener_on_toast(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_clone_windcore(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -756,6 +782,12 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_spawn_warmup_once(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_wind_android_fn_func_init_logging(`filter`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun ffi_wind_android_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -880,19 +912,34 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_func_init_logging() != 1174) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_candidates() != 7095) {
+    if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_candidates() != 8246) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_hide_candidates() != 62984) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_focus_gained() != 27907) {
+    if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_status() != 19801) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_toast() != 36283) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_focus_gained() != 55877) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_focus_lost() != 17783) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 26693) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_run_command() != 36173) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_spawn_warmup_once() != 36030) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 57465) {
@@ -1291,14 +1338,24 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 public interface UiEventListener {
     
     /**
-     * 候选更新：preedit 为编码区串，items 为当前页候选文本，selected 为页内高亮下标
+     * 候选/编码区更新
      */
-    fun `onCandidates`(`preedit`: kotlin.String, `items`: List<kotlin.String>, `selected`: kotlin.UInt)
+    fun `onCandidates`(`update`: CandidateUpdate)
     
     /**
      * 候选清空/隐藏
      */
     fun `onHideCandidates`()
+    
+    /**
+     * 模式真值变化（中英/标点/全半角/简繁/方案短称）
+     */
+    fun `onStatus`(`status`: InputStatus)
+    
+    /**
+     * 一次性提示（方案切换/模式切换/词库就绪/错误）
+     */
+    fun `onToast`(`text`: kotlin.String)
     
     companion object
 }
@@ -1409,17 +1466,15 @@ open class UiEventListenerImpl: Disposable, AutoCloseable, UiEventListener
 
     
     /**
-     * 候选更新：preedit 为编码区串，items 为当前页候选文本，selected 为页内高亮下标
-     */override fun `onCandidates`(`preedit`: kotlin.String, `items`: List<kotlin.String>, `selected`: kotlin.UInt)
+     * 候选/编码区更新
+     */override fun `onCandidates`(`update`: CandidateUpdate)
         = 
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_method_uieventlistener_on_candidates(
         it,
         
-        FfiConverterString.lower(`preedit`),
-        FfiConverterSequenceString.lower(`items`),
-        FfiConverterUInt.lower(`selected`),_status)
+        FfiConverterTypeCandidateUpdate.lower(`update`),_status)
 }
     }
     
@@ -1435,6 +1490,38 @@ open class UiEventListenerImpl: Disposable, AutoCloseable, UiEventListener
     UniffiLib.uniffi_wind_android_fn_method_uieventlistener_on_hide_candidates(
         it,
         _status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 模式真值变化（中英/标点/全半角/简繁/方案短称）
+     */override fun `onStatus`(`status`: InputStatus)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_uieventlistener_on_status(
+        it,
+        
+        FfiConverterTypeInputStatus.lower(`status`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 一次性提示（方案切换/模式切换/词库就绪/错误）
+     */override fun `onToast`(`text`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_uieventlistener_on_toast(
+        it,
+        
+        FfiConverterString.lower(`text`),_status)
 }
     }
     
@@ -1459,13 +1546,11 @@ open class UiEventListenerImpl: Disposable, AutoCloseable, UiEventListener
 // Put the implementation in an object so we don't pollute the top-level namespace
 internal object uniffiCallbackInterfaceUiEventListener {
     internal object `onCandidates`: UniffiCallbackInterfaceUiEventListenerMethod0 {
-        override fun callback(`uniffiHandle`: Long,`preedit`: RustBuffer.ByValue,`items`: RustBuffer.ByValue,`selected`: Int,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+        override fun callback(`uniffiHandle`: Long,`update`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
             val uniffiObj = FfiConverterTypeUiEventListener.handleMap.get(uniffiHandle)
             val makeCall = { ->
                 uniffiObj.`onCandidates`(
-                    FfiConverterString.lift(`preedit`),
-                    FfiConverterSequenceString.lift(`items`),
-                    FfiConverterUInt.lift(`selected`),
+                    FfiConverterTypeCandidateUpdate.lift(`update`),
                 )
             }
             val writeReturn = { _: Unit -> Unit }
@@ -1477,6 +1562,30 @@ internal object uniffiCallbackInterfaceUiEventListener {
             val uniffiObj = FfiConverterTypeUiEventListener.handleMap.get(uniffiHandle)
             val makeCall = { ->
                 uniffiObj.`onHideCandidates`(
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+    internal object `onStatus`: UniffiCallbackInterfaceUiEventListenerMethod2 {
+        override fun callback(`uniffiHandle`: Long,`status`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeUiEventListener.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`onStatus`(
+                    FfiConverterTypeInputStatus.lift(`status`),
+                )
+            }
+            val writeReturn = { _: Unit -> Unit }
+            uniffiTraitInterfaceCall(uniffiCallStatus, makeCall, writeReturn)
+        }
+    }
+    internal object `onToast`: UniffiCallbackInterfaceUiEventListenerMethod3 {
+        override fun callback(`uniffiHandle`: Long,`text`: RustBuffer.ByValue,`uniffiOutReturn`: Pointer,uniffiCallStatus: UniffiRustCallStatus,) {
+            val uniffiObj = FfiConverterTypeUiEventListener.handleMap.get(uniffiHandle)
+            val makeCall = { ->
+                uniffiObj.`onToast`(
+                    FfiConverterString.lift(`text`),
                 )
             }
             val writeReturn = { _: Unit -> Unit }
@@ -1501,6 +1610,8 @@ internal object uniffiCallbackInterfaceUiEventListener {
         uniffiClone,
         `onCandidates`,
         `onHideCandidates`,
+        `onStatus`,
+        `onToast`,
     )
 
     // Registers the foreign callback with the Rust side.
@@ -1650,7 +1761,7 @@ public object FfiConverterTypeUiEventListener: FfiConverter<UiEventListener, Lon
 public interface WindCoreInterface {
     
     /**
-     * 焦点获得（对应 onStartInput）
+     * 焦点获得（对应 onStartInput）。首次调用时顺带启动后台预热。
      */
     fun `focusGained`()
     
@@ -1663,6 +1774,31 @@ public interface WindCoreInterface {
      * 按下键（vk = wind-keys VK 码）。抬起事件骨架期不喂（协调器按键链以 down 为主）。
      */
     fun `keyDown`(`vk`: kotlin.UInt): KeyResult
+    
+    /**
+     * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
+     * ——同一个变化也可能由按键或焦点事件引发，只留推送一条路，K 侧才不会有两份真值。
+     */
+    fun `runCommand`(`cmd`: EngineCommand)
+    
+    /**
+     * 可选方案列表。下标即 [`EngineCommand::SelectSchema`] 的 `index`
+     * ——顺序取自引擎管理器，与协调器内部的选择下标同源，K 侧不要自行排序。
+     */
+    fun `schemas`(): List<SchemaInfo>
+    
+    /**
+     * 后台预热首次真实查询会触发的惰性构建，只跑一次。
+     *
+     * **为什么必须在 `focus_gained` 之后而不是构造期**：协调器在无编辑上下文时
+     * （`ime_active=false`）会把按键短路掉，构造期喂的假按键根本走不到候选构建，
+     * 实测「预热」只花 3ms 就返回、惰性构建原封不动留给用户的第一次按键。
+     *
+     * **为什么走真实按键路径而不是调某个 preload 函数**：要预热的是反查/合并索引
+     * （88526 条聚合成 combined.wdat，真机冷启动实测同步阻塞 2.8 秒），它的触发点
+     * 埋在候选构建链深处；另写一条预加载路径必然与真实路径漂移，漏掉一处就白做。
+     */
+    fun `spawnWarmupOnce`()
     
     companion object
 }
@@ -1792,7 +1928,7 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
-     * 焦点获得（对应 onStartInput）
+     * 焦点获得（对应 onStartInput）。首次调用时顺带启动后台预热。
      */override fun `focusGained`()
         = 
     callWithHandle {
@@ -1838,6 +1974,63 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     
 
     
+    /**
+     * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
+     * ——同一个变化也可能由按键或焦点事件引发，只留推送一条路，K 侧才不会有两份真值。
+     */override fun `runCommand`(`cmd`: EngineCommand)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_run_command(
+        it,
+        
+        FfiConverterTypeEngineCommand.lower(`cmd`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 可选方案列表。下标即 [`EngineCommand::SelectSchema`] 的 `index`
+     * ——顺序取自引擎管理器，与协调器内部的选择下标同源，K 侧不要自行排序。
+     */override fun `schemas`(): List<SchemaInfo> {
+            return FfiConverterSequenceTypeSchemaInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_schemas(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 后台预热首次真实查询会触发的惰性构建，只跑一次。
+     *
+     * **为什么必须在 `focus_gained` 之后而不是构造期**：协调器在无编辑上下文时
+     * （`ime_active=false`）会把按键短路掉，构造期喂的假按键根本走不到候选构建，
+     * 实测「预热」只花 3ms 就返回、惰性构建原封不动留给用户的第一次按键。
+     *
+     * **为什么走真实按键路径而不是调某个 preload 函数**：要预热的是反查/合并索引
+     * （88526 条聚合成 combined.wdat，真机冷启动实测同步阻塞 2.8 秒），它的触发点
+     * 埋在候选构建链深处；另写一条预加载路径必然与真实路径漂移，漏掉一处就白做。
+     */override fun `spawnWarmupOnce`()
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_spawn_warmup_once(
+        it,
+        _status)
+}
+    }
+    
+    
+
+    
 
     
 
@@ -1872,6 +2065,163 @@ public object FfiConverterTypeWindCore: FfiConverter<WindCore, Long> {
 
     override fun write(value: WindCore, buf: ByteBuffer) {
         buf.putLong(lower(value))
+    }
+}
+
+
+
+/**
+ * 候选帧：编码栏与候选栏一次渲染所需的全部数据。
+ *
+ * 拆成 Record 而非长参数列表——`UpdateCandidates` 还会继续加字段（翻页栏、注释行），
+ * 每加一个都改 trait 方法签名会连带 Kotlin 实现全部返工。
+ */
+data class CandidateUpdate (
+    /**
+     * 编码区串（五笔码 / 拼音串），编码栏正文
+     */
+    var `preedit`: kotlin.String
+    , 
+    /**
+     * 编码区插入符位置：`preedit` 内的**字节**偏移（恒在字符边界）
+     */
+    var `preeditCaret`: kotlin.UInt
+    , 
+    /**
+     * 模式指示文本（五/拼/英/符…），编码栏左侧角标；空 = 不显示
+     */
+    var `modeLabel`: kotlin.String
+    , 
+    /**
+     * 当前页候选文本
+     */
+    var `items`: List<kotlin.String>
+    , 
+    /**
+     * 键盘选中项（页内下标），空格上屏目标
+     */
+    var `selected`: kotlin.UInt
+    , 
+    /**
+     * 当前页（1 起）
+     */
+    var `page`: kotlin.UInt
+    , 
+    /**
+     * 总页数
+     */
+    var `totalPages`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCandidateUpdate: FfiConverterRustBuffer<CandidateUpdate> {
+    override fun read(buf: ByteBuffer): CandidateUpdate {
+        return CandidateUpdate(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CandidateUpdate) = (
+            FfiConverterString.allocationSize(value.`preedit`) +
+            FfiConverterUInt.allocationSize(value.`preeditCaret`) +
+            FfiConverterString.allocationSize(value.`modeLabel`) +
+            FfiConverterSequenceString.allocationSize(value.`items`) +
+            FfiConverterUInt.allocationSize(value.`selected`) +
+            FfiConverterUInt.allocationSize(value.`page`) +
+            FfiConverterUInt.allocationSize(value.`totalPages`)
+    )
+
+    override fun write(value: CandidateUpdate, buf: ByteBuffer) {
+            FfiConverterString.write(value.`preedit`, buf)
+            FfiConverterUInt.write(value.`preeditCaret`, buf)
+            FfiConverterString.write(value.`modeLabel`, buf)
+            FfiConverterSequenceString.write(value.`items`, buf)
+            FfiConverterUInt.write(value.`selected`, buf)
+            FfiConverterUInt.write(value.`page`, buf)
+            FfiConverterUInt.write(value.`totalPages`, buf)
+    }
+}
+
+
+
+/**
+ * 引擎当前模式真值。**数据，不是界面**——工具栏画几个格、放哪、什么图标由 Kotlin 决定。
+ */
+data class InputStatus (
+    var `chineseMode`: kotlin.Boolean
+    , 
+    /**
+     * 方案短称：中文态取方案 icon_label（"五"/"拼"），英文态为 "英"/大写锁定 "A"
+     */
+    var `iconLabel`: kotlin.String
+    , 
+    var `fullWidth`: kotlin.Boolean
+    , 
+    var `chinesePunct`: kotlin.Boolean
+    , 
+    var `s2tEnabled`: kotlin.Boolean
+    , 
+    /**
+     * 是否该展示简繁开关（用户未启用简繁功能时为 false）
+     */
+    var `s2tShown`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeInputStatus: FfiConverterRustBuffer<InputStatus> {
+    override fun read(buf: ByteBuffer): InputStatus {
+        return InputStatus(
+            FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: InputStatus) = (
+            FfiConverterBoolean.allocationSize(value.`chineseMode`) +
+            FfiConverterString.allocationSize(value.`iconLabel`) +
+            FfiConverterBoolean.allocationSize(value.`fullWidth`) +
+            FfiConverterBoolean.allocationSize(value.`chinesePunct`) +
+            FfiConverterBoolean.allocationSize(value.`s2tEnabled`) +
+            FfiConverterBoolean.allocationSize(value.`s2tShown`)
+    )
+
+    override fun write(value: InputStatus, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`chineseMode`, buf)
+            FfiConverterString.write(value.`iconLabel`, buf)
+            FfiConverterBoolean.write(value.`fullWidth`, buf)
+            FfiConverterBoolean.write(value.`chinesePunct`, buf)
+            FfiConverterBoolean.write(value.`s2tEnabled`, buf)
+            FfiConverterBoolean.write(value.`s2tShown`, buf)
     }
 }
 
@@ -1940,6 +2290,220 @@ public object FfiConverterTypeKeyResult: FfiConverterRustBuffer<KeyResult> {
 
 
 
+/**
+ * 输入方案条目（方案选择器的数据源）
+ */
+data class SchemaInfo (
+    /**
+     * 方案 id（wubi86 / pinyin …）
+     */
+    var `id`: kotlin.String
+    , 
+    /**
+     * 显示名（方案文件 `[schema] name`）
+     */
+    var `name`: kotlin.String
+    , 
+    /**
+     * 短称（"五"/"拼"）
+     */
+    var `iconLabel`: kotlin.String
+    , 
+    var `active`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemaInfo: FfiConverterRustBuffer<SchemaInfo> {
+    override fun read(buf: ByteBuffer): SchemaInfo {
+        return SchemaInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemaInfo) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`iconLabel`) +
+            FfiConverterBoolean.allocationSize(value.`active`)
+    )
+
+    override fun write(value: SchemaInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`iconLabel`, buf)
+            FfiConverterBoolean.write(value.`active`, buf)
+    }
+}
+
+
+
+/**
+ * Kotlin 可下达的引擎命令。
+ *
+ * 刻意是一张**手工挑选的小表**而非桌面 `MenuCmd` 的镜像：后者含截图、打开目录、
+ * 诊断 HUD、语言栏图标等一批桌面专属项，暴露给移动端只会制造调不通的入口。
+ * 新增移动端要用的开关时在此显式加一条。
+ */
+sealed class EngineCommand {
+    
+    /**
+     * 切到英文模式（中→英）
+     */
+    object English : EngineCommand()
+    
+    
+    /**
+     * 选中第 N 个方案（下标对齐 [`WindCore::schemas`]），并回到中文模式（英→中）
+     */
+    data class SelectSchema(
+        val `index`: kotlin.UInt) : EngineCommand()
+        
+    {
+        
+
+        companion object
+    }
+    
+    /**
+     * 中文标点 ↔ 英文标点
+     */
+    object TogglePunct : EngineCommand()
+    
+    
+    /**
+     * 全角 ↔ 半角
+     */
+    object ToggleWidth : EngineCommand()
+    
+    
+    /**
+     * 简入繁出开关
+     */
+    object ToggleS2t : EngineCommand()
+    
+    
+    /**
+     * 重载用户配置（设置页改完即时生效）
+     */
+    object ReloadConfig : EngineCommand()
+    
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeEngineCommand : FfiConverterRustBuffer<EngineCommand>{
+    override fun read(buf: ByteBuffer): EngineCommand {
+        return when(buf.getInt()) {
+            1 -> EngineCommand.English
+            2 -> EngineCommand.SelectSchema(
+                FfiConverterUInt.read(buf),
+                )
+            3 -> EngineCommand.TogglePunct
+            4 -> EngineCommand.ToggleWidth
+            5 -> EngineCommand.ToggleS2t
+            6 -> EngineCommand.ReloadConfig
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: EngineCommand): ULong = when(value) {
+        is EngineCommand.English -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is EngineCommand.SelectSchema -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterUInt.allocationSize(value.`index`)
+            )
+        }
+        is EngineCommand.TogglePunct -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is EngineCommand.ToggleWidth -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is EngineCommand.ToggleS2t -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+        is EngineCommand.ReloadConfig -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+            )
+        }
+    }
+
+    override fun write(value: EngineCommand, buf: ByteBuffer) {
+        when(value) {
+            is EngineCommand.English -> {
+                buf.putInt(1)
+                Unit
+            }
+            is EngineCommand.SelectSchema -> {
+                buf.putInt(2)
+                FfiConverterUInt.write(value.`index`, buf)
+                Unit
+            }
+            is EngineCommand.TogglePunct -> {
+                buf.putInt(3)
+                Unit
+            }
+            is EngineCommand.ToggleWidth -> {
+                buf.putInt(4)
+                Unit
+            }
+            is EngineCommand.ToggleS2t -> {
+                buf.putInt(5)
+                Unit
+            }
+            is EngineCommand.ReloadConfig -> {
+                buf.putInt(6)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
 
 /**
  * @suppress
@@ -1962,6 +2526,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSchemaInfo: FfiConverterRustBuffer<List<SchemaInfo>> {
+    override fun read(buf: ByteBuffer): List<SchemaInfo> {
+        val len = buf.getInt()
+        return List<SchemaInfo>(len) {
+            FfiConverterTypeSchemaInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SchemaInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSchemaInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SchemaInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSchemaInfo.write(it, buf)
         }
     }
 }

@@ -2,6 +2,7 @@ package com.windinput.ime.core
 
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import com.windinput.ime.keyboard.KeyAction
 import java.io.File
@@ -22,6 +23,9 @@ class RustSession(
 
     companion object {
         private const val TAG = "RustSession"
+
+        /** 一帧的微秒数（60Hz）；JNI 同步调用超过它就会掉帧 */
+        private const val FRAME_BUDGET_US = 16_000L
 
         // wind-keys VK 码（SSOT 在主仓 wind-keys/keymap.rs）
         private const val VK_BACK = 0x08u
@@ -47,16 +51,38 @@ class RustSession(
                     rustRoot.absolutePath,
                     "wubi86",
                     object : UiEventListener {
-                        override fun onCandidates(
-                            preedit: String,
-                            items: List<String>,
-                            selected: UInt,
-                        ) {
-                            sessionRef?.postCandidates(items)
+                        override fun onCandidates(update: uniffi.wind_android.CandidateUpdate) {
+                            sessionRef?.post(
+                                UiEvent.Candidates(
+                                    items = update.items,
+                                    preedit = update.preedit,
+                                    modeLabel = update.modeLabel,
+                                    selected = update.selected.toInt(),
+                                    page = update.page.toInt(),
+                                    totalPages = update.totalPages.toInt(),
+                                ),
+                            )
                         }
 
                         override fun onHideCandidates() {
-                            sessionRef?.postCandidates(emptyList())
+                            sessionRef?.post(UiEvent.Candidates(emptyList()))
+                        }
+
+                        override fun onStatus(status: uniffi.wind_android.InputStatus) {
+                            sessionRef?.post(
+                                UiEvent.Status(
+                                    chineseMode = status.chineseMode,
+                                    iconLabel = status.iconLabel,
+                                    fullWidth = status.fullWidth,
+                                    chinesePunct = status.chinesePunct,
+                                    s2tEnabled = status.s2tEnabled,
+                                    s2tShown = status.s2tShown,
+                                ),
+                            )
+                        }
+
+                        override fun onToast(text: String) {
+                            sessionRef?.post(UiEvent.Toast(text))
                         }
                     },
                 )
@@ -73,13 +99,38 @@ class RustSession(
 
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private fun postCandidates(items: List<String>) {
-        mainHandler.post { listener?.invoke(UiEvent.Candidates(items)) }
+    /** 泵线程在**非主线程**回调，一律 post 回主线程再交给 UI */
+    private fun post(event: UiEvent) {
+        mainHandler.post { listener?.invoke(event) }
     }
 
     override fun focusGained() = core.focusGained()
 
     override fun focusLost() = core.focusLost()
+
+    override fun schemas(): List<SchemaEntry> =
+        core.schemas().mapIndexed { i, s ->
+            SchemaEntry(
+                index = i,
+                id = s.id,
+                name = s.name,
+                iconLabel = s.iconLabel,
+                active = s.active,
+            )
+        }
+
+    override fun runCommand(cmd: EngineCmd) {
+        val native = when (cmd) {
+            EngineCmd.English -> uniffi.wind_android.EngineCommand.English
+            is EngineCmd.SelectSchema ->
+                uniffi.wind_android.EngineCommand.SelectSchema(cmd.index.toUInt())
+            EngineCmd.TogglePunct -> uniffi.wind_android.EngineCommand.TogglePunct
+            EngineCmd.ToggleWidth -> uniffi.wind_android.EngineCommand.ToggleWidth
+            EngineCmd.ToggleS2t -> uniffi.wind_android.EngineCommand.ToggleS2t
+            EngineCmd.ReloadConfig -> uniffi.wind_android.EngineCommand.ReloadConfig
+        }
+        core.runCommand(native)
+    }
 
     override fun keyPressed(action: KeyAction, shifted: Boolean): Boolean {
         val vk = toVk(action, shifted) ?: return false
@@ -98,10 +149,17 @@ class RustSession(
 
     /** 喂键并应用同步结果（commit/组合区）。@return 是否被引擎消费 */
     private fun dispatch(vk: UInt): Boolean {
+        // JNI 往返耗时单独计：它在**主线程**上同步阻塞，是输入延迟里唯一不可
+        // 让位给渲染的一段。超过一帧（16ms）就必须改成异步，故按帧标注。
+        val t0 = SystemClock.elapsedRealtimeNanos()
         val result = core.keyDown(vk)
+        val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
+        if (costUs > FRAME_BUDGET_US) {
+            Log.w(TAG, "keyDown 阻塞主线程 ${costUs}µs（超一帧）vk=0x${vk.toString(16)}")
+        }
         Log.d(
             TAG,
-            "vk=0x${vk.toString(16)} -> consumed=${result.consumed} " +
+            "vk=0x${vk.toString(16)} ${costUs}µs -> consumed=${result.consumed} " +
                 "commit='${result.commitText}' comp='${result.composition}' " +
                 "changed=${result.compositionChanged}",
         )

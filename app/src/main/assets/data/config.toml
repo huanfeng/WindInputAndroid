@@ -1,0 +1,656 @@
+# WindInput 系统预置配置（键名 6 域重命名后，见 docs/config-key-migration.md）
+# 此文件为应用内置默认配置，随程序安装包分发。
+# 加载优先级：代码默认值（Layer 1）→ 本文件（Layer 2）→ 用户配置
+# （%APPDATA%\WindInput\config.toml，Layer 3）。
+# 修改此文件可调整新安装或新版本升级后的默认行为，无需重新编译。
+#
+# ── 本文件的契约 ────────────────────────────────────────────────────────────
+# 1. **完整**：`config_schema.rs` 的 REGISTRY 里每一个键都必须在此显式列出，
+#    使本文件同时是「出厂默认值」与「全部可配置项的说明书」。
+#    仅两个实例集合键刻意不写（见下方 [schema] 段说明），已在测试中登记豁免。
+#    守护测试：`data_config_toml_covers_registry`（缺键即失败）、
+#    `data_config_toml_has_no_orphan_keys`（多键即失败）。
+# 2. **新增配置项需四处同步**：`config.rs` 结构体字段 + `Default` 初值 →
+#    `config_schema.rs` 的 REGISTRY → 本文件。漏掉本文件时上面第一个测试会失败。
+# 3. **数组是整体覆盖，不是合并**：本文件写出的数组会**整体替换**代码默认值，
+#    而非并集。故此处漏写一个元素 = 该元素在成品里不存在。改数组类键前请先比对
+#    `config.rs` 的 `default_*()` 函数。
+#
+# 注意：本文件不写 version 键——version 是用户文件的迁移状态锚点。
+
+[schema]
+active = "wubi86"
+available = ["wubi86", "wubi86_pinyin"]
+# 主码表方案 ID（拼音反查码源），留空时按 available 顺序自动选第一个码表方案
+primary_codetable = ""
+# 主拼音方案 ID（临时拼音的目标方案，如双拼方案 id），留空 = 全拼 "pinyin"
+primary_pinyin = ""
+
+# ── 刻意不在本文件出现的一个键（实例集合，注册表类型 StructList）────────────
+# schema.mix_modes      临时融合模式列表（代码默认 = 内置「快捷」quick_mix，`;` 触发，
+#                       成员 quick_input.calc/.date/.number/.repeat + $primary_pinyin + english）
+#
+# 它是**结构体数组**，本文件一旦写出就会整体替换代码默认值，把当时的定义**冻结**
+# 成快照——日后在 `default_mix_modes()` 里给内置「快捷」加成员或改触发键，全部会被
+# 这份陈旧快照静默遮蔽（用户配置层已因设置页整表写回踩过同一个坑，见
+# `Config::migrate_quick_mix_pinyin_member`）。故真相源留在代码侧，本文件不写。
+# 它已在 `data_config_toml_covers_registry` 的豁免名单中登记。
+#
+# 原先并列的 `schema.special_modes` 已**删除**：特殊模式（快符/生僻字等）的实例集合
+# 改由「带 [overlay] 段的已安装方案」定义，呈现配置写在方案文件的 [overlay] 段，
+# 引导键与直达热键写在下方 [keys.key_actions]（如 backslash = "special:<方案id>"）。
+# 见 docs/redesign/overlay-mode-config.md。
+
+# 全局码表配置：所有码表方案公共基线（出厂取主力码表 wubi86 偏好）。
+# 方案个性覆盖：在方案 .schema.toml 的 [engine.codetable] 内联行为字段（作者基线），或
+# %APPDATA%/WindInput/schema_overrides/{id}.toml 同名的 [engine.codetable] 段（设置页写入，深合并覆盖）；
+# 二者段名/字段与本节一致，字段存在即覆盖、缺省即回落本节。
+[schema.codetable]
+top_code_commit = true
+clear_on_empty_max = false
+auto_commit_at_full = false
+# 自动上屏的最短码长（0 = 等于该方案全码长）。隐藏参数，设置页不暴露。
+auto_commit_min_len = 0
+punct_commit = true
+show_code_hint = true
+single_code_input = false
+single_code_complete = true
+z_key_repeat = true
+# z 键功能：空缓冲按 z、且 z 在本方案是死码（无以 z 开头的编码）时，进哪个模式。
+# 值域：""/none（作正常编码字母）/ temp_pinyin / temp_english / mix:<id> / special:<id>。
+# 与 z_key_repeat 正交：repeat 先手，继续打字母才轮到本项。
+# 出厂空 = 不启用；这是**方案级**配置，按码表在自己的 [engine.codetable] 里开。
+z_key_action = ""
+
+# 码元字符集：哪些字符可以进输入缓冲（决定一次按键是打码还是作标点/选词/透传）。
+# 格式为「范围 + 字面」，如 a-x（五笔标准）、a-x/（词库含 /test 这类词条）、a-z0-9（要打 Win10）。
+# `-` 写在首位或末位时作字面。大小写不敏感。出厂空 = 内置默认 a-z。
+# 这是**方案级**配置，按码表在自己的 [engine.codetable] 里写；此处是全局基线。
+input_chars = ""
+# 可作**首码**的字符集（input_chars 的子集）。空 = 与 input_chars 相同。
+# 典型用途：数字要能作码元（打得出 Win10）但不能起头——空缓冲下的数字键是选词/透传，
+# 若它同时是首码，就再也选不了「第 1 个候选」，也拿不回原生数字输入。
+# 故要数字作码元时，配 input_chars = "a-z0-9" 与 leading_chars = "a-z"。
+leading_chars = ""
+
+# 码表调频（全局唯一；strategy: top=一次到顶 MRU / step=逐次提升）。
+#
+# 首选保护按**输入码长分级**（见 docs/design/codetable-freq-short-code-protection.md）：
+# 词库靠权重表达简码的钦定地位（gen_dict 给一简 9999 / 二简 9950 / 三简 9000），但调频重排
+# 的比较链**不含 weight**，只看「有没有被选过」。五笔一简 25 个码每个都是二选一
+# （a → 工 9999 / 戈 9998），次选字被误选一次就永久翻转。故简码位保住首选、全码位放开。
+[schema.codetable.frequency]
+enabled = false
+# 兜底档：码长 ≥ 4 的深码位。0 = 不保护——那里正是调频该起作用的地方。
+protect_top_n = 0
+# 一简位（码长 1）：保护词库钦定首选。
+protect_top_n_len1 = 1
+# 二简位（码长 2）。
+protect_top_n_len2 = 1
+# 三简位（码长 3）：默认不保护，其钦定性弱于一二简。
+protect_top_n_len3 = 0
+strategy = "top"
+# 前缀补全候选参与位置提升的范围：none | single | all（默认 all）。
+# **仅 strategy = "position" 时生效**；top/step 走布尔 used-first，不读本项。
+# 码表默认 all 而拼音默认 single：码表的前缀补全已由来源档位隔离、跨不到精确档之前，
+# 无需再按语义单元收窄，且与 top/step 的历史行为一致。
+promote_prefix = "all"
+# 衰减半衰期（小时）：调频热度衰减到一半所需时间。**仅 strategy = "position" 时生效**。
+# 0 = 用内置默认 72 小时。**与 schema.pinyin.frequency.half_life 完全独立，不回落到它**
+# ——设置页上这是两个独立控件，回落链会让用户「码表的留在 0、改了拼音的、码表跟着变」。
+half_life = 0.0
+
+# 码表自动造词（连续单字）：连续单字上屏累积成序列，遇终止符（标点/回车/空格/焦点切换/
+# 光标移动/多字词上屏）或空闲超时后，按方案 [[encoder.rules]] 为整串算词组编码写入**临时
+# 词库**（立即可选），累计用满 promote_count 次才晋升进用户词库。
+[schema.codetable.auto_phrase]
+enabled = false
+# 造词最小字数。内部字段，设置页不暴露。
+min_phrase_len = 2
+# 造词最大字数。**超长序列整体放弃**，不截末尾 N 字——在连续多字中间切一刀，切出来的
+# 多半不是词，是杂词的主要来源。内部字段，设置页不暴露。
+max_phrase_len = 5
+# 临时词晋升进用户词库所需的使用次数。0 = 不晋升，一直留在临时词库。
+promote_count = 0
+# 连续单字之间的最大间隔（毫秒，0 = 用内置 5000）。超时则视作序列终止。
+# 兜底用：终止信号全漏时防止跨句拼出「加好加好」这类杂词。内部字段，设置页不暴露。
+idle_timeout_ms = 0
+# 临时词库条目上限（0 = 不限）。超出后淘汰权重最低者。内部字段，设置页不暴露。
+temp_max_entries = 5000
+
+# 全局拼音配置：所有拼音类方案（全拼/双拼/混输拼音子方案/临时拼音反查）共用一份。
+[schema.pinyin]
+show_code_hint = true
+use_smart_compose = true
+separator = "auto"
+
+# 双拼相关的全局行为。与**方案级** [engine.pinyin.shuangpin]（那里放 layout＝这个方案的
+# 编码规则）分工：本段是「这台机器怎么用双拼」的偏好，一次配置对所有双拼方案生效。
+[schema.pinyin.shuangpin]
+# 双拼方案下额外把击键当全拼再解释一遍（多人共用一台机器：主力打双拼，别人只会全拼）。
+# 只有**低置信**的全拼候选（前缀补全 / 子短语）沉底；精确整词与整句和双拼候选同层竞争，
+# 由消费长度决定先后。同一个词双拼也打得出时，留下的是双拼那条。
+# 非双拼方案下本项无效；混输的拼音次引擎强制关闭。
+allow_full_pinyin = false
+
+# 模糊音：enabled 是总开关，下面每项各自控制一组等价音（默认全关，逐项按需开启）。
+[schema.pinyin.fuzzy]
+enabled = false
+# 声母组
+zh_z = false
+ch_c = false
+sh_s = false
+n_l = false
+f_h = false
+r_l = false
+# 韵母组（前后鼻音）
+an_ang = false
+en_eng = false
+in_ing = false
+ian_iang = false
+uan_uang = false
+
+# 拼音调频（衰减参数；三个数值 0 = 用词频 store 的内置默认）。
+[schema.pinyin.frequency]
+enabled = true
+# 半衰期（小时）：词频热度衰减到一半所需时间。
+half_life = 0.0
+# base 系数与最近使用峰值：**当前模型不使用**，改动无效果。
+# 拼音词频已改为位置提升模型（按候选位次前移，不打分），只有 half_life 仍生效。
+# 保留这两项是为了将来若恢复打分模型可直接复用，见 docs/design/freq-rerank-model.md。
+base_scale = 0.0
+recency_peak = 0.0
+# 前缀补全候选参与词频位置提升的范围：none | single | all（默认 single）。
+#   none   —— 前缀补全一律不提升
+#   single —— 只提升「单个语义单元」的候选：中文单字、西文单词（如 hello）
+#   all    —— 全部提升
+# 判据是语义单元数而非字符数：英文所有候选都是前缀匹配（打 hel 出 hello），
+# 按字符数会把英文调频整个挡死。「东西」「thank you」都是 2 个单元，不提升。
+promote_prefix = "single"
+
+# 词组补全的音节数约束。约束的是「码比输入长」的补全词——即引擎在预测你还没打的音节。
+# 精确匹配、子短语、整句、简拼都不受影响（它们不预测任何东西）。
+#
+# 尺子是「输入自身的音节数」= 完整音节数 + (有尾部残码 ? 1 : 0)。`dianh` = dian + 残码 h
+# 算 2 个音节，故它照常出「电话」；而 `dian` / `xia` / `d` 都只算 1 个。
+[schema.pinyin.completion]
+# 至少输入几个音节才给出词组候选。
+# 2 = 打到第 2 个音节才给（`d`/`dian`/`xia` 只出单字，对齐主流拼音输入法）。
+# 1 = 不设限，回到 0.x 的历史行为（单字母就混进「但是」「的时候」）。
+min_syllables = 2
+# 词组最多比输入多几个音节。数值越大，引擎越敢预测你还没打的内容。
+# 0 = 只给音节数与输入相等的词；
+# 1 = 只补下一个音节（`nih` 出「你好」「你会」，不出 4 音节的「你会发现」）；
+# 3 = 出厂值；
+# 4 以上才够 `zhonghuar`（3 音节）补出 7 音节的「中华人民共和国」。
+max_extra_syllables = 3
+
+# 拼音自动造词。
+
+[schema.pinyin.auto_learn]
+enabled = true
+# 造词最小字数（0 = 用内置 2）。
+min_word_length = 0
+# 临时词晋升进用户词库所需的使用次数（0 = 用内置默认）。
+promote_count = 0
+
+# 全局英文配置：英文方案自身的行为。英文自 0.114 起是可切换方案，不再挂靠码表段
+# ——那是历史包袱（英文引擎复用码表的重排路径，配置就顺手挂在了 schema.codetable 下），
+# 结果纯码表用户的「上屏行为」里混着只对英文生效的项，英文用户改调频又会连带改掉五笔的。
+[schema.english]
+# 英文方案下上屏一个词后再补一个空格。英文是词间带空格的语言，连打时每次上屏都要多按一次。
+# 覆盖所有选中方式（空格/数字键/次三选键/鼠标）与「空格上屏原码」；回车上屏原码不补。
+commit_space = false
+
+# 英文调频。**没有 protect_top_n***：那组是「简码位首选保护」，判据是本次输入的码长，
+# 而英文没有简码位——一个 a 后面跟的是几万个词而不是钦定首选，照搬只会锁死前几位。
+[schema.english.frequency]
+enabled = false
+# top（一次到顶 MRU）/ step（逐次提升）/ position（位次渐进）。
+# **默认与码表不同**：英文候选几乎全是前缀匹配，top/step 那种「用过一次即整体跳到没用过
+# 的那批之前」过于激进，误选一次就把词顶到很显眼的位置且不衰减。position 每次只前移
+# 一半、久不用会回落，更适合前缀为主的场景。
+strategy = "position"
+# 前缀补全候选参与位置提升的范围：none | single | all。**仅 position 生效**。
+# 英文默认 all——它的候选本来就几乎全是前缀补全（打 hel 出 hello），收窄等于关掉大半。
+promote_prefix = "all"
+# 衰减半衰期（小时），0 = 内置默认 72 小时；仅 position 生效。与码表/拼音各自独立。
+half_life = 0.0
+# 词频记账码口径：candidate | input（默认 candidate）。原 codetable.frequency.english_code_scope。
+#   candidate —— 打 hel 选 hello 记成 (hello, hello)，之后打 he 也受益（跨码位共享）
+#   input     —— 记成 (hel, hello)，各前缀独立学习（与码表同侧）
+# ⚠️ 本项按**候选来源**生效而非按当前方案：混输方案里混进来的英文候选同样读它。
+code_scope = "candidate"
+
+# 全局混输配置（融合策略；全局唯一，无方案级 override）。
+[schema.mix]
+show_source_hint = false
+enable_english = false
+pinyin_only_overflow = true
+top_code_override_pinyin = false
+# 满码自动上屏**与顶码上屏**遇拼音候选则否决（粗粒度：整串只要查得出拼音候选就让路拼音，
+# 不看拼音成不成词）。与下方细粒度的 block_commit_on_pinyin_word 叠加，任一命中即否决。
+# 注意它同时管顶码上屏，而 schema.codetable.top_code_commit 出厂即开；
+# top_code_override_pinyin 可无视本否决强制倒向码表。
+# 它还是**满码空码清空**（schema.codetable.clear_on_empty_max）的总闸：开着时「已有拼音候选」
+# 或「拼音还没打完」都会拦下清空；关掉则拼音不再干预，满码只剩「部分匹配」的拼音候选时即清空
+# （如 nunl：候选「嫩」只解释了前 3 码 nun）。仍在打的词不受影响——wanl 有前缀补全候选
+# （wanle→完了，消费整串）照常拦住清空。
+auto_commit_block_on_pinyin = true
+# 满码上屏遇英文候选则否决（保护正在输入英文词的用户；仅 enable_english 开时有意义）。
+auto_commit_block_on_english = false
+min_pinyin_length = 2
+# 英文最小触发长度（2 字符以内不查英文；0=回退 3）。
+min_english_length = 3
+# 拼音歧义拦截（词强度）：整串是强拼音词时否决五笔自动/顶码上屏，让拼音赢
+# （wangba→网吧 拦；aipu→落实 无强词放行）。独立于 auto_commit_block_on_pinyin。
+block_commit_on_pinyin_word = true
+# 词强度权重阈值（0=仅结构判据：拼音首选须≥2汉字且消费整串；预留真机调）。
+pinyin_word_min_weight = 0
+# 混输时拼音是否产出简拼候选（声母缩写，nh→你好）。关闭后混输的拼音只认全拼，
+# 适合「只把拼音当临时输入补位」的用户——简拼会让几乎任何字母串都可能是拼音。
+# 仅影响混输的拼音子引擎，纯拼音方案不受影响。
+enable_pinyin_abbrev = true
+
+[schema.quick_input]
+# 注：; 由内置 mix「快捷」融合接管。各候选来源（计算 / 日期 / 数字金额 / 重复上屏 /
+# 拼音 / 英文）是该 mix 的 members 成员——开关即增删、优先级即顺序，真相源在代码侧的
+# default_mix_modes()，本文件不写 mix_modes（写了会把定义冻结成快照，见文件头说明）。
+# 本段只留与来源无关的全局项——没有总开关，禁用＝把 quick_mix 的 trigger_keys 清空。
+#
+# 「强制竖排」原是本段的 force_vertical，现已迁往 mix_modes[].candidate_layout ——
+# 它的判定条件本就是「**这个 mix 实例**含 quick 成员」，属于实例的显示属性。
+# 内置 quick_mix 出厂即 "vertical"，默认值在代码侧 default_mix_modes()（本文件不写
+# mix_modes，写了会把整份定义冻结成快照，见文件头说明）。存量 force_vertical 在加载期
+# 自动迁移：true → "vertical"，false → "follow"（不是 horizontal——false 的语义是「不强制」）。
+decimal_places = 6
+
+[input]
+filter_mode = "smart"
+enter_behavior = "commit"
+space_on_empty_behavior = "commit"
+numpad_behavior = "direct"
+# 顶码上屏时「已确认文字」如何落到宿主（内部/实验项，设置页不暴露）：
+#   direct_commit（默认）= 顶码时真提交，余码的新组合延到触发键 keyup 才开，靠隔一拍
+#                          消息泵躲开 diff 合并；无下划线歧义、WPS 智能标点顶屏不清空。
+#   pre_confirm         = 留在 TSF 组合态聚合，延到最终 CommitText 才真提交；diff 式宿主
+#                          （终端 / Chromium）不双写，但部分宿主会给整段画下划线。
+top_commit_mode = "direct_commit"
+
+# 检索范围放宽（filter_mode = "smart" 时的增强，见 docs/design/smart-filter-scope-relax.md）
+#
+# 智能档会滤掉「同码位已有常用字」的生僻字，代价是唯一编码被占的字彻底打不出——如五笔
+# 「桜」(sivg) 与常用「档」同码，只能整体切「全部字符」，且常忘记切回。
+#
+# 出路只有一条，且**完全由用户主动触发**：候选窗内翻页翻到底，再按一次向后翻页键，即把
+# 被滤掉的字追加到列表末尾；本次组合结束（上屏/取消）后自动恢复。刻意不做任何自动行为
+# ——「候选不足一页就自动补充」试过，平白改变了智能档的既有观感，已删除。
+[input.scope_relax]
+# 末页再按向后翻页键 → 临时放宽。候选不足一页时同样适用（那时只有一页，一样翻不动）。
+page_end_key = true
+# 放宽放出来的候选的前缀标注（空串=不标注），用于与正常候选区分。
+prefix = "·"
+
+# 启动默认状态（原 [general] 域）
+[input.default]
+remember_last_state = false
+chinese_mode = true
+full_width = false
+chinese_punct = true
+# 中英状态作用域："global"=所有应用共享（默认）；"app"=每个应用各自记忆中英文（会话级）
+state_scope = "global"
+
+# 标点：随中英、数字后智能英文标点、自定义映射
+[input.punct]
+follow_mode = false
+smart_after_digit = true
+smart_list = ".,:"
+# custom_enabled 为自定义标点映射总开关；custom_mappings 留空时全部走内置默认转换
+custom_enabled = false
+# 自定义标点映射表：key = 源字符（引号用 "1/"2/'1/'2 区分左右），
+# value = [中文半角, 英文全角, 中文全角, 英文半角]（空串或缺列 = 该状态回退默认转换）。
+# 例：custom_mappings = { "." = ["。", "．", "。", "."] }
+custom_mappings = {}
+
+# 智能符号：同一标点在时限内连按两次，删前一字符替换为另一形态。
+# 三个总开关互相独立，各管一种上下文，都默认关：
+#   smart_mode         = 中文标点状态：连按 → 换英文（数字后智能标点方向相反，见下）
+#   english_punct_mode = 中文输入 + 标点切英文：连按 → 换中文
+#   english_mode       = 英文输入模式：连按 → 换中文
+# 后两者拆成两个开关而非一个，是因为场景不同：前者是「用英文标点写中文、偶尔要个中文句号」，
+# 后者是「正在打英文」。多数人只想要前者，英文态保持纯净。
+[input.symbol]
+smart_mode = false
+smart_timeout_ms = 500
+smart_chars = "。，？！：；、～￥·……——"
+# 替换方案（「体感」与「兼容性」的取舍，故两者都保留）：
+#   delete_replace（默认）= 首次按键直接上屏中文符号，再按一次删掉重打成英文。所见即所得、
+#                           无预览态中间状态，实际体感更好；代价是依赖对宿主做删改。
+#   hold_composition      = 首次按键开 TSF 组合态预览中文符号，再按一次替换组合提交英文；
+#                           超时后自动提交中文。全程不做删改，**兼容性更好**，适合在
+#                           delete_replace 下表现异常的宿主。
+smart_method = "delete_replace"
+# 英文标点状态（中文输入模式 + 工具栏标点切英文）下的智能符号
+english_punct_mode = false
+# 英文输入模式（整个输入法切英文）下的智能符号。开启会让 core 把下面 english_chars 里的键
+# 推给输入法 DLL 吃下转发——英文半角下这些键本来直接透传给宿主，不吃就到不了引擎。
+# 故此开关影响面比上一个大，默认关。
+english_mode = false
+# 参与英文智能符号的**源字符**集合（上面两个开关共用）。与 smart_chars 存中文产物不同，
+# 这里存键本身的 ASCII 标点（`.` 而非 `。`）。
+# 不建议放配对符（([{"' 等）：英文模式下这些键被吃走后配对改由引擎处理，而 DLL 的跳出栈是
+# 空的，Tab 跳出会失效。
+english_chars = ".,?!:;"
+
+[input.temp_english]
+enabled = true
+# show_candidates：候选列表 = 原文 → 大小写变形（全小写/首字母大写/全大写，去掉与原文重复者）
+#                  → 英文词库前缀匹配（保持词库原文大小写）。关闭则只留原文一条。
+show_candidates = true
+# case_variants：是否生成上面那三条大小写变形候选。
+#   它们每条都占一个候选位——每页 5 条时能吃掉一半，把词库候选挤到下一页；
+#   且变形项没有词库带来的注释/词频，与词库候选交错时列表参差。
+#   只想要英文词库补全、不需要大小写变换的人可以关掉。
+case_variants = true
+shift_behavior = "temp_english"
+trigger_keys = []
+# allow_symbols：符号与数字直接入缓冲（C++ / hello2 / x64）而非上屏退出或选词。总开关，
+#                放行哪些字符由下面的 symbol_chars 精确决定。
+allow_symbols = false
+# symbol_chars：允许入缓冲的字符白名单，**逐字符字面匹配**（不支持 a-z 范围写法——`-` 在
+#               符号集里太常用，当成范围元字符会静默放行一大片）。留空 = 一个都不放行。
+#               列表外的字符一律维持 allow_symbols 关闭时的语义：符号「上屏高亮候选 +
+#               转换后标点 → 退出」，`;`/`'` 选第 2/3 候选，`-=[],.` 翻页，数字键 1-9 选词。
+#               ⚠ 列入的字符会交出上述职责：出厂含 `.` 与 `-` 是为了 obj.prop / e-mail /
+#               snake_case，代价是临英下 comma_period、minus_equal 两个翻页键组各被劈掉
+#               一半（上一页只剩 ↑ 与 PgUp），且「打完英文按句号上屏」失效。不需要就删掉它俩。
+#               另：缓冲里一旦出现非字母字符（如 C++），数字键无条件入缓冲——此时词库查不到，
+#               候选只剩原文与大小写变形，再把数字当选词键就打不出 C++11。
+symbol_chars = "0123456789+-_.@#/"
+# space_as_input：空格作为输入字符入缓冲（可打出带空格的英文短句）。上屏职责转给回车，
+#                 且回车此时上屏「高亮候选」而非原文——否则该配置下没有任何选词键可用。
+space_as_input = false
+# candidate_layout：进入本模式期间的候选排列方向，各模式都有同名项。
+#   follow（默认）= 跟随全局 ui.candidate.layout，用户改全局本模式跟着改
+#   vertical / horizontal = 本模式期间覆盖全局方向，退出自动恢复
+# 不是布尔：follow 与 vertical 只在全局本身竖排时才有区别（前者跟着变、后者恒定）。
+# 临英常设 horizontal——英文候选一行放得下，全局竖排时反而占屏。
+candidate_layout = "follow"
+# 模式级注释模板（高级，无图形界面）：本模式期间覆盖全局 ui.candidate.comment_template_*。
+#   不写这两个键 = 跟随全局；写空串 "" = 本模式不显示注释；写模板 = 本模式改用它。
+#   「不写」与「写空串」是两回事，所以这里刻意不预置——预置任何值都会改掉默认语义。
+#   临英的典型用法（挂了英汉注释库时，只在打英文时显示释义）：
+# comment_template_vertical   = "${dict}"
+# comment_template_horizontal = "${dict}"
+# 同样的两个键在 [input.temp_pinyin]、[input.url]、[[schema.mix_modes]]、
+# [[schema.special_modes]] 下也可用。说明见 https://windinput.com/docs/settings/appearance/candidate-comment
+
+[input.capslock]
+cancel_on_mode_switch = false
+
+[input.temp_pinyin]
+enabled = true
+trigger_keys = ["backtick"]
+# 直达热键（如 "ctrl+shift+p"；空串 = 不注册）。与 trigger_keys 引导键共存，
+# 用热键进入时组合区不写引导符。
+hotkey = ""
+candidate_layout = "follow"
+
+[input.auto_pair]
+chinese = false
+english = false
+chinese_pairs = ["（）", "【】", "｛｝", "《》", "〈〉"]
+english_pairs = ["()", "[]", "{}", "<>"]
+# 跳出配对的按键，可多选。"right_symbol" = 右符号键本身（打 ） 跳出已插入的 （）），
+# 其余为键名 tab / enter / space / escape。列表里没有就是没有，不做隐式补偿。
+# 引号等对称配对永不参与右符号跳出（按键不带「开/闭」信息），只能靠 tab / enter 跳出。
+jump_out_keys = ["right_symbol"]
+# 配对状态时效（秒），0 = 不过期。管的是同一个输入框内的状态陈旧：用户中途用鼠标点走、
+# 把括号退格删掉之后，很久之后的 Tab 不该再被当成跳出键吃掉。
+# 从最后一次按键算起，持续输入会不断刷新，在括号里打多久都不会误过期。
+# 跨焦点不归它管——失焦一律清空配对状态。
+state_ttl_secs = 120
+
+# URL 临时输入模式：正常输入下打出完整前缀（如 http / www.）即进入网址输入模式，
+# 模式内自由输入网址字符（不触发上屏），空格或回车上屏。默认关闭。
+[input.url]
+enabled = false
+prefixes = ["www.", "http", "https", "ftp."]
+candidate_layout = "follow"
+
+# 快捷加词面板（Ctrl+= 进入，见 [keys] add_word）。
+# 默认竖排：逐字确认的面板竖排更易读。此前是硬编码强制竖排、没有开关。
+[input.add_word]
+candidate_layout = "vertical"
+
+[input.s2t]
+enabled = false
+variant = "s2t"
+
+[input.cmdbar]
+enabled = false
+candidate_prefix = "⚡"
+
+# 短语前缀列举（原 [dict.phrase]）
+[input.phrase]
+min_prefix = 2
+
+[keys]
+toggle_mode_keys = ["lshift", "rshift"]
+commit_on_switch = true
+switch_engine = "ctrl+shift+e"
+toggle_full_width = "shift+space"
+toggle_punct = "ctrl+."
+delete_candidate = "ctrl+shift+number"
+pin_candidate = "ctrl+number"
+toggle_toolbar = 'ctrl+shift+\'
+open_settings = "ctrl+shift+]"
+add_word = "ctrl+equal"
+open_add_word_dialog = "ctrl+shift+equal"
+toggle_s2t = "ctrl+shift+j"
+activate_ime = "ctrl+shift+["
+take_screenshot = "ctrl+shift+f11"
+# 改用系统级 RegisterHotKey 抢占的**动作名**列表（不是键串）：列进来的动作会绕开宿主
+# 自身的同名快捷键。仅支持无需按键上下文的 7 个动作：
+#   switch_engine / toggle_full_width / toggle_punct / toggle_toolbar /
+#   open_settings / take_screenshot / toggle_s2t
+# 写入其它名字只会进 warn 日志并被忽略。activate_ime 不在此列（走系统
+# DirectSwitchHotkeys 注册表，不经 RegisterHotKey）。空 = 全部走普通键盘钩子。
+global_hotkeys = []
+# 方案直达热键：key = 方案 id，value = 热键串。按下即把该方案切成当前方案，
+# 效果等同用 switch_engine 循环键一路切到它（同样遵循 commit_on_switch、同样持久化）。
+# 例：schema_hotkeys = { english = "ctrl+shift+n", wubi86 = "ctrl+shift+w" }
+# 与 [[schema.special_modes]] 的 hotkey 是两回事：那个进 overlay、打完一段自动退回；
+# 这个是换方案，不再按一次不会回来。
+schema_hotkeys = {}
+# 按键功能表：key = 热键串，value = 动词。与上面「一个功能一个字段」的写法不同，
+# 这是「这个键干什么」的通用表，将来方案文件的 [key_actions] 用同一套动词值域
+# （见 docs/design/schema-key-actions.md）。
+# 当前支持的动词：
+#   toggle_schema:<方案id>  切到该方案；**再按一次回到来源方案**
+# 例：key_actions = { "ctrl+shift+n" = "toggle_schema:english" }
+# 与 schema_hotkeys 的区别就是那个回程：那个切过去不再按一次不会回来，这个会。
+# 无法识别的动词只进 warn 日志并被忽略。
+key_actions = {}
+# 会话态按键功能表：key = 键名，value = 动词。管的是「**正在打字**（有编码或候选）时这个
+# 键干什么」，与上面 key_actions 的「空闲时这个键干什么」是两张表——同一个键在两种状态下
+# 可以是两个动作（如 Tab 打字时翻页、空闲时仍是宿主的制表符）。
+# 键名：tab / shift+tab / capslock / pageup / pagedown / up / down / left / right / home /
+#       end，以及符号键 minus equal lbracket rbracket comma period semicolon quote 等。
+#       只认 shift+ 一种前缀；带 ctrl/alt 的组合键请写在上面的 key_actions 里。
+# 动词：page_prev / page_next / highlight_up / highlight_down
+#       cancel(放弃当前输入，等同 Esc；别名 clear) / none(在本态禁用该键)
+#       select_candidate:N(选中当前页第 N 个候选，N 从 1 起，2 即次选键)
+#       select_char:N(以词定字，取高亮候选词的第 N 个字，N 从 1 起)
+# 例（Tab 向下翻页、CapsLock 向上翻页）：
+#   session_actions = { tab = "page_next", "shift+tab" = "page_prev", capslock = "page_prev" }
+# 例（嫌 Esc 太远，用 Tab 放弃这一段）：
+#   session_actions = { tab = "cancel" }
+# 本表只存**你显式配的**键。下面四项 page_keys / highlight_keys / select_key_groups /
+# select_char_keys 各自独立保存，**运行时**才与本表合并（本表写了的键优先）——两边都
+# 保持原样，改一处不会动到另一处。出厂默认留在那四项里、不写在这，这样把它们清成 []
+# 就真的能关掉对应功能。
+# 撞键时按消费顺序裁决：以词定字 > 翻页/高亮 > 二三候选。
+# ⚠ capslock 与其它键不同：Windows 的大小写锁定状态在输入法拿到按键之前就已翻转，
+#   压不住。故本项一旦配了 capslock，程序会安装一个全局键盘钩子，在系统改状态之前
+#   拦下它（打字时才拦，空闲时 CapsLock 照常切大小写）。**不配 capslock 就完全不装
+#   这个钩子。** 副作用：极少数安全软件会对全局键盘钩子告警。
+session_actions = {}
+# 二三候选键（第1键选第2候选、第2键选第3候选）。可选键组：
+#   semicolon_quote(;/') / comma_period(,/.) / lrshift(左右Shift) / lrctrl(左右Ctrl)
+# 修饰键组（lrshift/lrctrl）在**松开**时才选词，且只认「轻敲」——按住超过 500ms 或中途
+# 按了别的键都不算，否则 Ctrl+A 的那一下 Ctrl 就会选走候选。与 toggle_mode_keys 撞键时：
+# 有候选选词，无候选切中英文（候选不足以命中该位次则吞键，不切换）。
+select_key_groups = ["semicolon_quote"]
+page_keys = ["pageupdown", "minus_equal"]
+highlight_keys = ["arrows", "tab"]
+# 以词定字：用成对标点键从当前高亮候选词中逐字上屏（第1键取第1字、第2键取第2字）。
+# 可选键组 comma_period(,/.) / minus_equal(-/=) / brackets([/])；空数组=禁用。
+# 词长不足时按 [keys.overflow].select_char_key 策略处理。
+select_char_keys = []
+
+# 无效按键策略（候选不足以命中目标位次时）：ignore=吞键 / commit=上屏高亮候选 /
+# commit_and_input=上屏高亮候选并追加该键字符。number_key=数字键、select_key=次/三选键、
+# select_char_key=以词定字键。
+[keys.overflow]
+number_key = "ignore"
+select_key = "ignore"
+select_char_key = "ignore"
+
+[ui.candidate]
+# 首显用过非权威坐标时，权威坐标与它相差在「行高 × 本值」以内就不再校正。
+# 校正动作本身才是抖动的观感来源；换行/重排的偏差远超此阈值，仍会正常校正。0 = 关闭容差。
+first_show_settle_ratio = 0.8
+# 两次按键间隔小于此毫秒数即视为连续输入，first_show_mode="fast" 时直接采信首条试探坐标
+# （连打不重排，跟手比精确更重要）。0 = 关闭该快路径。
+fast_typing_window_ms = 100
+# first_show_mode="fast" 的兜底超时（毫秒）：等不到试探/权威坐标就用现有坐标先显示。
+# 必须远小于 wait 档的 150ms——Word 这类宿主不发 OnLayoutChange 且组合坐标要 60~190ms 才到，
+# 连打时组合只活 27~57ms，上屏即作废 timer，150ms 兜底永远不会到期（fast 就退化成 wait）。
+fast_first_show_fallback_ms = 25
+font_size = 18
+font_size_follow_theme = true
+per_page = 7
+per_page_extended = 0
+max_chars = 16
+# 候选注释段（候选右侧灰字）模板。横排/竖排各一份、互不影响——两种排布能放的宽度差一个
+# 数量级（竖排每行独占，横排全部候选共享一行）。
+#
+# 语法：
+#   ${name}      变量替换
+#   ${a|b|c}     取首个非空的变量
+#   { ... }      可选段：段内变量全为空则整段（含字面文字）消失
+#   另：空变量会吞掉紧邻的一个空格；整个模板的变量全空时不显示任何内容。
+#
+# 可用变量：
+#   code_hint          引擎产的编码提示（码表前缀候选的剩余编码 si→sikao 标 kao；混输标记「拼」）
+#   code               主码表整词反查编码（仅拼音来源候选，且受方案 show_code_hint 门控）
+#   pinyin             带声调注音 nǐ hǎo（多音字按词典消歧：「行长」得 háng zhǎng 而非 xíng cháng）
+#   chaizi             拆字字根串，仅单字候选（需方案配了 [engine.chaizi]）
+#   chaizi_code        该字在拆字库里的编码，仅单字候选
+#   chaizi_all[:分隔符] 拆字字根不限字数，默认空格连接；如 ${chaizi_all:／}（可能很长，慎用于横排）
+#   dict               挂载的注释词库里该词的注释（见下方 [[ui.comment_dicts]]）
+#
+# 出厂值 ${code_hint|code} 等价于本功能引入前的固定行为。
+# 例：竖排显示字根与注音 → "{〔${chaizi}〕}{ ${pinyin}}"
+# 完整说明与更多示例：https://windinput.com/docs/settings/appearance/candidate-comment
+comment_template_vertical = "${code_hint|code}"
+comment_template_horizontal = "${code_hint|code}"
+# 注释段最大字数（0=不限），超出截断并加省略号。
+comment_max_chars = 0
+# 注释词库（供 ${dict} 变量查询）不随附任何内容——词典多有版权，由用户自行放置。
+# 需要时在**用户配置**里按下面的形态增补（出厂为空，故此处不预置）：
+#
+#   [[ui.comment_dicts]]
+#   id = "emoji"                          # 稳定标识（日志/设置页定位用）
+#   label = "Emoji 名称"
+#   path = "comments/emoji.dict.yaml"     # 相对 schemas/；用户目录优先，回落安装目录
+#   enabled = true
+#   schemas = []                          # 限定生效方案；留空=全部方案
+#
+# path 以 schemas/ 为基准（同拆字库、字根字体等方案附属资源）。放在那里是有意的：
+# 整机备份打包的是整个 schemas 目录（递归），注释库因此自动随备份走，
+# 不必再单列一处「记得也要备份」的目录。
+#
+# 数组顺序即优先级（同一个词多库都有注释时取靠前的）。schemas 用来避免无谓开销：
+# 一份大英汉词典写 schemas = ["english"] 后，中文方案下根本不加载。
+# 格式与更多示例：https://windinput.com/docs/settings/appearance/candidate-comment
+layout = "horizontal"
+# 编码显示方式：app_inline=内嵌应用光标处(候选窗不显 preedit) | candidate_top=候选窗顶部独立栏 | candidate_inline=编码内联候选首单元
+preedit_display = "app_inline"
+# 候选窗上翻到光标上方时的两个正交行为开关（可单独或叠加）：
+flip_when_above = false          # 反转候选项排列顺序（仅竖排 layout="vertical" 生效）
+                                 # 反转期间上下条目键（↑↓ / Shift+Tab、Tab）按屏幕方向走，翻页键不受影响
+swap_preedit_when_above = false  # 交换编码栏与候选栏位置（编码沉底贴光标）
+# 完全不显示候选窗（与上翻无关的独立开关；盲打用）。
+hide_window = false
+index_labels = ""
+pager_bar_display = ""
+page_number_display = ""
+pager_in_preedit = false         # 翻页栏并入编码栏行右对齐（竖排省一行；仅 candidate_top 生效）
+# 定位方式：follow_caret=跟随光标（默认） | fixed=固定屏幕位置（不再随光标移动，也不再上翻）
+position_mode = "follow_caret"
+# 固定模式下的内容左上屏幕坐标，由拖动候选窗落盘；(0,0)=尚未设定，首显落到屏幕默认锚点。
+custom_x = 0
+custom_y = 0
+
+[ui.font]
+family = ""
+path = ""
+render_mode = "directwrite"
+
+[ui.theme]
+name = "default"
+style = "system"
+
+[ui.mode_indicator]
+# 进入临时拼音/双拼/快捷/英文/快符等模式时的标识：short=短称(拼/双/快/英/符) | full=全称(临时拼音…) | none=不显示
+style = "short"
+
+[ui.status]
+enabled = true
+duration = 800
+display_mode = "temp"
+# 焦点切换到新输入框时也强制显示一次（提示"这个框现在是什么状态"）。
+# follow_caret 定位模式下，只有取到 TSF 权威坐标才显示——拿不到宁可不显示，也不弹在错位置。
+show_on_focus = false
+schema_name_style = "full"
+position_mode = "follow_caret"
+offset_x = 0
+offset_y = 0
+custom_x = 0
+custom_y = 0
+# 气泡显示哪些内容段；留空 = 全部显示。可选：schema/punct/full_width/s2t/caps
+items = ["schema", "punct", "full_width", "s2t", "caps"]
+
+# 悬停提示：原 ui.tooltip.{code,pinyin,chaizi,debug}.* 子表已拍平为平铺字段
+[ui.tooltip]
+delay = 200
+code_enabled = true
+pinyin_enabled = true
+pinyin_heteronyms = true
+pinyin_max_readings = 0
+chaizi_enabled = false
+debug_enabled = false
+
+[ui.toolbar]
+visible = true
+hide_in_fullscreen = true
+# 自动隐藏：显示后 auto_hide_delay 秒无交互则 1 秒淡出（悬停/拖动顺延；默认关）
+auto_hide = false
+auto_hide_delay = 5
+# 纵向排列：竖着摆放工具栏（默认横条）。几何仍取主题 [toolbar]，条宽=height、每格高=button_width。
+vertical = false
+
+[stats]
+enabled = true
+track_english = true
+
+[debug]
+# trace / debug / info / warn / error。注意 info 及以下级别不得含用户输入内容与候选词。
+log_level = "info"
+# 单个日志文件大小上限（MB），超出即滚动。
+log_max_size_mb = 10
+# 保留的旧日志文件数上限（不含主文件）。服务每次启动都会滚动一次，
+# 故该值约等于「能回溯最近几次运行」。
+log_max_files = 10

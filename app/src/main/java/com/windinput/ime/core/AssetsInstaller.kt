@@ -8,9 +8,14 @@ import java.io.File
 /**
  * 出厂数据安装器：把 APK assets/data 整树拷到 filesDir/data。
  *
- * 版本锚点 = versionCode（写入 data/.installed_version）：
- * - 首启或 App 升级（versionCode 变化）→ 出厂层整体重放（用户层不动）；
- * - 同版本 → 跳过，零 I/O。
+ * 版本锚点 = `versionCode:lastUpdateTime`（写入 data/.installed_version）：
+ * - 首启 / 升级 / **重装同版本** → 出厂层整体重放（用户层不动）；
+ * - 未变 → 跳过，零 I/O。
+ *
+ * ⚠ 锚点里必须带 `lastUpdateTime`，只用 versionCode 会在开发迭代中骗人：改了 assets
+ * 但没动版本号时 `installDebug` 装上去也不会重放，引擎读到的还是旧数据，现象是
+ * 「明明加了 system.phrases.toml，日志还说缺失」。重装同版本多拷一次的代价只有
+ * 几十毫秒，远低于这种误判的排查成本。
  *
  * 词库 yaml（GPL 合规，原文分发）后续同走此通道进入 data/schemas/，
  * mmap 与端上编译均要求真实文件路径，故必须拷出而非直接读 assets。
@@ -45,7 +50,7 @@ class AssetsInstaller(private val context: Context, private val dirs: DataDirs) 
             @Suppress("DEPRECATION")
             info.versionCode.toLong()
         }
-        "$code"
+        "$code:${info.lastUpdateTime}"
     } catch (e: PackageManager.NameNotFoundException) {
         "unknown"
     }

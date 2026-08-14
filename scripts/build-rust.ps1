@@ -19,8 +19,18 @@ $env:ANDROID_NDK_HOME = "D:\Develop\SDK\AndroidSdk\ndk\28.2.13676358"
 Push-Location $windInput
 try {
     # 1. 交叉编译 .so（模拟器 x86_64 + 真机 arm64）
-    $profileArg = if ($CargoProfile -eq "release") { @("--release") } else { @() }
-    cargo ndk -t x86_64 -t arm64-v8a -o $jniLibs build -p wind-android @profileArg
+    #
+    # ⚠ 参数一律拼进**一个数组**再整体 splat，不要写成 `... build -p x @profileArg`。
+    # PowerShell 的 `if` 会把单元素数组解包成标量：`$p = if (…) { @("--release") }`
+    # 得到的是 String 而非 Array，而 `@字符串` 是**按字符 splat**——实测传给 cargo 的
+    # 是 `- - r e l e a s e` 八个参数，报错只有一句 `unexpected argument '-' found`，
+    # 从错误信息完全看不出源头在这行。
+    $ndkArgs = @(
+        "-t", "x86_64", "-t", "arm64-v8a", "-o", $jniLibs,
+        "build", "-p", "wind-android"
+    )
+    if ($CargoProfile -eq "release") { $ndkArgs += "--release" }
+    cargo ndk @ndkArgs
     if ($LASTEXITCODE -ne 0) { throw "cargo ndk 失败（exit $LASTEXITCODE）" }
     # redb 声明了 cdylib，cargo-ndk 会一并拷出，APK 不需要
     Remove-Item -Force -ErrorAction SilentlyContinue "$jniLibs\*\libredb-*.so"

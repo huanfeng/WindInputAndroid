@@ -74,8 +74,9 @@ class FakeSession : ImeSession {
     }
 
     private fun publish() {
-        listener?.invoke(UiEvent.Composition(buffer.toString()))
-        listener?.invoke(UiEvent.Candidates(candidates()))
+        listener?.invoke(
+            UiEvent.Candidates(items = candidates(), preedit = buffer.toString(), modeLabel = "占"),
+        )
     }
 
     private fun commit(text: String) {

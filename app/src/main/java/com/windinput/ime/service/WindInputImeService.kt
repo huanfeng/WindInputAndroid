@@ -13,11 +13,13 @@ import android.widget.LinearLayout
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.AssetsInstaller
 import com.windinput.ime.core.ClipboardStore
+import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.FakeSession
 import com.windinput.ime.core.ImeSession
 import com.windinput.ime.core.RecentEmojiStore
 import com.windinput.ime.core.RustCoreLoader
 import com.windinput.ime.core.RustSession
+import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.keyboard.BarView
@@ -33,7 +35,9 @@ import com.windinput.ime.keyboard.LayoutRepository
 import com.windinput.ime.panels.ClipboardWindow
 import com.windinput.ime.panels.EmojiWindow
 import com.windinput.ime.panels.ExpandedCandidatesWindow
+import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
+import com.windinput.ime.settings.SettingsActivity
 import java.io.File
 
 /**
@@ -54,6 +58,7 @@ class WindInputImeService :
     TextEditingWindow.Listener,
     ClipboardWindow.Listener,
     EmojiWindow.Listener,
+    QuickPanelWindow.Listener,
     ExpandedCandidatesWindow.Listener {
 
     private lateinit var session: ImeSession
@@ -76,6 +81,10 @@ class WindInputImeService :
     private var clipboardWindow: ClipboardWindow? = null
     private var emojiWindow: EmojiWindow? = null
     private var expandedCandidatesWindow: ExpandedCandidatesWindow? = null
+    private var quickPanelWindow: QuickPanelWindow? = null
+
+    /** 编码是否同时写进宿主组合区（ui.android.inline_preedit，默认关，见 onUiEvent） */
+    private var inlinePreedit = false
 
     override fun onCreate() {
         super.onCreate()
@@ -132,6 +141,7 @@ class WindInputImeService :
         clipboardWindow = ClipboardWindow(clipboardStore, listener = this)
         emojiWindow = EmojiWindow(recentEmojiStore, listener = this)
         expandedCandidatesWindow = ExpandedCandidatesWindow(listener = this)
+        quickPanelWindow = QuickPanelWindow(listener = this)
 
         windowManager = InputWindowManager(panelContainer, keyboardWindow!!).also {
             it.attachInitial()
@@ -178,6 +188,7 @@ class WindInputImeService :
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
             enterLabel = enterActionLabel(info)
         }
+        inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
         selecting = false
         windowManager?.showKeyboard()
         applyEditorScene(info)
@@ -231,6 +242,10 @@ class WindInputImeService :
         val ic = currentInputConnection
         when (event) {
             is UiEvent.Composition -> {
+                // 编码默认只显示在自绘编码栏，不塞进宿主组合区：五笔码（"aa"）嵌在
+                // 正文里是噪声，且与编码栏重复。想要宿主内联的用户开
+                // ui.android.inline_preedit。
+                if (!inlinePreedit) return
                 if (event.preedit.isEmpty()) {
                     ic?.finishComposingText()
                 } else {
@@ -238,7 +253,13 @@ class WindInputImeService :
                 }
             }
             is UiEvent.Candidates -> {
-                barView?.setCandidates(event.items)
+                barView?.setCandidateFrame(
+                    items = event.items,
+                    preedit = event.preedit,
+                    modeLabel = event.modeLabel,
+                    page = event.page,
+                    totalPages = event.totalPages,
+                )
                 expandedCandidatesWindow?.setCandidates(event.items)
                 // 候选清空时若停留在展开面板，收回键盘
                 if (event.items.isEmpty() &&
@@ -248,7 +269,23 @@ class WindInputImeService :
                 }
             }
             is UiEvent.CommitText -> ic?.commitText(event.text, 1)
+            is UiEvent.Status -> {
+                barView?.setStatus(event)
+                quickPanelWindow?.updateStatus(event)
+            }
+            is UiEvent.Toast -> showToast(event.text)
         }
+    }
+
+    /**
+     * 引擎提示：用系统 Toast 而非自绘浮层。
+     *
+     * IME 进程可以弹 Toast（不需要窗口焦点），而自绘浮层要么占键盘空间、要么得申请
+     * 悬浮窗权限——为一句「已切换到五笔」不值得。
+     */
+    private fun showToast(text: String) {
+        if (text.isBlank()) return
+        android.widget.Toast.makeText(this, text, android.widget.Toast.LENGTH_SHORT).show()
     }
 
     // ── 键盘回调 ─────────────────────────────────────────────────
@@ -308,11 +345,46 @@ class WindInputImeService :
     override fun onToolbarAction(action: BarView.ToolbarAction) {
         val wm = windowManager ?: return
         when (action) {
+            BarView.ToolbarAction.QUICK_PANEL -> quickPanelWindow?.let { wm.show(it) }
             BarView.ToolbarAction.EMOJI -> emojiWindow?.let { wm.show(it) }
             BarView.ToolbarAction.CLIPBOARD -> clipboardWindow?.let { wm.show(it) }
             BarView.ToolbarAction.TEXT_EDIT -> textEditingWindow?.let { wm.show(it) }
+            BarView.ToolbarAction.SETTINGS -> openSettings()
             BarView.ToolbarAction.HIDE_IME -> requestHideSelf(0)
         }
+    }
+
+    // ── 快捷功能面板 ─────────────────────────────────────────────
+
+    override fun onQuickCommand(cmd: EngineCmd) {
+        session.runCommand(cmd)
+    }
+
+    override fun quickSchemas(): List<SchemaEntry> = session.schemas()
+
+    override fun onOpenPanel(target: QuickPanelWindow.Target) {
+        val wm = windowManager ?: return
+        when (target) {
+            QuickPanelWindow.Target.EMOJI -> emojiWindow?.let { wm.show(it) }
+            QuickPanelWindow.Target.CLIPBOARD -> clipboardWindow?.let { wm.show(it) }
+            QuickPanelWindow.Target.TEXT_EDIT -> textEditingWindow?.let { wm.show(it) }
+        }
+    }
+
+    override fun onOpenSettings() = openSettings()
+
+    /**
+     * 打开设置页。
+     *
+     * `NEW_TASK` 是必须的：输入法服务不是 Activity，没有任务栈可挂；
+     * 同时收起键盘，否则设置页起来后键盘悬在上面挡住内容。
+     */
+    private fun openSettings() {
+        requestHideSelf(0)
+        startActivity(
+            android.content.Intent(this, SettingsActivity::class.java)
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     override fun onExpandCandidates() {
