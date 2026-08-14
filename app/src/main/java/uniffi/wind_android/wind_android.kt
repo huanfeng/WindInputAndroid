@@ -733,8 +733,6 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
     ): Int
-    external fun uniffi_wind_android_checksum_method_windcore_spawn_warmup_once(
-    ): Int
     external fun uniffi_wind_android_checksum_constructor_windcore_new(
     ): Int
     external fun ffi_wind_android_uniffi_contract_version(
@@ -780,14 +778,12 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_focus_lost(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,`modifiers`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
-    external fun uniffi_wind_android_fn_method_windcore_spawn_warmup_once(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
     external fun uniffi_wind_android_fn_func_init_logging(`filter`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun ffi_wind_android_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -930,16 +926,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_focus_lost() != 17783) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 26693) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 15385) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_run_command() != 36173) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_wind_android_checksum_method_windcore_spawn_warmup_once() != 36030) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 57465) {
@@ -1136,6 +1129,33 @@ private class JavaLangRefCleanable(
 /**
  * @suppress
  */
+public object FfiConverterUByte: FfiConverter<UByte, Byte> {
+    override fun lift(value: Byte): UByte {
+        return value.toUByte()
+    }
+
+    fun lift(value: Int): UByte {
+        return value.toUByte()
+    }
+
+    override fun read(buf: ByteBuffer): UByte {
+        return lift(buf.get())
+    }
+
+    override fun lower(value: UByte): Byte {
+        return value.toByte()
+    }
+
+    override fun allocationSize(value: UByte) = 1UL
+
+    override fun write(value: UByte, buf: ByteBuffer) {
+        buf.put(value.toByte())
+    }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterUInt: FfiConverter<UInt, Int> {
     override fun lift(value: Int): UInt {
         return value.toUInt()
@@ -1153,6 +1173,29 @@ public object FfiConverterUInt: FfiConverter<UInt, Int> {
 
     override fun write(value: UInt, buf: ByteBuffer) {
         buf.putInt(value.toInt())
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterInt: FfiConverter<Int, Int> {
+    override fun lift(value: Int): Int {
+        return value
+    }
+
+    override fun read(buf: ByteBuffer): Int {
+        return buf.getInt()
+    }
+
+    override fun lower(value: Int): Int {
+        return value
+    }
+
+    override fun allocationSize(value: Int) = 4UL
+
+    override fun write(value: Int, buf: ByteBuffer) {
+        buf.putInt(value)
     }
 }
 
@@ -1771,9 +1814,11 @@ public interface WindCoreInterface {
     fun `focusLost`()
     
     /**
-     * 按下键（vk = wind-keys VK 码）。抬起事件骨架期不喂（协调器按键链以 down 为主）。
+     * 按下键（vk = wind-keys VK 码，`modifiers` 见 [`wind_host::Modifiers`]）。
+     *
+     * 抬起事件骨架期不喂（协调器按键链以 down 为主）。
      */
-    fun `keyDown`(`vk`: kotlin.UInt): KeyResult
+    fun `keyDown`(`vk`: kotlin.UInt, `modifiers`: kotlin.UInt): KeyResult
     
     /**
      * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
@@ -1786,19 +1831,6 @@ public interface WindCoreInterface {
      * ——顺序取自引擎管理器，与协调器内部的选择下标同源，K 侧不要自行排序。
      */
     fun `schemas`(): List<SchemaInfo>
-    
-    /**
-     * 后台预热首次真实查询会触发的惰性构建，只跑一次。
-     *
-     * **为什么必须在 `focus_gained` 之后而不是构造期**：协调器在无编辑上下文时
-     * （`ime_active=false`）会把按键短路掉，构造期喂的假按键根本走不到候选构建，
-     * 实测「预热」只花 3ms 就返回、惰性构建原封不动留给用户的第一次按键。
-     *
-     * **为什么走真实按键路径而不是调某个 preload 函数**：要预热的是反查/合并索引
-     * （88526 条聚合成 combined.wdat，真机冷启动实测同步阻塞 2.8 秒），它的触发点
-     * 埋在候选构建链深处；另写一条预加载路径必然与真实路径漂移，漏掉一处就白做。
-     */
-    fun `spawnWarmupOnce`()
     
     companion object
 }
@@ -1958,15 +1990,18 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
-     * 按下键（vk = wind-keys VK 码）。抬起事件骨架期不喂（协调器按键链以 down 为主）。
-     */override fun `keyDown`(`vk`: kotlin.UInt): KeyResult {
+     * 按下键（vk = wind-keys VK 码，`modifiers` 见 [`wind_host::Modifiers`]）。
+     *
+     * 抬起事件骨架期不喂（协调器按键链以 down 为主）。
+     */override fun `keyDown`(`vk`: kotlin.UInt, `modifiers`: kotlin.UInt): KeyResult {
             return FfiConverterTypeKeyResult.lift(
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_method_windcore_key_down(
         it,
         
-        FfiConverterUInt.lower(`vk`),_status)
+        FfiConverterUInt.lower(`vk`),
+        FfiConverterUInt.lower(`modifiers`),_status)
 }
     }
     )
@@ -2005,29 +2040,6 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     }
     )
     }
-    
-
-    
-    /**
-     * 后台预热首次真实查询会触发的惰性构建，只跑一次。
-     *
-     * **为什么必须在 `focus_gained` 之后而不是构造期**：协调器在无编辑上下文时
-     * （`ime_active=false`）会把按键短路掉，构造期喂的假按键根本走不到候选构建，
-     * 实测「预热」只花 3ms 就返回、惰性构建原封不动留给用户的第一次按键。
-     *
-     * **为什么走真实按键路径而不是调某个 preload 函数**：要预热的是反查/合并索引
-     * （88526 条聚合成 combined.wdat，真机冷启动实测同步阻塞 2.8 秒），它的触发点
-     * 埋在候选构建链深处；另写一条预加载路径必然与真实路径漂移，漏掉一处就白做。
-     */override fun `spawnWarmupOnce`()
-        = 
-    callWithHandle {
-    uniffiRustCall() { _status ->
-    UniffiLib.uniffi_wind_android_fn_method_windcore_spawn_warmup_once(
-        it,
-        _status)
-}
-    }
-    
     
 
     
@@ -2161,6 +2173,72 @@ public object FfiConverterTypeCandidateUpdate: FfiConverterRustBuffer<CandidateU
 
 
 /**
+ * 一次编辑操作（[`wind_host::EditOp`] 的 FFI 投影）。
+ *
+ * UniFFI 的枚举载荷支持有限，此处摊平成带 `kind` 判别位的 Record：
+ * Kotlin 侧一个 `when(kind)` 分派到对应的 `InputConnection` 调用。
+ */
+data class EditOp (
+    /**
+     * 0=Commit 1=SetComposition 2=DeleteBackward 3=ReplaceBackward 4=MoveCursor
+     */
+    var `kind`: kotlin.UByte
+    , 
+    /**
+     * Commit/SetComposition/ReplaceBackward 的文本
+     */
+    var `text`: kotlin.String
+    , 
+    /**
+     * SetComposition 的插入符（字符数）；DeleteBackward/ReplaceBackward 的字符数
+     */
+    var `count`: kotlin.UInt
+    , 
+    /**
+     * MoveCursor 的位移（正右负左）
+     */
+    var `delta`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeEditOp: FfiConverterRustBuffer<EditOp> {
+    override fun read(buf: ByteBuffer): EditOp {
+        return EditOp(
+            FfiConverterUByte.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: EditOp) = (
+            FfiConverterUByte.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`text`) +
+            FfiConverterUInt.allocationSize(value.`count`) +
+            FfiConverterInt.allocationSize(value.`delta`)
+    )
+
+    override fun write(value: EditOp, buf: ByteBuffer) {
+            FfiConverterUByte.write(value.`kind`, buf)
+            FfiConverterString.write(value.`text`, buf)
+            FfiConverterUInt.write(value.`count`, buf)
+            FfiConverterInt.write(value.`delta`, buf)
+    }
+}
+
+
+
+/**
  * 引擎当前模式真值。**数据，不是界面**——工具栏画几个格、放哪、什么图标由 Kotlin 决定。
  */
 data class InputStatus (
@@ -2228,7 +2306,11 @@ public object FfiConverterTypeInputStatus: FfiConverterRustBuffer<InputStatus> {
 
 
 /**
- * 按键事件的同步结果（主输入路返回值的移动端投影）
+ * 按键事件的同步结果。
+ *
+ * 从「上屏文本 + 组合区」这种**三元组投影**改成**指令流**：前者只装得下 InsertText 族，
+ * 智能符号配对、回退替换、配对跳出这些动作在移动端被静默丢弃（不报错、不掉键，
+ * 单纯功能没有）。指令流由核心的穷尽映射产出，新增动作会在核心编译期报错。
  */
 data class KeyResult (
     /**
@@ -2237,19 +2319,14 @@ data class KeyResult (
     var `consumed`: kotlin.Boolean
     , 
     /**
-     * 需上屏的文本（空 = 无）
+     * 按序执行的编辑指令
      */
-    var `commitText`: kotlin.String
+    var `ops`: List<EditOp>
     , 
     /**
-     * 新组合区内容（配合 `composition_changed` 使用）
+     * 模式是否变化（宿主据此刷新指示器；具体状态走推送通道）
      */
-    var `composition`: kotlin.String
-    , 
-    /**
-     * 组合区是否需要更新（true 且 composition 为空 = 清除组合区）
-     */
-    var `compositionChanged`: kotlin.Boolean
+    var `modeChanged`: kotlin.Boolean
     
 ){
     
@@ -2267,24 +2344,21 @@ public object FfiConverterTypeKeyResult: FfiConverterRustBuffer<KeyResult> {
     override fun read(buf: ByteBuffer): KeyResult {
         return KeyResult(
             FfiConverterBoolean.read(buf),
-            FfiConverterString.read(buf),
-            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeEditOp.read(buf),
             FfiConverterBoolean.read(buf),
         )
     }
 
     override fun allocationSize(value: KeyResult) = (
             FfiConverterBoolean.allocationSize(value.`consumed`) +
-            FfiConverterString.allocationSize(value.`commitText`) +
-            FfiConverterString.allocationSize(value.`composition`) +
-            FfiConverterBoolean.allocationSize(value.`compositionChanged`)
+            FfiConverterSequenceTypeEditOp.allocationSize(value.`ops`) +
+            FfiConverterBoolean.allocationSize(value.`modeChanged`)
     )
 
     override fun write(value: KeyResult, buf: ByteBuffer) {
             FfiConverterBoolean.write(value.`consumed`, buf)
-            FfiConverterString.write(value.`commitText`, buf)
-            FfiConverterString.write(value.`composition`, buf)
-            FfiConverterBoolean.write(value.`compositionChanged`, buf)
+            FfiConverterSequenceTypeEditOp.write(value.`ops`, buf)
+            FfiConverterBoolean.write(value.`modeChanged`, buf)
     }
 }
 
@@ -2526,6 +2600,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeEditOp: FfiConverterRustBuffer<List<EditOp>> {
+    override fun read(buf: ByteBuffer): List<EditOp> {
+        val len = buf.getInt()
+        return List<EditOp>(len) {
+            FfiConverterTypeEditOp.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<EditOp>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeEditOp.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<EditOp>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeEditOp.write(it, buf)
         }
     }
 }

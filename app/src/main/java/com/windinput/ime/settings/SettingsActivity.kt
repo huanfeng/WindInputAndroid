@@ -50,6 +50,9 @@ class SettingsActivity : ComponentActivity() {
                     onEnableIme = {
                         startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
                     },
+                    onOpenTestPad = {
+                        startActivity(Intent(this, TestPadActivity::class.java))
+                    },
                 )
             }
         }
@@ -61,6 +64,7 @@ private fun SettingsScreen(
     groups: List<SettingGroup>,
     config: UserConfig,
     onEnableIme: () -> Unit,
+    onOpenTestPad: () -> Unit,
 ) {
     // 状态缓存：key → 当前值（初值 = 用户配置 ?: 清单默认）
     val toggles = remember {
@@ -97,17 +101,34 @@ private fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(onClick = onEnableIme)
-                        .padding(16.dp),
-                ) {
-                    Text(text = "启用输入法")
-                    Text(
-                        text = "在系统设置中启用「清风输入法」",
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
+                Column {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onEnableIme)
+                            .padding(16.dp),
+                    ) {
+                        Text(text = "启用输入法")
+                        Text(
+                            text = "在系统设置中启用「清风输入法」",
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
+                    // 手动试打入口。与自动化测试**共用同一个页面**：改完布局/主题/方案
+                    // 能立刻在这里验，不必切到别的 App（借用别家输入框还会被它自己的
+                    // 自动补全、场景切换干扰）。
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onOpenTestPad)
+                            .padding(16.dp),
+                    ) {
+                        Text(text = "输入测试台")
+                        Text(
+                            text = "普通/搜索/数字/密码四种场景的输入框，用于试打",
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                 }
             }
 

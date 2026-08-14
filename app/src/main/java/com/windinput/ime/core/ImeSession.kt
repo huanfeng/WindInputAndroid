@@ -7,9 +7,31 @@ import com.windinput.ime.keyboard.KeyAction
  *
  * 与主仓协议语义对应（docs/architecture.md §3.1）：候选列表/编码区/上屏文本/模式状态。
  */
+/**
+ * 一次编辑操作（核心 `wind_host::EditOp` 的 Kotlin 投影）。
+ *
+ * 按键结果从「上屏文本 + 组合区」的三元组改成指令流，是因为前者只装得下最基本的
+ * 插入动作：智能符号配对、回退替换、配对跳出这些在移动端曾被**静默丢弃**
+ * （不报错、不掉键，单纯功能没有）。指令由核心的穷尽映射产出，新增动作会在核心编译期报错。
+ */
+sealed interface EditOp {
+    data class Commit(val text: String) : EditOp
+
+    /** @param caret 插入符在 [text] 内的字符位置 */
+    data class SetComposition(val text: String, val caret: Int) : EditOp
+
+    data class DeleteBackward(val count: Int) : EditOp
+
+    /** 删除光标前 [count] 个字符后插入 [text]（一步完成，宿主撤销栈才记成一次） */
+    data class ReplaceBackward(val count: Int, val text: String) : EditOp
+
+    /** 光标水平移动（正右负左），单位字符 */
+    data class MoveCursor(val delta: Int) : EditOp
+}
+
 sealed interface UiEvent {
-    /** 宿主组合区变化（空串 = 清除）。编码栏走 [Candidates].preedit，两者互斥使用 */
-    data class Composition(val preedit: String) : UiEvent
+    /** 编辑指令流：按序执行 */
+    data class Edits(val ops: List<EditOp>) : UiEvent
 
     /**
      * 候选帧：编码栏与候选栏一次渲染所需的全部数据。
@@ -26,9 +48,6 @@ sealed interface UiEvent {
         val page: Int = 1,
         val totalPages: Int = 1,
     ) : UiEvent
-
-    /** 上屏文本 */
-    data class CommitText(val text: String) : UiEvent
 
     /**
      * 引擎模式真值变化。

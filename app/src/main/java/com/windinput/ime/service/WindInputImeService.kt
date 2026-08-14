@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.AssetsInstaller
 import com.windinput.ime.core.ClipboardStore
+import com.windinput.ime.core.EditOp
 import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.FakeSession
 import com.windinput.ime.core.ImeSession
@@ -241,17 +242,7 @@ class WindInputImeService :
     private fun onUiEvent(event: UiEvent) {
         val ic = currentInputConnection
         when (event) {
-            is UiEvent.Composition -> {
-                // 编码默认只显示在自绘编码栏，不塞进宿主组合区：五笔码（"aa"）嵌在
-                // 正文里是噪声，且与编码栏重复。想要宿主内联的用户开
-                // ui.android.inline_preedit。
-                if (!inlinePreedit) return
-                if (event.preedit.isEmpty()) {
-                    ic?.finishComposingText()
-                } else {
-                    ic?.setComposingText(event.preedit, 1)
-                }
-            }
+            is UiEvent.Edits -> applyEdits(ic ?: return, event.ops)
             is UiEvent.Candidates -> {
                 barView?.setCandidateFrame(
                     items = event.items,
@@ -268,13 +259,68 @@ class WindInputImeService :
                     windowManager?.showKeyboard()
                 }
             }
-            is UiEvent.CommitText -> ic?.commitText(event.text, 1)
             is UiEvent.Status -> {
                 barView?.setStatus(event)
                 quickPanelWindow?.updateStatus(event)
             }
             is UiEvent.Toast -> showToast(event.text)
         }
+    }
+
+    /**
+     * 执行核心下发的编辑指令流。
+     *
+     * 每条指令都有 `InputConnection` 的直接对应物——这正是把按键结果从「上屏文本 +
+     * 组合区」的三元组改成指令流的理由：智能符号配对、回退替换、配对跳出以前在这里
+     * 无处落地，只能被丢弃（不报错、不掉键，单纯功能没有）。
+     *
+     * `beginBatchEdit` 包住整批：一次按键的多条指令（如「上屏 + 开新组合」）在宿主
+     * 撤销栈里应该是一步，也避免中间态触发多次 reflow。
+     */
+    private fun applyEdits(ic: android.view.inputmethod.InputConnection, ops: List<EditOp>) {
+        if (ops.isEmpty()) return
+        ic.beginBatchEdit()
+        try {
+            for (op in ops) {
+                when (op) {
+                    is EditOp.Commit -> ic.commitText(op.text, 1)
+                    is EditOp.SetComposition -> {
+                        if (op.text.isEmpty()) {
+                            ic.finishComposingText()
+                        } else if (inlinePreedit) {
+                            // 编码默认只显示在自绘编码栏：五笔码嵌在正文里是噪声，且与
+                            // 编码栏重复。想要宿主内联的用户开 ui.android.inline_preedit。
+                            ic.setComposingText(op.text, op.caret.coerceAtLeast(1))
+                        }
+                    }
+                    // 按**码点**删除：核心按字符计数，deleteSurroundingText 的单位是
+                    // UTF-16 code unit，emoji 等增补平面字符会被删半个。
+                    is EditOp.DeleteBackward ->
+                        ic.deleteSurroundingTextInCodePoints(op.count, 0)
+                    is EditOp.ReplaceBackward -> {
+                        ic.deleteSurroundingTextInCodePoints(op.count, 0)
+                        ic.commitText(op.text, 1)
+                    }
+                    is EditOp.MoveCursor -> moveCursor(ic, op.delta)
+                }
+            }
+        } finally {
+            ic.endBatchEdit()
+        }
+    }
+
+    /** 相对移动光标：取当前选区绝对位置再 setSelection，比连发方向键可靠 */
+    private fun moveCursor(ic: android.view.inputmethod.InputConnection, delta: Int) {
+        if (delta == 0) return
+        val extracted = ic.getExtractedText(ExtractedTextRequest(), 0)
+        if (extracted == null) {
+            // 拿不到选区时退回方向键（部分宿主不支持 ExtractedText）
+            val code = if (delta > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
+            repeat(kotlin.math.abs(delta)) { sendDownUpKeyEvents(code) }
+            return
+        }
+        val pos = (extracted.startOffset + extracted.selectionEnd + delta).coerceAtLeast(0)
+        ic.setSelection(pos, pos)
     }
 
     /**

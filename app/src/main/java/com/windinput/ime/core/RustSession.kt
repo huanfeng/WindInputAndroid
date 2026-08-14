@@ -147,12 +147,12 @@ class RustSession(
         dispatch(VK_ESCAPE)
     }
 
-    /** 喂键并应用同步结果（commit/组合区）。@return 是否被引擎消费 */
+    /** 喂键并派发编辑指令流。@return 是否被引擎消费 */
     private fun dispatch(vk: UInt): Boolean {
         // JNI 往返耗时单独计：它在**主线程**上同步阻塞，是输入延迟里唯一不可
         // 让位给渲染的一段。超过一帧（16ms）就必须改成异步，故按帧标注。
         val t0 = SystemClock.elapsedRealtimeNanos()
-        val result = core.keyDown(vk)
+        val result = core.keyDown(vk, 0u)
         val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
         if (costUs > FRAME_BUDGET_US) {
             Log.w(TAG, "keyDown 阻塞主线程 ${costUs}µs（超一帧）vk=0x${vk.toString(16)}")
@@ -160,16 +160,28 @@ class RustSession(
         Log.d(
             TAG,
             "vk=0x${vk.toString(16)} ${costUs}µs -> consumed=${result.consumed} " +
-                "commit='${result.commitText}' comp='${result.composition}' " +
-                "changed=${result.compositionChanged}",
+                "ops=${result.ops.size}",
         )
-        if (result.commitText.isNotEmpty()) {
-            listener?.invoke(UiEvent.CommitText(result.commitText))
-        }
-        if (result.compositionChanged) {
-            listener?.invoke(UiEvent.Composition(result.composition))
+        if (result.ops.isNotEmpty()) {
+            listener?.invoke(UiEvent.Edits(result.ops.map(::toEditOp)))
         }
         return result.consumed
+    }
+
+    /**
+     * FFI 的扁平 Record → Kotlin 密封类。
+     *
+     * `kind` 判别位的取值由核心 `wind-android` 的 `EditOp` 定义，两边必须同步；
+     * 未知取值**抛异常而不是忽略**——静默忽略正是「新动作上了核心、移动端悄无声息
+     * 地没有」的老路。
+     */
+    private fun toEditOp(op: uniffi.wind_android.EditOp): EditOp = when (op.kind.toInt()) {
+        0 -> EditOp.Commit(op.text)
+        1 -> EditOp.SetComposition(op.text, op.count.toInt())
+        2 -> EditOp.DeleteBackward(op.count.toInt())
+        3 -> EditOp.ReplaceBackward(op.count.toInt(), op.text)
+        4 -> EditOp.MoveCursor(op.delta)
+        else -> error("未知 EditOp.kind=${op.kind}，核心与 K 侧的判别位定义已漂移")
     }
 
     /** 软键 → wind-keys VK 码；null = 不进引擎（调用方走默认行为） */

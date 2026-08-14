@@ -81,7 +81,7 @@ class FakeSession : ImeSession {
 
     private fun commit(text: String) {
         buffer.setLength(0)
-        listener?.invoke(UiEvent.CommitText(text))
+        listener?.invoke(UiEvent.Edits(listOf(EditOp.Commit(text))))
         publish()
     }
 }
