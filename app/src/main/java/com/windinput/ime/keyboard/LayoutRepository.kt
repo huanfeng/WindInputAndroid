@@ -118,6 +118,7 @@ class LayoutRepository(private val dirs: DataDirs) {
                 "enter" -> KeyAction.Enter
                 "space" -> KeyAction.Space
                 "switch_symbols" -> KeyAction.SwitchSymbols
+                "switch_lang" -> KeyAction.SwitchLang
                 else -> throw IllegalArgumentException("未知 action: $name")
             }
             val label = entry.getString("label")

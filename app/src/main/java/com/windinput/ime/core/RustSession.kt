@@ -35,12 +35,37 @@ class RustSession(
         private const val VK_OEM_COMMA = 0xBCu
         private const val VK_OEM_PERIOD = 0xBEu
 
+        /** 进程内唯一核心（见 [getOrCreate]） */
+        @Volatile
+        private var instance: RustSession? = null
+
+        /**
+         * 取进程内**唯一**的会话，没有则构造。
+         *
+         * # 为什么必须是单例
+         *
+         * `InputMethodService.onCreate` 不是只调一次：切换输入法、系统配置变化都会
+         * 重建服务。每次新建一个 `WindCore` 的后果是两份 77132 条词库常驻、两个
+         * 预热线程、两个 prepare 线程，**争抢同一个 redb 文件锁与协调器 state 锁**
+         * ——实测每次按键被拖到 140~480ms，触摸事件随之堆积、连点被误判成滑动。
+         *
+         * 核心是无状态可复用的（焦点/组合都随 focusGained 重置），复用比重建更正确。
+         */
+        @Synchronized
+        fun getOrCreate(dataDir: File, rustRoot: File): RustSession? {
+            instance?.let {
+                Log.i(TAG, "复用已有核心（IME 服务重建）")
+                return it
+            }
+            return create(dataDir, rustRoot)?.also { instance = it }
+        }
+
         /**
          * 创建会话；.so 加载或核心构造失败返回 null（调用方回退 FakeSession）。
          * @param dataDir 出厂数据目录（filesDir/data，含 schemas/）
          * @param rustRoot Rust 用户/缓存根（filesDir/rust）
          */
-        fun create(dataDir: File, rustRoot: File): RustSession? {
+        private fun create(dataDir: File, rustRoot: File): RustSession? {
             return try {
                 rustRoot.mkdirs()
                 uniffi.wind_android.initLogging("info,wind_coordinator=debug")
@@ -160,7 +185,7 @@ class RustSession(
         Log.d(
             TAG,
             "vk=0x${vk.toString(16)} ${costUs}µs -> consumed=${result.consumed} " +
-                "ops=${result.ops.size}",
+                "ops=" + result.ops.joinToString { "k${it.kind}:'${it.text}'" },
         )
         if (result.ops.isNotEmpty()) {
             listener?.invoke(UiEvent.Edits(result.ops.map(::toEditOp)))

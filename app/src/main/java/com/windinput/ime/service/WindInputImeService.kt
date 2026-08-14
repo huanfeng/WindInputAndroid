@@ -13,6 +13,7 @@ import android.widget.LinearLayout
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.AssetsInstaller
 import com.windinput.ime.core.ClipboardStore
+import com.windinput.ime.core.DeferredSession
 import com.windinput.ime.core.EditOp
 import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.FakeSession
@@ -87,16 +88,46 @@ class WindInputImeService :
     /** 编码是否同时写进宿主组合区（ui.android.inline_preedit，默认关，见 onUiEvent） */
     private var inlinePreedit = false
 
+    /**
+     * 当前方案短称（引擎推送的 `iconLabel`：五笔为「五」、英文方案为「英」）。
+     *
+     * ⚠ 中英键**不能**用 `chineseMode` 判据：英文在本端是一个**方案**，而
+     * `SelectSchema` 会把 `chinese_mode` 一并设回 true——于是切到英文方案后
+     * `chineseMode` 仍是 true，键面显示「中」，再点一次又切去英文，**切不回来**。
+     * 方案短称才是这里要的真值。
+     */
+    private var modeLabel = "中"
+
+    /**
+     * 切到英文之前的中文方案下标，用于原路切回。
+     *
+     * ⚠ 不能默认 0：方案列表按文件名排序，`english` 恰好排在最前，默认 0 会让
+     * 「切回中文」实际切到英文。`-1` 表示未记录，回退时按 id 找第一个非英文方案。
+     */
+    private var lastChineseSchema = -1
+
     override fun onCreate() {
         super.onCreate()
         val dirs = (application as WindInputApp).dataDirs
         layoutRepository = LayoutRepository(dirs)
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
-        // Rust 核心可用则用真会话，否则回退占位。首启需保证出厂数据已拷出
-        //（installIfNeeded 幂等，命中版本标记时零 I/O），否则引擎读不到方案。
+        // 核心**异步构造**：它要加载三层配置、开 redb、把词库 yaml 编译成 wdat，
+        // 放在主线程会突破系统的输入分发超时（实测直接 ANR）。未就绪期间 keyPressed
+        // 返回 false，字母直接上屏——头一两秒不过中文引擎，好过键盘假死。
         session = if (RustCoreLoader.available) {
-            AssetsInstaller(this, dirs).installIfNeeded()
-            RustSession.create(dirs.dataDir, File(filesDir, "rust")) ?: FakeSession()
+            val installer = AssetsInstaller(this, dirs)
+            DeferredSession(
+                dataDir = dirs.dataDir,
+                rustRoot = File(filesDir, "rust"),
+                // 出厂数据拷出也必须在后台：数 MB 逐文件流式拷贝，留在这里会连同
+                // 核心构造一起把 onCreate 拖过输入分发超时（实测 ANR）
+                prepareData = { installer.installIfNeeded() },
+                onReady = { ready ->
+                    // 就绪时若已在输入，补一次焦点，否则引擎收不到当前会话
+                    if (currentInputConnection != null) ready.focusGained()
+                    barView?.setPreparing(false)
+                },
+            ).also { it.start() }
         } else {
             FakeSession()
         }
@@ -145,8 +176,16 @@ class WindInputImeService :
         quickPanelWindow = QuickPanelWindow(listener = this)
 
         windowManager = InputWindowManager(panelContainer, keyboardWindow!!).also {
+            // 面板打开时条区整个让位：面板自带左上角返回，不再上下两条横栏并排。
+            // 面板高度 = 条区 + 键盘，所以让位前后 IME 窗口总高不变、键盘不跳。
+            it.onWindowChanged = { window ->
+                val keyboardMode = window === keyboardWindow
+                bar.visibility = if (keyboardMode) View.VISIBLE else View.GONE
+                bar.setExpanded(window === expandedCandidatesWindow)
+            }
             it.attachInitial()
         }
+        bar.setPreparing((session as? DeferredSession)?.ready == false)
         root.post {
             android.util.Log.i(
                 TAG,
@@ -162,6 +201,9 @@ class WindInputImeService :
 
     private companion object {
         const val TAG = "WindIme"
+
+        /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
+        const val ENGLISH_SCHEMA_ID = "english"
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -195,9 +237,20 @@ class WindInputImeService :
         applyEditorScene(info)
     }
 
-    /** imeOptions → 回车键动作标签 */
+    /**
+     * imeOptions → 回车键动作标签；`null` = 显示默认换行图标。
+     *
+     * ⚠ 光看 `IME_MASK_ACTION` 是不够的：多行文本框里系统常给出 `IME_ACTION_NEXT`
+     * （因为表单后面还有输入框），但**回车在多行框里恒为换行**，照抄就会出现
+     * 「键上写着『下一项』、按下去却是换行」——真机实测到的就是这个。
+     *
+     * 两条否决优先于 action：
+     * - `TYPE_TEXT_FLAG_MULTI_LINE`：多行框回车换行，action 只能由别的方式触发
+     * - `IME_FLAG_NO_ENTER_ACTION`：宿主明确声明「回车不要执行 action」
+     */
     private fun enterActionLabel(info: EditorInfo?): String? {
         if (info == null) return null
+        if (!enterPerformsAction(info)) return null
         if (info.actionLabel != null) return info.actionLabel.toString()
         return when (info.imeOptions and EditorInfo.IME_MASK_ACTION) {
             EditorInfo.IME_ACTION_GO -> "前往"
@@ -208,6 +261,20 @@ class WindInputImeService :
             EditorInfo.IME_ACTION_PREVIOUS -> "上一项"
             else -> null
         }
+    }
+
+    /**
+     * 回车是否应执行编辑器动作（而非换行）。
+     *
+     * **标签与行为共用这一个判据**——分成两处判必然漂移，那正是「显示下一项、
+     * 实际换行」的成因。
+     */
+    private fun enterPerformsAction(info: EditorInfo?): Boolean {
+        if (info == null) return false
+        if (info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0) return false
+        if (info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0) return false
+        val action = info.imeOptions and EditorInfo.IME_MASK_ACTION
+        return action != EditorInfo.IME_ACTION_NONE && action != EditorInfo.IME_ACTION_UNSPECIFIED
     }
 
     override fun onFinishInput() {
@@ -260,7 +327,9 @@ class WindInputImeService :
                 }
             }
             is UiEvent.Status -> {
+                modeLabel = event.iconLabel.ifEmpty { if (event.chineseMode) "中" else "英" }
                 barView?.setStatus(event)
+                keyboardWindow?.keyboardView?.modeLabel = modeLabel
                 quickPanelWindow?.updateStatus(event)
             }
             is UiEvent.Toast -> showToast(event.text)
@@ -337,8 +406,17 @@ class WindInputImeService :
     // ── 键盘回调 ─────────────────────────────────────────────────
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {
+        // 中英切换是宿主侧动作，不走引擎按键路径
+        if (action == KeyAction.SwitchLang) {
+            toggleLanguage()
+            return
+        }
         if (!directInput && session.keyPressed(action, shifted)) return
-        val ic = currentInputConnection ?: return
+        val ic = currentInputConnection
+        if (ic == null) {
+            android.util.Log.w(TAG, "默认行为无法执行：currentInputConnection 为 null action=$action")
+            return
+        }
         when (action) {
             is KeyAction.Text -> {
                 val ch = if (shifted) action.char.uppercaseChar() else action.char
@@ -346,8 +424,11 @@ class WindInputImeService :
             }
             KeyAction.Space -> ic.commitText(" ", 1)
             KeyAction.Backspace -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            // 与 enterActionLabel 共用 enterPerformsAction：键面写什么，按下就做什么
             KeyAction.Enter -> {
-                if (!sendDefaultEditorAction(true)) {
+                if (enterPerformsAction(currentInputEditorInfo)) {
+                    sendDefaultEditorAction(true)
+                } else {
                     ic.commitText("\n", 1)
                 }
             }
@@ -358,6 +439,39 @@ class WindInputImeService :
 
     override fun onCandidateSelected(index: Int) {
         session.candidateSelected(index)
+    }
+
+    /**
+     * 中英键：中文方案 ↔ 系统英文模式。
+     *
+     * ⚠ **暂用系统英文模式（字母直出、无候选），而非英文方案。**
+     * 切到英文**方案**（带词库补全）目前会出现「候选来自英文引擎、上屏却走中文码表」
+     * ——真机实测打 `hi` 候选正确显示 hi/Hi-Fi/hibernate，空格上屏却得到「步」
+     * （`hi` 的五笔字）。核心侧的方案切换与候选合成的关系尚未理清，见主仓
+     * `wind-android/tests/key_flow.rs::english_schema_commits_latin_not_hanzi`
+     * （已标 ignore 并留了完整证据）。
+     *
+     * 现在这条路行为是正确的，只是少了英文补全。
+     */
+    private fun toggleLanguage() {
+        val schemas = session.schemas()
+        val active = schemas.firstOrNull { it.active }
+        if (modeLabel == "英") {
+            // 回到离开前那个中文方案；未记录时找第一个非英文方案，绝不用下标 0
+            val target = lastChineseSchema.takeIf { it >= 0 }
+                ?: schemas.firstOrNull { it.id != ENGLISH_SCHEMA_ID }?.index
+                ?: return
+            session.runCommand(EngineCmd.SelectSchema(target))
+            return
+        }
+        lastChineseSchema = active?.index ?: -1
+        session.runCommand(EngineCmd.English)
+    }
+
+    override fun onKeyLongPress(action: KeyAction) {
+        if (action == KeyAction.SwitchLang) {
+            quickPanelWindow?.let { windowManager?.show(it) }
+        }
     }
 
     /** 空格滑动移光标 */
@@ -433,8 +547,13 @@ class WindInputImeService :
         )
     }
 
-    override fun onExpandCandidates() {
-        expandedCandidatesWindow?.let { windowManager?.show(it) }
+    override fun onToggleExpanded() {
+        val wm = windowManager ?: return
+        if (wm.current === expandedCandidatesWindow) {
+            wm.showKeyboard()
+        } else {
+            expandedCandidatesWindow?.let { wm.show(it) }
+        }
     }
 
     override fun onPasteSuggestion(text: String) {
@@ -443,6 +562,7 @@ class WindInputImeService :
 
     override fun onExpandedCandidateSelected(index: Int) {
         session.candidateSelected(index)
+        // 选中即原位返回：展开候选的唯一去向就是选一个词
         windowManager?.showKeyboard()
     }
 

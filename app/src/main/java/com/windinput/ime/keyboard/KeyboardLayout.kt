@@ -14,6 +14,15 @@ sealed interface KeyAction {
     data object Space : KeyAction
     data object Shift : KeyAction
     data object SwitchSymbols : KeyAction
+
+    /**
+     * 中英切换（底栏，回车左侧）。
+     *
+     * 点击 = 在中文方案与**英文方案**之间切换。用英文方案而非「系统英文模式」是有意的：
+     * 后者只是把字母直通给宿主、没有候选，而移动端打英文很依赖词库补全。
+     * 长按 = 打开快捷面板做其它切换（方案 / 标点 / 全半角 / 简繁）。
+     */
+    data object SwitchLang : KeyAction
 }
 
 data class KeyDef(
@@ -55,8 +64,10 @@ object KeyboardLayouts {
     private fun bottomRow(switchLabel: String): List<KeyDef> = listOf(
         KeyDef(switchLabel, KeyAction.SwitchSymbols, widthWeight = 1.5f, isSpecial = true),
         KeyDef("，", KeyAction.Text('，'), longPress = "、！？：；"),
-        KeyDef("空格", KeyAction.Space, widthWeight = 4f),
+        KeyDef("空格", KeyAction.Space, widthWeight = 3.4f),
         KeyDef("。", KeyAction.Text('。'), longPress = "…～·—％"),
+        // 中英切换固定在回车左侧——主流输入法的位置约定，肌肉记忆在这
+        KeyDef("中/英", KeyAction.SwitchLang, widthWeight = 1.3f, isSpecial = true),
         KeyDef("⏎", KeyAction.Enter, widthWeight = 1.5f, isSpecial = true),
     )
 

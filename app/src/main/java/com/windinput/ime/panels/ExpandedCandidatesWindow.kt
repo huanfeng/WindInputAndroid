@@ -10,14 +10,21 @@ import androidx.recyclerview.widget.RecyclerView
 import com.windinput.ime.keyboard.InputWindow
 
 /**
- * 展开式候选面板：候选条 ∨ 按钮进入，全面板区网格展示全部候选（中文重码刚需）。
- * 分页加载（对接 Rust 核心的按页取候选）为后续能力，当前展示会话给出的全量。
+ * 展开式候选面板：条区的展开钮进入，整个面板区网格铺开全部候选（中文重码刚需）。
+ *
+ * # 为什么不用 PanelScaffold
+ *
+ * 它没有标题栏、也没有返回按钮：**选中即原位返回**，收起则再点一次条区的展开钮
+ * （那个钮在展开态变成收起态）。此前套 PanelScaffold 会多出「返回 / 候选」一整条，
+ * 而展开候选的唯一去向就是选一个词——为它专设一行返回栏纯属浪费高度，
+ * 且与上方条区里仍在显示的候选形成重复。
+ *
+ * 分页加载（对接核心的按页取候选）为后续能力，当前展示会话给出的全量。
  */
 class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
 
     interface Listener {
         fun onExpandedCandidateSelected(index: Int)
-        fun onBackToKeyboard()
     }
 
     private companion object {
@@ -39,12 +46,12 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
             adapter = this@ExpandedCandidatesWindow.adapter
             setBackgroundColor(Color.WHITE)
         }
-        return PanelScaffold.build(
-            context = context,
-            title = "候选",
-            onBack = listener::onBackToKeyboard,
-            content = grid!!,
+        // 高度与键盘态一致（条区 + 键盘四行），切换不跳
+        grid!!.layoutParams = android.view.ViewGroup.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            PanelScaffold.panelHeightPx(context),
         )
+        return grid!!
     }
 
     private class CandidateAdapter(

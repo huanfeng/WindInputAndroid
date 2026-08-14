@@ -31,7 +31,8 @@ $rows = @(
     @{ keys = @("q","w","e","r","t","y","u","i","o","p"); weights = @(1,1,1,1,1,1,1,1,1,1) },
     @{ keys = @("a","s","d","f","g","h","j","k","l");     weights = @(1,1,1,1,1,1,1,1,1) },
     @{ keys = @("SHIFT","z","x","c","v","b","n","m","BS"); weights = @(1.5,1,1,1,1,1,1,1,1.5) },
-    @{ keys = @("SYM","COMMA","SPACE","PERIOD","ENTER");   weights = @(1.5,1,4,1,1.5) }
+    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步（中英键在回车左侧）
+    @{ keys = @("SYM","COMMA","SPACE","PERIOD","LANG","ENTER"); weights = @(1.5,1,3.4,1,1.3,1.5) }
 )
 
 $script:geo = $null
@@ -50,6 +51,7 @@ function Init-Geometry {
     $kbTop = $kbBottom - 4 * $rowPx
     $script:geo = @{
         W = [int]$w; H = [int]$h
+        Density = $density
         RowPx = $rowPx
         KbBottom = $kbBottom
         KbTop = $kbTop
@@ -57,6 +59,11 @@ function Init-Geometry {
         BarY = $kbTop - [int]($mainRowPx / 2)
         # 编码栏中心（组合中才可见）
         CodeBarY = $kbTop - $mainRowPx - [int]($codeBarPx / 2)
+        # 面板 header 中心：面板打开时**条区整个让位**，面板从条区位置起画，
+        # 其 header 与条区等高（BarView.TOTAL_DP）。写成 kbTop+xx 会点进键盘区。
+        PanelHeaderY = $kbTop - $codeBarPx - $mainRowPx + [int](($codeBarPx + $mainRowPx) / 2)
+        # 返回图标中心：header 左侧固定 52dp 宽
+        PanelBackX = [int](26 * $density)
     }
     Write-Host "几何: ${w}x${h} density=$density 行高=$rowPx 键盘顶=$kbTop 候选y=$($script:geo.BarY) 编码栏y=$($script:geo.CodeBarY)" -ForegroundColor DarkGray
 }
@@ -114,18 +121,24 @@ function Get-PadText {
     return ""
 }
 
+# 轮询重试：`force-stop` 后 Activity 要重建，固定 sleep 在慢设备（真机首启、
+# 模拟器负载高时）不够，dump 会拿到还没布局好的层级。
 function Get-EditBounds {
-    $xml = Dump-Xml
-    foreach ($node in ($xml -split '<node')) {
-        if ($node -match 'content-desc="windinput-testpad"' -and
-            $node -match 'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"') {
-            return @{
-                CX = [int](([int]$Matches[1] + [int]$Matches[3]) / 2)
-                CY = [int](([int]$Matches[2] + [int]$Matches[4]) / 2)
+    for ($try = 0; $try -lt 12; $try++) {
+        $xml = Dump-Xml
+        foreach ($node in ($xml -split '<node')) {
+            if ($node -match 'content-desc="windinput-testpad"' -and
+                $node -match 'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"') {
+                return @{
+                    CX = [int](([int]$Matches[1] + [int]$Matches[3]) / 2)
+                    CY = [int](([int]$Matches[2] + [int]$Matches[4]) / 2)
+                }
             }
         }
+        Start-Sleep -Milliseconds 700
+        Adb shell am start -n "$pkg/.settings.TestPadActivity" | Out-Null
     }
-    throw "找不到测试输入框"
+    throw "找不到测试输入框（重试 12 次仍无）"
 }
 
 function Reset-Pad {
@@ -170,17 +183,42 @@ if (-not $SkipInstall) {
 }
 # 坑 1：模拟器有硬件键盘 → 不显示软键盘视图
 Adb shell settings put secure show_ime_with_hard_keyboard 1 | Out-Null
-Adb shell ime enable $ime | Out-Null
-# 坑 2：force-stop 会让系统切回 Gboard，必须重新 set（顺序不能颠倒）
+# 坑 2：force-stop 会让系统切回 Gboard。**enable 与 set 都必须排在 force-stop 之后**
+# ——`pm clear` 还会把输入法重置成未启用，enable 若排在前面就被一起清掉了，
+# 表现为「脚本说当前输入法是 Gboard」。
 Adb shell am force-stop $pkg | Out-Null
 Start-Sleep -Seconds 1
+Adb shell ime enable $ime | Out-Null
 Adb shell ime set $ime | Out-Null
-Start-Sleep -Seconds 1
-$cur = (Adb shell settings get secure default_input_method).Trim()
+# 系统写 secure setting 有延迟，轮询确认而不是睡固定时长
+$cur = ""
+for ($i = 0; $i -lt 10; $i++) {
+    Start-Sleep -Milliseconds 500
+    $cur = (Adb shell settings get secure default_input_method).Trim()
+    if ($cur -like "$pkg*") { break }
+    Adb shell ime set $ime | Out-Null
+}
 if ($cur -notlike "$pkg*") { throw "当前输入法不是本应用: $cur" }
 # 清日志：用例 10 靠 logcat 判性能，读到上一轮的旧告警会误报
 Adb logcat -c | Out-Null
 Init-Geometry
+
+# ── 建立前置条件：确保处于中文方案 ──────────────────────────────────────
+# **方案选择是持久化的**（引擎会把 schema.active 写进用户配置）。上一次运行若在
+# 英文用例中途失败，英文方案就留在那儿了，下次启动仍是英文——于是所有中文用例
+# 连同系统短语一起失败，看起来像功能坏了。测试必须自己把前置条件建起来。
+Write-Host "`n[0] 前置：确保中文方案" -ForegroundColor Yellow
+Reset-Pad
+Tap-Key "a"; Tap-Key "a"; Tap-Key "SPACE"
+if ((Get-PadText) -notmatch '^[一-龥]$') {
+    Write-Host "  当前非中文方案，切回中文" -ForegroundColor DarkYellow
+    Reset-Pad
+    Tap-Key "LANG"
+    Start-Sleep -Seconds 4
+    Reset-Pad
+    Tap-Key "a"; Tap-Key "a"; Tap-Key "SPACE"
+}
+CheckMatch "已处于中文方案" '^[一-龥]$' (Get-PadText)
 
 Write-Host "`n[1] 五笔组合上屏：aa + 空格" -ForegroundColor Yellow
 Reset-Pad
@@ -249,11 +287,15 @@ Write-Host "`n[9] 快捷面板往返" -ForegroundColor Yellow
 # 区，实测正好点中「英」格，测试自己把引擎切成了英文模式，污染后面所有用例。
 # 面板上任何坐标都可能是功能键，只点自己放的「返回」才安全。
 Reset-Pad
-Adb shell input tap 60 $script:geo.BarY | Out-Null   # 工具栏最左格 = 面板入口
+# 工具栏：模式指示(权重1.2) + 6 个图标(各 1)，总权重 7.2；面板入口是第 2 格
+Adb shell input tap ([int]($script:geo.W * 1.7 / 7.2)) $script:geo.BarY | Out-Null
 Start-Sleep -Milliseconds 800
 $panelH = Get-ImeHeight
-Adb shell input tap 90 ($script:geo.KbTop + [int](20 * 2.625)) | Out-Null  # 面板 header「返回」
-Start-Sleep -Milliseconds 800
+# ⚠ 坐标取自 $geo.PanelHeaderY/PanelBackX，别自己算：面板打开时条区让位、面板
+# 从条区位置起画，header 不在 kbTop 之下而在其**之上**。此处曾写成 kbTop+20dp，
+# 点进了键盘区 → 面板没返回 → 后续用例的点击全落在面板上，级联成多个假失败。
+Adb shell input tap $script:geo.PanelBackX $script:geo.PanelHeaderY | Out-Null
+Start-Sleep -Seconds 2
 Tap-Key "a"; Tap-Key "a"; Tap-Key "SPACE"
 CheckMatch "返回后键盘可用" '^[一-龥]$' (Get-PadText)
 if ($panelH -le 0) {
@@ -275,7 +317,31 @@ if ($slow) {
     Write-Host "  PASS  无 100ms 级主线程阻塞" -ForegroundColor Green
 }
 
-Write-Host "`n[11] 快速点击的按下反馈" -ForegroundColor Yellow
+Write-Host "`n[11] 中英切换键" -ForegroundColor Yellow
+# 底栏中英键：切英文后字母直出，再点回中文恢复出汉字。
+# ⚠ 目前英文走的是**系统英文模式**（无候选）。英文方案带补全尚未打通
+#（候选走英文引擎、上屏走中文码表），见主仓 key_flow.rs 里标 ignore 的那条用例。
+Reset-Pad
+Tap-Key "LANG"
+# 切换要走引擎，等待给足
+Start-Sleep -Seconds 4
+Tap-Key "h"; Tap-Key "i"; Tap-Key "SPACE"
+$en = Get-PadText
+CheckMatch "英文模式出拉丁字符" '^[A-Za-z ]+$' $en
+
+Tap-Key "LANG"
+Start-Sleep -Seconds 3
+Reset-Pad
+Tap-Key "a"; Tap-Key "a"; Tap-Key "SPACE"
+$backToCn = Get-PadText
+CheckMatch "切回中文出汉字" '^[一-龥]$' $backToCn
+# ⚠ 收尾必须回到中文：方案选择持久化，留在英文会污染**下一次运行**的所有中文用例
+if ($backToCn -notmatch '^[一-龥]$') {
+    Write-Host "  切回失败，强制再切一次以免污染下次运行" -ForegroundColor DarkYellow
+    Reset-Pad; Tap-Key "LANG"; Start-Sleep -Seconds 4
+}
+
+Write-Host "`n[12] 快速点击的按下反馈" -ForegroundColor Yellow
 # 「点得快就没有按下效果」的回归。`input tap` 的 down/up 间隔近乎为零，是最坏情况：
 # 两次 invalidate 落在同一帧内被合并，若不做保底，按下态一帧都不会被绘制。
 # KeyboardView 在高亮结束时自检绘制帧数，未绘制即打 W 日志。

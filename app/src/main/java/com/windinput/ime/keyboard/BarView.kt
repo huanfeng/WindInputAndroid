@@ -36,7 +36,8 @@ class BarView(
     interface Listener {
         fun onToolbarAction(action: ToolbarAction)
 
-        fun onExpandCandidates()
+        /** 展开/收起候选全览（同一个钮往返） */
+        fun onToggleExpanded()
 
         fun onPasteSuggestion(text: String)
     }
@@ -54,6 +55,18 @@ class BarView(
         const val TOTAL_DP = CODE_BAR_DP + MAIN_ROW_DP
 
         private const val SUGGESTION_TIMEOUT_MS = 30_000L
+
+        private const val PREPARING_TEXT = "词库准备中…"
+
+        /** 工具栏图标与动作（顺序即从左到右）；模式指示另置最左 */
+        private val TOOLBAR_ITEMS = listOf(
+            PanelIcon.Glyph.GRID to ToolbarAction.QUICK_PANEL,
+            PanelIcon.Glyph.EMOJI to ToolbarAction.EMOJI,
+            PanelIcon.Glyph.CLIPBOARD to ToolbarAction.CLIPBOARD,
+            PanelIcon.Glyph.TEXT_EDIT to ToolbarAction.TEXT_EDIT,
+            PanelIcon.Glyph.SETTINGS to ToolbarAction.SETTINGS,
+            PanelIcon.Glyph.COLLAPSE to ToolbarAction.HIDE_IME,
+        )
 
         /** ViewGroup.LayoutParams.MATCH_PARENT 的短名（类内无法裸用继承来的常量） */
         private const val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -83,6 +96,12 @@ class BarView(
 
     /** 工具栏上的模式指示（"五"/"英"），由引擎推送更新 */
     private val modeChip: TextView
+
+    /** 候选展开/收起钮：展开态图标翻转，同一个钮往返 */
+    private val expandButton = PanelIcon(context).apply {
+        glyph = PanelIcon.Glyph.EXPAND
+        setOnClickListener { listener.onToggleExpanded() }
+    }
 
     private val dismissSuggestion = Runnable { hideClipSuggestion() }
 
@@ -130,8 +149,8 @@ class BarView(
                 LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
             )
             addView(
-                iconButton("∨") { listener.onExpandCandidates() },
-                LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT),
+                expandButton,
+                LayoutParams(dp(44), LayoutParams.MATCH_PARENT),
             )
         }
 
@@ -157,8 +176,8 @@ class BarView(
             )
             addView(suggestionText, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
             addView(
-                iconButton("✕") { hideClipSuggestion() },
-                LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT),
+                icon(PanelIcon.Glyph.CLOSE) { hideClipSuggestion() },
+                LayoutParams(dp(44), LayoutParams.MATCH_PARENT),
             )
         }
 
@@ -225,6 +244,29 @@ class BarView(
         }
     }
 
+    /** 候选全览的展开态：钮的图标随之翻转（展开↔收起同一个钮） */
+    fun setExpanded(expanded: Boolean) {
+        expandButton.glyph =
+            if (expanded) PanelIcon.Glyph.COLLAPSE else PanelIcon.Glyph.EXPAND
+    }
+
+    /**
+     * 核心尚在后台构造：编码栏位置显示提示条。
+     *
+     * 不弹 Toast、不禁用键盘——用户此时按键会直接上屏英文（宿主默认行为），
+     * 键盘照常可用，只是没有中文候选。给一行静态提示即可，别打断输入。
+     */
+    fun setPreparing(preparing: Boolean) {
+        if (!preparing) {
+            if (preeditView.text == PREPARING_TEXT) codeBar.visibility = GONE
+            return
+        }
+        codeBar.visibility = VISIBLE
+        modeLabelView.visibility = GONE
+        pagerView.text = ""
+        preeditView.text = PREPARING_TEXT
+    }
+
     /** 引擎模式真值 → 工具栏指示（K 侧不自记开关态） */
     fun setStatus(status: com.windinput.ime.core.UiEvent.Status) {
         modeChip.text = status.iconLabel.ifEmpty { if (status.chineseMode) "中" else "英" }
@@ -282,29 +324,17 @@ class BarView(
         setBackgroundColor(0xFFFAFAFC.toInt())
 
         addView(modeChip, LayoutParams(0, LayoutParams.MATCH_PARENT, 1.2f))
-        addView(
-            iconButton("⋮⋮") { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) },
-            LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-        )
-        addView(
-            iconButton("😀") { listener.onToolbarAction(ToolbarAction.EMOJI) },
-            LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-        )
-        addView(
-            iconButton("📋") { listener.onToolbarAction(ToolbarAction.CLIPBOARD) },
-            LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-        )
-        addView(
-            iconButton("✂") { listener.onToolbarAction(ToolbarAction.TEXT_EDIT) },
-            LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-        )
-        addView(
-            iconButton("⚙") { listener.onToolbarAction(ToolbarAction.SETTINGS) },
-            LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-        )
-        addView(
-            iconButton("▾") { listener.onToolbarAction(ToolbarAction.HIDE_IME) },
-            LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-        )
+        for ((glyph, action) in TOOLBAR_ITEMS) {
+            addView(
+                icon(glyph) { listener.onToolbarAction(action) },
+                LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
+            )
+        }
     }
+
+    private fun icon(glyph: PanelIcon.Glyph, onClick: () -> Unit): PanelIcon =
+        PanelIcon(context).apply {
+            this.glyph = glyph
+            setOnClickListener { onClick() }
+        }
 }

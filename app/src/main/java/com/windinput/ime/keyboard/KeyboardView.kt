@@ -38,6 +38,9 @@ class KeyboardView(context: Context) : View(context) {
 
         /** 退格滑动抬手：删除当前选区 */
         fun onBackspaceSwipeDelete()
+
+        /** 功能键长按（当前用于中英键 → 打开快捷面板） */
+        fun onKeyLongPress(action: KeyAction)
     }
 
     var listener: Listener? = null
@@ -54,6 +57,20 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 按键预览气泡开关（设置项 ui.android.key_preview） */
     var previewEnabled = false
+
+    /**
+     * 当前方案短称（「五」/「拼」/「英」），中英键直接显示它。
+     *
+     * 值由引擎推送（Service 转发），**本地不自记**——方案切换、密码框强制英文都发生在
+     * 引擎内部，本地记第二份必然与引擎漂移。用短称而不是 `chineseMode` 布尔：
+     * 英文在本端是一个方案，切过去后 `chineseMode` 仍为 true（见 Service 的说明）。
+     */
+    var modeLabel: String = "中"
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
 
     /** 回车键动作标签（imeOptions 驱动：发送/搜索/下一项…），null = 缺省 label */
     var enterLabel: String? = null
@@ -178,6 +195,9 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    /** 长按已触发（抬手时不再补发单击） */
+    private var longPressFired = false
+
     private val longPressRunnable = Runnable {
         val key = pressedKey ?: return@Runnable
         val rect = pressedRect ?: return@Runnable
@@ -185,8 +205,17 @@ class KeyboardView(context: Context) : View(context) {
             popupManager.dismissPreview()
             popupManager.showPopup(rect, key.longPress.map { it.toString() })
             repeatHaptic()
+        } else if (hasLongPressAction(key.action)) {
+            // 功能键长按走独立回调（没有字符气泡可弹）。置位后抬手不补单击，
+            // 否则「长按开面板」会连带触发一次「点击切模式」。
+            longPressFired = true
+            repeatHaptic()
+            listener?.onKeyLongPress(key.action)
         }
     }
+
+    private fun hasLongPressAction(action: KeyAction): Boolean =
+        action == KeyAction.SwitchLang
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
@@ -257,6 +286,11 @@ class KeyboardView(context: Context) : View(context) {
         if (key.action == KeyAction.Enter && enterLabel != null) {
             return enterLabel!!
         }
+        // 中英键显示**当前**方案短称，而不是「中/英」这种两可的静态字样：
+        // 用户要一眼看出现在在哪个方案，而不是这个键能切到哪去
+        if (key.action == KeyAction.SwitchLang) {
+            return modeLabel
+        }
         if (key.action == KeyAction.Shift && shiftLocked) {
             return "⇪"
         }
@@ -275,6 +309,7 @@ class KeyboardView(context: Context) : View(context) {
                 downY = event.y
                 swipeConsumed = false
                 repeatFired = false
+                longPressFired = false
                 spaceSwipeActive = false
                 backspaceSwipeActive = false
                 lastStepX = event.x
@@ -299,7 +334,7 @@ class KeyboardView(context: Context) : View(context) {
                         repeating = true
                         handler.postDelayed(repeatRunnable, 400)
                     }
-                    if (key.longPress.isNotEmpty()) {
+                    if (key.longPress.isNotEmpty() || hasLongPressAction(key.action)) {
                         handler.postDelayed(longPressRunnable, 300)
                     }
                 }
@@ -368,7 +403,7 @@ class KeyboardView(context: Context) : View(context) {
                 val key = pressedKey
                 val popupChoice =
                     if (popupManager.isPopupShown) popupManager.popupSelected() else null
-                val skipTap = repeatFired // 连删已触发过则抬手不再补发单击
+                val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
                 val wasSpaceSwipe = spaceSwipeActive
                 val wasBackspaceSwipe = backspaceSwipeActive
                 cancelPress()
