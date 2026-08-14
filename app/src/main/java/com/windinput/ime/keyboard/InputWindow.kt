@@ -11,6 +11,19 @@ import android.widget.FrameLayout
  */
 abstract class InputWindow {
 
+    /**
+     * 本窗口是否**保留上方条区**（而不是让位）。
+     *
+     * 默认 false：面板套 [com.windinput.ime.panels.PanelScaffold]，自带左上角返回，
+     * 条区让位给它，前后总高不变。
+     *
+     * 展开候选面板是唯一的 true：它刻意不套脚手架（选中即返回，为它专设一行返回栏
+     * 是浪费），返回入口就在条区尾格上。**曾经把它一并让位掉，结果是展开后无路可退**
+     * ——这条属性就是为了让「我自带返回吗」由窗口自己声明，而不是靠一句
+     * 「非键盘窗口一律让位」的一般化规则去猜。
+     */
+    open val keepsBar: Boolean get() = false
+
     /** 懒创建的视图（附着期间缓存，detach 不销毁） */
     private var view: View? = null
 

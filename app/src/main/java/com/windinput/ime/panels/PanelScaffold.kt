@@ -37,6 +37,16 @@ object PanelScaffold {
     }
 
     /**
+     * 键盘四行的高度（px）——**保留条区**的窗口（[com.windinput.ime.keyboard.InputWindow.keepsBar]）
+     * 该用这个高度，而不是 [panelHeightPx]：条区没让位，再按整体高铺开就会把 IME 窗口
+     * 顶高一整条，键盘随之上跳。
+     */
+    fun keyboardHeightPx(context: Context): Int {
+        val density = context.resources.displayMetrics.density
+        return (KEYBOARD_ROWS * KeyboardDimens.rowHeightDp * density).toInt()
+    }
+
+    /**
      * 构建面板骨架。
      *
      * @param onBack 返回键盘（左上角）

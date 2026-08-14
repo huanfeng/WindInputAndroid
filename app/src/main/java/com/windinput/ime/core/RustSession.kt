@@ -144,6 +144,9 @@ class RustSession(
             )
         }
 
+    override fun shuangpinLayouts(): List<LayoutEntry> =
+        core.shuangpinLayouts().map { LayoutEntry(id = it.id, name = it.name, active = it.active) }
+
     override fun runCommand(cmd: EngineCmd) {
         val native = when (cmd) {
             EngineCmd.English -> uniffi.wind_android.EngineCommand.English
@@ -153,6 +156,8 @@ class RustSession(
             EngineCmd.ToggleWidth -> uniffi.wind_android.EngineCommand.ToggleWidth
             EngineCmd.ToggleS2t -> uniffi.wind_android.EngineCommand.ToggleS2t
             EngineCmd.ReloadConfig -> uniffi.wind_android.EngineCommand.ReloadConfig
+            is EngineCmd.SetShuangpinLayout ->
+                uniffi.wind_android.EngineCommand.SetShuangpinLayout(cmd.id)
         }
         core.runCommand(native)
     }

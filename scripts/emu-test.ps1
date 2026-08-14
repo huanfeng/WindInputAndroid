@@ -203,6 +203,18 @@ if ($cur -notlike "$pkg*") { throw "当前输入法不是本应用: $cur" }
 Adb logcat -c | Out-Null
 Init-Geometry
 
+# 活跃方案快照：跑完要比对（见文件末尾）。
+# **方案选择是持久化的**，而面板上任何一个点错的坐标都可能把它改掉——改完当次用例
+# 照样 PASS（不过是换了个中文方案，断言只看「是不是汉字」），污染留给**下一次**运行，
+# 现象是「昨天好好的今天全挂」。故把「跑完方案没变」单列成一条不变量来守。
+function Get-ActiveSchema {
+    $line = Adb shell run-as $pkg cat files/rust/config/WindInput/config.toml 2>$null |
+        Select-String '^active = ' | Select-Object -First 1
+    if ($line) { return $line.ToString().Trim() }
+    return ""   # 首次运行尚未落盘，或非 debug 包没有 run-as
+}
+$script:schemaBefore = Get-ActiveSchema
+
 # ── 建立前置条件：确保处于中文方案 ──────────────────────────────────────
 # **方案选择是持久化的**（引擎会把 schema.active 写进用户配置）。上一次运行若在
 # 英文用例中途失败，英文方案就留在那儿了，下次启动仍是英文——于是所有中文用例
@@ -287,8 +299,11 @@ Write-Host "`n[9] 快捷面板往返" -ForegroundColor Yellow
 # 区，实测正好点中「英」格，测试自己把引擎切成了英文模式，污染后面所有用例。
 # 面板上任何坐标都可能是功能键，只点自己放的「返回」才安全。
 Reset-Pad
-# 工具栏：模式指示(权重1.2) + 6 个图标(各 1)，总权重 7.2；面板入口是第 2 格
-Adb shell input tap ([int]($script:geo.W * 1.7 / 7.2)) $script:geo.BarY | Out-Null
+# 工具栏 = 6 个等宽图标（BarView.TOOLBAR_ITEMS 5 个 + 尾格），快捷面板入口是**第 1 格**。
+# ⚠ 这里曾按「模式指示(1.2) + 6 图标」算成 W*1.7/7.2；那一格删掉后坐标指向了别的图标，
+# 用例照样 PASS（打开的是表情面板，返回键位置相同），只是验的东西悄悄换了。
+# 布局改了必须同步这行。
+Adb shell input tap ([int]($script:geo.W / 12)) $script:geo.BarY | Out-Null
 Start-Sleep -Milliseconds 800
 $panelH = Get-ImeHeight
 # ⚠ 坐标取自 $geo.PanelHeaderY/PanelBackX，别自己算：面板打开时条区让位、面板
@@ -357,6 +372,14 @@ if ($missed -eq 0) {
     $script:failed++
 }
 Reset-Pad
+
+Write-Host "`n[13] 跑完不改变活跃方案" -ForegroundColor Yellow
+$schemaAfter = Get-ActiveSchema
+if ($script:schemaBefore -eq "") {
+    Write-Host "  SKIP  首次运行，无基线可比" -ForegroundColor DarkGray
+} else {
+    Check "活跃方案未被用例改动" $script:schemaBefore $schemaAfter
+}
 
 Write-Host "`n================================" -ForegroundColor Cyan
 if ($script:failed -eq 0) { Write-Host "全部通过" -ForegroundColor Green; exit 0 }

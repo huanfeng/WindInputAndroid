@@ -25,6 +25,10 @@ import android.widget.TextView
  * 故空闲时编码栏 GONE、主行（工具栏）吃满全高，组合中主行让出 [CODE_BAR_DP]。
  *
  * 主行三态优先级：候选 > 剪贴板建议 > 工具栏；建议条 30s 超时自动消失。
+ *
+ * **候选展开态**（下方铺开全部候选）主行强制切工具栏：候选已在网格里，条上再画一遍
+ * 纯属重复；同时尾格由「收起键盘」变「返回」——展开面板自己没有返回栏，
+ * 这一格就是它唯一的退路。
  */
 @SuppressLint("ViewConstructor")
 class BarView(
@@ -58,14 +62,19 @@ class BarView(
 
         private const val PREPARING_TEXT = "词库准备中…"
 
-        /** 工具栏图标与动作（顺序即从左到右）；模式指示另置最左 */
+        /**
+         * 工具栏图标与动作（顺序即从左到右）。**尾格不在此列**——它是可变的
+         * （收起键盘 ↔ 返回），见 [trailingIcon]。
+         *
+         * 曾经最左还有一格模式指示（「五」/「英」），已删：键盘底栏有了中英切换键，
+         * 模式就写在那个键面上，条上再挂一份既重复又占宽。
+         */
         private val TOOLBAR_ITEMS = listOf(
             PanelIcon.Glyph.GRID to ToolbarAction.QUICK_PANEL,
             PanelIcon.Glyph.EMOJI to ToolbarAction.EMOJI,
             PanelIcon.Glyph.CLIPBOARD to ToolbarAction.CLIPBOARD,
             PanelIcon.Glyph.TEXT_EDIT to ToolbarAction.TEXT_EDIT,
             PanelIcon.Glyph.SETTINGS to ToolbarAction.SETTINGS,
-            PanelIcon.Glyph.COLLAPSE to ToolbarAction.HIDE_IME,
         )
 
         /** ViewGroup.LayoutParams.MATCH_PARENT 的短名（类内无法裸用继承来的常量） */
@@ -94,13 +103,27 @@ class BarView(
     private var state = State.TOOLBAR
     private var hasCandidates = false
 
-    /** 工具栏上的模式指示（"五"/"英"），由引擎推送更新 */
-    private val modeChip: TextView
+    /** 候选是否已在下方面板铺开（见 [setExpanded]） */
+    private var expanded = false
 
-    /** 候选展开/收起钮：展开态图标翻转，同一个钮往返 */
+    /** 候选态尾格：展开全部候选 */
     private val expandButton = PanelIcon(context).apply {
         glyph = PanelIcon.Glyph.EXPAND
         setOnClickListener { listener.onToggleExpanded() }
+    }
+
+    /**
+     * 工具栏尾格：与 [expandButton] 同一个屏幕位置（条区最右）。
+     *
+     * 常态是「收起键盘」；候选展开时变「返回」——用户看到的就是「原下拉钮的位置
+     * 变成了返回」。两个动作共用一格而不是并排两格：这一格的语义恒为
+     * 「离开当前这层」，并排反而要用户分辨两个下箭头。
+     */
+    private val trailingIcon = PanelIcon(context).apply {
+        glyph = PanelIcon.Glyph.COLLAPSE
+        setOnClickListener {
+            if (expanded) listener.onToggleExpanded() else listener.onToolbarAction(ToolbarAction.HIDE_IME)
+        }
     }
 
     private val dismissSuggestion = Runnable { hideClipSuggestion() }
@@ -182,13 +205,6 @@ class BarView(
         }
 
         // ── 主行：工具栏 ──
-        modeChip = TextView(context).apply {
-            text = "五"
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setTextColor(0xFF32568C.toInt())
-            setOnClickListener { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) }
-        }
         toolbar = buildToolbar()
 
         mainRow = FrameLayout(context).apply {
@@ -237,6 +253,8 @@ class BarView(
             pagerView.text = if (totalPages > 1) "$page/$totalPages" else ""
         }
 
+        // 展开态下主行归工具栏管：候选正在下方网格里铺开，条上不再重复一份
+        if (expanded) return
         if (hasCandidates) {
             applyState(State.CANDIDATES)
         } else if (state == State.CANDIDATES) {
@@ -244,10 +262,21 @@ class BarView(
         }
     }
 
-    /** 候选全览的展开态：钮的图标随之翻转（展开↔收起同一个钮） */
+    /**
+     * 候选全览面板的开合：条区随之在「候选行」与「工具栏（快捷模式）」之间切换，
+     * 尾格同步在「收起键盘」与「返回」之间切换。
+     */
     fun setExpanded(expanded: Boolean) {
-        expandButton.glyph =
-            if (expanded) PanelIcon.Glyph.COLLAPSE else PanelIcon.Glyph.EXPAND
+        this.expanded = expanded
+        trailingIcon.glyph =
+            if (expanded) PanelIcon.Glyph.BACK else PanelIcon.Glyph.COLLAPSE
+        applyState(
+            when {
+                expanded -> State.TOOLBAR
+                hasCandidates -> State.CANDIDATES
+                else -> State.TOOLBAR
+            },
+        )
     }
 
     /**
@@ -265,11 +294,6 @@ class BarView(
         modeLabelView.visibility = GONE
         pagerView.text = ""
         preeditView.text = PREPARING_TEXT
-    }
-
-    /** 引擎模式真值 → 工具栏指示（K 侧不自记开关态） */
-    fun setStatus(status: com.windinput.ime.core.UiEvent.Status) {
-        modeChip.text = status.iconLabel.ifEmpty { if (status.chineseMode) "中" else "英" }
     }
 
     /** 复制新内容后的建议条（候选优先级更高，仅空闲时展示） */
@@ -303,33 +327,21 @@ class BarView(
 
     private fun dp(value: Int): Int = (value * density).toInt()
 
-    private fun iconButton(label: String, onClick: () -> Unit): TextView =
-        TextView(context).apply {
-            text = label
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setTextColor(0xFF646464.toInt())
-            setPadding(dp(14), 0, dp(14), 0)
-            setOnClickListener { onClick() }
-        }
-
     /**
-     * 空闲工具栏。左端是**模式指示兼快捷面板入口**（点它进方案/开关/设置的全功能页），
-     * 右端是收起键盘，中间放高频面板入口。
-     *
-     * 图标目前是文本 emoji 占位；正式版换主题化矢量图标（wind-theme 键盘域节点）。
+     * 空闲工具栏：左端是快捷面板入口（点它进方案/开关/设置的全功能页），
+     * 中间放高频面板入口，尾格见 [trailingIcon]。全部等宽。
      */
     private fun buildToolbar(): View = LinearLayout(context).apply {
         orientation = HORIZONTAL
         setBackgroundColor(0xFFFAFAFC.toInt())
 
-        addView(modeChip, LayoutParams(0, LayoutParams.MATCH_PARENT, 1.2f))
         for ((glyph, action) in TOOLBAR_ITEMS) {
             addView(
                 icon(glyph) { listener.onToolbarAction(action) },
                 LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
             )
         }
+        addView(trailingIcon, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
     }
 
     private fun icon(glyph: PanelIcon.Glyph, onClick: () -> Unit): PanelIcon =

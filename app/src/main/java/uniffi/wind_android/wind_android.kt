@@ -733,6 +733,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_shuangpin_layouts(
+    ): Int
     external fun uniffi_wind_android_checksum_constructor_windcore_new(
     ): Int
     external fun ffi_wind_android_uniffi_contract_version(
@@ -783,6 +785,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_func_init_logging(`filter`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -933,6 +937,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 56562) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 57465) {
@@ -1832,6 +1839,12 @@ public interface WindCoreInterface {
      */
     fun `schemas`(): List<SchemaInfo>
     
+    /**
+     * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
+     * 用户可以往 `schemas/shuangpin/` 里丢自己的布局文件，硬编码清单看不见它。
+     */
+    fun `shuangpinLayouts`(): List<LayoutInfo>
+    
     companion object
 }
 
@@ -2034,6 +2047,23 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_method_windcore_schemas(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
+     * 用户可以往 `schemas/shuangpin/` 里丢自己的布局文件，硬编码清单看不见它。
+     */override fun `shuangpinLayouts`(): List<LayoutInfo> {
+            return FfiConverterSequenceTypeLayoutInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_shuangpin_layouts(
         it,
         _status)
 }
@@ -2365,6 +2395,58 @@ public object FfiConverterTypeKeyResult: FfiConverterRustBuffer<KeyResult> {
 
 
 /**
+ * 一个双拼布局（`schemas/shuangpin/<id>.toml`）。
+ */
+data class LayoutInfo (
+    /**
+     * 文件名 stem，即写回 [`EngineCommand::SetShuangpinLayout`] 的值
+     */
+    var `id`: kotlin.String
+    , 
+    /**
+     * 显示名（布局文件 `[meta].name`），如「小鹤双拼」
+     */
+    var `name`: kotlin.String
+    , 
+    var `active`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLayoutInfo: FfiConverterRustBuffer<LayoutInfo> {
+    override fun read(buf: ByteBuffer): LayoutInfo {
+        return LayoutInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: LayoutInfo) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterBoolean.allocationSize(value.`active`)
+    )
+
+    override fun write(value: LayoutInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterBoolean.write(value.`active`, buf)
+    }
+}
+
+
+
+/**
  * 输入方案条目（方案选择器的数据源）
  */
 data class SchemaInfo (
@@ -2475,6 +2557,21 @@ sealed class EngineCommand {
     object ReloadConfig : EngineCommand()
     
     
+    /**
+     * 设置双拼布局（`id` 取自 [`WindCore::shuangpin_layouts`]）。
+     *
+     * 不走 `MenuCmd`：桌面那套菜单里没有这一项（桌面在设置页里改），
+     * 而移动端没有设置页 RPC 通道，只能经本命令直达协调器。
+     */
+    data class SetShuangpinLayout(
+        val `id`: kotlin.String) : EngineCommand()
+        
+    {
+        
+
+        companion object
+    }
+    
 
     
 
@@ -2499,6 +2596,9 @@ public object FfiConverterTypeEngineCommand : FfiConverterRustBuffer<EngineComma
             4 -> EngineCommand.ToggleWidth
             5 -> EngineCommand.ToggleS2t
             6 -> EngineCommand.ReloadConfig
+            7 -> EngineCommand.SetShuangpinLayout(
+                FfiConverterString.read(buf),
+                )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
     }
@@ -2541,6 +2641,13 @@ public object FfiConverterTypeEngineCommand : FfiConverterRustBuffer<EngineComma
                 4UL
             )
         }
+        is EngineCommand.SetShuangpinLayout -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`id`)
+            )
+        }
     }
 
     override fun write(value: EngineCommand, buf: ByteBuffer) {
@@ -2568,6 +2675,11 @@ public object FfiConverterTypeEngineCommand : FfiConverterRustBuffer<EngineComma
             }
             is EngineCommand.ReloadConfig -> {
                 buf.putInt(6)
+                Unit
+            }
+            is EngineCommand.SetShuangpinLayout -> {
+                buf.putInt(7)
+                FfiConverterString.write(value.`id`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
@@ -2628,6 +2740,34 @@ public object FfiConverterSequenceTypeEditOp: FfiConverterRustBuffer<List<EditOp
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeEditOp.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeLayoutInfo: FfiConverterRustBuffer<List<LayoutInfo>> {
+    override fun read(buf: ByteBuffer): List<LayoutInfo> {
+        val len = buf.getInt()
+        return List<LayoutInfo>(len) {
+            FfiConverterTypeLayoutInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<LayoutInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeLayoutInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<LayoutInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeLayoutInfo.write(it, buf)
         }
     }
 }

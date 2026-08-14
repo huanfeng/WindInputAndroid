@@ -43,6 +43,11 @@ class QuickPanelWindow(
 
     enum class Target { EMOJI, CLIPBOARD, TEXT_EDIT }
 
+    private companion object {
+        /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
+        const val ENGLISH_SCHEMA_ID = "english"
+    }
+
     private var schemaRow: LinearLayout? = null
     private var toggleGrid: GridLayout? = null
     private var status: UiEvent.Status? = null
@@ -131,7 +136,9 @@ class QuickPanelWindow(
                 marginEnd = (6 * density).toInt()
             },
         )
-        for (s in listener.quickSchemas()) {
+        // 英文方案不再单列一格：上面那个「英」就是它的入口，两格并排点哪个都行
+        // 会让人以为是两回事（一个是模式、一个是方案），而现阶段它们本就是同一件事。
+        for (s in listener.quickSchemas().filter { it.id != ENGLISH_SCHEMA_ID }) {
             row.addView(
                 chip(context, s.name.ifEmpty { s.id }, selected = chinese && s.active) {
                     listener.onQuickCommand(EngineCmd.SelectSchema(s.index))

@@ -78,6 +78,18 @@ data class SchemaEntry(
 )
 
 /**
+ * 双拼布局条目（设置页「双拼布局」数据源）。
+ *
+ * 清单由核心扫描 `schemas/shuangpin` 下的 `.toml` 得出而不是 K 侧写死：用户可以往那个目录
+ * 丢自己的布局文件，硬编码清单看不见它。
+ */
+data class LayoutEntry(
+    val id: String,
+    val name: String,
+    val active: Boolean,
+)
+
+/**
  * 引擎命令：快捷面板上的开关落到引擎的唯一通路。
  *
  * 只列**移动端真正会用**的项——桌面菜单里的截图/打开目录/诊断 HUD 不在此列
@@ -98,6 +110,9 @@ sealed interface EngineCmd {
 
     /** 重载用户配置（设置页改完即时生效） */
     data object ReloadConfig : EngineCmd
+
+    /** 设置双拼布局（[id] 取自 [LayoutEntry.id]） */
+    data class SetShuangpinLayout(val id: String) : EngineCmd
 }
 
 /**
@@ -127,6 +142,9 @@ interface ImeSession {
 
     /** 可选方案列表（快捷面板的方案选择器） */
     fun schemas(): List<SchemaEntry> = emptyList()
+
+    /** 可选双拼布局（设置页「双拼布局」） */
+    fun shuangpinLayouts(): List<LayoutEntry> = emptyList()
 
     /** 下达引擎命令；结果经 [UiEvent.Status] 异步回报 */
     fun runCommand(cmd: EngineCmd) = Unit

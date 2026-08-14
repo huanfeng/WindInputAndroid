@@ -176,11 +176,15 @@ class WindInputImeService :
         quickPanelWindow = QuickPanelWindow(listener = this)
 
         windowManager = InputWindowManager(panelContainer, keyboardWindow!!).also {
-            // 面板打开时条区整个让位：面板自带左上角返回，不再上下两条横栏并排。
+            // 面板打开时条区让位：面板自带左上角返回，不再上下两条横栏并排。
             // 面板高度 = 条区 + 键盘，所以让位前后 IME 窗口总高不变、键盘不跳。
+            //
+            // 例外由窗口自己声明（InputWindow.keepsBar）：展开候选面板没有自己的返回栏，
+            // 返回入口就在条区尾格上，把它一并让位掉就等于展开后无路可退。
             it.onWindowChanged = { window ->
                 val keyboardMode = window === keyboardWindow
-                bar.visibility = if (keyboardMode) View.VISIBLE else View.GONE
+                bar.visibility =
+                    if (keyboardMode || window.keepsBar) View.VISIBLE else View.GONE
                 bar.setExpanded(window === expandedCandidatesWindow)
             }
             it.attachInitial()
@@ -328,7 +332,6 @@ class WindInputImeService :
             }
             is UiEvent.Status -> {
                 modeLabel = event.iconLabel.ifEmpty { if (event.chineseMode) "中" else "英" }
-                barView?.setStatus(event)
                 keyboardWindow?.keyboardView?.modeLabel = modeLabel
                 quickPanelWindow?.updateStatus(event)
             }

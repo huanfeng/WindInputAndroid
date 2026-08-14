@@ -107,6 +107,9 @@ class DeferredSession(
 
     override fun schemas(): List<SchemaEntry> = delegate?.schemas() ?: emptyList()
 
+    override fun shuangpinLayouts(): List<LayoutEntry> =
+        delegate?.shuangpinLayouts() ?: emptyList()
+
     override fun runCommand(cmd: EngineCmd) {
         delegate?.runCommand(cmd)
     }
