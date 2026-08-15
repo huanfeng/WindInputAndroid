@@ -1,0 +1,38 @@
+[package]
+name = "wind-android"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "lib"]
+
+# Kotlin 绑定生成器（host 侧工具，不进 Android 产物）：
+# cargo run -p wind-android --features cli --bin uniffi-bindgen -- \
+#   generate --library <wind_android.dll/.so> --language kotlin --out-dir <dir>
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi_bindgen.rs"
+required-features = ["cli"]
+
+[features]
+cli = ["uniffi/cli"]
+
+[dependencies]
+wind-coordinator = { path = "../wind-coordinator", default-features = false }
+wind-host = { path = "../wind-host" }
+wind-bridge = { path = "../wind-bridge" }
+wind-config = { path = "../wind-config" }
+wind-ipc = { path = "../wind-ipc" }
+wind-keys = { path = "../wind-keys" }
+wind-ui-types = { path = "../wind-ui-types" }
+uniffi = "0.32"
+tracing = { workspace = true }
+
+# Rust 日志 → logcat：没有它，引擎侧问题在设备上只能盲猜（walking skeleton
+# 首测就栽在这上面）。仅 Android 目标编译，桌面构建不受影响。
+[target.'cfg(target_os = "android")'.dependencies]
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }
+tracing-android = "0.2"
+
+[lints]
+workspace = true
