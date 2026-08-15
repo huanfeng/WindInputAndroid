@@ -1,6 +1,12 @@
-# 构建 Rust 核心并接入本工程（walking skeleton 构建链）
+# 构建 Rust 核心并接入本工程
 # 前置：rustup target add aarch64-linux-android x86_64-linux-android；cargo install cargo-ndk
-# 用法：pwsh scripts/build-rust.ps1 [-Profile release|debug]
+# 用法：pwsh scripts/build-rust.ps1 [-CargoProfile release|debug]
+#
+# 编译对象是**本仓的** rust/wind-android（UniFFI 绑定层）。输入法内核在主仓，
+# 经 wind-mobile 门面以 path 依赖引入——因此**两仓必须并列存放**：
+#   <workspace>/WindInput          主仓（核心 + wind-mobile 门面）
+#   <workspace>/WindInputAndroid   本仓（Kotlin 壳 + wind-android 绑定层）
+# 主仓不在隔壁时 cargo 会报 path 依赖找不到，那不是环境问题，是目录摆错了。
 param(
     # ⚠ 不能叫 $Profile：那是 PowerShell 内置自动变量（配置文件路径），
     # 用它作参数名会让判断静默跑偏、编译不执行却仍打印成功。
@@ -10,13 +16,13 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path $PSScriptRoot -Parent
-$windInput = Join-Path (Split-Path $root -Parent) "WindInput\wind_input"
+$rustDir = Join-Path $root "rust"
 $jniLibs = Join-Path $root "app\src\main\jniLibs"
 $javaDir = Join-Path $root "app\src\main\java"
 
 $env:ANDROID_NDK_HOME = "D:\Develop\SDK\AndroidSdk\ndk\28.2.13676358"
 
-Push-Location $windInput
+Push-Location $rustDir
 try {
     # 1. 交叉编译 .so（模拟器 x86_64 + 真机 arm64）
     #

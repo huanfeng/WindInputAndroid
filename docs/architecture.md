@@ -31,8 +31,11 @@ Android 上 IME 就是 `InputMethodService` 进程本身，因此 **IPC 层与�
 │ 键盘 UI（Android 原生渲染：自定义 View + Canvas）       │
 │   软键盘布局、按键触摸、候选条、长按气泡、震动/音效       │
 ├──────────────── JNI（UniFFI 生成绑定）────────────────┤
-│ wind-android（主仓新增 Rust FFI crate，cdylib → .so） │
-│   会话门面：键事件进 → UiCommand/候选/上屏事件出        │
+│ wind-android（**本仓** rust/，cdylib → .so）          │
+│   只做类型投影：核心类型 ↔ UniFFI Record/Enum          │
+├───────────────── 唯一一条依赖边 ─────────────────────┤
+│ wind-mobile（主仓门面，纯 Rust 无绑定框架）             │
+│   会话门面：键事件进 → 候选/状态/编辑指令出             │
 ├─────────────────────────────────────────────────────┤
 │ 复用的 Rust 核心（主仓 wind_input workspace）          │
 │   wind-coordinator（headless）+ wind-engine /        │
@@ -59,19 +62,43 @@ Android 上 IME 就是 `InputMethodService` 进程本身，因此 **IPC 层与�
 
 ## 3. 关键设计决策
 
-### 3.1 FFI 接缝：`wind-android` crate + UniFFI
+### 3.1 FFI 接缝：`wind-mobile` 门面 + 本仓 `wind-android` 绑定层
 
-- 主仓新增 `wind-android` crate（`crate-type = ["cdylib"]`），**Rust 代码留在主仓**
-  与其他 crate 同仓演进；本仓（WindInputAndroid）只放 Kotlin 工程，经 Gradle 的
-  cargo-ndk 插件（rust-android-gradle）按路径引用编译出 `.so`。
+> **决策已变更**（原方案：`wind-android` crate 放主仓，「Rust 代码留在主仓」）。
+> 变更理由见下方「为什么把绑定层搬进本仓」。
+
+- **主仓** `wind-mobile`：移动端形态的门面，纯 Rust、**不含任何绑定框架**。三层配置
+  加载、已装方案扫描、预热闸门、候选窗口、吃键判定转发都在这里——判据是「换成 iOS
+  还成不成立」，成立的就留主仓。
+- **本仓** `rust/wind-android`（`crate-type = ["cdylib"]`）：只做三件 Android 专属的事
+  ——类型投影（核心类型 ↔ UniFFI Record/Enum）、日志接 logcat、产物形态与绑定生成。
+  它对主仓**只有一条 path 依赖**（`wind-mobile`），因此两仓必须并列存放。
 - 绑定用 **UniFFI** 自动生成 Kotlin（回调接口、错误传递均为生成代码，避免手写 JNI）。
 - API 形状参考 `wind_bridge::MessageHandler` trait（key_event、focus_gained/lost 等
   与 `onStartInput`/`onFinishInput`/键事件几乎一一对应）。
 - 反向通道：`Coordinator::new_headless_with_ui` 已返回 `Receiver<UiCommand>`，
-  FFI 层消费该通道，经 UniFFI callback interface 推送**结构化数据**（候选列表、
-  预编辑串、模式状态）给 Kotlin，由原生 UI 渲染。
+  `wind-mobile` 的泵线程消费该通道并转成中立的 `MobileEventSink` 回调，绑定层再投影
+  到 UniFFI callback interface 推给 Kotlin，由原生 UI 渲染。
 - `UiCommand` 42 个变体需逐一标注「接 / 不接 / 语义变化」（方法论沿用
   `wind_macos/AGENTS.md` 的功能差距表，macOS 接了 29 个）。
+
+#### 为什么把绑定层搬进本仓
+
+原方案让 `wind-android` 住在主仓，直接 path 依赖**七个**核心 crate
+（coordinator/host/bridge/config/ipc/keys/ui-types）。两个问题：
+
+1. **绑定层焊在核心的内部结构上**。核心一次内部重构就打断安卓构建，而安卓仓在另一条
+   CI 上，断了往往过几天才发现。收敛成 `wind-mobile` 一条边后，核心怎么重构由门面吸收。
+2. **平台代码散在两个仓**。Kotlin 壳在本仓、FFI 层在主仓，改一个特性要跨仓提交两次，
+   历史也对不起来。
+
+搬迁代价（**已知且接受**）：
+
+- 主仓 CI 的 Android 闸门从「wind-android 全包」降级为「wind-mobile 全包」，**不再覆盖
+  FFI 绑定层自身**（uniffi 宏 / cdylib / tracing-android 的 cfg 分支）。这一件改由本仓
+  `scripts/build-rust.ps1` 真正交叉编译 `.so` 时把关——比 check 更强，但反馈晚一个仓。
+- 两仓各有 `Cargo.lock` 与 `target/`，同一批依赖会编译两遍。
+- 本仓不能单独 clone 后构建，必须与主仓并列存放。
 
 ### 3.2 事件模型：软键盘点按合成为 VK 键事件
 

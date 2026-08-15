@@ -32,8 +32,21 @@ docs/                         架构文档与上游改造说明
 
 要求：JDK 17、Android SDK（compileSdk 36）。`local.properties` 配置 `sdk.dir`。
 
-Rust 核心（`wind-android` crate）位于主仓，经 cargo-ndk 编译 `.so` 后接入本仓
-（walking skeleton 阶段接通，当前键盘为透传占位）。
+Rust 侧：
+
+```powershell
+pwsh scripts/build-rust.ps1     # 交叉编译 .so + 生成 Kotlin 绑定
+```
+
+绑定层 `rust/wind-android` 在本仓，输入法内核在主仓，两者经主仓的 `wind-mobile`
+门面以 path 依赖对接——因此**两仓必须并列存放**：
+
+```
+<workspace>/WindInput          主仓（核心 + wind-mobile 门面）
+<workspace>/WindInputAndroid   本仓（Kotlin 壳 + wind-android 绑定层）
+```
+
+主仓不在隔壁时 cargo 会报 path 依赖找不到，那不是环境问题，是目录摆错了。
 
 ## 当前状态
 

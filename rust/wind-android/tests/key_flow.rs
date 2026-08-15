@@ -30,8 +30,11 @@ impl UiEventListener for Recorder {
     }
 }
 
+/// 出厂数据取**主仓的** `build_dev/data`（方案与词库的唯一真源，不在本仓复制一份）。
+///
+/// 路径假设两仓并列存放，与 `Cargo.toml` 里 wind-mobile 的 path 依赖同一个前提。
 fn data_dir() -> std::path::PathBuf {
-    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../build_dev/data")
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../WindInput/build_dev/data")
 }
 
 fn has_schemas() -> bool {
@@ -714,7 +717,7 @@ fn candidate_window_is_capped() {
     settle();
     let w = core.candidates(0, u32::MAX);
     assert!(
-        w.items.len() <= wind_coordinator::candidate_pull::MAX_WINDOW,
+        w.items.len() <= wind_mobile::MAX_WINDOW,
         "单次拉取不得超过 MAX_WINDOW，实得 {}",
         w.items.len(),
     );

@@ -18,18 +18,18 @@ required-features = ["cli"]
 cli = ["uniffi/cli"]
 
 [dependencies]
-wind-coordinator = { path = "../wind-coordinator", default-features = false }
-wind-host = { path = "../wind-host" }
-wind-bridge = { path = "../wind-bridge" }
-wind-config = { path = "../wind-config" }
-wind-ipc = { path = "../wind-ipc" }
-wind-keys = { path = "../wind-keys" }
-wind-ui-types = { path = "../wind-ui-types" }
+# ⚠ **只此一条**通往核心。绑定层曾经直接 path 依赖七个核心 crate
+# （coordinator/host/bridge/config/ipc/keys/ui-types），等于焊在核心的内部结构上：
+# 核心一次内部重构就打断本仓构建，而本仓在另一条 CI 上，断了往往过几天才发现。
+# 新增能力时改 wind-mobile 的门面，不要在这里另开一条 path 依赖绕过它。
+#
+# 路径假设**两仓并列存放**（`<workspace>/WindInput` 与 `<workspace>/WindInputAndroid`）。
+# 这个前提本来就存在——scripts/build-rust.ps1 一直是这么找主仓的。
+wind-mobile = { path = "../../../WindInput/wind_input/crates/wind-mobile" }
 uniffi = "0.32"
-tracing = { workspace = true }
 
 # Rust 日志 → logcat：没有它，引擎侧问题在设备上只能盲猜（walking skeleton
-# 首测就栽在这上面）。仅 Android 目标编译，桌面构建不受影响。
+# 首测就栽在这上面）。仅 Android 目标编译，桌面构建（跑测试、生成绑定）不受影响。
 [target.'cfg(target_os = "android")'.dependencies]
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }
 tracing-android = "0.2"

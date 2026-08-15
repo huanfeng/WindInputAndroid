@@ -932,16 +932,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_toast() != 36283) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_candidates() != 11241) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_candidates() != 43261) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_focus_gained() != 55877) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_focus_gained() != 4561) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_focus_lost() != 17783) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_focus_lost() != 32859) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 15385) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 7962) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_run_command() != 36173) {
@@ -950,13 +950,13 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 9691) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 14719) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 56562) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 61817) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 57465) {
+    if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 19999) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -1397,7 +1397,7 @@ public object FfiConverterString: FfiConverter<String, RustBuffer.ByValue> {
 
 
 /**
- * 反向通道回调（UiCommand 泵线程调用，**非主线程**，Kotlin 侧自行 post）
+ * 反向通道回调（核心的泵线程调用，**非主线程**，Kotlin 侧自行 post）
  */
 public interface UiEventListener {
     
@@ -1425,7 +1425,7 @@ public interface UiEventListener {
 }
 
 /**
- * 反向通道回调（UiCommand 泵线程调用，**非主线程**，Kotlin 侧自行 post）
+ * 反向通道回调（核心的泵线程调用，**非主线程**，Kotlin 侧自行 post）
  */
 open class UiEventListenerImpl: Disposable, AutoCloseable, UiEventListener
 {
@@ -1827,25 +1827,28 @@ public interface WindCoreInterface {
     /**
      * 拉取候选全量的一个窗口。**纯读**，不改状态，可随时调。
      *
-     * 别在每次按键都拉一大段：序列化与宿主侧的文字测量都在主线程上。
+     * 别在每次按键都拉一大段：序列化与 K 侧的文字测量都在主线程上。
      * 起手拉够铺满一两屏即可，用户滚到尾部再续取。
      */
     fun `candidates`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow
     
     /**
-     * 焦点获得（对应 onStartInput）。首次调用时顺带启动后台预热。
+     * 焦点获得（对应 onStartInput）。
+     *
+     * 词库预热在核心构造时就已启动（不在这里），所以本调用是廉价的。
      */
     fun `focusGained`()
     
     /**
-     * 焦点丢失（对应 onFinishInput）。Thread 语义 = 真正离开，清输入态。
+     * 焦点丢失（对应 onFinishInput）。语义 = 真正离开，清输入态。
      */
     fun `focusLost`()
     
     /**
-     * 按下键（vk = wind-keys VK 码，`modifiers` 见 [`wind_host::Modifiers`]）。
+     * 按下键（vk = wind-keys VK 码，`modifiers` 为位掩码）。
      *
-     * 抬起事件骨架期不喂（协调器按键链以 down 为主）。
+     * 抬起事件骨架期不喂（协调器按键链以 down 为主）。吃键判定在核心内部完成，
+     * K 侧**不要**自己判断哪些键该拦——`consumed=false` 就照系统默认行为走。
      */
     fun `keyDown`(`vk`: kotlin.UInt, `modifiers`: kotlin.UInt): KeyResult
     
@@ -1864,14 +1867,15 @@ public interface WindCoreInterface {
     /**
      * 按**绝对下标**选词，返回编辑指令流（与 [`Self::key_down`] 同一种形状）。
      *
-     * 取代此前"合成数字键"的做法——那条路把选词限死在页内 1-9，第 10 个及以后
-     * 永远点不到。
+     * `index` 是全量候选里的绝对下标，不是页内的——取自 [`Self::candidates`] 拉到的
+     * 窗口。取代此前「合成数字键」的做法：那条路把选词限死在页内 1-9，第 10 个及
+     * 以后永远点不到，候选栏的滚动也就失去了意义。
      */
     fun `selectCandidate`(`index`: kotlin.UInt): KeyResult
     
     /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
-     * 用户可以往 `schemas/shuangpin/` 里丢自己的布局文件，硬编码清单看不见它。
+     * 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
      */
     fun `shuangpinLayouts`(): List<LayoutInfo>
     
@@ -1910,7 +1914,7 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
      *
      * - `data_dir`: 出厂数据目录（schemas/ 所在，即 Android filesDir/data）
      * - `user_root`: 用户/缓存数据根（Android filesDir/rust，内部分 config/data/cache）
-     * - `schema`: 激活方案 id（骨架期单方案，如 "wubi86"）
+     * - `schema`: **首装兜底**方案 id（如 "wubi86"）；用户上次选过的优先
      */
     constructor(`dataDir`: kotlin.String, `userRoot`: kotlin.String, `schema`: kotlin.String, `listener`: UiEventListener) :
         this(UniffiWithHandle, 
@@ -2005,7 +2009,7 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     /**
      * 拉取候选全量的一个窗口。**纯读**，不改状态，可随时调。
      *
-     * 别在每次按键都拉一大段：序列化与宿主侧的文字测量都在主线程上。
+     * 别在每次按键都拉一大段：序列化与 K 侧的文字测量都在主线程上。
      * 起手拉够铺满一两屏即可，用户滚到尾部再续取。
      */override fun `candidates`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow {
             return FfiConverterTypeCandidateWindow.lift(
@@ -2024,7 +2028,9 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
-     * 焦点获得（对应 onStartInput）。首次调用时顺带启动后台预热。
+     * 焦点获得（对应 onStartInput）。
+     *
+     * 词库预热在核心构造时就已启动（不在这里），所以本调用是廉价的。
      */override fun `focusGained`()
         = 
     callWithHandle {
@@ -2039,7 +2045,7 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
-     * 焦点丢失（对应 onFinishInput）。Thread 语义 = 真正离开，清输入态。
+     * 焦点丢失（对应 onFinishInput）。语义 = 真正离开，清输入态。
      */override fun `focusLost`()
         = 
     callWithHandle {
@@ -2054,9 +2060,10 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
-     * 按下键（vk = wind-keys VK 码，`modifiers` 见 [`wind_host::Modifiers`]）。
+     * 按下键（vk = wind-keys VK 码，`modifiers` 为位掩码）。
      *
-     * 抬起事件骨架期不喂（协调器按键链以 down 为主）。
+     * 抬起事件骨架期不喂（协调器按键链以 down 为主）。吃键判定在核心内部完成，
+     * K 侧**不要**自己判断哪些键该拦——`consumed=false` 就照系统默认行为走。
      */override fun `keyDown`(`vk`: kotlin.UInt, `modifiers`: kotlin.UInt): KeyResult {
             return FfiConverterTypeKeyResult.lift(
     callWithHandle {
@@ -2110,8 +2117,9 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     /**
      * 按**绝对下标**选词，返回编辑指令流（与 [`Self::key_down`] 同一种形状）。
      *
-     * 取代此前"合成数字键"的做法——那条路把选词限死在页内 1-9，第 10 个及以后
-     * 永远点不到。
+     * `index` 是全量候选里的绝对下标，不是页内的——取自 [`Self::candidates`] 拉到的
+     * 窗口。取代此前「合成数字键」的做法：那条路把选词限死在页内 1-9，第 10 个及
+     * 以后永远点不到，候选栏的滚动也就失去了意义。
      */override fun `selectCandidate`(`index`: kotlin.UInt): KeyResult {
             return FfiConverterTypeKeyResult.lift(
     callWithHandle {
@@ -2129,7 +2137,7 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     
     /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
-     * 用户可以往 `schemas/shuangpin/` 里丢自己的布局文件，硬编码清单看不见它。
+     * 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
      */override fun `shuangpinLayouts`(): List<LayoutInfo> {
             return FfiConverterSequenceTypeLayoutInfo.lift(
     callWithHandle {
@@ -2185,9 +2193,6 @@ public object FfiConverterTypeWindCore: FfiConverter<WindCore, Long> {
 
 /**
  * 候选帧：编码栏与候选栏一次渲染所需的全部数据。
- *
- * 拆成 Record 而非长参数列表——`UpdateCandidates` 还会继续加字段（翻页栏、注释行），
- * 每加一个都改 trait 方法签名会连带 Kotlin 实现全部返工。
  */
 data class CandidateUpdate (
     /**
@@ -2277,8 +2282,7 @@ public object FfiConverterTypeCandidateUpdate: FfiConverterRustBuffer<CandidateU
  * 候选全量的一个窗口（滚动候选栏 / 展开面板的数据源）。
  *
  * 推送帧 [`CandidateUpdate`] 给的是**当页**候选，够画编码栏与页码，但装不下一条
- * 可滚动的长列表。宿主要更多时按 `(offset, limit)` 来拉——核心侧另有硬上限，
- * 见 `wind_coordinator::candidate_pull::MAX_WINDOW`。
+ * 可滚动的长列表。宿主要更多时按 `(offset, limit)` 来拉——核心侧另有硬上限。
  */
 data class CandidateWindow (
     var `items`: List<kotlin.String>
@@ -2289,7 +2293,7 @@ data class CandidateWindow (
     var `offset`: kotlin.UInt
     , 
     /**
-     * **全量**候选总数：宿主据此判断还要不要续取
+     * **全量**候选总数：Kotlin 据此判断还要不要续取
      */
     var `total`: kotlin.UInt
     , 
@@ -2338,7 +2342,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
 
 
 /**
- * 一次编辑操作（[`wind_host::EditOp`] 的 FFI 投影）。
+ * 一次编辑操作（[`wind_mobile::EditOp`] 的 FFI 投影）。
  *
  * UniFFI 的枚举载荷支持有限，此处摊平成带 `kind` 判别位的 Record：
  * Kotlin 侧一个 `when(kind)` 分派到对应的 `InputConnection` 调用。
@@ -2530,7 +2534,7 @@ public object FfiConverterTypeKeyResult: FfiConverterRustBuffer<KeyResult> {
 
 
 /**
- * 一个双拼布局（`schemas/shuangpin/<id>.toml`）。
+ * 一个双拼布局。
  */
 data class LayoutInfo (
     /**
@@ -2644,9 +2648,9 @@ public object FfiConverterTypeSchemaInfo: FfiConverterRustBuffer<SchemaInfo> {
 /**
  * Kotlin 可下达的引擎命令。
  *
- * 刻意是一张**手工挑选的小表**而非桌面 `MenuCmd` 的镜像：后者含截图、打开目录、
- * 诊断 HUD、语言栏图标等一批桌面专属项，暴露给移动端只会制造调不通的入口。
- * 新增移动端要用的开关时在此显式加一条。
+ * 刻意是一张**手工挑选的小表**而非桌面菜单的镜像：后者含截图、打开目录、诊断 HUD、
+ * 语言栏图标等一批桌面专属项，暴露给移动端只会制造调不通的入口。
+ * 新增移动端要用的开关时，先在 [`wind_mobile::MobileCommand`] 加一条，再在此投影。
  */
 sealed class EngineCommand {
     
@@ -2693,10 +2697,7 @@ sealed class EngineCommand {
     
     
     /**
-     * 设置双拼布局（`id` 取自 [`WindCore::shuangpin_layouts`]）。
-     *
-     * 不走 `MenuCmd`：桌面那套菜单里没有这一项（桌面在设置页里改），
-     * 而移动端没有设置页 RPC 通道，只能经本命令直达协调器。
+     * 设置双拼布局（`id` 取自 [`WindCore::shuangpin_layouts`]）
      */
     data class SetShuangpinLayout(
         val `id`: kotlin.String) : EngineCommand()

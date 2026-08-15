@@ -134,6 +134,16 @@ function Get-PadText {
 # 轮询重试：`force-stop` 后 Activity 要重建，固定 sleep 在慢设备（真机首启、
 # 模拟器负载高时）不够，dump 会拿到还没布局好的层级。
 function Get-EditBounds {
+    # 真机上最常见的「重试 12 次仍无」不是布局慢，而是**屏幕休眠或通知栏挡着**：
+    # Activity 明明是 mFocusedApp，dump 却拿不到节点，日志里只有十几行
+    # 「intent has been delivered to currently running top-most instance」，
+    # 看起来像 IME 坏了。先唤醒再说，省得又去查引擎。
+    #   adb shell dumpsys power | grep mWakefulness    → Dozing 就是它
+    #   adb shell dumpsys window | grep mCurrentFocus  → NotificationShade 就是它
+    Adb shell input keyevent KEYCODE_WAKEUP | Out-Null
+    Adb shell cmd statusbar collapse | Out-Null
+    Adb shell wm dismiss-keyguard | Out-Null
+
     for ($try = 0; $try -lt 12; $try++) {
         $xml = Dump-Xml
         foreach ($node in ($xml -split '<node')) {
