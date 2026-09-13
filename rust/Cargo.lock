@@ -1096,6 +1096,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6e4313cd5fcd3dad5cafa179702e2b244f760991f45397d14d4ebf38247da75"
 
 [[package]]
+name = "unicode-segmentation"
+version = "1.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6f5d3c3b1bf09027a88a6bc961fc00497d651009560b5463668dc81b0fa87a8"
+
+[[package]]
 name = "uniffi"
 version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1310,6 +1316,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "wind-assoc"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+ "wind-config",
+]
+
+[[package]]
+name = "wind-aux-code"
+version = "0.1.0"
+dependencies = [
+ "tracing",
+ "wind-candidate",
+]
+
+[[package]]
 name = "wind-bridge"
 version = "0.1.0"
 dependencies = [
@@ -1327,6 +1349,7 @@ name = "wind-candidate"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "unicode-segmentation",
 ]
 
 [[package]]
@@ -1352,9 +1375,11 @@ dependencies = [
  "dirs",
  "serde",
  "serde_json",
+ "serde_yaml",
  "thiserror",
  "toml 0.8.23",
  "tracing",
+ "unicode-segmentation",
  "wind-quick-input",
 ]
 
@@ -1369,6 +1394,8 @@ dependencies = [
  "serde_json",
  "toml 0.8.23",
  "tracing",
+ "wind-assoc",
+ "wind-aux-code",
  "wind-bridge",
  "wind-candidate",
  "wind-cmdbar",
@@ -1382,6 +1409,7 @@ dependencies = [
  "wind-punct",
  "wind-quick-input",
  "wind-reverse",
+ "wind-softkeyboard",
  "wind-store",
  "wind-theme",
  "wind-transform",
@@ -1451,12 +1479,14 @@ dependencies = [
 name = "wind-mobile"
 version = "0.1.0"
 dependencies = [
+ "toml 0.8.23",
  "tracing",
  "wind-bridge",
  "wind-config",
  "wind-coordinator",
  "wind-host",
  "wind-ipc",
+ "wind-keys",
  "wind-ui-types",
 ]
 
@@ -1500,6 +1530,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "wind-softkeyboard"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml 0.8.23",
+ "tracing",
+]
+
+[[package]]
 name = "wind-store"
 version = "0.1.0"
 dependencies = [
@@ -1511,6 +1550,7 @@ dependencies = [
  "thiserror",
  "tracing",
  "uuid",
+ "wind-cmdbar",
 ]
 
 [[package]]
