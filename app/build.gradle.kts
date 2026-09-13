@@ -10,7 +10,13 @@ android {
     namespace = "com.windinput.ime"
     // miuix 0.9.3 要求 compileSdk ≥ 37；AGP 8.13 官方推荐上限 36，
     // 已在 gradle.properties 里 suppressUnsupportedCompileSdk 抑制告警
+    //
+    // ⚠ API 37 起 SDK 平台包带**小版本号**（platforms;android-37.0 / 37.1 / 37.2），
+    // 光写 compileSdk = 37 时 AGP 去找 hash "android-37"，新装的 SDK 里没有这个目录，
+    // 报的是「Failed to find target with hash string 'android-37'」——看着像 SDK 没装全，
+    // 其实是命名变了。compileSdkMinor 把 hash 补成 "android-37.0"。
     compileSdk = 37
+    compileSdkMinor = 0
 
     defaultConfig {
         applicationId = "com.windinput.ime"

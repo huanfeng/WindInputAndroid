@@ -1,0 +1,516 @@
+#!/usr/bin/env bash
+# 模拟器端到端输入测试（Linux/macOS 版，Windows 见 emu-test.ps1）：
+# 环境准备 → 点击键盘按键 → 断言输入框内容
+#
+# ── 三个必踩的坑（都已在脚本里处理，改动前先读）────────────────────────
+# 1. 模拟器带硬件键盘，InputMethodService.onEvaluateInputViewShown() 默认返回
+#    false → 软键盘视图**从不创建**。必须 settings put secure
+#    show_ime_with_hard_keyboard 1。
+# 2. `am force-stop` 掉当前 IME 时，系统会把默认输入法切回 Gboard。之后所有
+#    点击都是 Gboard 在响应（表现为"输入法坏了"）。force-stop 后必须重新 ime set。
+# 3. 输入框为空时 uiautomator dump 会把 hint 当作 text 输出，据此断言会误判。
+#    脚本按 hint 属性剔除。
+#
+# ── bash 版独有的坑 ───────────────────────────────────────────────────
+# 4. `adb shell` 的输出是 **CRLF**。不剥掉 \r，`[[ "$t" == " " ]]` 这类等值断言
+#    会全线失败，而打印出来看起来一模一样——最难查的一类假失败。adb_ 统一 tr -d。
+# 5. bash 没有浮点运算。按键宽度权重（1.5 / 3.4）必须走 awk，用 $(( )) 会被
+#    静默截断成整数，坐标偏到隔壁键上。
+#
+# 键盘按键是 Canvas 自绘的，uiautomator 看不到按键节点，只能按坐标点击；
+# 坐标由布局比例算出（与 KeyboardLayouts / KeyboardDimens 一致），布局改了要同步这里。
+#
+# 用法：scripts/emu-test.sh [-s emulator-5554] [--skip-install]
+set -uo pipefail
+
+SERIAL="${ANDROID_SERIAL:-emulator-5554}"
+SKIP_INSTALL=0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -s|--serial) SERIAL="$2"; shift 2 ;;
+        --skip-install) SKIP_INSTALL=1; shift ;;
+        -h|--help) sed -n '1,30p' "$0"; exit 0 ;;
+        *) echo "未知参数: $1" >&2; exit 2 ;;
+    esac
+done
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/sdk}}"
+ADB="${ADB:-$SDK/platform-tools/adb}"
+[[ -x "$ADB" ]] || ADB="$(command -v adb)" || { echo "找不到 adb" >&2; exit 1; }
+PKG="com.windinput.ime"
+IME="$PKG/.service.WindInputImeService"
+
+# 坑 4：剥掉 CRLF 的 \r，否则等值断言全线假失败
+adb_() { "$ADB" -s "$SERIAL" "$@" 2>/dev/null | tr -d '\r'; }
+adb_q() { "$ADB" -s "$SERIAL" "$@" >/dev/null 2>&1; }
+
+# ⚠ 致命错误要能从子 shell 里穿出来。reset_pad/get_edit_bounds 都在
+# `t="$(probe_chinese)"` 这类命令替换里跑，那是**子 shell**——里面 `exit 1` 只结束
+# 子 shell，主脚本毫不知情地继续跑下一个用例。实测现象是「找不到测试输入框」连打
+# 七遍然后照常往下测，全是假结果。kill 主进程才是真的停。
+TOP_PID=$$
+trap 'exit 1' TERM
+die() { echo "$*" >&2; kill -s TERM "$TOP_PID" 2>/dev/null; exit 1; }
+
+# ── 键盘布局：与 KeyboardLayouts.qwerty 保持一致 ────────────────────────
+ROW_KEYS=(
+    "q w e r t y u i o p"
+    "a s d f g h j k l"
+    "SHIFT z x c v b n m BS"
+    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步（中英键在回车左侧）
+    "SYM COMMA SPACE PERIOD LANG ENTER"
+)
+ROW_W=(
+    "1 1 1 1 1 1 1 1 1 1"
+    "1 1 1 1 1 1 1 1 1"
+    "1.5 1 1 1 1 1 1 1 1.5"
+    "1.5 1 3.4 1 1.3 1.5"
+)
+NROWS=${#ROW_KEYS[@]}
+
+GEO_W=0; GEO_H=0; GEO_DENSITY=0; GEO_ROWPX=0
+GEO_KBTOP=0; GEO_KBBOTTOM=0; GEO_BARY=0; GEO_CODEBARY=0
+GEO_PANELHEADERY=0; GEO_PANELBACKX=0
+
+init_geometry() {
+    local size w h dpi
+    size="$(adb_ shell wm size | sed 's/.*:[[:space:]]*//' | tr -d '[:space:]')"
+    w="${size%%x*}"; h="${size##*x}"
+    dpi="$(adb_ shell wm density | sed 's/.*:[[:space:]]*//' | tr -d '[:space:]')"
+    GEO_W="$w"; GEO_H="$h"
+    # 坑 5：所有带小数的量一次性交给 awk 算完，bash 只接整数
+    read -r GEO_DENSITY GEO_ROWPX GEO_KBTOP GEO_KBBOTTOM GEO_BARY GEO_CODEBARY \
+            GEO_PANELHEADERY GEO_PANELBACKX < <(awk -v h="$h" -v dpi="$dpi" 'BEGIN{
+        d = dpi / 160.0
+        rowPx     = int(56 * d + 0.5)   # KeyboardDimens.rowHeightDp 默认值
+        # 条区 = 编码栏 + 主行（BarView.CODE_BAR_DP / MAIN_ROW_DP），总高恒定
+        codeBarPx = int(26 * d + 0.5)
+        mainRowPx = int(44 * d + 0.5)
+        # 底部 insets（手势条/导航栏）：InputRootView 的 bottomSpacer 高度
+        insetPx   = int(48 * d + 0.5)
+        kbBottom  = h - insetPx
+        kbTop     = kbBottom - 4 * rowPx
+        # 候选行在条区下半：条区顶 = kbTop-(编码栏+主行)，候选行中心再下移半个主行
+        barY      = kbTop - int(mainRowPx / 2)
+        # 编码栏中心（组合中才可见）
+        codeBarY  = kbTop - mainRowPx - int(codeBarPx / 2)
+        # 面板 header 中心：面板打开时**条区整个让位**，面板从条区位置起画，
+        # 其 header 与条区等高（BarView.TOTAL_DP）。写成 kbTop+xx 会点进键盘区。
+        panelHdrY = kbTop - codeBarPx - mainRowPx + int((codeBarPx + mainRowPx) / 2)
+        # 返回图标中心：header 左侧固定 52dp 宽
+        panelBackX = int(26 * d + 0.5)
+        printf "%.4f %d %d %d %d %d %d %d\n", d, rowPx, kbTop, kbBottom, barY, codeBarY, panelHdrY, panelBackX
+    }')
+    echo "几何: ${GEO_W}x${GEO_H} density=$GEO_DENSITY 行高=$GEO_ROWPX 键盘顶=$GEO_KBTOP 候选y=$GEO_BARY 编码栏y=$GEO_CODEBARY"
+}
+
+tap_key() {
+    local name="$1" r idx keys weights cx cy
+    for ((r = 0; r < NROWS; r++)); do
+        read -ra keys <<< "${ROW_KEYS[$r]}"
+        idx=-1
+        local i
+        for i in "${!keys[@]}"; do [[ "${keys[$i]}" == "$name" ]] && { idx=$i; break; }; done
+        (( idx < 0 )) && continue
+        weights="${ROW_W[$r]}"
+        cx="$(awk -v ws="$weights" -v idx="$idx" -v W="$GEO_W" 'BEGIN{
+            n = split(ws, a, " "); total = 0
+            for (i = 1; i <= n; i++) total += a[i]
+            unit = W / total; x = 0
+            for (i = 1; i <= idx; i++) x += a[i] * unit
+            printf "%d", int(x + a[idx+1] * unit / 2)
+        }')"
+        cy="$(awk -v kb="$GEO_KBBOTTOM" -v n="$NROWS" -v r="$r" -v rp="$GEO_ROWPX" \
+              'BEGIN{ printf "%d", int(kb - (n - r - 0.5) * rp) }')"
+        adb_q shell input tap "$cx" "$cy"
+        sleep 0.4
+        return 0
+    done
+    die "未知键位: $name"
+}
+
+# 点候选条第 n 项（0 起，按等宽粗估；候选窄时够用）
+tap_candidate() {
+    adb_q shell input tap $(( 60 + $1 * 120 )) "$GEO_BARY"
+    sleep 0.5
+}
+
+# 点第 n 项并把上屏文本读回来（读完清空），供「首屏候选有哪些」这类取样用
+tap_candidate_text() {
+    tap_candidate "$1"
+    local t; t="$(get_pad_text)"
+    reset_pad
+    tap_key a
+    sleep 0.5
+    printf '%s' "$t"
+}
+
+# IME 窗口高度（px）。uiautomator 看不到 IME 窗口，只能从 window inset 取。
+get_ime_height() {
+    local v
+    v="$(adb_ shell dumpsys window displays \
+        | grep -oP 'mType=ime .*mInsetsHint=Insets\{[^}]*bottom=\K\d+' | head -1)"
+    printf '%s' "${v:-0}"
+}
+
+dump_xml() {
+    adb_q shell uiautomator dump /sdcard/wt.xml
+    adb_ shell cat /sdcard/wt.xml
+}
+
+# 读输入框内容；输入框为空时 dump 会把 hint 填进 text，需剔除
+get_pad_text() {
+    local node text hint
+    while IFS= read -r node; do
+        [[ "$node" == *'content-desc="windinput-testpad"'* ]] || continue
+        text=""; hint=""
+        [[ "$node" =~ [[:space:]]text=\"([^\"]*)\" ]] && text="${BASH_REMATCH[1]}"
+        [[ "$node" =~ [[:space:]]hint=\"([^\"]*)\" ]] && hint="${BASH_REMATCH[1]}"
+        # 显示的是 hint = 实际为空
+        [[ -n "$hint" && "$text" == "$hint" ]] && return 0
+        printf '%s' "$text"
+        return 0
+    done < <(dump_xml | sed 's/<node/\n<node/g')
+}
+
+EDIT_CX=0; EDIT_CY=0
+# 轮询重试：`force-stop` 后 Activity 要重建，固定 sleep 在慢设备（真机首启、
+# 模拟器负载高时）不够，dump 会拿到还没布局好的层级。
+get_edit_bounds() {
+    # 真机上最常见的「重试 12 次仍无」不是布局慢，而是**屏幕休眠或通知栏挡着**：
+    # Activity 明明是 mFocusedApp，dump 却拿不到节点，日志里只有十几行
+    # 「intent has been delivered to currently running top-most instance」，
+    # 看起来像 IME 坏了。先唤醒再说，省得又去查引擎。
+    #   adb shell dumpsys power | grep mWakefulness    → Dozing 就是它
+    #   adb shell dumpsys window | grep mCurrentFocus  → NotificationShade 就是它
+    adb_q shell input keyevent KEYCODE_WAKEUP
+    adb_q shell cmd statusbar collapse
+    adb_q shell wm dismiss-keyguard
+
+    local try node xml
+    for ((try = 0; try < 12; try++)); do
+        xml="$(dump_xml)"
+        while IFS= read -r node; do
+            [[ "$node" == *'content-desc="windinput-testpad"'* ]] || continue
+            if [[ "$node" =~ bounds=\"\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]\" ]]; then
+                EDIT_CX=$(( (BASH_REMATCH[1] + BASH_REMATCH[3]) / 2 ))
+                EDIT_CY=$(( (BASH_REMATCH[2] + BASH_REMATCH[4]) / 2 ))
+                return 0
+            fi
+        done < <(printf '%s' "$xml" | sed 's/<node/\n<node/g')
+        # 第三种「dump 拿不到节点」的成因（前两种是休眠和通知栏）：**ANR 对话框**。
+        # 它盖在最前面，dump 出来的整棵树都是那个弹窗，于是报「找不到测试输入框」，
+        # 根因却和输入法毫无关系。从快照恢复时尤其容易撞上——恢复瞬间系统时间跳变，
+        # watchdog 就判 SystemUI 无响应。认 aerr_close 这个按钮 id，点掉继续。
+        dismiss_anr "$xml"
+        sleep 0.7
+        adb_q shell am start -n "$PKG/.settings.TestPadActivity"
+    done
+    die "找不到测试输入框（重试 12 次仍无）"
+}
+
+# 点掉 ANR 对话框的「关闭」按钮。传入已 dump 好的 xml，避免多跑一次 dump。
+dismiss_anr() {
+    local node
+    [[ "$1" == *'android:id/aerr_close'* ]] || return 0
+    while IFS= read -r node; do
+        [[ "$node" == *'android:id/aerr_close'* ]] || continue
+        if [[ "$node" =~ bounds=\"\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]\" ]]; then
+            echo "  检测到 ANR 对话框，点掉" >&2
+            adb_q shell input tap $(( (BASH_REMATCH[1] + BASH_REMATCH[3]) / 2 )) \
+                                  $(( (BASH_REMATCH[2] + BASH_REMATCH[4]) / 2 ))
+            sleep 1.5
+            return 0
+        fi
+    done < <(printf '%s' "$1" | sed 's/<node/\n<node/g')
+}
+
+reset_pad() {
+    adb_q shell am start -n "$PKG/.settings.TestPadActivity"
+    sleep 2
+    # 清空：全选 + 删除（比重启 Activity 快，且不会掉 IME）
+    get_edit_bounds
+    adb_q shell input tap "$EDIT_CX" "$EDIT_CY"
+    sleep 0.8
+    adb_q shell input keyevent KEYCODE_MOVE_END
+    # 次数要够长：命令短语用例会上屏 36 字符的 UUID，删不干净会污染下一个用例
+    #（表现为下一条断言"实得"里带着上一条的残字，极易误判成新 bug）。
+    # 一次 shell 里连发 40 下，逐次 exec 要多花 ~20s。
+    adb_q shell 'for i in $(seq 1 40); do input keyevent KEYCODE_DEL; done'
+    sleep 0.3
+    [[ -z "$(get_pad_text)" ]] || die "reset_pad 未清空输入框，后续断言不可信"
+}
+
+FAILED=0
+G=$'\e[32m'; R=$'\e[31m'; Y=$'\e[33m'; C=$'\e[36m'; D=$'\e[90m'; N=$'\e[0m'
+
+check() {   # case expected actual
+    if [[ "$3" == "$2" ]]; then
+        echo "  ${G}PASS${N}  $1 => '$3'"
+    else
+        echo "  ${R}FAIL${N}  $1 期望 '$2' 实得 '$3'"; FAILED=$((FAILED + 1))
+    fi
+}
+check_match() {   # case pattern actual
+    if printf '%s' "$3" | grep -qP "$2"; then
+        echo "  ${G}PASS${N}  $1 => '$3'"
+    else
+        echo "  ${R}FAIL${N}  $1 期望匹配 /$2/ 实得 '$3'"; FAILED=$((FAILED + 1))
+    fi
+}
+CN='^[\x{4e00}-\x{9fa5}]$'
+CN_PLUS='^[\x{4e00}-\x{9fa5}]+$'
+
+# ── 环境准备 ──────────────────────────────────────────────────────────
+if (( ! SKIP_INSTALL )); then
+    echo "${C}构建并安装...${N}"
+    ( cd "$ROOT" && ./gradlew :app:assembleDebug ) >/dev/null || { echo "构建失败" >&2; exit 1; }
+    adb_q install -r "$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+fi
+# 坑 1：模拟器有硬件键盘 → 不显示软键盘视图
+adb_q shell settings put secure show_ime_with_hard_keyboard 1
+# 坑 2：force-stop 会让系统切回 Gboard。**enable 与 set 都必须排在 force-stop 之后**
+# ——`pm clear` 还会把输入法重置成未启用，enable 若排在前面就被一起清掉了，
+# 表现为「脚本说当前输入法是 Gboard」。
+adb_q shell am force-stop "$PKG"
+sleep 1
+adb_q shell ime enable "$IME"
+adb_q shell ime set "$IME"
+# 系统写 secure setting 有延迟，轮询确认而不是睡固定时长
+cur=""
+for ((i = 0; i < 10; i++)); do
+    sleep 0.5
+    cur="$(adb_ shell settings get secure default_input_method | tr -d '[:space:]')"
+    [[ "$cur" == "$PKG"* ]] && break
+    adb_q shell ime set "$IME"
+done
+[[ "$cur" == "$PKG"* ]] || { echo "当前输入法不是本应用: $cur" >&2; exit 1; }
+# 清日志：用例 10 靠 logcat 判性能，读到上一轮的旧告警会误报
+adb_q logcat -c
+init_geometry
+
+# 活跃方案快照：跑完要比对（见文件末尾）。
+# **方案选择是持久化的**，而面板上任何一个点错的坐标都可能把它改掉——改完当次用例
+# 照样 PASS（不过是换了个中文方案，断言只看「是不是汉字」），污染留给**下一次**运行，
+# 现象是「昨天好好的今天全挂」。故把「跑完方案没变」单列成一条不变量来守。
+get_active_schema() {
+    # 首次运行尚未落盘，或非 debug 包没有 run-as → 空
+    adb_ shell run-as "$PKG" cat files/rust/config/WindInput/config.toml \
+        | grep -m1 '^active = ' | sed 's/[[:space:]]*$//'
+}
+SCHEMA_BEFORE="$(get_active_schema)"
+
+# ── 建立前置条件：确保处于中文方案 ──────────────────────────────────────
+# **方案选择是持久化的**（引擎会把 schema.active 写进用户配置）。上一次运行若在
+# 英文用例中途失败，英文方案就留在那儿了，下次启动仍是英文——于是所有中文用例
+# 连同系统短语一起失败，看起来像功能坏了。测试必须自己把前置条件建起来。
+echo; echo "${Y}[0] 前置：确保中文方案${N}"
+# 打一次中文探针；出汉字返回该字，否则返回空。
+probe_chinese() {
+    reset_pad
+    tap_key a; tap_key a; tap_key SPACE
+    local t; t="$(get_pad_text)"
+    printf '%s' "$t" | grep -qP "$CN" && printf '%s' "$t"
+}
+
+# ⚠ **核心是异步构造的**（DeferredSession），未就绪时按键交还宿主、字母直接上屏。
+# 那个结果（'aa '）与「当前不是中文方案」**完全一样**，此前这里把两者混为一谈：
+# 重装后核心还没起来，[0] 就断定"非中文方案"去点中英键，**把输入法切进了英文**，
+# 于是 [1]~[11] 的中文用例连环失败——失败现象在别处，根因是这一个判据。
+# 先重试等就绪，重试到底仍不出汉字，才认为真是方案/模式不对。
+wait_chinese() {
+    local tries="${1:-6}" i t
+    for ((i = 0; i < tries; i++)); do
+        t="$(probe_chinese)"
+        [[ -n "$t" ]] && { printf '%s' "$t"; return; }
+        sleep 2
+    done
+}
+
+probe="$(wait_chinese)"
+if [[ -z "$probe" ]]; then
+    echo "  ${Y}等不到中文候选，判定为非中文模式，点中英键切回${N}"
+    reset_pad
+    tap_key LANG
+    sleep 4
+    probe="$(wait_chinese 3)"
+fi
+check_match "已处于中文方案" "$CN" "$probe"
+
+echo; echo "${Y}[1] 五笔组合上屏：aa + 空格${N}"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+check_match "上屏汉字" "$CN" "$(get_pad_text)"
+
+echo; echo "${Y}[2] 连续两轮组合（候选每轮都要出）${N}"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+tap_key a; tap_key a; tap_key SPACE
+check_match "两轮各上屏一字" '^[\x{4e00}-\x{9fa5}]{2}$' "$(get_pad_text)"
+
+echo; echo "${Y}[3] 空缓冲功能键${N}"
+reset_pad
+tap_key SPACE
+check "空缓冲空格出空格" " " "$(get_pad_text)"
+tap_key BS
+check "退格删除" "" "$(get_pad_text)"
+
+echo; echo "${Y}[4] 中文标点${N}"
+reset_pad
+tap_key COMMA
+check_match "标点上屏" '^[，,]$' "$(get_pad_text)"
+
+echo; echo "${Y}[5] 候选点选${N}"
+reset_pad
+tap_key a; tap_key a
+tap_candidate 1
+check_match "点选第二个候选" "$CN" "$(get_pad_text)"
+
+echo; echo "${Y}[6] 组合中退格删码${N}"
+reset_pad
+tap_key a; tap_key a; tap_key BS; tap_key SPACE
+check_match "删一码后上屏" "$CN" "$(get_pad_text)"
+
+echo; echo "${Y}[7] 系统短语（命令直通车）${N}"
+reset_pad
+# uuid 是出厂命令短语（display = {uuid()} 求值结果）。探针不用 date：
+# date 的五笔码表候选太多，短语被挤到第二页。
+tap_key u; tap_key u; tap_key i; tap_key d
+tap_candidate 0
+# 首选未必是短语，只断言「打得出东西」+ 不崩；短语是否在首位属排序策略
+check_match "短语码可上屏" '.+' "$(get_pad_text)"
+
+echo; echo "${Y}[8] 条区总高恒定（编码栏出现不顶高键盘）${N}"
+# ⚠ 编码栏本身**无法用 uiautomator 断言**：IME 窗口不进 dump（实测 dump 只有宿主
+# Activity 的 9 个节点）。改测它必须守住的那条约束——组合态出现编码栏时，IME 窗口
+# 总高不能变，否则每次起手打字键盘都会跳一下。高度取自 dumpsys 的 ime inset。
+reset_pad
+idle_h="$(get_ime_height)"
+tap_key a; tap_key a
+composing_h="$(get_ime_height)"
+if (( idle_h > 0 && idle_h == composing_h )); then
+    echo "  ${G}PASS${N}  空闲/组合两态窗口同高 ${idle_h}px"
+else
+    echo "  ${R}FAIL${N}  窗口高度跳变：空闲 ${idle_h}px → 组合 ${composing_h}px"; FAILED=$((FAILED + 1))
+fi
+tap_key BS; tap_key BS
+
+echo; echo "${Y}[9] 快捷面板往返${N}"
+# 同样绕开 dump：验证「打开面板 → 键盘让位 → 返回 → 键盘恢复」这条往返。
+#
+# ⚠ 不要用「敲原 'a' 键位应无反应」来验证面板已顶上：那个坐标落在面板的方案选择
+# 区，实测正好点中「英」格，测试自己把引擎切成了英文模式，污染后面所有用例。
+# 面板上任何坐标都可能是功能键，只点自己放的「返回」才安全。
+reset_pad
+# 工具栏 = 6 个等宽图标（BarView.TOOLBAR_ITEMS 5 个 + 尾格），快捷面板入口是**第 1 格**。
+# ⚠ 这里曾按「模式指示(1.2) + 6 图标」算成 W*1.7/7.2；那一格删掉后坐标指向了别的图标，
+# 用例照样 PASS（打开的是表情面板，返回键位置相同），只是验的东西悄悄换了。
+# 布局改了必须同步这行。
+adb_q shell input tap $(( GEO_W / 12 )) "$GEO_BARY"
+sleep 0.8
+panel_h="$(get_ime_height)"
+# ⚠ 坐标取自 GEO_PANELHEADERY/GEO_PANELBACKX，别自己算：面板打开时条区让位、面板
+# 从条区位置起画，header 不在 kbTop 之下而在其**之上**。此处曾写成 kbTop+20dp，
+# 点进了键盘区 → 面板没返回 → 后续用例的点击全落在面板上，级联成多个假失败。
+adb_q shell input tap "$GEO_PANELBACKX" "$GEO_PANELHEADERY"
+sleep 2
+tap_key a; tap_key a; tap_key SPACE
+check_match "返回后键盘可用" "$CN" "$(get_pad_text)"
+if (( panel_h <= 0 )); then
+    echo "  ${R}FAIL${N}  面板期间取不到 IME 窗口高度"; FAILED=$((FAILED + 1))
+fi
+
+echo; echo "${Y}[10] 首键延迟（词库预热）${N}"
+# 惰性构建的反查/合并索引若没被后台预热，会同步阻塞用户首键（实测 2.8s）。
+# 阈值取 100ms 而非一帧：16ms 级抖动是 GC/调度噪声，卡顿量级才是要守的。
+slow="$(adb_ shell logcat -d -s RustSession:W \
+    | grep -oP '阻塞主线程 \K\d+(?=µs)' | awk '$1 > 100000' | paste -sd, -)"
+if [[ -n "$slow" ]]; then
+    echo "  ${R}FAIL${N}  首键阻塞主线程 ${slow}µs"; FAILED=$((FAILED + 1))
+else
+    echo "  ${G}PASS${N}  无 100ms 级主线程阻塞"
+fi
+
+echo; echo "${Y}[11] 中英切换键${N}"
+# 底栏中英键：切英文后字母直出，再点回中文恢复出汉字。
+# ⚠ 目前英文走的是**系统英文模式**（无候选）。英文方案带补全尚未打通
+#（候选走英文引擎、上屏走中文码表），见主仓 key_flow.rs 里标 ignore 的那条用例。
+reset_pad
+tap_key LANG
+# 切换要走引擎，等待给足
+sleep 4
+tap_key h; tap_key i; tap_key SPACE
+check_match "英文模式出拉丁字符" '^[A-Za-z ]+$' "$(get_pad_text)"
+
+tap_key LANG
+sleep 3
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+back_to_cn="$(get_pad_text)"
+check_match "切回中文出汉字" "$CN" "$back_to_cn"
+# ⚠ 收尾必须回到中文：方案选择持久化，留在英文会污染**下一次运行**的所有中文用例
+if ! printf '%s' "$back_to_cn" | grep -qP "$CN"; then
+    echo "  ${Y}切回失败，强制再切一次以免污染下次运行${N}"
+    reset_pad; tap_key LANG; sleep 4
+fi
+
+echo; echo "${Y}[12] 快速点击的按下反馈${N}"
+# 「点得快就没有按下效果」的回归。`input tap` 的 down/up 间隔近乎为零，是最坏情况：
+# 两次 invalidate 落在同一帧内被合并，若不做保底，按下态一帧都不会被绘制。
+# KeyboardView 在高亮结束时自检绘制帧数，未绘制即打 W 日志。
+reset_pad
+adb_q logcat -c
+for ((i = 0; i < 10; i++)); do adb_q shell input tap 60 "$GEO_KBTOP"; done
+sleep 0.8
+missed="$(adb_ shell logcat -d -s WindKeyboard:W | grep -c "一帧未绘制")"
+if (( missed == 0 )); then
+    echo "  ${G}PASS${N}  10 次极限连点均绘制出按下态"
+else
+    echo "  ${R}FAIL${N}  $missed 次按下高亮未被绘制"; FAILED=$((FAILED + 1))
+fi
+reset_pad
+
+echo; echo "${Y}[13] 候选栏滚动后可选中第 10 个以后的候选${N}"
+# 此前点选靠**合成页内数字键 1-9**，第 10 个及以后永远点不到，候选栏做了滚动也是空转
+# （一帧只有 6~9 条）。现在候选按窗口拉取、按绝对下标选词。
+#
+# 判据刻意宽松——只断言「上屏了一个汉字，且不是首屏那几个」：具体是哪个字取决于
+# 滚动距离与字宽，钉死某个字会变成脆弱用例。要守的是「够得着远处的候选」。
+reset_pad
+tap_key a                         # 单码 a：五笔重码极多，必然远超一屏
+sleep 0.6
+near=()
+for ((i = 0; i < 3; i++)); do near+=("$(tap_candidate_text "$i")"); done
+# 甩两把把候选栏滚远（起点留出右边距，避开展开钮）
+swipe_from="$(awk -v w="$GEO_W" 'BEGIN{ printf "%d", int(w * 0.75) }')"
+for ((i = 0; i < 2; i++)); do
+    adb_q shell input swipe "$swipe_from" "$GEO_BARY" 60 "$GEO_BARY" 120
+    sleep 0.7
+done
+adb_q shell input tap "$(awk -v w="$GEO_W" 'BEGIN{ printf "%d", int(w * 0.4) }')" "$GEO_BARY"
+sleep 0.7
+far="$(get_pad_text)"
+check_match "滚动后点选出汉字" "$CN_PLUS" "$far"
+in_near=0
+for t in "${near[@]}"; do [[ -n "$far" && "$t" == "$far" ]] && in_near=1; done
+if (( in_near )); then
+    echo "  ${R}FAIL${N}  滚动后选到的仍是首屏候选 '$far'（滚动没生效或仍受页内 9 项限制）"
+    FAILED=$((FAILED + 1))
+elif [[ -n "$far" ]]; then
+    printf '  %sPASS%s  选到的是首屏之外的候选 => %s（首屏为 %s）\n' \
+        "$G" "$N" "'$far'" "$(IFS=/; echo "${near[*]}")"
+fi
+
+echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
+schema_after="$(get_active_schema)"
+if [[ -z "$SCHEMA_BEFORE" ]]; then
+    echo "  ${D}SKIP  首次运行，无基线可比${N}"
+else
+    check "活跃方案未被用例改动" "$SCHEMA_BEFORE" "$schema_after"
+fi
+
+echo; echo "${C}================================${N}"
+if (( FAILED == 0 )); then echo "${G}全部通过${N}"; exit 0; fi
+echo "${R}${FAILED} 项失败${N}"
+exit 1

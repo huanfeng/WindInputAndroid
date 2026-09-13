@@ -30,12 +30,20 @@ docs/                         架构文档与上游改造说明
 ./gradlew :app:assembleDebug
 ```
 
-要求：JDK 17、Android SDK（compileSdk 36）。`local.properties` 配置 `sdk.dir`。
+要求：JDK 17~21、Android SDK。`local.properties` 配置 `sdk.dir`。
 
-Rust 侧：
+> **compileSdk 37 的坑**：API 37 起平台包带小版本号（`platforms;android-37.0`），
+> 只写 `compileSdk = 37` 时 AGP 找的是 `android-37`，报「Failed to find target with
+> hash string」——看着像 SDK 没装全，其实是命名变了。工程已用 `compileSdkMinor = 0`
+> 补齐，SDK 侧要装的是 `platforms;android-37.0` 而非 `platforms;android-37`。
 
+Rust 侧（两套脚本等价，按平台选）：
+
+```bash
+scripts/build-rust.sh           # Linux / macOS
+```
 ```powershell
-pwsh scripts/build-rust.ps1     # 交叉编译 .so + 生成 Kotlin 绑定
+pwsh scripts/build-rust.ps1     # Windows
 ```
 
 绑定层 `rust/wind-android` 在本仓，输入法内核在主仓，两者经主仓的 `wind-mobile`
@@ -47,6 +55,61 @@ pwsh scripts/build-rust.ps1     # 交叉编译 .so + 生成 Kotlin 绑定
 ```
 
 主仓不在隔壁时 cargo 会报 path 依赖找不到，那不是环境问题，是目录摆错了。
+
+## 测试
+
+分三层，**越靠上越该先跑**——模拟器一轮几分钟，Rust 层同一条按键序列几秒就有结论，
+能在下面复现的问题不要拿到模拟器上试错。
+
+| 层 | 跑什么 | 命令 |
+| --- | --- | --- |
+| Rust 单测 | 按键流 / 方案切换 / 候选回调（`rust/wind-android/tests/key_flow.rs`） | `cd rust && cargo test -p wind-android` |
+| 构建 | 交叉编译 + APK | `scripts/build-rust.sh && ./gradlew :app:assembleDebug` |
+| 端到端 | 模拟器上点键盘、断言输入框（15 个用例） | `scripts/emu-test.sh` |
+
+一键跑完整条：
+
+```bash
+scripts/test-all.sh             # Rust 单测 → 交叉编译 → APK → 起模拟器 → 端到端
+scripts/test-all.sh --skip-emu  # 只到构建为止
+```
+
+Linux 服务器上先把无头模拟器拉起来：
+
+```bash
+scripts/emu-up.sh               # 从快照恢复（默认），等到 boot_completed
+scripts/emu-up.sh --cold        # 丢掉快照完整开机，要干净环境时用
+```
+
+**无显卡机器上的两处优化**（都在 `emu-up.sh` 里，改动前先读那里的注释）：
+
+- **软件渲染**走 SwiftShader（`-gpu swiftshader_indirect`），完全不碰 GPU。
+  新版 emulator 的 `-help-gpu` 已不列这个名字但仍接受，日志里认这行确认生效：
+  `emuglConfig_init: vulkan_mode_selected:swiftshader`。
+- **开机快照**：冷启动约 40s，之后从快照恢复只要十几秒。快照会**固化硬件配置**，
+  所以脚本在 `config.ini` 有改动时自动作废旧快照——否则「改了核数内存却一点没变快」
+  没有任何提示。
+
+> 快照恢复的瞬间系统时间跳变，watchdog 常判 SystemUI 无响应弹出 ANR 对话框。它盖在
+> 最前面，之后任何 `uiautomator dump` 拿到的都是那个弹窗，端到端里表现为**「找不到
+> 测试输入框」**——跟输入法毫无关系。`emu-up.sh`（存快照前）和 `emu-test.sh`
+> （每次找不到输入框时）都会认 `aerr_close` 按钮点掉它。
+
+> **模拟器要 `/dev/kvm`**。没有它 QEMU 退化成纯软件 CPU 模拟，开机十几分钟、点击
+> 几乎不响应，端到端会全线超时假失败——所以 `emu-up.sh` 开机就硬检查一次，缺了直接报错
+> 而不是慢慢跑。跑在 LXC 容器里时宿主机要透传（PVE 8.1+，对**非特权容器**同样有效）：
+>
+> ```bash
+> pct set <CTID> --dev0 /dev/kvm,gid=<容器内 kvm 组的 gid>,mode=0660
+> pct reboot <CTID>
+> ```
+>
+> gid 用 `getent group kvm` 在**容器内**查（各发行版不同，Ubuntu 24.04 上是动态分配的），
+> 再把自己加进该组：`sudo usermod -aG kvm $USER`，重新登录生效。
+>
+> ⚠ 别用老教程里的 `lxc.mount.entry` + `lxc.cgroup2.devices.allow` 那套：非特权容器的
+> uid 映射会把 bind 进来的设备节点显示成 `nobody:nogroup`，**容器内没有写权限**，
+> `/dev/kvm` 看着在、模拟器就是起不来。`emu-up.sh` 的 `-w` 检查专门拦这种半吊子状态。
 
 ## 当前状态
 
