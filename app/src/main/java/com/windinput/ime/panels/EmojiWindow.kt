@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.windinput.ime.core.RecentEmojiStore
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.Palette
 
 /**
  * 表情面板：分类 Tab（最近使用置首）+ 多行网格 + 退格。
@@ -73,7 +74,7 @@ class EmojiWindow(
         grid = RecyclerView(context).apply {
             layoutManager = GridLayoutManager(context, COLUMNS)
             adapter = this@EmojiWindow.adapter
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Palette.current.surface)
         }
         content.addView(
             grid,
@@ -108,7 +109,7 @@ class EmojiWindow(
                     if (i == index) Typeface.BOLD else Typeface.NORMAL,
                 )
                 tabs.getChildAt(i).setBackgroundColor(
-                    if (i == index) 0xFFE6F0FF.toInt() else Color.TRANSPARENT,
+                    if (i == index) Palette.current.accentSoft else Color.TRANSPARENT,
                 )
             }
         }

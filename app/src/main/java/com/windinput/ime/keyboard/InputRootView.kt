@@ -1,7 +1,6 @@
 package com.windinput.ime.keyboard
 
 import android.content.Context
-import android.graphics.Color
 import android.os.Build
 import android.view.View
 import android.view.WindowInsets
@@ -25,7 +24,7 @@ class InputRootView(context: Context) : LinearLayout(context) {
     init {
         orientation = VERTICAL
         // 与键盘同色，否则底部露出异色带
-        setBackgroundColor(Color.parseColor("#F0F2F5"))
+        setBackgroundColor(Palette.current.background)
         fitsSystemWindows = false
         addView(bottomSpacer, LayoutParams(LayoutParams.MATCH_PARENT, 0))
     }

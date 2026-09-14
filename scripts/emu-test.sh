@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 模拟器端到端输入测试（Linux/macOS 版，Windows 见 emu-test.ps1）：
 # 环境准备 → 点击键盘按键 → 断言输入框内容
+# 用例 [15][16]（组合态同步）为 bash 版新增，emu-test.ps1 尚无。
 #
 # ── 三个必踩的坑（都已在脚本里处理，改动前先读）────────────────────────
 # 1. 模拟器带硬件键盘，InputMethodService.onEvaluateInputViewShown() 默认返回
@@ -501,6 +502,27 @@ elif [[ -n "$far" ]]; then
     printf '  %sPASS%s  选到的是首屏之外的候选 => %s（首屏为 %s）\n' \
         "$G" "$N" "'$far'" "$(IFS=/; echo "${near[*]}")"
 fi
+
+echo; echo "${Y}[15] 收起键盘后组合态不残留${N}"
+# 打到一半按返回收键盘，再点回输入框——之前那串码必须已经作废：接着按空格应上屏
+# 一个空格，而不是把旧码拼出来的字。onFinishInputView 就是为这个加的。
+reset_pad
+tap_key a; tap_key a
+adb_q shell input keyevent KEYCODE_BACK      # 收键盘（不失焦，不走 onFinishInput）
+sleep 1
+adb_q shell input tap "$EDIT_CX" "$EDIT_CY"   # 点回输入框，键盘重新弹出
+sleep 1.5
+tap_key SPACE
+check "收键盘后空格不上屏旧码的字" " " "$(get_pad_text)"
+
+echo; echo "${Y}[16] 点编辑框移动光标后组合态不残留${N}"
+# 键盘不收、直接点编辑框（用户挪光标的最常见方式）：同样要作废组合。
+reset_pad
+tap_key a; tap_key a
+adb_q shell input tap "$EDIT_CX" "$EDIT_CY"   # onViewClicked / onUpdateEditorToolType
+sleep 1
+tap_key SPACE
+check "点编辑框后空格不上屏旧码的字" " " "$(get_pad_text)"
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"

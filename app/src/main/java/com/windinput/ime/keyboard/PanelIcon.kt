@@ -55,7 +55,7 @@ class PanelIcon(context: Context) : View(context) {
             invalidate()
         }
 
-    var tint: Int = 0xFF4B5563.toInt()
+    var tint: Int = Palette.current.icon
         set(value) {
             field = value
             invalidate()

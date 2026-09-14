@@ -55,8 +55,20 @@ class KeyboardView(context: Context) : View(context) {
     /** 按键触觉反馈开关（设置项 ui.android.haptic） */
     var hapticEnabled = true
 
+    /** 按键音开关（设置项 ui.android.sound）；音量随系统 */
+    var soundEnabled = false
+
     /** 按键预览气泡开关（设置项 ui.android.key_preview） */
     var previewEnabled = false
+
+    /**
+     * 长按判定时长（设置项 ui.android.long_press_delay）。退格连删的起始延迟与它
+     * **共用**：两者在用户感知里是同一件事——「按住多久算按住」，分开配只会互相打架。
+     */
+    var longPressDelayMs = 300
+
+    private val audioManager =
+        context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
 
     /**
      * 当前方案短称（「五」/「拼」/「英」），中英键直接显示它。
@@ -87,13 +99,14 @@ class KeyboardView(context: Context) : View(context) {
     private var shiftLocked = false
     private var lastShiftTapTime = 0L
 
-    // ── 占位配色（后续由主题系统提供） ──────────────────────────────
-    private val bgColor = 0xFFF0F2F5.toInt()
-    private val keyColor = 0xFFFFFFFF.toInt()
-    private val keySpecialColor = 0xFFD9DDE3.toInt()
-    private val keyPressedColor = 0xFFBBD0F8.toInt()
-    private val textColor = 0xFF1E1E1E.toInt()
-    private val hintColor = 0xFF969696.toInt()
+    // ── 配色取自键盘域调色板（Service 按系统深浅色注入，见 Palette） ──
+    private val palette = Palette.current
+    private val bgColor = palette.background
+    private val keyColor = palette.key
+    private val keySpecialColor = palette.keySpecial
+    private val keyPressedColor = palette.keyPressed
+    private val textColor = palette.text
+    private val hintColor = palette.hint
 
     private val density = resources.displayMetrics.density
 
@@ -324,18 +337,16 @@ class KeyboardView(context: Context) : View(context) {
                 highlightFrames = 0
                 highlightAt = android.os.SystemClock.uptimeMillis()
                 if (key != null) {
-                    if (hapticEnabled) {
-                        performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                    }
+                    feedback(key)
                     if (previewEnabled && !key.isSpecial && key.action is KeyAction.Text) {
                         popupManager.showPreview(bounds.rect, displayLabel(key))
                     }
                     if (key.action == KeyAction.Backspace) {
                         repeating = true
-                        handler.postDelayed(repeatRunnable, 400)
+                        handler.postDelayed(repeatRunnable, longPressDelayMs.toLong())
                     }
                     if (key.longPress.isNotEmpty() || hasLongPressAction(key.action)) {
-                        handler.postDelayed(longPressRunnable, 300)
+                        handler.postDelayed(longPressRunnable, longPressDelayMs.toLong())
                     }
                 }
                 invalidate()
@@ -420,10 +431,26 @@ class KeyboardView(context: Context) : View(context) {
         return true
     }
 
-    private fun repeatHaptic() {
+    /** 按下反馈：震动 + 按键音，各自受开关控制 */
+    private fun feedback(key: KeyDef) {
         if (hapticEnabled) {
             performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         }
+        if (soundEnabled) {
+            // 系统自带四种键音按键型分发（空格/退格/回车有各自的音色），与系统键盘一致
+            val fx = when (key.action) {
+                KeyAction.Space -> android.media.AudioManager.FX_KEYPRESS_SPACEBAR
+                KeyAction.Backspace -> android.media.AudioManager.FX_KEYPRESS_DELETE
+                KeyAction.Enter -> android.media.AudioManager.FX_KEYPRESS_RETURN
+                else -> android.media.AudioManager.FX_KEYPRESS_STANDARD
+            }
+            // -1 = 跟随系统触摸音量
+            audioManager.playSoundEffect(fx, -1f)
+        }
+    }
+
+    private fun repeatHaptic() {
+        pressedKey?.let { feedback(it) }
     }
 
     private fun cancelTimers() {

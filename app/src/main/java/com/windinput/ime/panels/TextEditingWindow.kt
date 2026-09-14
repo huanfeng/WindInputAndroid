@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.Palette
 
 /**
  * 文本编辑面板：光标移动/选择/剪切复制粘贴（参考 fcitx5 TextEditingWindow）。
@@ -76,7 +77,7 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
         selectButton?.let {
             val selecting = listener.isSelecting()
             it.setTypeface(null, if (selecting) Typeface.BOLD else Typeface.NORMAL)
-            it.setTextColor(if (selecting) 0xFF3B82F6.toInt() else 0xFF1E1E1E.toInt())
+            it.setTextColor(if (selecting) Palette.current.accentText else Palette.current.text)
         }
     }
 
@@ -86,8 +87,8 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
             text = label
             gravity = Gravity.CENTER
             textSize = 16f
-            setTextColor(0xFF1E1E1E.toInt())
-            setBackgroundColor(0xFFFFFFFF.toInt())
+            setTextColor(Palette.current.text)
+            setBackgroundColor(Palette.current.key)
             setOnClickListener(onClick)
         }
 }

@@ -1,7 +1,6 @@
 package com.windinput.ime.panels
 
 import android.content.Context
-import android.graphics.Color
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -9,6 +8,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import com.windinput.ime.core.ClipboardStore
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.Palette
 
 /**
  * 剪贴板历史面板：点击粘贴、置顶、删除、清空（跳过置顶）。
@@ -60,7 +60,7 @@ class ClipboardWindow(
                 TextView(context).apply {
                     text = "复制的内容会出现在这里"
                     gravity = Gravity.CENTER
-                    setTextColor(0xFF969696.toInt())
+                    setTextColor(Palette.current.hint)
                     setPadding(0, (48 * density).toInt(), 0, 0)
                 },
             )
@@ -71,14 +71,14 @@ class ClipboardWindow(
             val row = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setBackgroundColor(Color.WHITE)
+                setBackgroundColor(Palette.current.key)
             }
             row.addView(
                 TextView(context).apply {
                     text = entry.text
                     maxLines = 2
                     ellipsize = android.text.TextUtils.TruncateAt.END
-                    setTextColor(0xFF1E1E1E.toInt())
+                    setTextColor(Palette.current.text)
                     val p = (10 * density).toInt()
                     setPadding(p, p, p, p)
                     setOnClickListener { listener.onPasteText(entry.text) }

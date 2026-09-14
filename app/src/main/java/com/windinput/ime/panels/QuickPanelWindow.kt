@@ -1,7 +1,6 @@
 package com.windinput.ime.panels
 
 import android.content.Context
-import android.graphics.Color
 import android.view.Gravity
 import android.view.View
 import android.widget.GridLayout
@@ -12,6 +11,7 @@ import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.Palette
 
 /**
  * 快捷功能面板：方案切换 + 模式开关 + 各面板与设置入口。
@@ -39,6 +39,15 @@ class QuickPanelWindow(
 
         /** 当前可选方案 */
         fun quickSchemas(): List<SchemaEntry>
+
+        /** 弹系统输入法选择器 */
+        fun onSwitchInputMethod()
+
+        /** 系统里有没有可转发的语音输入法（没有就不摆入口，免得点不通） */
+        fun voiceInputAvailable(): Boolean
+
+        /** 切到系统语音输入法 */
+        fun onVoiceInput()
     }
 
     enum class Target { EMOJI, CLIPBOARD, TEXT_EDIT }
@@ -85,6 +94,13 @@ class QuickPanelWindow(
             cell(density),
         )
         more.addView(chip(context, "⚙ 设置") { listener.onOpenSettings() }, cell(density))
+        if (listener.voiceInputAvailable()) {
+            more.addView(chip(context, "🎤 语音输入") { listener.onVoiceInput() }, cell(density))
+        }
+        more.addView(
+            chip(context, "🌐 切换输入法") { listener.onSwitchInputMethod() },
+            cell(density),
+        )
         column.addView(more, matchWrap())
 
         rebuildSchemas(context)
@@ -183,7 +199,7 @@ class QuickPanelWindow(
         return TextView(context).apply {
             this.text = text
             textSize = 11f
-            setTextColor(0xFF969696.toInt())
+            setTextColor(Palette.current.hint)
             setPadding(0, (4 * density).toInt(), 0, (2 * density).toInt())
         }
     }
@@ -212,10 +228,11 @@ class QuickPanelWindow(
             textSize = 13f
             gravity = Gravity.CENTER
             maxLines = 1
-            setTextColor(if (selected) Color.WHITE else 0xFF1E1E1E.toInt())
+            val p = Palette.current
+            setTextColor(if (selected) p.onAccent else p.text)
             background = android.graphics.drawable.GradientDrawable().apply {
                 cornerRadius = 8 * density
-                setColor(if (selected) 0xFF4A78C8.toInt() else Color.WHITE)
+                setColor(if (selected) p.accent else p.key)
             }
             setOnClickListener { onClick() }
         }

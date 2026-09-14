@@ -8,6 +8,8 @@ import android.view.KeyEvent
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.InputMethodSubtype
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import com.windinput.ime.WindInputApp
@@ -34,6 +36,7 @@ import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
+import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.panels.ClipboardWindow
 import com.windinput.ime.panels.EmojiWindow
 import com.windinput.ime.panels.ExpandedCandidatesWindow
@@ -146,6 +149,8 @@ class WindInputImeService :
 
     override fun onCreateInputView(): View {
         applyKeyboardDimens()
+        // 深浅色跟随系统：uiMode 变化会让系统重跑本方法，下面所有视图都按新调色板构造
+        Palette.applyFromSystem(this)
         // 根视图自理手势条/导航栏避让（IME 窗口不吃系统自动 padding）
         val root = InputRootView(this)
 
@@ -250,13 +255,57 @@ class WindInputImeService :
         super.onStartInputView(info, restarting)
         keyboardWindow?.keyboardView?.apply {
             hapticEnabled = userConfig.getBoolean("ui.android.haptic", true)
+            soundEnabled = userConfig.getBoolean("ui.android.sound", false)
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
+            longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)
             enterLabel = enterActionLabel(info)
         }
         inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
         selecting = false
         windowManager?.showKeyboard()
         applyEditorScene(info)
+    }
+
+    /**
+     * 键盘收起（按返回键、宿主主动隐藏）：**清掉组合态**。
+     *
+     * 这里与 [onFinishInput] 不是一回事：收起键盘只走这一个回调，输入连接还在。
+     * 不清的话，编码栏里打到一半的码会在下次弹出键盘时原样冒出来，而用户早已
+     * 忘了它——接着按的第一个键就拼进了那串旧码，出来的字完全对不上。
+     */
+    override fun onFinishInputView(finishingInput: Boolean) {
+        abandonComposition()
+        selecting = false
+        super.onFinishInputView(finishingInput)
+    }
+
+    /**
+     * 用户**点了编辑框**（光标被挪到了别处）：组合态跟着作废。
+     *
+     * 五笔/拼音的编码是相对「光标当时的位置」积累的，光标一挪，再上屏就落在
+     * 新位置，用户看到的是一串字凭空插进了别处。fcitx5 与 Gboard 都在这一刻清组合。
+     *
+     * API 29 起标记 deprecated，但编辑器至今仍会调它（API 36 亦然）；34+ 另有
+     * [onUpdateEditorToolType]，两个都接，谁来都清。
+     */
+    @Suppress("DEPRECATION", "OVERRIDE_DEPRECATION")
+    override fun onViewClicked(focusChanged: Boolean) {
+        super.onViewClicked(focusChanged)
+        abandonComposition()
+    }
+
+    override fun onUpdateEditorToolType(toolType: Int) {
+        super.onUpdateEditorToolType(toolType)
+        abandonComposition()
+    }
+
+    /**
+     * 丢弃当前组合（不上屏）。核心走 ESC 语义；宿主侧若开了内联编码，把组合区收掉，
+     * 否则那串灰字会留在正文里。空组合时两步都是空操作，随便调。
+     */
+    private fun abandonComposition() {
+        session.reset()
+        if (inlinePreedit) currentInputConnection?.finishComposingText()
     }
 
     /**
@@ -586,6 +635,52 @@ class WindInputImeService :
     }
 
     override fun onOpenSettings() = openSettings()
+
+    /**
+     * 系统输入法选择器。`switchToNextInputMethod` 是盲切，用户看不到切去了哪个；
+     * 选择器列出全部已启用输入法，与 Gboard 地球键长按的行为一致。
+     */
+    override fun onSwitchInputMethod() {
+        (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker()
+    }
+
+    override fun voiceInputAvailable(): Boolean = findVoiceInput() != null
+
+    /**
+     * 语音输入：**转发给系统里带 voice 子类型的输入法**（通常是 Google 语音输入），
+     * 说完系统会切回本输入法。自研识别不做（docs/android-ime-features.md §9）。
+     */
+    override fun onVoiceInput() {
+        val (id, subtype) = findVoiceInput() ?: run {
+            showToast("没有可用的语音输入法")
+            return
+        }
+        if (android.os.Build.VERSION.SDK_INT >= 28) {
+            switchInputMethod(id, subtype)
+        } else {
+            val token = window?.window?.attributes?.token ?: return
+            @Suppress("DEPRECATION")
+            (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                .setInputMethodAndSubtype(token, id, subtype)
+        }
+    }
+
+    /**
+     * 在已启用的输入法里找第一个 `voice` 模式的子类型。
+     *
+     * 只看**已启用**的：没启用的输入法系统不允许切过去，列出来也是点不通的入口。
+     * `allowsImplicitlySelectedSubtypes = true` 是必须的——语音输入法一般不会被
+     * 用户手动勾选子类型，全靠系统隐式选中。
+     */
+    private fun findVoiceInput(): Pair<String, InputMethodSubtype>? {
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        for (imi in imm.enabledInputMethodList) {
+            val subtype = imm.getEnabledInputMethodSubtypeList(imi, true)
+                .firstOrNull { it.mode == "voice" } ?: continue
+            return imi.id to subtype
+        }
+        return null
+    }
 
     /**
      * 打开设置页。

@@ -98,9 +98,9 @@ class KeyPopupManager(private val anchor: View) {
 
     private fun highlight() {
         popupItems.forEachIndexed { i, tv ->
-            tv.setTextColor(if (i == selectedIndex) 0xFF3B82F6.toInt() else 0xFF1E1E1E.toInt())
+            tv.setTextColor(if (i == selectedIndex) Palette.current.accentText else Palette.current.text)
             tv.setBackgroundColor(
-                if (i == selectedIndex) 0xFFE6F0FF.toInt() else Color.TRANSPARENT,
+                if (i == selectedIndex) Palette.current.accentSoft else Color.TRANSPARENT,
             )
         }
     }
@@ -126,14 +126,14 @@ class KeyPopupManager(private val anchor: View) {
             text = label
             textSize = size
             gravity = Gravity.CENTER
-            setTextColor(0xFF1E1E1E.toInt())
+            setTextColor(Palette.current.text)
             background = bubbleBackground()
         }
 
     private fun bubbleBackground(): GradientDrawable =
         GradientDrawable().apply {
-            setColor(Color.WHITE)
+            setColor(Palette.current.key)
             cornerRadius = 10 * density
-            setStroke((1 * density).toInt(), 0xFFC8C8C8.toInt())
+            setStroke((1 * density).toInt(), Palette.current.border)
         }
 }

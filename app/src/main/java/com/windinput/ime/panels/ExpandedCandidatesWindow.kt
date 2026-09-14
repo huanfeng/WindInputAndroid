@@ -1,13 +1,13 @@
 package com.windinput.ime.panels
 
 import android.content.Context
-import android.graphics.Color
 import android.view.Gravity
 import android.view.View
 import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.Palette
 
 /**
  * 展开式候选面板：条区的展开钮进入，整个面板区网格铺开全部候选（中文重码刚需）。
@@ -71,7 +71,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         grid = RecyclerView(context).apply {
             layoutManager = lm
             adapter = this@ExpandedCandidatesWindow.adapter
-            setBackgroundColor(Color.WHITE)
+            setBackgroundColor(Palette.current.surface)
             addOnScrollListener(
                 object : RecyclerView.OnScrollListener() {
                     override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {
@@ -122,7 +122,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
             val tv = TextView(parent.context).apply {
                 textSize = 18f
                 gravity = Gravity.CENTER
-                setTextColor(0xFF1E1E1E.toInt())
+                setTextColor(Palette.current.text)
                 layoutParams = RecyclerView.LayoutParams(
                     RecyclerView.LayoutParams.MATCH_PARENT,
                     (46 * density).toInt(),

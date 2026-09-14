@@ -51,3 +51,22 @@ min = 36
 max = 64
 step = 2
 platform = "android"
+
+[[group.item]]
+key = "ui.android.sound"
+type = "toggle"
+title = "按键音"
+summary = "点按键盘时播放系统按键音，音量随系统触摸音量"
+default = false
+platform = "android"
+
+[[group.item]]
+key = "ui.android.long_press_delay"
+type = "int"
+title = "长按判定时长"
+summary = "按住多久算长按（弹出符号气泡 / 开始连删），毫秒"
+default = 300
+min = 150
+max = 600
+step = 50
+platform = "android"

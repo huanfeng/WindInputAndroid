@@ -43,11 +43,11 @@ class CandidateBarView(context: Context) : View(context) {
     private val barHeightPx = (44 * density).toInt()
     private val itemPaddingH = 14 * density
 
-    private val bgColor = 0xFFFAFAFC.toInt()
-    private val pressedColor = 0xFFE6F0FF.toInt()
-    private val separatorColor = 0xFFE8EAF0.toInt()
+    private val bgColor = Palette.current.surface
+    private val pressedColor = Palette.current.accentSoft
+    private val separatorColor = Palette.current.separator
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF1E1E1E.toInt()
+        color = Palette.current.text
         textSize = 19 * density
     }
     private val helperPaint = Paint(Paint.ANTI_ALIAS_FLAG)

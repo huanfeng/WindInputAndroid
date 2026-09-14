@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.windinput.ime.keyboard.BarView
+import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.PanelIcon
 
@@ -62,7 +63,7 @@ object PanelScaffold {
         val density = context.resources.displayMetrics.density
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(0xFFF0F2F5.toInt())
+            setBackgroundColor(Palette.current.background)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 panelHeightPx(context),
@@ -72,7 +73,7 @@ object PanelScaffold {
         val header = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(0xFFFAFAFC.toInt())
+            setBackgroundColor(Palette.current.surface)
         }
         header.addView(
             backButton(context, onBack),
@@ -86,7 +87,7 @@ object PanelScaffold {
                 text = title
                 textSize = 15f
                 gravity = Gravity.CENTER_VERTICAL
-                setTextColor(0xFF1E1E1E.toInt())
+                setTextColor(Palette.current.text)
             },
             LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f),
         )
@@ -117,7 +118,7 @@ object PanelScaffold {
     private fun backButton(context: Context, onBack: () -> Unit): View =
         PanelIcon(context).apply {
             glyph = PanelIcon.Glyph.BACK
-            tint = 0xFF1E1E1E.toInt()
+            tint = Palette.current.text
             setOnClickListener { onBack() }
         }
 
@@ -127,7 +128,7 @@ object PanelScaffold {
             text = label
             gravity = Gravity.CENTER
             textSize = 14f
-            setTextColor(0xFF4A78C8.toInt())
+            setTextColor(Palette.current.accent)
             setPadding((14 * density).toInt(), 0, (14 * density).toInt(), 0)
             setBackgroundColor(Color.TRANSPARENT)
             setOnClickListener { onClick() }

@@ -65,7 +65,7 @@ pwsh scripts/build-rust.ps1     # Windows
 | --- | --- | --- |
 | Rust 单测 | 按键流 / 方案切换 / 候选回调（`rust/wind-android/tests/key_flow.rs`） | `cd rust && cargo test -p wind-android` |
 | 构建 | 交叉编译 + APK | `scripts/build-rust.sh && ./gradlew :app:assembleDebug` |
-| 端到端 | 模拟器上点键盘、断言输入框（15 个用例） | `scripts/emu-test.sh` |
+| 端到端 | 模拟器上点键盘、断言输入框（17 个用例） | `scripts/emu-test.sh` |
 
 一键跑完整条：
 
@@ -125,7 +125,11 @@ scripts/emu-up.sh --cold        # 丢掉快照完整开机，要干净环境时�
 - [x] 文本编辑 / 剪贴板历史 / 表情 三个 P0 面板
 - [x] 按键手势体系：长按气泡、按键预览、上滑副字符（TOML 声明）
 - [x] 展开式候选面板、回车键动作标签
-- [x] Walking skeleton：wind-android cdylib + UniFFI + RustSession（wubi86，待模拟器实测）
+- [x] Walking skeleton：wind-android cdylib + UniFFI + RustSession（模拟器端到端 17/17）
+- [x] 对照 fcitx5-android 补基础功能（docs/android-ime-features.md §12）：组合态与光标/收键盘同步、
+      按键音、长按时长可配、语音输入转发、系统输入法选择器、深浅色跟随系统
+- [x] 调色板槽位落地（`keyboard/Palette.kt`，内置浅/深两套）——主题系统的 K 侧接口已定
 - [ ] 词库 yaml 进 assets + 端上编译 + 分级加载（骨架已收 wubi86 主/扩展词库）
-- [ ] 主题键盘域节点 + 共享调色板
-- [ ] 九宫格布局、单手模式、横竖屏独立尺寸配置
+- [ ] wind-theme 求值结果灌进 Palette（主题键盘域节点）
+- [ ] 九宫格布局、单手模式（横竖屏键高已可独立配置）
+- [ ] 物理键盘按键直连引擎 + 浮动候选窗、Direct Boot、键盘边距配置——余下缺口见 §12

@@ -141,8 +141,8 @@ class BarView(
         modeLabelView = TextView(context).apply {
             textSize = 12f
             gravity = Gravity.CENTER
-            setTextColor(0xFFFFFFFF.toInt())
-            setBackgroundColor(0xFF4A78C8.toInt())
+            setTextColor(Palette.current.onAccent)
+            setBackgroundColor(Palette.current.accent)
             setPadding(dp(6), dp(1), dp(6), dp(1))
         }
         preeditView = TextView(context).apply {
@@ -150,19 +150,19 @@ class BarView(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MIDDLE
             gravity = Gravity.CENTER_VERTICAL
-            setTextColor(0xFF32568C.toInt())
+            setTextColor(Palette.current.preedit)
             setPadding(dp(8), 0, dp(8), 0)
         }
         pagerView = TextView(context).apply {
             textSize = 12f
             gravity = Gravity.CENTER
-            setTextColor(0xFF969696.toInt())
+            setTextColor(Palette.current.hint)
             setPadding(dp(8), 0, dp(12), 0)
         }
         codeBar = LinearLayout(context).apply {
             orientation = HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(0xFFFAFAFC.toInt())
+            setBackgroundColor(Palette.current.surface)
             setPadding(dp(10), 0, 0, 0)
             visibility = GONE
             addView(modeLabelView, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
@@ -189,11 +189,11 @@ class BarView(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             gravity = Gravity.CENTER_VERTICAL
-            setTextColor(0xFF1E1E1E.toInt())
+            setTextColor(Palette.current.text)
         }
         suggestionRow = LinearLayout(context).apply {
             orientation = HORIZONTAL
-            setBackgroundColor(0xFFFAFAFC.toInt())
+            setBackgroundColor(Palette.current.surface)
             addView(
                 TextView(context).apply {
                     text = "📋"
@@ -349,7 +349,7 @@ class BarView(
      */
     private fun buildToolbar(): View = LinearLayout(context).apply {
         orientation = HORIZONTAL
-        setBackgroundColor(0xFFFAFAFC.toInt())
+        setBackgroundColor(Palette.current.surface)
 
         for ((glyph, action) in TOOLBAR_ITEMS) {
             addView(

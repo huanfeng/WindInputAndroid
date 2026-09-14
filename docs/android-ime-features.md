@@ -80,12 +80,12 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 
 | 功能 | 优先级 | 落点 | 参考与说明 |
 |---|---|---|---|
-| 深浅色跟随系统 | P0 | K+R | 主题 TOML 的 light/dark 双态变体是桌面现成设计 |
+| 深浅色跟随系统 | P0 | K+R | 已实现 ✅（`Palette.kt` 内置浅/深两套，按 uiMode 选）；主题 TOML 的 light/dark 双态变体是桌面现成设计 |
 | 主题系统（调色板共享 + 键盘域节点） | P1 | K+R | 见 architecture.md §3.4；主题**制作/编辑走 PC 工具站**（§3.7），手机端只做导入+应用，不做 fcitx5 式 21 色槽编辑器 |
 | 背景图片主题（裁剪/亮度） | P2 | K | 制作走工具站；手机端仅应用（本地图片裁剪可保留最简版） |
 | Monet 动态取色（Android 12+） | P2 | K | fcitx5: `ThemeMonet.kt`，与我们调色板体系可并存（动态色作为一个特殊主题） |
 | 主题导入导出 | P2 | K | fcitx5 本地文件管理；我们天然是 TOML 文件，导入导出免费 |
-| 按键音/震动细分（按下/长按分别配置，按键类型区分音效） | P1 | K | fcitx5: `InputFeedbacks.kt`；我们已有基础震动开关 ✅ |
+| 按键音/震动细分（按下/长按分别配置，按键类型区分音效） | P1 | K | 按键音基础版 ✅（系统四种键音按键型分发，音量随系统）；按下/长按细分未做。fcitx5: `InputFeedbacks.kt`；我们已有基础震动开关 ✅ |
 
 ## 6. 系统集成
 
@@ -94,8 +94,8 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 | EditorInfo 场景感知（密码/数字框） | P0 | K | 已实现基础版 ✅；扩展：email/URI 场景换底排键位 |
 | 回车键动作标签（发送/搜索/下一项） | P0 | K | imeOptions 驱动回车键显示，主流标配 |
 | 全面屏/导航栏适配（edge-to-edge） | P0 | K | fcitx5: 三档处理 + Android 15 强制 e2e 自动降级。**Android 15 (targetSdk 35) 强制 edge-to-edge，必须一开始就做对** |
-| 语音输入入口（转发系统 voice IME） | P1 | K | fcitx5 做法：找系统带 voice subtype 的输入法转发，自己不做识别。讯飞式自研语音不做 |
-| 输入法切换（语言键轮换 + 长按选择器） | P1 | K | fcitx5 自绘选择对话框体验更好 |
+| 语音输入入口（转发系统 voice IME） | P1 | K | 已实现 ✅（快捷面板，系统里有 voice 子类型的输入法才出入口）；自研识别不做 |
+| 输入法切换（语言键轮换 + 长按选择器） | P1 | K | 系统选择器已接 ✅（快捷面板「切换输入法」）；自绘选择对话框待定 |
 | 物理键盘支持（隐藏软盘 + 浮动候选窗） | P2 | K+R | fcitx5: 跟随光标的浮动候选窗（onUpdateCursorAnchorInfo）；桌面键事件模型在 Rust 侧免费 |
 | Direct Boot（锁屏前可用） | P1 | K | 设备加密存储同步关键设置；输入法作为解锁前组件必须处理 |
 | 隐私模式（incognito，密码/隐私场景不学词） | P1 | K+R | FlorisBoard 有；对接 Rust 侧 = 暂停用户词频学习 |
@@ -173,3 +173,36 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 - [Android Stylus 手写 API](https://developer.android.com/develop/ui/views/touch-and-input/stylus-input/stylus-input-in-text-fields)
 - [IME 集成 Autofill 内联建议](https://developer.android.com/identity/autofill/ime-autofill)
 - [小胖输入法官网](https://pangime.com/)、[双检索机制](https://pangime.com/shuangjiansuo.html)、[功能介绍（ababtools）](https://ababtools.com/?post=6535)
+
+## 12. 对照 fcitx5-android 的现状核对（2026-09-14）
+
+fcitx5-android 是架构最像本项目的参照（Kotlin 壳 + 原生引擎推送候选）。逐项对过它的
+`FcitxInputMethodService` 覆写点、`input/` 各组件和 `AppPrefs` 设置项之后，基础功能层面
+的差集如下。**只列基础功能**，方案/词库这类由 Rust 核心带来的能力不在此比。
+
+### 本轮补上的
+
+| 缺口 | 做法 | 守它的用例 |
+|---|---|---|
+| 收键盘 / 点编辑框后编码残留 | `onFinishInputView`、`onViewClicked`、`onUpdateEditorToolType` 三处作废组合（核心 ESC 语义） | emu-test [15] [16] |
+| 按键音 | 系统 `AudioManager` 四种键音按键型分发；`ui.android.sound` | — |
+| 长按判定时长 | `ui.android.long_press_delay`，退格连删起始延迟与之共用 | — |
+| 语音输入 | 找已启用输入法里第一个 `voice` 子类型转发；没有就不摆入口 | — |
+| 切换输入法 | 系统选择器（`showInputMethodPicker`） | — |
+| 深浅色 | `Palette.kt` 内置两套，`onCreateInputView` 按 uiMode 选；全部视图颜色只从槽位取 | 手工：`cmd uimode night yes` 截图 |
+
+### 仍缺的（按建议顺序）
+
+| 缺口 | fcitx5 对应 | 说明 |
+|---|---|---|
+| 物理键盘：按键直连引擎、浮动候选窗 | `onKeyDown/onKeyUp` → `forwardKeyEvent`；`onUpdateCursorAnchorInfo` 定位浮窗 | 平板 + 蓝牙键盘场景。桌面键事件模型在 Rust 侧现成，K 侧要做的是 KeyEvent → VK 映射与浮窗 |
+| 键盘左右 / 底部边距（横竖屏成对） | `keyboardSidePadding` / `keyboardBottomPadding` 的 twinInt | 大屏单手够不着两侧时的标配 |
+| Direct Boot | `directBootAware` + 设备加密存储 | 锁屏解锁前的密码框用不了本输入法，系统会临时换别的 |
+| 空格长按行为可配 | `spaceKeyLongPressBehavior` | 现为无动作 |
+| 内联建议（Autofill） | `onCreateInlineSuggestionsRequest` | 密码管理器填充条 |
+| 候选长按（删词 / 置顶） | 无（fcitx5 走引擎菜单） | Rust 侧 shadow pin/delete 现成，K 侧缺手势 + 菜单 |
+| 状态栏输入法图标 | `showStatusIcon` | 小事，但主流都有 |
+| 备份 / 恢复 | `UserDataManager` | 桌面 wind-transfer 是现成通道 |
+
+fcitx5 有而**刻意不做**的：主题编辑器（21 色槽）——制作走 PC 工具站；插件系统——本项目
+引擎单一；表情肤色变体、颜文字分类——二期按需。
