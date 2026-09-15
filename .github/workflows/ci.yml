@@ -1,0 +1,77 @@
+name: CI
+
+# push/PR 门禁：Rust 双架构交叉编译 + UniFFI 绑定漂移检查 + debug APK。
+#
+# ⚠ 刻意**不跑** `cargo test -p wind-android`：那组测试要主仓 build_dev/data（数十 MB 词库，
+#   dev.sh gen-data 下载组装），缺数据时 setup() 返回 None、用例静默跳过——CI 上跑出来的
+#   是一个虚假的绿。要么把数据生成接进来，要么不跑；不能跑一个不测东西的测试。
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 交叉编译 + APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出本仓
+        uses: actions/checkout@v7
+        with:
+          path: WindInputAndroid
+      # 主仓已开源，默认 GITHUB_TOKEN 即可。取 main：本仓 Cargo.lock 锁的是 crate 版本不是
+      # 主仓提交，主仓改了 wind-mobile 公开面会在这里炸——这正是要的（主仓 ci.yml 也 check
+      # wind-mobile，但绑定层自身在 Android target 可编与否只有本仓能验）。
+      - name: 检出主仓 WindInput（wind-mobile path 依赖）
+        uses: actions/checkout@v7
+        with:
+          repository: huanfeng/WindInput
+          path: WindInput
+
+      - uses: ./WindInputAndroid/.github/actions/setup-env
+
+      - name: 交叉编译 .so + 生成 Kotlin 绑定
+        working-directory: WindInputAndroid
+        run: scripts/build-rust.sh release
+
+      # 绑定源码是提交的。生成结果与提交不一致 = 核心公开面变了而绑定没重新生成提交，
+      # 装到设备上就是 UniFFI checksum 不匹配直接崩。
+      - name: 绑定未漂移
+        working-directory: WindInputAndroid
+        run: |
+          if ! git diff --exit-code --stat -- app/src/main/java/uniffi/; then
+            echo "::error::UniFFI 绑定与提交不一致，本地跑 scripts/build-rust.sh 后把 app/src/main/java/uniffi/ 一起提交"
+            exit 1
+          fi
+
+      - name: 构建 debug APK
+        working-directory: WindInputAndroid
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      # CI 没有 local.properties → 走仓库里公开的 debug 密钥。核对一下确实是它，
+      # 而不是 runner 上凭空生成的一把（那样每次 CI 产物签名都不同，谁也装不上谁）。
+      - name: debug 包签名 = keystore/debug.keystore
+        working-directory: WindInputAndroid
+        run: |
+          expect=$(keytool -list -keystore keystore/debug.keystore -storepass android \
+                   | grep -oE '\(SHA-256\): [0-9A-F:]+' | tr -d ':' | cut -d' ' -f2 | tr 'A-F' 'a-f')
+          actual=$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs \
+                   app/build/outputs/apk/debug/app-debug.apk | grep -oE 'SHA-256 digest: [0-9a-f]+' | cut -d' ' -f3)
+          echo "expect=$expect"; echo "actual=$actual"
+          [ "$expect" = "$actual" ] || { echo "::error::debug 包不是仓库 debug 密钥签的"; exit 1; }
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: app-debug
+          path: WindInputAndroid/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14

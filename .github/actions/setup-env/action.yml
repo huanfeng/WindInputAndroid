@@ -1,0 +1,41 @@
+name: 准备 Android + Rust 构建环境
+description: >
+  JDK 21 / Android SDK+NDK / Rust 双 Android target / cargo-ndk。
+  ci.yml 与 release.yml 共用，两边环境必须逐字一致——否则「CI 绿、发版红」查起来毫无头绪。
+
+# 目录前提（调用方负责 checkout）：
+#   $GITHUB_WORKSPACE/WindInput          主仓（wind-mobile 门面，path 依赖）
+#   $GITHUB_WORKSPACE/WindInputAndroid   本仓
+# 与本地开发的「两仓并列」是同一个前提，见 README「构建」一节。
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-java@v6
+      with:
+        distribution: temurin
+        java-version: '21'
+        cache: gradle
+
+    # 版本与 local.properties / build.gradle.kts 里的一致；platforms;android-37.0 的
+    # 小版本号命名见 README「compileSdk 37 的坑」。
+    - uses: android-actions/setup-android@v4
+      with:
+        packages: platforms;android-37.0 build-tools;37.0.0 platform-tools ndk;28.2.13676358
+
+    - name: 导出 NDK 路径
+      shell: bash
+      run: echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: aarch64-linux-android, x86_64-linux-android
+
+    # cache-bin 默认开：~/.cargo/bin 里的 cargo-ndk 随缓存走，命中后下面那步几秒过
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: WindInputAndroid/rust
+
+    - name: 安装 cargo-ndk
+      shell: bash
+      run: command -v cargo-ndk >/dev/null || cargo install cargo-ndk --locked

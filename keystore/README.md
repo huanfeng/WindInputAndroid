@@ -19,6 +19,18 @@ signing.keyPassword=…
 
 ⚠ 缺任何一项都视为没给：debug 回退到下面那把公开密钥，release 不签名。别只填一半。
 
+## CI（release.yml）
+
+同一把密钥以 secrets 形式给 CI：
+
+| secret | 内容 |
+| --- | --- |
+| `ANDROID_SIGNING_KEYSTORE_BASE64` | `base64 -w0 xxx.jks` |
+| `ANDROID_SIGNING_STORE_PASSWORD` / `_KEY_ALIAS` / `_KEY_PASSWORD` | 与 local.properties 四项一一对应 |
+
+设置：`base64 -w0 xxx.jks | gh secret set ANDROID_SIGNING_KEYSTORE_BASE64`，其余三个同理。
+缺任何一个 release.yml 直接失败，不会退回 debug 密钥。
+
 ## debug.keystore（已提交，随意分发）
 
 没有个人密钥时（别人 clone、CI）debug 包的兜底。alias `androiddebugkey`，

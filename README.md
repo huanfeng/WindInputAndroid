@@ -111,6 +111,20 @@ scripts/emu-up.sh --cold        # 丢掉快照完整开机，要干净环境时�
 > uid 映射会把 bind 进来的设备节点显示成 `nobody:nogroup`，**容器内没有写权限**，
 > `/dev/kvm` 看着在、模拟器就是起不来。`emu-up.sh` 的 `-w` 检查专门拦这种半吊子状态。
 
+## CI / 发版
+
+| 工作流 | 触发 | 做什么 |
+| --- | --- | --- |
+| `ci.yml` | push main / PR | 双架构交叉编译 → UniFFI 绑定漂移检查 → debug APK（仓库 debug 密钥签） |
+| `release.yml` | push tag `v*` | 同上，但用 secrets 里的个人密钥签 release 包 + sha256，建**草稿** Release |
+| `release.yml` | 手动触发 | 只产 artifact，不发 Release |
+
+发一版：改 `app/build.gradle.kts` 的 `versionCode` / `versionName` → 提交 → `git tag v<versionName>`
+→ push tag。tag 与 versionName 不一致会在「确定版本号」一步直接失败。草稿 Release 人工过目后发布。
+
+签名方案（一把密钥签所有包，任何机器构出来的互相能覆盖安装）见 `keystore/README.md`。
+CI 上 **不跑** Rust 测试——它要主仓 build_dev/data，缺数据时用例静默跳过，是假绿；见 ci.yml 头注释。
+
 ## 当前状态
 
 - [x] 架构设计定稿（docs/architecture.md）

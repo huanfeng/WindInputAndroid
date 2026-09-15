@@ -1,0 +1,163 @@
+name: Release
+
+# 两种触发（与主仓 release.yml 同一口径）：
+#   push tag v*        → 签名 APK + sha256，建**草稿** Release，人工过目后发布
+#   workflow_dispatch  → 只产出可测 artifact，不发 Release
+#
+# 签名：一把个人密钥签所有包（见 keystore/README.md），CI 从 secrets 取：
+#   ANDROID_SIGNING_KEYSTORE_BASE64 / _STORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD
+# 缺任何一个**直接失败**。release 包没签名等于没法覆盖安装，宁可不出包。
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: 签名 APK
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: WindInputAndroid
+      - uses: actions/checkout@v7
+        with:
+          repository: huanfeng/WindInput
+          path: WindInput
+
+      - uses: ./WindInputAndroid/.github/actions/setup-env
+
+      # tag 是版本的唯一真值源，但 versionName 写死在 build.gradle.kts 里——两处必须一致，
+      # 否则「Release 页写 v0.3.0、装上去关于页显示 0.2.0」。手动触发时用 versionName-dev.sha。
+      - name: 确定版本号
+        id: v
+        working-directory: WindInputAndroid
+        run: |
+          gradle_v=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | cut -d'"' -f2)
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            V="${GITHUB_REF_NAME#v}"
+            [ "$V" = "$gradle_v" ] || { echo "::error::tag $GITHUB_REF_NAME 与 build.gradle.kts 的 versionName=$gradle_v 不一致，先改 versionName/versionCode 再打 tag"; exit 1; }
+          else
+            V="$gradle_v-dev.${GITHUB_SHA:0:8}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "build version = $V"
+
+      - name: 写入签名密钥
+        working-directory: WindInputAndroid
+        env:
+          KS_B64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          KS_KEY_PASS: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
+        run: |
+          for v in KS_B64 KS_PASS KS_ALIAS KS_KEY_PASS; do
+            [ -n "${!v}" ] || { echo "::error::缺 secret（$v），release 包必须签名"; exit 1; }
+          done
+          printf '%s' "$KS_B64" | base64 -d > keystore/ci.jks
+          {
+            echo "signing.storeFile=keystore/ci.jks"
+            echo "signing.storePassword=$KS_PASS"
+            echo "signing.keyAlias=$KS_ALIAS"
+            echo "signing.keyPassword=$KS_KEY_PASS"
+          } > local.properties
+          # 核对密钥能打开，别等 gradle 走到最后一步才发现密码错
+          keytool -list -keystore keystore/ci.jks -storepass "$KS_PASS" -alias "$KS_ALIAS" >/dev/null
+
+      - name: 交叉编译 .so + 生成 Kotlin 绑定
+        working-directory: WindInputAndroid
+        run: scripts/build-rust.sh release
+
+      - name: 绑定未漂移
+        working-directory: WindInputAndroid
+        run: git diff --exit-code --stat -- app/src/main/java/uniffi/
+
+      - name: 构建 release APK
+        working-directory: WindInputAndroid
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      # 签名核对不硬编码指纹：从刚解出来的密钥算，与 APK 上的比。硬编码会在换密钥时
+      # 变成一条只会误报的检查。
+      - name: 签名 = secrets 里的密钥
+        id: sign
+        working-directory: WindInputAndroid
+        env:
+          KS_PASS: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+        run: |
+          expect=$(keytool -list -keystore keystore/ci.jks -storepass "$KS_PASS" \
+                   | grep -oE '\(SHA-256\): [0-9A-F:]+' | tr -d ':' | cut -d' ' -f2 | tr 'A-F' 'a-f')
+          actual=$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs \
+                   app/build/outputs/apk/release/app-release.apk | grep -oE 'SHA-256 digest: [0-9a-f]+' | cut -d' ' -f3)
+          echo "expect=$expect"; echo "actual=$actual"
+          [ "$expect" = "$actual" ] || { echo "::error::release 包签名与 secrets 密钥不符"; exit 1; }
+          echo "fingerprint=$expect" >> "$GITHUB_OUTPUT"
+          rm -f keystore/ci.jks local.properties
+
+      - name: 命名产物 + sha256
+        working-directory: WindInputAndroid
+        env:
+          V: ${{ steps.v.outputs.version }}
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release.apk "dist/WindInputAndroid-$V.apk"
+          cd dist && sha256sum "WindInputAndroid-$V.apk" > "WindInputAndroid-$V.apk.sha256"
+          echo "${{ steps.sign.outputs.fingerprint }}" > "WindInputAndroid-$V.apk.signer-sha256"
+          ls -lh
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist-android
+          path: WindInputAndroid/dist/*
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: 创建草稿 Release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0     # 找上一个 tag 生成变更记录
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist-android
+          path: dist
+
+      # 本仓提交不走 PR，GitHub 自动生成的 notes 只有空的 "What's Changed"，自己按提交列。
+      - name: 生成 Release Notes
+        env:
+          V: ${{ needs.build.outputs.version }}
+        run: |
+          prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
+          range=${prev:+$prev..}$GITHUB_REF_NAME
+          {
+            echo "## 安装"
+            echo
+            echo "- 签名指纹（SHA-256）：\`$(cat dist/*.signer-sha256)\`。与之前版本同一把密钥，直接覆盖安装。"
+            echo "- 校验：\`sha256sum -c WindInputAndroid-$V.apk.sha256\`"
+            echo
+            echo "## 变更记录（${prev:-起点}..$GITHUB_REF_NAME）"
+            echo
+            git log "$range" --no-merges --pretty=format:'- %s (%h)'
+            echo
+          } > release_notes.md
+          cat release_notes.md
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          draft: true
+          name: 清风输入法 Android v${{ needs.build.outputs.version }}
+          body_path: release_notes.md
+          files: |
+            dist/*.apk
+            dist/*.sha256
