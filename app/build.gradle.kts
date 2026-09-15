@@ -1,3 +1,4 @@
+import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -26,6 +27,36 @@ android {
         versionName = "0.2.0"
     }
 
+    // ── 签名 ─────────────────────────────────────────────────────────
+    // 一把密钥签**所有**包（debug 与 release 不分），任何机器构出来的包互相都能覆盖安装。
+    // 密钥文件与密码放 local.properties（已 gitignore）的 signing.* 四项，绝不进仓库。
+    // 没给这四项（别人 clone、CI）：debug 回退到仓库里公开的 keystore/debug.keystore，
+    // release 保持未签名——宁可装不上，也不能悄悄签出一个"看着像正式包"的东西。
+    val localProps = Properties().apply {
+        val f = rootProject.file("local.properties")
+        if (f.isFile) f.inputStream().use { load(it) }
+    }
+    val personalSigning = listOf(
+        "signing.storeFile", "signing.storePassword", "signing.keyAlias", "signing.keyPassword",
+    ).map { localProps.getProperty(it) }.takeIf { values -> values.all { it != null } }
+
+    signingConfigs {
+        getByName("debug") {
+            if (personalSigning != null) {
+                val (store, storePass, alias, keyPass) = personalSigning
+                storeFile = rootProject.file(store!!)
+                storePassword = storePass
+                keyAlias = alias
+                keyPassword = keyPass
+            } else {
+                storeFile = rootProject.file("keystore/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -33,6 +64,8 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            // 同一把：有个人密钥才签 release
+            if (personalSigning != null) signingConfig = signingConfigs.getByName("debug")
         }
     }
 
