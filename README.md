@@ -65,7 +65,7 @@ pwsh scripts/build-rust.ps1     # Windows
 | --- | --- | --- |
 | Rust 单测 | 按键流 / 方案切换 / 候选回调（`rust/wind-android/tests/key_flow.rs`） | `cd rust && cargo test -p wind-android` |
 | 构建 | 交叉编译 + APK | `scripts/build-rust.sh && ./gradlew :app:assembleDebug` |
-| 端到端 | 模拟器上点键盘、断言输入框（17 个用例） | `scripts/emu-test.sh` |
+| 端到端 | 模拟器上点键盘、断言输入框（20 个用例） | `scripts/emu-test.sh` |
 
 一键跑完整条：
 
@@ -143,6 +143,9 @@ CI 上 **不跑** Rust 测试——它要主仓 build_dev/data，缺数据时用
 - [x] 对照 fcitx5-android 补基础功能（docs/android-ime-features.md §12）：组合态与光标/收键盘同步、
       按键音、长按时长可配、语音输入转发、系统输入法选择器、深浅色跟随系统
 - [x] 调色板槽位落地（`keyboard/Palette.kt`，内置浅/深两套）——主题系统的 K 侧接口已定
+- [x] 真机反馈修整（2026-09-16）：标点键面/输出随中英模式（布局 ASCII 化，`Punct.kt`）、
+      空格居中（底栏对称 + 表情键）、编码栏改浮层（条区 70→44dp）、编码态滑退格清编码、
+      编辑面板选择改 `setSelection`、快捷面板改图标格子、设置页 +9 项与 select 类型
 - [ ] 词库 yaml 进 assets + 端上编译 + 分级加载（骨架已收 wubi86 主/扩展词库）
 - [ ] wind-theme 求值结果灌进 Palette（主题键盘域节点）
 - [ ] 九宫格布局、单手模式（横竖屏键高已可独立配置）

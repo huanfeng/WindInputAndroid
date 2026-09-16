@@ -95,11 +95,19 @@ class Palette(
         var current: Palette = light
             private set
 
-        /** 按系统深浅色选一套并设为当前 */
-        fun applyFromSystem(context: Context): Palette {
-            val night = context.resources.configuration.uiMode and
-                Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-            current = if (night) dark else light
+        /**
+         * 选一套设为当前。[mode] 来自设置项 ui.android.theme：`light` / `dark` / 其它 = 跟随系统。
+         */
+        fun apply(context: Context, mode: String): Palette {
+            current = when (mode) {
+                "light" -> light
+                "dark" -> dark
+                else -> {
+                    val night = context.resources.configuration.uiMode and
+                        Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                    if (night) dark else light
+                }
+            }
             return current
         }
     }

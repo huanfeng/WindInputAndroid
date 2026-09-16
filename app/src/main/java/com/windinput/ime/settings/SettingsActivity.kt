@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +33,7 @@ import com.windinput.ime.core.LayoutEntry
 import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UserConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -184,6 +186,26 @@ private fun SettingsScreen(
             }
         }
     }
+    val strings = remember {
+        mutableStateMapOf<String, String>().apply {
+            for (group in groups) {
+                for (item in group.items) {
+                    if (item.type == "select") {
+                        put(item.key, config.getString(item.key, item.defaultValue as? String ?: ""))
+                    }
+                }
+            }
+        }
+    }
+    // 标了 reload 的键归引擎读：写完通知它重读配置。UI 侧的键不用——Service 每次弹出都重读
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    fun afterWrite(item: SettingItem) {
+        if (!item.reload) return
+        scope.launch {
+            withContext(Dispatchers.IO) { CoreAccess.obtain(context) }?.runCommand(EngineCmd.ReloadConfig)
+        }
+    }
 
     Scaffold(
         topBar = { SmallTopAppBar(title = "清风输入法") },
@@ -248,6 +270,7 @@ private fun SettingsScreen(
                                     onCheckedChange = { checked ->
                                         toggles[item.key] = checked
                                         config.put(item.key, checked)
+                                        afterWrite(item)
                                     },
                                 )
                                 "int" -> IntRow(
@@ -256,6 +279,16 @@ private fun SettingsScreen(
                                     onValueChange = { v ->
                                         ints[item.key] = v
                                         config.put(item.key, v.toLong())
+                                        afterWrite(item)
+                                    },
+                                )
+                                "select" -> SelectRows(
+                                    item = item,
+                                    value = strings[item.key] ?: "",
+                                    onValueChange = { v ->
+                                        strings[item.key] = v
+                                        config.put(item.key, v)
+                                        afterWrite(item)
                                     },
                                 )
                             }
@@ -264,6 +297,25 @@ private fun SettingsScreen(
                 }
             }
         }
+    }
+}
+
+/**
+ * 单选项：标题一行 + 每个选项一行打勾（与方案区同一形态）。
+ * 不做下拉菜单：选项就三五个，全部摊开比藏进菜单少一次点击，也和 miuix 的列表风格一致。
+ */
+@Composable
+private fun SelectRows(
+    item: SettingItem,
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 16.dp)) {
+        Text(text = item.title)
+        item.summary?.let { Text(text = it, modifier = Modifier.padding(top = 2.dp)) }
+    }
+    for ((optValue, label) in item.options) {
+        ChoiceRow(title = label, selected = optValue == value, onClick = { onValueChange(optValue) })
     }
 }
 

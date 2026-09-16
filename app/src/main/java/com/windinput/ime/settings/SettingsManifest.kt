@@ -19,6 +19,10 @@ data class SettingItem(
     val min: Int? = null,
     val max: Int? = null,
     val step: Int = 1,
+    /** select 类型的选项：(value, label)，value 即写入配置的字符串 */
+    val options: List<Pair<String, String>> = emptyList(),
+    /** 改动后要通知引擎重读配置（引擎侧的键；UI 侧的键不需要，Service 每次弹出都重读） */
+    val reload: Boolean = false,
 )
 
 data class SettingGroup(
@@ -64,6 +68,14 @@ object SettingsManifest {
                         min = item.getLong("min")?.toInt(),
                         max = item.getLong("max")?.toInt(),
                         step = item.getLong("step")?.toInt() ?: 1,
+                        options = item.getArray("options")?.let { arr ->
+                            (0 until arr.size()).map { o ->
+                                val t = arr.getTable(o)
+                                requireNotNull(t.getString("value")) { "option 缺少 value" } to
+                                    (t.getString("label") ?: t.getString("value")!!)
+                            }
+                        } ?: emptyList(),
+                        reload = item.getBoolean("reload") ?: false,
                     )
                 },
             )

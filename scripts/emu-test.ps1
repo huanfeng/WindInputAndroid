@@ -32,7 +32,7 @@ $rows = @(
     @{ keys = @("a","s","d","f","g","h","j","k","l");     weights = @(1,1,1,1,1,1,1,1,1) },
     @{ keys = @("SHIFT","z","x","c","v","b","n","m","BS"); weights = @(1.5,1,1,1,1,1,1,1,1.5) },
     # 底栏权重须与 assets/data/layouts/qwerty.toml 同步（中英键在回车左侧）
-    @{ keys = @("SYM","COMMA","SPACE","PERIOD","LANG","ENTER"); weights = @(1.5,1,3.4,1,1.3,1.5) }
+    @{ keys = @("SYM","EMOJI","COMMA","SPACE","PERIOD","LANG","ENTER"); weights = @(1.3,1,1,3.4,1,1,1.3) }
 )
 
 $script:geo = $null
@@ -42,8 +42,8 @@ function Init-Geometry {
     $w, $h = $size -split 'x'
     $density = [double](((Adb shell wm density) -replace '.*:\s*','').Trim()) / 160.0
     $rowPx = [int][math]::Round(56 * $density)     # KeyboardDimens.rowHeightDp 默认值
-    # 条区 = 编码栏 + 主行（BarView.CODE_BAR_DP / MAIN_ROW_DP），总高恒定
-    $codeBarPx = [int][math]::Round(26 * $density)
+    # 条区只有主行（BarView.MAIN_ROW_DP）；编码栏是浮层不占高度，故 codeBarPx = 0
+    $codeBarPx = 0
     $mainRowPx = [int][math]::Round(44 * $density)
     # 底部 insets（手势条/导航栏）：InputRootView 的 bottomSpacer 高度
     $insetPx = [int][math]::Round(48 * $density)

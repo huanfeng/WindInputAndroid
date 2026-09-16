@@ -79,9 +79,8 @@ class KeyPopupManager(private val anchor: View) {
         highlight()
     }
 
-    /** 当前选中字符；未弹出返回 null */
-    fun popupSelected(): String? =
-        popupItems.getOrNull(selectedIndex)?.text?.toString()
+    /** 当前选中项**下标**；未弹出返回 null。调用方按下标映回自己的字符表（气泡里显示的可能是换过形态的） */
+    fun popupSelectedIndex(): Int? = if (popupItems.isEmpty()) null else selectedIndex
 
     fun dismissPopup() {
         popup?.dismiss()

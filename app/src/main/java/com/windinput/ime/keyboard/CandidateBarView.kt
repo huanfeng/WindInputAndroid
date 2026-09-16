@@ -50,6 +50,18 @@ class CandidateBarView(context: Context) : View(context) {
         color = Palette.current.text
         textSize = 19 * density
     }
+
+    /** 候选字号（sp，设置项 ui.android.candidate_text_sp）；改后全部重量 */
+    var textSizeSp = 19f
+        set(value) {
+            if (field == value) return
+            field = value
+            textPaint.textSize = value * density
+            itemBounds.clear()
+            contentWidth = 0f
+            measureFrom(0)
+            invalidate()
+        }
     private val helperPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private var candidates: List<String> = emptyList()

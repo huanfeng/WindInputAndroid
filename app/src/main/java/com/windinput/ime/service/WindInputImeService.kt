@@ -74,6 +74,15 @@ class WindInputImeService :
     /** 文本编辑面板的选择模式（方向键扩选） */
     private var selecting = false
 
+    /** 选择模式的锚点（绝对偏移）；焦点端随方向键走，选区 = [min, max] */
+    private var selAnchor = -1
+
+    /** 引擎侧是否有未上屏的编码（来自候选帧的 preedit 非空） */
+    private var composing = false
+
+    /** 剪贴板建议条开关（设置项 ui.android.clip_suggestion） */
+    private var clipSuggestionEnabled = true
+
     private lateinit var layoutRepository: LayoutRepository
     private lateinit var userConfig: UserConfig
     private lateinit var clipboardStore: ClipboardStore
@@ -137,7 +146,7 @@ class WindInputImeService :
         session.listener = ::onUiEvent
         clipboardStore = ClipboardStore(this).also { it.start() }
         clipboardStore.onNewClip = { text ->
-            if (!directInput) barView?.showClipSuggestion(text)
+            if (!directInput && clipSuggestionEnabled) barView?.showClipSuggestion(text)
         }
         recentEmojiStore = RecentEmojiStore(this)
     }
@@ -149,8 +158,8 @@ class WindInputImeService :
 
     override fun onCreateInputView(): View {
         applyKeyboardDimens()
-        // 深浅色跟随系统：uiMode 变化会让系统重跑本方法，下面所有视图都按新调色板构造
-        Palette.applyFromSystem(this)
+        // 深浅色：uiMode 变化会让系统重跑本方法，下面所有视图都按新调色板构造
+        Palette.apply(this, userConfig.getString("ui.android.theme", "system"))
         // 根视图自理手势条/导航栏避让（IME 窗口不吃系统自动 padding）
         val root = InputRootView(this)
 
@@ -258,8 +267,13 @@ class WindInputImeService :
             soundEnabled = userConfig.getBoolean("ui.android.sound", false)
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
             longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)
+            spaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_space_cursor", true)
+            backspaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
+            swipeSymbolsEnabled = userConfig.getBoolean("ui.android.gesture_swipe_symbols", true)
             enterLabel = enterActionLabel(info)
         }
+        barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 19).toFloat()
+        clipSuggestionEnabled = userConfig.getBoolean("ui.android.clip_suggestion", true)
         inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
         selecting = false
         windowManager?.showKeyboard()
@@ -275,6 +289,8 @@ class WindInputImeService :
      */
     override fun onFinishInputView(finishingInput: Boolean) {
         abandonComposition()
+        // 编码浮层是独立窗口，不随 IME 窗口隐藏，必须显式收
+        barView?.hidePreedit()
         selecting = false
         super.onFinishInputView(finishingInput)
     }
@@ -392,6 +408,7 @@ class WindInputImeService :
                 }
                 loadedCandidates = page.items
                 candidateTotal = page.total
+                composing = event.preedit.isNotEmpty()
 
                 barView?.setCandidateFrame(
                     items = loadedCandidates,
@@ -411,6 +428,8 @@ class WindInputImeService :
             is UiEvent.Status -> {
                 modeLabel = event.iconLabel.ifEmpty { if (event.chineseMode) "中" else "英" }
                 keyboardWindow?.keyboardView?.modeLabel = modeLabel
+                // 键面标点形态跟引擎的真值走：英文模式或关了中文标点，键面就显示 ASCII
+                keyboardWindow?.keyboardView?.chinesePunct = event.chineseMode && event.chinesePunct
                 quickPanelWindow?.updateStatus(event)
             }
             is UiEvent.Toast -> showToast(event.text)
@@ -487,9 +506,13 @@ class WindInputImeService :
     // ── 键盘回调 ─────────────────────────────────────────────────
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {
-        // 中英切换是宿主侧动作，不走引擎按键路径
+        // 中英切换 / 表情键是宿主侧动作，不走引擎按键路径
         if (action == KeyAction.SwitchLang) {
             toggleLanguage()
+            return
+        }
+        if (action == KeyAction.Emoji) {
+            emojiWindow?.let { windowManager?.show(it) }
             return
         }
         if (!directInput && session.keyPressed(action, shifted)) return
@@ -585,8 +608,15 @@ class WindInputImeService :
         repeat(kotlin.math.abs(delta)) { sendDownUpKeyEvents(keyCode) }
     }
 
-    /** 退格左滑扩选：实时选中光标前 count 个字符 */
+    /**
+     * 退格左滑扩选：实时选中光标前 count 个字符。
+     *
+     * **有编码时不碰宿主文本**：用户正在打字，滑退格的意图是「这串码不要了」，
+     * 不是删正文——此前会把编码留着、把输入框里的字选中删掉，与意图完全相反。
+     * 有编码时整个手势等价于清空编码（抬手时做，见 [onBackspaceSwipeDelete]）。
+     */
     override fun onBackspaceSelect(count: Int) {
+        if (composing) return
         val ic = currentInputConnection ?: return
         val extracted = ic.getExtractedText(ExtractedTextRequest(), 0) ?: return
         val end = extracted.startOffset + extracted.selectionEnd
@@ -594,8 +624,12 @@ class WindInputImeService :
         ic.setSelection(start, end)
     }
 
-    /** 退格滑动抬手：删除选区 */
+    /** 退格滑动抬手：有编码 → 清空编码；否则删除选区 */
     override fun onBackspaceSwipeDelete() {
+        if (composing) {
+            abandonComposition()
+            return
+        }
         val ic = currentInputConnection ?: return
         val selected = ic.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
@@ -724,16 +758,23 @@ class WindInputImeService :
 
     override fun isSelecting(): Boolean = selecting
 
+    /**
+     * 编辑动作全部基于 `getExtractedText` + `setSelection` 实现，不发带 Shift 的方向键事件。
+     *
+     * 此前选择模式靠 `sendKeyEvent(DPAD_*, META_SHIFT_ON)`：**多数编辑器不理会输入法
+     * 合成的按键 meta**（EditText 只在物理键盘事件里看 Shift），于是「选择」按下去光标
+     * 照常移动、选区纹丝不动——真机反馈「选择无效」就是它。选区直接 set 是所有实现
+     * `InputConnection` 的控件都支持的最小公分母。
+     *
+     * 拿不到 ExtractedText 的宿主（极少数自绘编辑器）退回方向键，能移不能选。
+     */
     override fun onEditAction(action: TextEditingWindow.EditAction) {
         val ic = currentInputConnection ?: return
         when (action) {
-            TextEditingWindow.EditAction.UP -> sendArrow(KeyEvent.KEYCODE_DPAD_UP)
-            TextEditingWindow.EditAction.DOWN -> sendArrow(KeyEvent.KEYCODE_DPAD_DOWN)
-            TextEditingWindow.EditAction.LEFT -> sendArrow(KeyEvent.KEYCODE_DPAD_LEFT)
-            TextEditingWindow.EditAction.RIGHT -> sendArrow(KeyEvent.KEYCODE_DPAD_RIGHT)
-            TextEditingWindow.EditAction.HOME -> sendArrow(KeyEvent.KEYCODE_MOVE_HOME)
-            TextEditingWindow.EditAction.END -> sendArrow(KeyEvent.KEYCODE_MOVE_END)
-            TextEditingWindow.EditAction.TOGGLE_SELECT -> selecting = !selecting
+            TextEditingWindow.EditAction.TOGGLE_SELECT -> {
+                selecting = !selecting
+                selAnchor = if (selecting) currentSelection(ic)?.second ?: -1 else -1
+            }
             TextEditingWindow.EditAction.SELECT_ALL -> {
                 ic.performContextMenuAction(android.R.id.selectAll)
                 selecting = false
@@ -748,20 +789,83 @@ class WindInputImeService :
             }
             TextEditingWindow.EditAction.PASTE -> ic.performContextMenuAction(android.R.id.paste)
             TextEditingWindow.EditAction.BACKSPACE -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+            else -> moveCaret(ic, action)
         }
     }
 
-    /** 方向/行首行尾键：选择模式下附加 Shift meta 扩选 */
-    private fun sendArrow(keyCode: Int) {
-        val ic = currentInputConnection ?: return
-        val meta = if (selecting) {
-            KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
-        } else {
-            0
+    /** 当前选区的绝对偏移 (start, end)；宿主不支持 ExtractedText 时为 null */
+    private fun currentSelection(ic: android.view.inputmethod.InputConnection): Pair<Int, Int>? {
+        val ext = ic.getExtractedText(ExtractedTextRequest(), 0) ?: return null
+        return (ext.startOffset + ext.selectionStart) to (ext.startOffset + ext.selectionEnd)
+    }
+
+    /** 方向 / 行首行尾：算出新焦点，选择模式下与锚点合成选区 */
+    private fun moveCaret(
+        ic: android.view.inputmethod.InputConnection,
+        action: TextEditingWindow.EditAction,
+    ) {
+        val ext = ic.getExtractedText(ExtractedTextRequest(), 0)
+        val text = ext?.text
+        if (ext == null || text == null) {
+            // 退回方向键：能移动，选不了
+            val code = when (action) {
+                TextEditingWindow.EditAction.UP -> KeyEvent.KEYCODE_DPAD_UP
+                TextEditingWindow.EditAction.DOWN -> KeyEvent.KEYCODE_DPAD_DOWN
+                TextEditingWindow.EditAction.LEFT -> KeyEvent.KEYCODE_DPAD_LEFT
+                TextEditingWindow.EditAction.RIGHT -> KeyEvent.KEYCODE_DPAD_RIGHT
+                TextEditingWindow.EditAction.HOME -> KeyEvent.KEYCODE_MOVE_HOME
+                else -> KeyEvent.KEYCODE_MOVE_END
+            }
+            sendDownUpKeyEvents(code)
+            return
         }
-        val now = SystemClock.uptimeMillis()
-        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, keyCode, 0, meta))
-        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, keyCode, 0, meta))
+        val base = ext.startOffset
+        val selStart = base + ext.selectionStart
+        val selEnd = base + ext.selectionEnd
+        // 焦点端：选择模式下是锚点的对侧；非选择模式选区已合并，取 end
+        val anchor = if (selecting && selAnchor >= 0) selAnchor else selEnd
+        val focus = if (selecting) (if (selStart == anchor) selEnd else selStart) else selEnd
+        val len = text.length
+
+        fun lineStart(pos: Int) = text.lastIndexOf('\n', pos - 1) + 1
+        fun lineEnd(pos: Int) = text.indexOf('\n', pos).let { if (it < 0) len else it }
+
+        val newFocus = when (action) {
+            TextEditingWindow.EditAction.LEFT -> {
+                var p = (focus - 1).coerceAtLeast(0)
+                if (p > 0 && Character.isLowSurrogate(text[p])) p--
+                p
+            }
+            TextEditingWindow.EditAction.RIGHT -> {
+                var p = (focus + 1).coerceAtMost(len)
+                if (p < len && Character.isLowSurrogate(text[p])) p++
+                p
+            }
+            TextEditingWindow.EditAction.HOME -> lineStart(focus)
+            TextEditingWindow.EditAction.END -> lineEnd(focus)
+            TextEditingWindow.EditAction.UP -> {
+                val ls = lineStart(focus)
+                if (ls == 0) 0 else {
+                    val prevEnd = ls - 1
+                    val prevStart = lineStart(prevEnd)
+                    (prevStart + (focus - ls)).coerceAtMost(prevEnd)
+                }
+            }
+            TextEditingWindow.EditAction.DOWN -> {
+                val le = lineEnd(focus)
+                if (le >= len) len else {
+                    val nextStart = le + 1
+                    (nextStart + (focus - lineStart(focus))).coerceAtMost(lineEnd(nextStart))
+                }
+            }
+            else -> focus
+        }
+        if (selecting) {
+            if (selAnchor < 0) selAnchor = anchor
+            ic.setSelection(minOf(selAnchor, newFocus), maxOf(selAnchor, newFocus))
+        } else {
+            ic.setSelection(newFocus, newFocus)
+        }
     }
 
     // ── 剪贴板面板 ───────────────────────────────────────────────

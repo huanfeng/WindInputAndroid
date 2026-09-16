@@ -67,6 +67,22 @@ class KeyboardView(context: Context) : View(context) {
      */
     var longPressDelayMs = 300
 
+    /** 空格横滑移光标 / 退格左滑扩选 / 上滑副字符 三个手势的开关（设置项 ui.android.gesture_*） */
+    var spaceSwipeEnabled = true
+    var backspaceSwipeEnabled = true
+    var swipeSymbolsEnabled = true
+
+    /**
+     * 中文标点形态开关：键面、角标、长按气泡里的标点按它显示成「，。？」还是「,.?」。
+     * 真值来自引擎推送（chineseMode && chinesePunct），本地不自记——见 [Punct] 说明。
+     */
+    var chinesePunct = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
     private val audioManager =
         context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
 
@@ -123,9 +139,12 @@ class KeyboardView(context: Context) : View(context) {
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = textColor
-        textAlign = Paint.Align.CENTER
+        textAlign = Paint.Align.LEFT
         textSize = 20 * density
     }
+
+    /** 复用的字形包围盒（onDraw 每键一次，避免分配） */
+    private val glyphBounds = android.graphics.Rect()
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = hintColor
         textAlign = Paint.Align.RIGHT
@@ -216,7 +235,8 @@ class KeyboardView(context: Context) : View(context) {
         val rect = pressedRect ?: return@Runnable
         if (key.longPress.isNotEmpty()) {
             popupManager.dismissPreview()
-            popupManager.showPopup(rect, key.longPress.map { it.toString() })
+            // 气泡里显示中英形态，抬手时按**下标**映回布局里的 ASCII 字符再喂引擎
+            popupManager.showPopup(rect, key.longPress.map { Punct.display(it, chinesePunct) })
             repeatHaptic()
         } else if (hasLongPressAction(key.action)) {
             // 功能键长按走独立回调（没有字符气泡可弹）。置位后抬手不补单击，
@@ -282,11 +302,15 @@ class KeyboardView(context: Context) : View(context) {
             canvas.drawRoundRect(rect, keyRadiusPx, keyRadiusPx, keyPaint)
             val label = displayLabel(key)
             val textY = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2
-            canvas.drawText(label, rect.centerX(), textY, textPaint)
-            // 右上角副字符角标
+            // 水平按**字形包围盒**居中，而不是按字符前进宽度居中：全角标点「，」「。」的
+            // 字形挤在字模左下角，按前进宽度居中会明显偏左（真机反馈的就是这个）。
+            // 竖向仍按 ascent/descent 居中——按包围盒居竖向会让 q 与 a 的基线上下乱跳。
+            textPaint.getTextBounds(label, 0, label.length, glyphBounds)
+            canvas.drawText(label, rect.centerX() - glyphBounds.exactCenterX(), textY, textPaint)
+            // 右上角副字符角标（按当前模式显示中英形态）
             key.swipeUp?.let { hint ->
                 canvas.drawText(
-                    hint.toString(),
+                    Punct.display(hint, chinesePunct),
                     rect.right - 5 * density,
                     rect.top + 13 * density,
                     hintPaint,
@@ -308,6 +332,10 @@ class KeyboardView(context: Context) : View(context) {
             return "⇪"
         }
         val action = key.action
+        // 标点键：键面随模式显示中英形态（布局里写的是 ASCII）
+        if (action is KeyAction.Text && !action.char.isLetterOrDigit()) {
+            return Punct.display(action.char, chinesePunct)
+        }
         return if ((shifted || shiftLocked) && action is KeyAction.Text && action.char.isLetter()) {
             key.label.uppercase()
         } else {
@@ -362,7 +390,7 @@ class KeyboardView(context: Context) : View(context) {
                 val dx = event.x - downX
 
                 // 空格横向滑动：移动光标（步进制，进入后不再出空格）
-                if (key.action == KeyAction.Space) {
+                if (key.action == KeyAction.Space && spaceSwipeEnabled) {
                     if (!spaceSwipeActive && kotlin.math.abs(dx) > swipeActivatePx) {
                         spaceSwipeActive = true
                         cancelTimers()
@@ -380,7 +408,7 @@ class KeyboardView(context: Context) : View(context) {
                 }
 
                 // 退格左滑：扩选删除（实时选中光标前 N 字符）
-                if (key.action == KeyAction.Backspace) {
+                if (key.action == KeyAction.Backspace && backspaceSwipeEnabled) {
                     val dxLeft = downX - event.x
                     if (!backspaceSwipeActive && dxLeft > swipeActivatePx) {
                         backspaceSwipeActive = true
@@ -397,7 +425,7 @@ class KeyboardView(context: Context) : View(context) {
                 }
 
                 // 上滑副字符：位移超阈值且以纵向为主
-                if (key.swipeUp != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
+                if (swipeSymbolsEnabled && key.swipeUp != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
                     swipeConsumed = true
                     cancelTimers()
                     popupManager.dismissAll()
@@ -412,8 +440,7 @@ class KeyboardView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_UP -> {
                 val key = pressedKey
-                val popupChoice =
-                    if (popupManager.isPopupShown) popupManager.popupSelected() else null
+                val popupChoice = popupManager.popupSelectedIndex()?.let { key?.longPress?.getOrNull(it) }
                 val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
                 val wasSpaceSwipe = spaceSwipeActive
                 val wasBackspaceSwipe = backspaceSwipeActive
@@ -422,7 +449,7 @@ class KeyboardView(context: Context) : View(context) {
                     swipeConsumed || wasSpaceSwipe -> Unit
                     wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
                     popupChoice != null ->
-                        listener?.onKeyAction(KeyAction.Text(popupChoice.first()), shifted = false)
+                        listener?.onKeyAction(KeyAction.Text(popupChoice), shifted = false)
                     key != null && !skipTap -> handleKey(key)
                 }
             }

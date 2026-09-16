@@ -59,14 +59,14 @@ ROW_KEYS=(
     "q w e r t y u i o p"
     "a s d f g h j k l"
     "SHIFT z x c v b n m BS"
-    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步（中英键在回车左侧）
-    "SYM COMMA SPACE PERIOD LANG ENTER"
+    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步（两侧对称，空格居中；中英键在回车左侧）
+    "SYM EMOJI COMMA SPACE PERIOD LANG ENTER"
 )
 ROW_W=(
     "1 1 1 1 1 1 1 1 1 1"
     "1 1 1 1 1 1 1 1 1"
     "1.5 1 1 1 1 1 1 1 1.5"
-    "1.5 1 3.4 1 1.3 1.5"
+    "1.3 1 1 3.4 1 1 1.3"
 )
 NROWS=${#ROW_KEYS[@]}
 
@@ -85,8 +85,8 @@ init_geometry() {
             GEO_PANELHEADERY GEO_PANELBACKX < <(awk -v h="$h" -v dpi="$dpi" 'BEGIN{
         d = dpi / 160.0
         rowPx     = int(56 * d + 0.5)   # KeyboardDimens.rowHeightDp 默认值
-        # 条区 = 编码栏 + 主行（BarView.CODE_BAR_DP / MAIN_ROW_DP），总高恒定
-        codeBarPx = int(26 * d + 0.5)
+        # 条区只有主行（BarView.MAIN_ROW_DP）；编码栏是浮层不占高度，故 codeBarPx = 0
+        codeBarPx = 0
         mainRowPx = int(44 * d + 0.5)
         # 底部 insets（手势条/导航栏）：InputRootView 的 bottomSpacer 高度
         insetPx   = int(48 * d + 0.5)
@@ -94,8 +94,8 @@ init_geometry() {
         kbTop     = kbBottom - 4 * rowPx
         # 候选行在条区下半：条区顶 = kbTop-(编码栏+主行)，候选行中心再下移半个主行
         barY      = kbTop - int(mainRowPx / 2)
-        # 编码栏中心（组合中才可见）
-        codeBarY  = kbTop - mainRowPx - int(codeBarPx / 2)
+        # 编码浮层中心（组合中才可见，伸出 IME 窗口顶部 28dp）
+        codeBarY  = kbTop - mainRowPx - int(14 * d)
         # 面板 header 中心：面板打开时**条区整个让位**，面板从条区位置起画，
         # 其 header 与条区等高（BarView.TOTAL_DP）。写成 kbTop+xx 会点进键盘区。
         panelHdrY = kbTop - codeBarPx - mainRowPx + int((codeBarPx + mainRowPx) / 2)
@@ -104,6 +104,30 @@ init_geometry() {
         printf "%.4f %d %d %d %d %d %d %d\n", d, rowPx, kbTop, kbBottom, barY, codeBarY, panelHdrY, panelBackX
     }')
     echo "几何: ${GEO_W}x${GEO_H} density=$GEO_DENSITY 行高=$GEO_ROWPX 键盘顶=$GEO_KBTOP 候选y=$GEO_BARY 编码栏y=$GEO_CODEBARY"
+}
+
+# 键位中心坐标 "cx cy"；找不到返回空
+key_center() {
+    local name="$1" r idx keys weights cx cy
+    for ((r = 0; r < NROWS; r++)); do
+        read -ra keys <<< "${ROW_KEYS[$r]}"
+        idx=-1
+        local i
+        for i in "${!keys[@]}"; do [[ "${keys[$i]}" == "$name" ]] && { idx=$i; break; }; done
+        (( idx < 0 )) && continue
+        weights="${ROW_W[$r]}"
+        cx="$(awk -v ws="$weights" -v idx="$idx" -v W="$GEO_W" 'BEGIN{
+            n = split(ws, a, " "); total = 0
+            for (i = 1; i <= n; i++) total += a[i]
+            unit = W / total; x = 0
+            for (i = 1; i <= idx; i++) x += a[i] * unit
+            printf "%d", int(x + a[idx+1] * unit / 2)
+        }')"
+        cy="$(awk -v kb="$GEO_KBBOTTOM" -v n="$NROWS" -v r="$r" -v rp="$GEO_ROWPX" \
+              'BEGIN{ printf "%d", int(kb - (n - r - 0.5) * rp) }')"
+        printf '%s %s' "$cx" "$cy"
+        return 0
+    done
 }
 
 tap_key() {
@@ -360,7 +384,7 @@ check "退格删除" "" "$(get_pad_text)"
 echo; echo "${Y}[4] 中文标点${N}"
 reset_pad
 tap_key COMMA
-check_match "标点上屏" '^[，,]$' "$(get_pad_text)"
+check "中文模式逗号是全角" "，" "$(get_pad_text)"
 
 echo; echo "${Y}[5] 候选点选${N}"
 reset_pad
@@ -443,6 +467,9 @@ tap_key LANG
 sleep 4
 tap_key h; tap_key i; tap_key SPACE
 check_match "英文模式出拉丁字符" '^[A-Za-z ]+$' "$(get_pad_text)"
+tap_key COMMA
+# 键面写的是 ASCII，英文模式引擎不吃，宿主直输——出来必须是半角逗号
+check_match "英文模式逗号是半角" '^[A-Za-z ]+,$' "$(get_pad_text)"
 
 tap_key LANG
 sleep 3
@@ -523,6 +550,46 @@ adb_q shell input tap "$EDIT_CX" "$EDIT_CY"   # onViewClicked / onUpdateEditorTo
 sleep 1
 tap_key SPACE
 check "点编辑框后空格不上屏旧码的字" " " "$(get_pad_text)"
+
+echo; echo "${Y}[17] 编辑面板：选择 + 方向键 + 剪切${N}"
+# 选择模式此前靠带 Shift 的方向键事件，多数编辑器不理会 → 「选择无效」。现在用 setSelection。
+# 面板网格 4 列 × 3 行铺满键盘四行区域；顶栏（返回）与条区等高。
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+tap_key a; tap_key a; tap_key SPACE
+tap_key a; tap_key a; tap_key SPACE
+before="$(get_pad_text)"
+# ⚠ 上屏后条区被**联想候选**（标点）占着，工具栏不可见；这时点条区点到的是联想项
+# （实测把「，」上了屏）。先点一下输入框：光标动 → 组合/联想作废 → 工具栏回来。
+adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 0.8
+adb_q shell input tap $(( GEO_W * 7 / 12 )) "$GEO_BARY"      # 工具栏第 4 格 = 文本编辑
+sleep 1
+cell_h=$(( GEO_ROWPX * 4 / 3 ))
+edit_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 8 )) $(( GEO_KBTOP + cell_h * (2 * $1 + 1) / 2 )); sleep 0.5; }
+edit_cell 1 1      # 选择
+edit_cell 1 0      # ←
+edit_cell 1 0      # ←
+edit_cell 0 2      # 剪切
+sleep 0.6
+after="$(get_pad_text)"
+adb_q shell input tap "$GEO_PANELBACKX" "$GEO_PANELHEADERY"   # 返回键盘
+sleep 1
+if printf '%s' "$before" | grep -qP '^[\x{4e00}-\x{9fa5}]{3}$'; then
+    check "选中末两字后剪切只剩一字" "${before:0:1}" "$after"
+else
+    echo "  ${R}FAIL${N}  前置三字未上屏：'$before'"; FAILED=$((FAILED + 1))
+fi
+
+echo; echo "${Y}[18] 有编码时滑退格清编码，不动正文${N}"
+# 此前有编码时左滑退格删的是输入框里的字（意图相反）。现在等价于清空编码。
+reset_pad
+tap_key a; tap_key a; tap_key SPACE          # 先上屏一个字当"正文"
+tap_key a; tap_key a                         # 再打两码，处于组合态
+read -r bs_x bs_y <<< "$(key_center BS)"
+adb_q shell input swipe "$bs_x" "$bs_y" $(( bs_x - GEO_W / 3 )) "$bs_y" 250
+sleep 0.6
+tap_key SPACE                                # 编码已清 → 空格出空格
+check_match "正文保留一字且编码已清" '^[\x{4e00}-\x{9fa5}] $' "$(get_pad_text)"
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"

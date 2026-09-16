@@ -38,6 +38,9 @@ class UserConfig(private val file: File) {
     fun getInt(key: String, default: Int): Int =
         (readAll()[key] as? Long)?.toInt() ?: default
 
+    fun getString(key: String, default: String): String =
+        readAll()[key] as? String ?: default
+
     /**
      * 写回一个键值（读全量 → 改内存 → 重新序列化整文件）。
      * 值仅支持标量（Boolean/Long/Double/String）。

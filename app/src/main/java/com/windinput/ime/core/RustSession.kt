@@ -5,6 +5,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
 import com.windinput.ime.keyboard.KeyAction
+import com.windinput.ime.keyboard.Punct
 import java.io.File
 import uniffi.wind_android.UiEventListener
 import uniffi.wind_android.WindCore
@@ -32,8 +33,9 @@ class RustSession(
         private const val VK_RETURN = 0x0Du
         private const val VK_ESCAPE = 0x1Bu
         private const val VK_SPACE = 0x20u
-        private const val VK_OEM_COMMA = 0xBCu
-        private const val VK_OEM_PERIOD = 0xBEu
+
+        /** wind_host::Modifiers::SHIFT（SSOT 在主仓 wind-host/src/key.rs） */
+        private const val MOD_SHIFT = 0x0001u
 
         /** 进程内唯一核心（见 [getOrCreate]） */
         @Volatile
@@ -163,8 +165,8 @@ class RustSession(
     }
 
     override fun keyPressed(action: KeyAction, shifted: Boolean): Boolean {
-        val vk = toVk(action, shifted) ?: return false
-        return dispatch(vk)
+        val (vk, mods) = toVk(action, shifted) ?: return false
+        return dispatch(vk, mods)
     }
 
     /**
@@ -199,15 +201,15 @@ class RustSession(
     }
 
     override fun reset() {
-        dispatch(VK_ESCAPE)
+        dispatch(VK_ESCAPE, 0u)
     }
 
     /** 喂键并派发编辑指令流。@return 是否被引擎消费 */
-    private fun dispatch(vk: UInt): Boolean {
+    private fun dispatch(vk: UInt, modifiers: UInt): Boolean {
         // JNI 往返耗时单独计：它在**主线程**上同步阻塞，是输入延迟里唯一不可
         // 让位给渲染的一段。超过一帧（16ms）就必须改成异步，故按帧标注。
         val t0 = SystemClock.elapsedRealtimeNanos()
-        val result = core.keyDown(vk, 0u)
+        val result = core.keyDown(vk, modifiers)
         val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
         if (costUs > FRAME_BUDGET_US) {
             Log.w(TAG, "keyDown 阻塞主线程 ${costUs}µs（超一帧）vk=0x${vk.toString(16)}")
@@ -239,22 +241,26 @@ class RustSession(
         else -> error("未知 EditOp.kind=${op.kind}，核心与 K 侧的判别位定义已漂移")
     }
 
-    /** 软键 → wind-keys VK 码；null = 不进引擎（调用方走默认行为） */
-    private fun toVk(action: KeyAction, shifted: Boolean): UInt? = when (action) {
+    /**
+     * 软键 → (wind-keys VK 码, 修饰位)；null = 不进引擎（调用方走默认行为）。
+     *
+     * 标点符号一律按美式键盘译成 VK（+Shift），让引擎做中文标点转换与引号配对
+     * ——桌面就是这么走的，K 侧不长第二份转换逻辑（见 [Punct] 的说明）。
+     * 英文模式下引擎不吃这些键，回到宿主默认行为上屏的就是 ASCII 本身。
+     */
+    private fun toVk(action: KeyAction, shifted: Boolean): Pair<UInt, UInt>? = when (action) {
         is KeyAction.Text -> {
             val c = action.char
             when {
-                // Shift 态大写字母骨架期绕过引擎直输
-                c in 'a'..'z' && !shifted -> 0x41u + (c - 'a').toUInt()
-                c in '0'..'9' -> 0x30u + (c - '0').toUInt()
-                c == '，' || c == ',' -> VK_OEM_COMMA
-                c == '。' || c == '.' -> VK_OEM_PERIOD
-                else -> null
+                // Shift 态大写字母骨架期绕过引擎直输（引擎的 Shift+字母 是「临时英文」语义）
+                c in 'a'..'z' && !shifted -> (0x41u + (c - 'a').toUInt()) to 0u
+                c in 'a'..'z' -> null
+                else -> Punct.vkOf(c)?.let { (vk, shift) -> vk to (if (shift) MOD_SHIFT else 0u) }
             }
         }
-        KeyAction.Space -> VK_SPACE
-        KeyAction.Backspace -> VK_BACK
-        KeyAction.Enter -> VK_RETURN
+        KeyAction.Space -> VK_SPACE to 0u
+        KeyAction.Backspace -> VK_BACK to 0u
+        KeyAction.Enter -> VK_RETURN to 0u
         else -> null
     }
 }

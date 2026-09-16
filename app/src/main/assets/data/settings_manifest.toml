@@ -70,3 +70,75 @@ min = 150
 max = 600
 step = 50
 platform = "android"
+
+[[group]]
+title = "外观"
+
+[[group.item]]
+key = "ui.android.theme"
+type = "select"
+title = "深浅色"
+summary = "键盘配色"
+default = "system"
+options = [
+  { value = "system", label = "跟随系统" },
+  { value = "light", label = "浅色" },
+  { value = "dark", label = "深色" },
+]
+platform = "android"
+
+[[group.item]]
+key = "ui.android.candidate_text_sp"
+type = "int"
+title = "候选字号"
+summary = "候选栏文字大小，sp"
+default = 19
+min = 15
+max = 24
+step = 1
+platform = "android"
+
+[[group]]
+title = "手势"
+
+[[group.item]]
+key = "ui.android.gesture_space_cursor"
+type = "toggle"
+title = "空格左右滑动移光标"
+default = true
+platform = "android"
+
+[[group.item]]
+key = "ui.android.gesture_backspace_select"
+type = "toggle"
+title = "退格左滑批量删除"
+summary = "有编码时清空编码，没有编码时选中并删除光标前的文字"
+default = true
+platform = "android"
+
+[[group.item]]
+key = "ui.android.gesture_swipe_symbols"
+type = "toggle"
+title = "字母键上滑出符号"
+summary = "关闭后仅长按可出副字符"
+default = true
+platform = "android"
+
+[[group]]
+title = "候选与剪贴板"
+
+[[group.item]]
+key = "ui.android.inline_preedit"
+type = "toggle"
+title = "编码嵌入输入框"
+summary = "打字时把编码同时显示在输入框里（默认只在编码栏显示）"
+default = false
+platform = "android"
+
+[[group.item]]
+key = "ui.android.clip_suggestion"
+type = "toggle"
+title = "复制后提示粘贴"
+summary = "复制新内容后在候选栏位置显示一条粘贴建议，30 秒后自动消失"
+default = true
+platform = "android"

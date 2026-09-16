@@ -10,19 +10,19 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * 键盘上方的条区：**编码栏 + 主行**两层，总高恒定。
+ * 键盘上方的条区：**一行**（候选 / 工具栏 / 剪贴板建议 三态），高度恒定 [TOTAL_DP]。
  *
  * ```
+ *   ╭ 五 aa 1/3 ╮                  编码栏：浮层（PreeditPopup），伸出窗口顶部，不占高度
  * ┌──────────────────────────────┐
- * │ 五 aa                    1/3 │  编码栏（CODE_BAR_DP，仅组合中显示）
- * ├──────────────────────────────┤
  * │ 式  戒  工  ...            ∨ │  主行：候选 / 工具栏 / 剪贴板建议
  * └──────────────────────────────┘
  * ```
  *
- * **总高为什么必须恒定**：条区高度直接决定 IME 窗口高度。若编码栏出现时整体变高，
- * 每次起手打字键盘都会向上跳一下、宿主界面跟着 reflow，观感与误触都很糟。
- * 故空闲时编码栏 GONE、主行（工具栏）吃满全高，组合中主行让出 [CODE_BAR_DP]。
+ * **高度为什么必须恒定**：条区高度直接决定 IME 窗口高度。若编码出现时整体变高，
+ * 每次起手打字键盘都会向上跳一下、宿主界面跟着 reflow。此前编码栏是条区里的一行，
+ * 为了恒定空闲时也得把那 26dp 占着——工具栏 70dp 高，真机上明显太高。现在编码栏
+ * 是浮层，条区只剩主行。
  *
  * 主行三态优先级：候选 > 剪贴板建议 > 工具栏；建议条 30s 超时自动消失。
  *
@@ -52,14 +52,11 @@ class BarView(
     enum class ToolbarAction { QUICK_PANEL, EMOJI, CLIPBOARD, TEXT_EDIT, SETTINGS, HIDE_IME }
 
     companion object {
-        /** 编码栏高度（dp）：明显小于主行，视觉上从属于候选 */
-        const val CODE_BAR_DP = 26f
-
         /** 主行高度（dp）：候选/工具栏 */
         const val MAIN_ROW_DP = 44f
 
-        /** 条区总高 = 编码栏 + 主行，恒定不随组合态变化 */
-        const val TOTAL_DP = CODE_BAR_DP + MAIN_ROW_DP
+        /** 条区总高 = 主行；编码栏是浮层不计入。恒定不随组合态变化 */
+        const val TOTAL_DP = MAIN_ROW_DP
 
         private const val SUGGESTION_TIMEOUT_MS = 30_000L
 
@@ -93,11 +90,11 @@ class BarView(
 
     private val density = resources.displayMetrics.density
 
-    // ── 编码栏 ───────────────────────────────────────────────────
-    private val modeLabelView: TextView
-    private val preeditView: TextView
-    private val pagerView: TextView
-    private val codeBar: LinearLayout
+    // ── 编码栏（浮层）──────────────────────────────────────────────
+    private val preeditPopup = PreeditPopup(this)
+
+    /** 核心构造期的提示是否正在显示（与真编码共用同一个浮层） */
+    private var preparing = false
 
     // ── 主行 ─────────────────────────────────────────────────────
     private val mainRow: FrameLayout
@@ -136,39 +133,6 @@ class BarView(
 
     init {
         orientation = VERTICAL
-
-        // ── 编码栏 ──
-        modeLabelView = TextView(context).apply {
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setTextColor(Palette.current.onAccent)
-            setBackgroundColor(Palette.current.accent)
-            setPadding(dp(6), dp(1), dp(6), dp(1))
-        }
-        preeditView = TextView(context).apply {
-            textSize = 15f
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.MIDDLE
-            gravity = Gravity.CENTER_VERTICAL
-            setTextColor(Palette.current.preedit)
-            setPadding(dp(8), 0, dp(8), 0)
-        }
-        pagerView = TextView(context).apply {
-            textSize = 12f
-            gravity = Gravity.CENTER
-            setTextColor(Palette.current.hint)
-            setPadding(dp(8), 0, dp(12), 0)
-        }
-        codeBar = LinearLayout(context).apply {
-            orientation = HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Palette.current.surface)
-            setPadding(dp(10), 0, 0, 0)
-            visibility = GONE
-            addView(modeLabelView, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT))
-            addView(preeditView, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
-            addView(pagerView, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
-        }
 
         // ── 主行：候选（含展开钮） ──
         candidateRow = LinearLayout(context).apply {
@@ -219,9 +183,7 @@ class BarView(
             addView(suggestionRow, FrameLayout.LayoutParams(MATCH, MATCH))
         }
 
-        addView(codeBar, LayoutParams(MATCH, dp(CODE_BAR_DP)))
-        // 主行用 weight 吃掉剩余高度：编码栏一显一隐，主行自动伸缩，总高不变
-        addView(mainRow, LayoutParams(MATCH, 0, 1f))
+        addView(mainRow, LayoutParams(MATCH, MATCH))
         applyState(State.TOOLBAR)
     }
 
@@ -250,13 +212,10 @@ class BarView(
         hasCandidates = items.isNotEmpty()
 
         if (preedit.isEmpty()) {
-            codeBar.visibility = GONE
+            if (!preparing) preeditPopup.dismiss()
         } else {
-            codeBar.visibility = VISIBLE
-            preeditView.text = preedit
-            modeLabelView.visibility = if (modeLabel.isEmpty()) GONE else VISIBLE
-            modeLabelView.text = modeLabel
-            pagerView.text = if (totalPages > 1) "$page/$totalPages" else ""
+            preparing = false
+            preeditPopup.show(preedit, modeLabel, if (totalPages > 1) "$page/$totalPages" else "")
         }
 
         // 展开态下主行归工具栏管：候选正在下方网格里铺开，条上不再重复一份
@@ -302,14 +261,25 @@ class BarView(
      * 键盘照常可用，只是没有中文候选。给一行静态提示即可，别打断输入。
      */
     fun setPreparing(preparing: Boolean) {
-        if (!preparing) {
-            if (preeditView.text == PREPARING_TEXT) codeBar.visibility = GONE
-            return
-        }
-        codeBar.visibility = VISIBLE
-        modeLabelView.visibility = GONE
-        pagerView.text = ""
-        preeditView.text = PREPARING_TEXT
+        this.preparing = preparing
+        if (preparing) preeditPopup.show(PREPARING_TEXT, "", "") else preeditPopup.dismiss()
+    }
+
+    /** 收掉编码浮层。键盘收起 / 面板切换时必须调：浮层是独立窗口，不随条区隐藏 */
+    fun hidePreedit() {
+        preparing = false
+        preeditPopup.dismiss()
+    }
+
+    override fun onDetachedFromWindow() {
+        hidePreedit()
+        super.onDetachedFromWindow()
+    }
+
+    override fun setVisibility(visibility: Int) {
+        super.setVisibility(visibility)
+        // 面板打开时条区让位（GONE），编码浮层跟着收；它锚在条区上，条区不在了它就没有落点
+        if (visibility != VISIBLE) hidePreedit()
     }
 
     /** 复制新内容后的建议条（候选优先级更高，仅空闲时展示） */

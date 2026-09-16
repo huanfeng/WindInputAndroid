@@ -23,6 +23,9 @@ sealed interface KeyAction {
      * 长按 = 打开快捷面板做其它切换（方案 / 标点 / 全半角 / 简繁）。
      */
     data object SwitchLang : KeyAction
+
+    /** 打开表情面板（底栏左侧；也是让空格居中的那块配重，见 bottomRow） */
+    data object Emoji : KeyAction
 }
 
 data class KeyDef(
@@ -61,14 +64,21 @@ object KeyboardLayouts {
             )
         }
 
+    /**
+     * 底栏。**标点一律写 ASCII**（中英形态由 [Punct] 按模式派生，见该文件说明）。
+     *
+     * 权重两侧对称：`1.3+1+1 = 1+1+1.3`，空格正好居中——此前左 2.5 / 右 3.8，空格明显
+     * 偏左。表情键是补上的那块配重，同时也是主流布局里表情的常规位置。
+     */
     private fun bottomRow(switchLabel: String): List<KeyDef> = listOf(
-        KeyDef(switchLabel, KeyAction.SwitchSymbols, widthWeight = 1.5f, isSpecial = true),
-        KeyDef("，", KeyAction.Text('，'), longPress = "、！？：；"),
+        KeyDef(switchLabel, KeyAction.SwitchSymbols, widthWeight = 1.3f, isSpecial = true),
+        KeyDef("☺", KeyAction.Emoji, isSpecial = true),
+        KeyDef(",", KeyAction.Text(','), longPress = "\\!?:;"),
         KeyDef("空格", KeyAction.Space, widthWeight = 3.4f),
-        KeyDef("。", KeyAction.Text('。'), longPress = "…～·—％"),
+        KeyDef(".", KeyAction.Text('.'), longPress = "^~`_%"),
         // 中英切换固定在回车左侧——主流输入法的位置约定，肌肉记忆在这
-        KeyDef("中/英", KeyAction.SwitchLang, widthWeight = 1.3f, isSpecial = true),
-        KeyDef("⏎", KeyAction.Enter, widthWeight = 1.5f, isSpecial = true),
+        KeyDef("中/英", KeyAction.SwitchLang, isSpecial = true),
+        KeyDef("⏎", KeyAction.Enter, widthWeight = 1.3f, isSpecial = true),
     )
 
     /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
