@@ -96,7 +96,8 @@ class CandidateMenuPopup(private val anchor: View) {
             sec.lines.forEachIndexed { i, line ->
                 body.addView(
                     TextView(anchor.context).apply {
-                        text = if (head != null && sec.inline && i == 0) "$head：$line" else line
+                        // 拆字段的字根是私用区字符，只给它们套字根字体，其余照常
+                        text = ZiGenFont.apply(context, if (head != null && sec.inline && i == 0) "$head：$line" else line)
                         textSize = 15f
                         setTextColor(p.text)
                         setTextIsSelectable(false)

@@ -1190,3 +1190,66 @@ fn dict_export_clear_import_round_trip() {
     core.user_word_remove(schema, code.into(), text.into())
         .expect("清理应成功");
 }
+
+/// 重载配置。放到 8MB 栈的线程里：debug 构建下整套重载（重建引擎集）要 2~3MB 栈，
+/// 超过测试线程默认的 2MB 会直接栈溢出中止。release 下 1MB 栈也够（实测），
+/// 设置页在 IO 线程上调它没有问题——这只是 debug 测试的事。
+fn reload_config(core: &Arc<WindCore>) {
+    let c = core.clone();
+    std::thread::Builder::new()
+        .stack_size(8 << 20)
+        .spawn(move || c.run_command(wind_android::EngineCommand::ReloadConfig))
+        .expect("起重载线程")
+        .join()
+        .expect("重载线程不应 panic");
+}
+
+/// 长按提示的段开关：「拆字」出厂关着；打开并重载后候选提示里多出拆字段，关回去后状态复原。
+/// 段名按原文定位（`编码{(${code_source})}` 这类模板名也能开关），显示名去掉了可选组。
+#[test]
+fn tooltip_section_toggle_reaches_candidate_tooltip() {
+    let Some((core, _rec, _env)) = setup_exclusive("tooltip_sections") else {
+        return;
+    };
+    let sections = core.tooltip_sections();
+    let chaizi = sections
+        .iter()
+        .find(|s| s.title == "拆字")
+        .expect("出厂段里应有「拆字」");
+    assert!(!chaizi.enabled, "拆字出厂关着");
+    assert!(
+        sections.iter().any(|s| s.title == "编码" && s.label.contains('{')),
+        "模板段名应给出去掉可选组的显示名：{sections:?}"
+    );
+    let label = chaizi.label.clone();
+
+    core.set_tooltip_section_enabled(label.clone(), true)
+        .expect("打开拆字应成功");
+    reload_config(&core);
+    assert!(
+        core.tooltip_sections().iter().any(|s| s.label == label && s.enabled),
+        "打开后应读回开着"
+    );
+    for vk in [0x57u32, 0x51, 0x56, 0x42] {
+        core.key_down(vk, 0); // wqvb → 你好
+    }
+    settle();
+    let tip = core.candidate_tooltip(0);
+    assert!(
+        tip.iter().any(|s| s.title.as_deref() == Some("拆字")),
+        "打开后首选的提示里应有拆字段，实得 {tip:?}"
+    );
+    core.key_down(0x1B, 0);
+
+    core.set_tooltip_section_enabled(label.clone(), false)
+        .expect("关闭拆字应成功");
+    reload_config(&core);
+    assert!(
+        core.tooltip_sections().iter().any(|s| s.label == label && !s.enabled),
+        "关回去后应读回关着"
+    );
+    assert!(
+        core.set_tooltip_section_enabled("没有这一段".into(), true).is_err(),
+        "不存在的段名要报错，不能静默成功"
+    );
+}

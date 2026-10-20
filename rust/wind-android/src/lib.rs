@@ -566,6 +566,27 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。
+    pub fn tooltip_sections(&self) -> Vec<TooltipSectionStateInfo> {
+        self.core
+            .tooltip_sections()
+            .into_iter()
+            .map(|s| TooltipSectionStateInfo {
+                label: s.label,
+                title: s.title,
+                enabled: s.enabled,
+            })
+            .collect()
+    }
+
+    /// 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
+    /// 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+    pub fn set_tooltip_section_enabled(&self, label: String, on: bool) -> Result<(), ConfigError> {
+        self.core
+            .set_tooltip_section_enabled(&label, on)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     // ── 设置页：输入统计 ─────────────────────────────────────────────
 
     /// 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
@@ -843,6 +864,14 @@ pub struct CandidateTooltipInfo {
 pub struct CandidateMenuItemInfo {
     pub label: String,
     pub action: String,
+    pub enabled: bool,
+}
+
+/// 候选提示的一段：`label` 是段名原文（开关时回传），`title` 是给人看的名字。
+#[derive(Debug, uniffi::Record)]
+pub struct TooltipSectionStateInfo {
+    pub label: String,
+    pub title: String,
     pub enabled: bool,
 }
 

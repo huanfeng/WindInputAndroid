@@ -538,6 +538,8 @@ private fun PageScreen(
         }
     } else {
         for ((name, items) in sections) SettingsCard(name, items, values)
+        // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
+        if (page.id == "ui") TooltipSectionsSection()
     }
 }
 

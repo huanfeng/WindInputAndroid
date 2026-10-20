@@ -767,6 +767,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_shuangpin_layouts(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_stats_clear(
@@ -774,6 +776,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_stats_daily(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_stats_summary(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_tooltip_sections(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_user_word_add(
     ): Int
@@ -868,6 +872,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(`ptr`: Long,`label`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_stats_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -875,6 +881,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_stats_daily(`ptr`: Long,`from`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_stats_summary(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_tooltip_sections(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_user_word_add(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1086,6 +1094,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled() != 12394) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled() != 59430) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 61817) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1096,6 +1107,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_stats_summary() != 63898) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_tooltip_sections() != 33354) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_user_word_add() != 15919) {
@@ -2180,6 +2194,12 @@ public interface WindCoreInterface {
     fun `setSchemaDictEnabled`(`schemaId`: kotlin.String, `dictId`: kotlin.String, `on`: kotlin.Boolean)
     
     /**
+     * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    fun `setTooltipSectionEnabled`(`label`: kotlin.String, `on`: kotlin.Boolean)
+    
+    /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
      * 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
      */
@@ -2199,6 +2219,11 @@ public interface WindCoreInterface {
      * 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
      */
     fun `statsSummary`(): StatsSummaryInfo?
+    
+    /**
+     * 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。
+     */
+    fun `tooltipSections`(): List<TooltipSectionStateInfo>
     
     /**
      * 手动加词。拼音码可带空格声明音节切分（`ni hao`）。
@@ -2746,6 +2771,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    @Throws(ConfigException::class)override fun `setTooltipSectionEnabled`(`label`: kotlin.String, `on`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(
+        it,
+        
+        FfiConverterString.lower(`label`),
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
+    
+
+    
+    /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
      * 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
      */override fun `shuangpinLayouts`(): List<LayoutInfo> {
@@ -2803,6 +2847,22 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_method_windcore_stats_summary(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。
+     */override fun `tooltipSections`(): List<TooltipSectionStateInfo> {
+            return FfiConverterSequenceTypeTooltipSectionStateInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_tooltip_sections(
         it,
         _status)
 }
@@ -3910,6 +3970,52 @@ public object FfiConverterTypeStatsSummaryInfo: FfiConverterRustBuffer<StatsSumm
 
 
 /**
+ * 候选提示的一段：`label` 是段名原文（开关时回传），`title` 是给人看的名字。
+ */
+data class TooltipSectionStateInfo (
+    var `label`: kotlin.String
+    , 
+    var `title`: kotlin.String
+    , 
+    var `enabled`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTooltipSectionStateInfo: FfiConverterRustBuffer<TooltipSectionStateInfo> {
+    override fun read(buf: ByteBuffer): TooltipSectionStateInfo {
+        return TooltipSectionStateInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: TooltipSectionStateInfo) = (
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterBoolean.allocationSize(value.`enabled`)
+    )
+
+    override fun write(value: TooltipSectionStateInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterBoolean.write(value.`enabled`, buf)
+    }
+}
+
+
+
+/**
  * 一条用户词。`code` 是显示码：拼音带音节空格（`ni hao`），码表原样。
  */
 data class UserWordInfo (
@@ -4767,6 +4873,34 @@ public object FfiConverterSequenceTypeSchemaInfo: FfiConverterRustBuffer<List<Sc
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeSchemaInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeTooltipSectionStateInfo: FfiConverterRustBuffer<List<TooltipSectionStateInfo>> {
+    override fun read(buf: ByteBuffer): List<TooltipSectionStateInfo> {
+        val len = buf.getInt()
+        return List<TooltipSectionStateInfo>(len) {
+            FfiConverterTypeTooltipSectionStateInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<TooltipSectionStateInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeTooltipSectionStateInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<TooltipSectionStateInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeTooltipSectionStateInfo.write(it, buf)
         }
     }
 }

@@ -27,6 +27,20 @@ url = "https://github.com/KyleBing/rime-wubi86-jidian"
 
 [[notice]]
 group = "词库与数据"
+name = "五笔 86 拆字数据库（wubi86_chaizi.txt）"
+usage = "长按候选提示里的拆字段（字根拆分）。来自五笔输入法资源网盘，原始作者不详；社区用户（论坛 t222）补全 8105 通规字与 CJK、CJK-A 并修订。未附版权声明，权利人如认为使用不当请联系我们"
+license = "未声明"
+url = "https://github.com/huanfeng/WindInput/blob/main/NOTICE.md"
+
+[[notice]]
+group = "词库与数据"
+name = "黑体字根字体（HeiTiZiGen.ttf）"
+usage = "显示拆字段里私用区的五笔字根字符。来自五笔输入法资源网盘，原始作者不详，未附版权声明，处理方式同上"
+license = "未声明"
+url = "https://github.com/huanfeng/WindInput/blob/main/NOTICE.md"
+
+[[notice]]
+group = "词库与数据"
 name = "白霜拼音（rime-frost）"
 usage = "拼音词库（字表、基础词库、扩展词库、纠错、16 个可选细胞词库）、英文词库、Emoji 附加表"
 license = "GPL-3.0"

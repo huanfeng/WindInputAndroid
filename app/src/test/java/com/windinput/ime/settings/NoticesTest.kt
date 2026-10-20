@@ -28,6 +28,8 @@ class NoticesTest {
         val names = notices.joinToString(" ") { it.name + it.usage }
         val required = mapOf(
             "schemas/wubi86" to "rime-wubi86-jidian",
+            "schemas/wubi86/wubi86_chaizi.txt" to "wubi86_chaizi.txt",
+            "schemas/wubi86/HeiTiZiGen.ttf" to "HeiTiZiGen.ttf",
             "schemas/pinyin" to "rime-frost",
             "schemas/english" to "rime-frost",
             "opencc" to "OpenCC",
