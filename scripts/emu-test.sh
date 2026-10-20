@@ -426,6 +426,15 @@ if adb_ shell run-as "$PKG" cat "$WUBI_SHADOW" | grep -q $'^aa\t'; then
     adb_q shell "run-as $PKG sed -i '/^aa\t/d' $WUBI_SHADOW"
     restart_pad
 fi
+# 首次使用的方案卡片会盖住键盘，别的用例全点不中：开跑前记成「已弹过」（[41] 专门测它）
+ONBOARD_XML=shared_prefs/ime_onboarding.xml
+mark_onboarded() {
+    printf '%s\n' "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>" \
+        '<map><boolean name="first_pick_shown" value="true" /></map>' \
+        | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p shared_prefs && cat > $ONBOARD_XML'"
+}
+mark_onboarded
+restart_pad
 SCHEMA_BEFORE="$(get_active_schema)"
 
 # ── 建立前置条件：确保处于中文方案 ──────────────────────────────────────
@@ -1018,6 +1027,33 @@ check "上屏后不留占位空格" "式" "$(get_pad_text)"
 printf '' | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $KB_CFG'"
 restart_pad
 wait_chinese >/dev/null
+
+echo; echo "${Y}[41] 首次使用：第一次弹键盘先出方案卡片，选完不再出${N}"
+# 点卡片里的「全拼」再打 ni：卡片在就出「你」；卡片没出来的话那一下落在字母键上，对不上
+adb_q shell run-as "$PKG" rm -f "$ONBOARD_XML"
+restart_pad            # am start -S：进程重起，SharedPreferences 的进程内缓存一并丢掉
+sleep 2
+# 点输入框把键盘叫出来。卡片可能已随测试台的 stateVisible 弹出——首次卡片不因点应用区域
+# 而收（真机上用户第一次几乎一定会再点一下文本框），所以这一下点不掉它
+adb_q shell input tap "$EDIT_CX" "$EDIT_CY"
+sleep 3
+menu_cell 0 1          # 全拼
+sleep 3
+tap_key n; tap_key i; tap_key SPACE
+check "首次卡片里选全拼后 ni 出「你」" "你" "$(get_pad_text)"
+# 切回五笔，并确认第二次弹键盘不再出卡片（出了的话 aa 会被卡片挡住）
+reset_pad
+read -r lx ly <<< "$(key_center LANG)"
+adb_q shell input swipe "$lx" "$ly" "$lx" "$ly" 900; sleep 0.8
+menu_cell 0 3          # 五笔
+sleep 2
+adb_q shell am force-stop "$PKG"
+restart_pad
+wait_chinese >/dev/null
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+check "第二次弹键盘不再出卡片" "式" "$(get_pad_text)"
+mark_onboarded
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"

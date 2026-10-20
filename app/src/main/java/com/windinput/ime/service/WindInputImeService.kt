@@ -154,6 +154,8 @@ class WindInputImeService :
                     if (currentInputConnection != null) ready.focusGained()
                     barView?.setPreparing(false)
                     refreshSchemaKeys()
+                    // 第一次弹键盘时核心多半还没起来，方案卡片等到这里再弹
+                    if (isInputViewShown) maybeShowFirstRunPicker()
                 },
                 // 切方案时核心可能在现编词库（首次切到拼音模拟器上近 5 秒）：期间与未就绪同样提示，
                 // 做完重读方案（空格键上的方案名、中英键的去向）
@@ -260,6 +262,9 @@ class WindInputImeService :
         const val DEFAULT_CHINESE_SCHEMA_ID = "wubi86"
         const val KEY_LAST_CHINESE = "last_chinese_schema"
 
+        /** 首次使用的方案卡片弹过没有（ime_onboarding prefs） */
+        const val KEY_FIRST_PICK_SHOWN = "first_pick_shown"
+
         /**
          * 有编码时 ⇧ 变「分词」的方案。只有全拼：分隔符 `auto` 档下全拼用反引号
          * （见 KeyboardView.SPLIT_CHAR）；双拼的反引号出厂归辅助码、`'` 归选词键，
@@ -358,6 +363,7 @@ class WindInputImeService :
         windowManager?.showKeyboard()
         applyEditorScene(info)
         refreshSchemaKeys()
+        maybeShowFirstRunPicker()
     }
 
     /** 光标动了（上屏、删除、点击挪光标）：重新判断要不要句首大写 */
@@ -406,6 +412,7 @@ class WindInputImeService :
      */
     override fun onFinishInputView(finishingInput: Boolean) {
         candidateMenu?.dismiss()
+        schemaPicker?.dismiss()
         abandonComposition()
         // 「词库准备中」不在这里撤：它画在条区里随窗口一起收；撤了再弹键盘时词库还没好，提示却没了
         selecting = false
@@ -742,6 +749,13 @@ class WindInputImeService :
 
     private var candidateMenu: CandidateMenuPopup? = null
 
+    /**
+     * 方案选择卡片（长按中英键 / 首次使用）。与 [candidateMenu] 分开：候选一变要收的是候选菜单
+     * （它记着的下标会失效），方案卡片跟候选无关——共用一个字段时，键盘刚弹出那一下的状态推送
+     * 就把首次使用的卡片收掉了。
+     */
+    private var schemaPicker: CandidateMenuPopup? = null
+
     private val switchHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val showSwitching = Runnable { barView?.setPreparing(true) }
 
@@ -867,12 +881,42 @@ class WindInputImeService :
      */
     override fun onKeyLongPress(action: KeyAction) {
         if (action != KeyAction.SwitchLang) return
-        val bar = barView ?: return
-        val schemas = session.schemas()
-        if (schemas.isEmpty()) {
+        if (!showSchemaPicker("切换方案")) {
             quickPanelWindow?.let { windowManager?.show(it) } // 核心没起来：退回快捷面板
-            return
         }
+    }
+
+    /**
+     * 首次使用：第一次在普通文本框里弹出键盘时，先弹方案卡片让用户选（豆包、微信首次都先问
+     * 键盘类型）。出厂默认是五笔，拼音用户不知道能换，第一句就打不出来。
+     *
+     * 只弹一次（弹出即记下，不管选没选）：关掉就当默认够用，之后随时长按中英键再换。
+     * 标记单独一个 prefs 文件——ime_state 在测试脚本里会被整个删掉重置方案，不能连带它。
+     * 核心还没起来时不弹（拿不到方案列表），就绪回调里会再试一次。
+     */
+    private fun maybeShowFirstRunPicker() {
+        if (onboardingPrefs.getBoolean(KEY_FIRST_PICK_SHOWN, false)) return
+        val info = currentInputEditorInfo ?: return
+        val cls = info.inputType and android.text.InputType.TYPE_MASK_CLASS
+        if (cls != android.text.InputType.TYPE_CLASS_TEXT || suspendsLearning(info.inputType, 0)) return
+        val bar = barView ?: return
+        // 条区要先量好才能定位卡片
+        bar.post {
+            if (onboardingPrefs.getBoolean(KEY_FIRST_PICK_SHOWN, false)) return@post
+            if (showSchemaPicker("选一个输入方案（以后长按中英键随时换）", dismissOnOutside = false)) {
+                onboardingPrefs.edit().putBoolean(KEY_FIRST_PICK_SHOWN, true).apply()
+            }
+        }
+    }
+
+    private val onboardingPrefs by lazy { getSharedPreferences("ime_onboarding", MODE_PRIVATE) }
+
+    /** 方案选择卡片（长按中英键、首次使用共用）。@return 是否弹出（核心未就绪 / 条区未就位时为 false） */
+    private fun showSchemaPicker(title: String, dismissOnOutside: Boolean = true): Boolean {
+        val bar = barView ?: return false
+        if (bar.width <= 0) return false
+        val schemas = session.schemas()
+        if (schemas.isEmpty()) return false
         val english = modeLabel == "英"
         val entries = schemas.map { s ->
             // 英文模式下引擎报的 active 仍是切走前的中文方案，勾要打在英文上
@@ -884,8 +928,9 @@ class WindInputImeService :
             )
         }
         candidateMenu?.dismiss()
-        candidateMenu = CandidateMenuPopup(bar).also { menu ->
-            menu.show("切换方案", entries) { entry ->
+        schemaPicker?.dismiss()
+        schemaPicker = CandidateMenuPopup(bar).also { menu ->
+            menu.show(title, entries, dismissOnOutside) { entry ->
                 val target = schemas.firstOrNull { it.index.toString() == entry.action } ?: return@show
                 if (target.id != ENGLISH_SCHEMA_ID) {
                     statePrefs.edit().putString(KEY_LAST_CHINESE, target.id).apply()
@@ -897,6 +942,7 @@ class WindInputImeService :
                 session.runCommand(EngineCmd.SelectSchema(target.index))
             }
         }
+        return schemaPicker?.isShowing == true
     }
 
     /** 空格滑动移光标 */

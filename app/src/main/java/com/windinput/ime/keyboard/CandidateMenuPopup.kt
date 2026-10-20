@@ -31,7 +31,16 @@ class CandidateMenuPopup(private val anchor: View) {
 
     private var popup: PopupWindow? = null
 
-    fun show(title: String, items: List<CandidateMenuEntry>, onPick: (CandidateMenuEntry) -> Unit) {
+    /**
+     * @param dismissOnOutside 点 IME 窗口以外（应用那边）是否收起。首次使用的方案卡片传 false：
+     *   第一次打开输入框，用户顺手再点一下文本框，引导卡片还没看清就没了
+     */
+    fun show(
+        title: String,
+        items: List<CandidateMenuEntry>,
+        dismissOnOutside: Boolean = true,
+        onPick: (CandidateMenuEntry) -> Unit,
+    ) {
         dismiss()
         if (items.isEmpty() || anchor.windowToken == null) return
         val p = Palette.current
@@ -107,8 +116,8 @@ class CandidateMenuPopup(private val anchor: View) {
             // 往上推，整张卡片随之上移一个状态栏高度、盖住候选条
             isClippingEnabled = false
             isTouchable = true
-            // IME 窗口以外（应用那边）被点时也收起
-            isOutsideTouchable = true
+            // IME 窗口以外（应用那边）被点时也收起（首次使用的卡片除外，见 show 的参数说明）
+            isOutsideTouchable = dismissOnOutside
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             showAtLocation(anchor, Gravity.NO_GRAVITY, loc[0], loc[1])
         }
