@@ -1,6 +1,5 @@
 package com.windinput.ime.panels
 
-import com.windinput.ime.keyboard.KeyHaptics
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
@@ -19,6 +18,8 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.windinput.ime.core.RecentStore
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.KeyHaptics
+import com.windinput.ime.keyboard.KeyIcons
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.Palette
 
@@ -135,6 +136,7 @@ class SymbolWindow(
         bottom.addView(
             keyCell(context, "⌫", palette.keySpecial, palette.text).apply {
                 contentDescription = "symbol-backspace"
+                KeyIcons.applyBackspace(this, palette.text)
                 setOnTouchListener(backspaceRepeater())
             },
             LinearLayout.LayoutParams(sideWidth, rowHeight),

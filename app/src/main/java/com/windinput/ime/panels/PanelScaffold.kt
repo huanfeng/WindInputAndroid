@@ -7,8 +7,9 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.windinput.ime.keyboard.BarView
-import com.windinput.ime.keyboard.Palette
+import com.windinput.ime.keyboard.KeyIcons
 import com.windinput.ime.keyboard.KeyboardDimens
+import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.keyboard.PanelIcon
 
 /**
@@ -132,5 +133,10 @@ object PanelScaffold {
             setPadding((14 * density).toInt(), 0, (14 * density).toInt(), 0)
             setBackgroundColor(Color.TRANSPARENT)
             setOnClickListener { onClick() }
+            // 退格与键盘上同一个矢量图标，不用字体里的 ⌫
+            if (label == "⌫") {
+                minWidth = (52 * density).toInt()
+                KeyIcons.applyBackspace(this, Palette.current.accent)
+            }
         }
 }

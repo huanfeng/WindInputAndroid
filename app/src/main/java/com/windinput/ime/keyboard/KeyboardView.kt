@@ -531,65 +531,17 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
-    // ── 功能键图标（矢量）──────────────────────────────────────────
-    // 笔画粗细与字母键面的视觉重量对齐；拐角用 CornerPathEffect 磨圆，与键帽圆角一个味道
-
-    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        strokeWidth = 1.8f * density
-        strokeJoin = Paint.Join.ROUND
-        strokeCap = Paint.Cap.ROUND
-        pathEffect = android.graphics.CornerPathEffect(2f * density)
-    }
+    private val iconPaint = KeyIcons.strokePaint(density)
     private val iconPath = android.graphics.Path()
 
-    /**
-     * 上档键：小写态描边箭头；单次大写实心箭头；大写锁定实心箭头 + 底下一横（三家通行的三态画法）。
-     */
     private fun drawShiftIcon(canvas: Canvas, rect: RectF, color: Int) {
-        val s = 20 * density
-        val cx = rect.centerX()
-        // 锁定态多一横，整体上移一点保持视觉居中
-        val cy = rect.centerY() - if (shiftLocked) 2.5f * density else 0f
-        fun x(u: Float) = cx + u * s
-        fun y(v: Float) = cy + v * s
-        iconPath.reset()
-        iconPath.moveTo(x(0f), y(-0.48f))
-        iconPath.lineTo(x(0.48f), y(0.04f))
-        iconPath.lineTo(x(0.2f), y(0.04f))
-        iconPath.lineTo(x(0.2f), y(0.42f))
-        iconPath.lineTo(x(-0.2f), y(0.42f))
-        iconPath.lineTo(x(-0.2f), y(0.04f))
-        iconPath.lineTo(x(-0.48f), y(0.04f))
-        iconPath.close()
         iconPaint.color = color
-        iconPaint.style = if (shifted || shiftLocked) Paint.Style.FILL_AND_STROKE else Paint.Style.STROKE
-        canvas.drawPath(iconPath, iconPaint)
-        if (shiftLocked) {
-            iconPaint.style = Paint.Style.STROKE
-            canvas.drawLine(x(-0.2f), y(0.62f), x(0.2f), y(0.62f), iconPaint)
-        }
+        KeyIcons.drawShift(canvas, rect.centerX(), rect.centerY(), density, shifted, shiftLocked, iconPaint, iconPath)
     }
 
-    /** 退格键：左尖的标签形外框，里面一个 × */
     private fun drawBackspaceIcon(canvas: Canvas, rect: RectF, color: Int) {
-        val s = 20 * density
-        val cx = rect.centerX()
-        val cy = rect.centerY()
-        fun x(u: Float) = cx + u * s
-        fun y(v: Float) = cy + v * s
-        iconPath.reset()
-        iconPath.moveTo(x(-0.62f), y(0f))
-        iconPath.lineTo(x(-0.3f), y(-0.36f))
-        iconPath.lineTo(x(0.58f), y(-0.36f))
-        iconPath.lineTo(x(0.58f), y(0.36f))
-        iconPath.lineTo(x(-0.3f), y(0.36f))
-        iconPath.close()
         iconPaint.color = color
-        iconPaint.style = Paint.Style.STROKE
-        canvas.drawPath(iconPath, iconPaint)
-        val d = 0.13f
-        canvas.drawLine(x(0.14f - d), y(-d), x(0.14f + d), y(d), iconPaint)
-        canvas.drawLine(x(0.14f - d), y(d), x(0.14f + d), y(-d), iconPaint)
+        KeyIcons.drawBackspace(canvas, rect.centerX(), rect.centerY(), density, iconPaint, iconPath)
     }
 
     /** 有编码且方案支持分词：⇧ 这一格临时当「分词」用（发 [SPLIT_CHAR]） */

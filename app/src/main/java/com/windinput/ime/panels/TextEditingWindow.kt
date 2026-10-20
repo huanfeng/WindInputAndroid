@@ -1,6 +1,5 @@
 package com.windinput.ime.panels
 
-import com.windinput.ime.keyboard.KeyHaptics
 import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
@@ -8,6 +7,8 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.KeyHaptics
+import com.windinput.ime.keyboard.KeyIcons
 import com.windinput.ime.keyboard.Palette
 
 /**
@@ -50,6 +51,7 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
                     refreshSelectState()
                 }
                 if (action == EditAction.TOGGLE_SELECT) selectButton = btn
+                if (action == EditAction.BACKSPACE) KeyIcons.applyBackspace(btn, Palette.current.text)
                 val gap = (3 * context.resources.displayMetrics.density).toInt()
                 rowView.addView(
                     btn,
