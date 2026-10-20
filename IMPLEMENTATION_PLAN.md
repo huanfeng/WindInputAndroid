@@ -185,6 +185,9 @@
 - 开源许可页（关于 → 开源许可）：`assets/licenses/notices.toml` 逐条列随包数据与程序库，
   五种许可证附全文；Rust 依赖清单由 `scripts/gen-rust-licenses.sh` 从 cargo tree 生成。
   单测核对「assets/data 里的每类数据都有声明」。
+- 首页状态卡按启用进度只给下一步（第 1 步启用 / 第 2 步切换 / 试一试），回到本页即重查。
+- 没做：Emoji「附加模块」开关——`input.emoji.modules` 是映射型配置，`config_set` 只收标量与字符串列表，
+  要先在主仓给映射型键开写入口。
 - 待做：外观改走核心主题——核心的调色板是候选窗语义色（text / accent …），没有键面、功能键这些
   键盘域颜色；要先在主题格式里定键盘域节点（architecture §3.4），APK 也还没带 themes 数据。
 
