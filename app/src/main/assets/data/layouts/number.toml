@@ -20,7 +20,7 @@ key = [
 key = [
   { spacer = 1 },
   { commit = "4", width = 1.4 }, { commit = "5", width = 1.4 }, { commit = "6", width = 1.4 },
-  { label = "空格", action = "space" },
+  { label = "空格", action = "space", special = true },
 ]
 
 [[rows]]

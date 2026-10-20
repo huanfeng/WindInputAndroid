@@ -153,7 +153,10 @@ object LayoutParser {
             }
             val label = entry.getString("label")
                 ?: throw IllegalArgumentException("功能键缺少 label")
-            add(KeyDef(label, action, width, isSpecial = true, rowSpan = rowSpan, isAccent = accent))
+            // 功能键缺省灰底；空格缺省画成字母键的白底（豆包 / 微信都是白空格）。`special` 显式覆盖：
+            // 九宫格里的小空格是灰的功能键。此前这里一律 isSpecial，字母层的长空格成了灰键
+            val special = entry.getBoolean("special") ?: (action != KeyAction.Space)
+            add(KeyDef(label, action, width, isSpecial = special, rowSpan = rowSpan, isAccent = accent))
         }
     }
 }

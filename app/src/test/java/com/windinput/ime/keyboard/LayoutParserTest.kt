@@ -69,6 +69,8 @@ class LayoutParserTest {
             assertEquals("$file row $i enText", builtin[i].map { it.enText }, bundled[i].map { it.enText })
             assertEquals("$file row $i rowSpan", builtin[i].map { it.rowSpan }, bundled[i].map { it.rowSpan })
             assertEquals("$file row $i accent", builtin[i].map { it.isAccent }, bundled[i].map { it.isAccent })
+            // 键底色（功能键灰、字母与空格白）也要一致：此前文件里的空格被解析成灰键，内置是白键
+            assertEquals("$file row $i special", builtin[i].map { it.isSpecial }, bundled[i].map { it.isSpecial })
         }
     }
 
