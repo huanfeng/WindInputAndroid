@@ -99,16 +99,27 @@ class Palette(
          * 选一套设为当前。[mode] 来自设置项 ui.android.theme：`light` / `dark` / 其它 = 跟随系统。
          */
         fun apply(context: Context, mode: String): Palette {
-            current = when (mode) {
-                "light" -> light
-                "dark" -> dark
-                else -> {
-                    val night = context.resources.configuration.uiMode and
-                        Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-                    if (night) dark else light
-                }
-            }
+            current = resolve(context, mode)
             return current
+        }
+
+        /**
+         * 按设置与系统深浅色算出该用哪套，不改 [current]（Service 用它核对当前视图配色对不对）。
+         *
+         * 「跟随系统」读**系统全局**配置（`Resources.getSystem()`），不读 Service 自己的：
+         * 刚装好、进程刚起来时 IME 服务拿到的配置可能是旧的——真机上出现过系统浅色、
+         * 键盘却是深色，切一次输入法（服务重建）才对。
+         */
+        fun resolve(context: Context, mode: String): Palette = when (mode) {
+            "light" -> light
+            "dark" -> dark
+            else -> {
+                val uiMode = android.content.res.Resources.getSystem().configuration.uiMode
+                    .takeIf { it and Configuration.UI_MODE_NIGHT_MASK != Configuration.UI_MODE_NIGHT_UNDEFINED }
+                    ?: context.resources.configuration.uiMode
+                val night = uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+                if (night) dark else light
+            }
         }
     }
 }

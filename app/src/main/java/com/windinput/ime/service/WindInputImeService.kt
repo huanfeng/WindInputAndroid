@@ -305,6 +305,11 @@ class WindInputImeService :
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // 配色核对：视图是按构造那一刻的深浅色画的，系统没发配置变更时不会重建。
+        // 对不上（刚装好时拿到了旧配置、或设置页改了深浅色）就当场重建整个输入视图。
+        if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current) {
+            setInputView(onCreateInputView())
+        }
         keyboardWindow?.keyboardView?.apply {
             hapticEnabled = userConfig.getBoolean("ui.android.haptic", true)
             soundEnabled = userConfig.getBoolean("ui.android.sound", false)
