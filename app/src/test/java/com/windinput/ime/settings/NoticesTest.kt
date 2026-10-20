@@ -41,6 +41,20 @@ class NoticesTest {
         }
     }
 
+    /**
+     * 以 AND 连接的许可证是「都得遵守」，不能挑一个：这类许可证必须有全文随包
+     * （例：unicode-ident 是 (MIT OR Apache-2.0) AND Unicode-3.0）。
+     */
+    @Test
+    fun rustAndLicensesHaveFullTexts() {
+        val required = File(dir, "rust-crates.txt").readLines()
+            .filterNot { it.startsWith("#") }
+            .mapNotNull { it.substringAfter('\t', "").substringAfter(" AND ", "").trim().takeIf(String::isNotEmpty) }
+            .toSet()
+        val missing = required.filter { it !in Notices.FULL_TEXTS || !File(dir, "$it.txt").isFile }
+        assertTrue("AND 许可证缺全文：$missing", missing.isEmpty())
+    }
+
     @Test
     fun rustCrateListIsGenerated() {
         val lines = File(dir, "rust-crates.txt").readLines().filterNot { it.startsWith("#") || it.isBlank() }

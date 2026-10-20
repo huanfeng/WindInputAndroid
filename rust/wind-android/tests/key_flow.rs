@@ -988,6 +988,24 @@ fn user_word_add_list_type_remove() {
         "删掉后列表里不应还有，实得 {:?}",
         page.items
     );
+
+    // 候选那边也得跟着没：只删了列表、引擎缓存没失效的回归，看列表是看不出来的
+    rec.candidates.lock().unwrap().clear();
+    for vk in [0x58u32, 0x58, 0x59, 0x59] {
+        core.key_down(vk, 0);
+    }
+    settle();
+    let typed: Vec<String> = rec
+        .candidates
+        .lock()
+        .unwrap()
+        .last()
+        .map(|(_, items)| items.clone())
+        .unwrap_or_default();
+    assert!(
+        !typed.iter().any(|t| t == text),
+        "删掉后打 {code} 不应再出这个词，实得 {typed:?}"
+    );
 }
 
 /// 无痕：暂停学习时打字照常上屏，但统计不涨；恢复后照常记。

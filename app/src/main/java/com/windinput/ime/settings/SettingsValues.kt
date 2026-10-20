@@ -96,7 +96,13 @@ class SettingsValues(
     /** select 的当前值，与选项的 value 同形（字符串） */
     fun choice(item: SettingItem): String = raw(item)?.toString() ?: ""
 
-    /** 写入。返回错误说明（成功为 null）。后台线程调用 */
+    /**
+     * 写入。返回错误说明（成功为 null）。后台线程调用。
+     *
+     * 串行：每次点击各起一个 IO 协程，不锁的话两次写真会并行——连点「简入繁出」「繁入简出」时
+     * 两边都读到对方「关着」，各写各的，二选一就同时开了；两次 ReloadConfig 也会交错。
+     */
+    @Synchronized
     fun set(item: SettingItem, value: Any): String? {
         // 二选一：打开本项时先关掉另一项（两边都是引擎项，一次重载）
         val partner = item.exclusiveWith?.takeIf { value == true || value == "true" }
@@ -127,6 +133,11 @@ class SettingsValues(
             null
         } catch (e: ConfigException) {
             Log.w(TAG, "写入 $key 失败", e)
+            // 二选一的另一项可能已经写进去了：重载并刷新快照，界面才和文件对得上
+            runCatching {
+                c.runCommand(EngineCommand.ReloadConfig)
+                engine = ConfigSnapshot.flatten(c.configSnapshot())
+            }
             (e as? ConfigException.Rejected)?.reason ?: e.toString()
         }
     }

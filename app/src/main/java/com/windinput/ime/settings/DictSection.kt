@@ -1,5 +1,8 @@
 package com.windinput.ime.settings
 
+import android.content.Context
+import android.os.SystemClock
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -19,6 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.windinput.ime.core.ImeSession
+import com.windinput.ime.core.SchemaEntry
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -33,6 +41,15 @@ import uniffi.wind_android.UserWordInfo
 /** 每次多取的条数 */
 private const val PAGE_SIZE = 50u
 
+/** 搜索防抖 */
+private const val SEARCH_DEBOUNCE_MS = 250L
+
+/** 清空确认：第二下至少隔这么久（挡误触双击） */
+private const val CONFIRM_MIN_GAP_MS = 600L
+
+/** 清空确认：这么久没点第二下就复位 */
+private const val CONFIRM_RESET_MS = 5000L
+
 /**
  * 词库页：当前方案的个人词（自己加的、打字时学到的）。查看、搜索、删除、加词、清空。
  *
@@ -44,11 +61,20 @@ private const val PAGE_SIZE = 50u
 internal fun DictSection(session: ImeSession?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val schema = session?.schemas()?.firstOrNull { it.active }
-    if (schema == null) {
+    // 当前方案走 JNI，不放在重组路径上（搜索框每敲一字就重组一次）
+    val schema by produceState<SchemaEntry?>(null, session) {
+        value = withContext(Dispatchers.IO) { session?.schemas()?.firstOrNull { it.active } }
+    }
+    val current = schema
+    if (current == null) {
         SectionTitle("正在启动输入法核心…")
         return
     }
+    DictContent(current, context, scope)
+}
+
+@Composable
+private fun DictContent(schema: SchemaEntry, context: Context, scope: CoroutineScope) {
 
     var query by remember { mutableStateOf("") }
     var words by remember { mutableStateOf<List<UserWordInfo>>(emptyList()) }
@@ -57,11 +83,14 @@ internal fun DictSection(session: ImeSession?) {
     var reload by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<UserWordInfo?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
+    var confirmAt by remember { mutableLongStateOf(0L) }
     var newCode by remember { mutableStateOf("") }
     var newText by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(schema.id, query, limit, reload) {
+        // 防抖：每次查询都扫满整张个人词表，连敲几个字就叠出几次全表扫描（JNI 调用取消不了）。
+        // 输入变了这个协程会被取消，delay 处直接短路
+        if (query.isNotEmpty()) delay(SEARCH_DEBOUNCE_MS)
         val page = withContext(Dispatchers.IO) {
             CoreAccess.obtainCore(context)?.userWords(schema.id, query.trim(), 0u, limit)
         }
@@ -69,18 +98,26 @@ internal fun DictSection(session: ImeSession?) {
         total = page?.total ?: 0uL
     }
 
-    /** 写操作放后台，失败把核心给的原因显示出来（只读模式等），成功后重读列表 */
-    fun write(done: String, op: (uniffi.wind_android.WindCore) -> Unit) {
+    /**
+     * 写操作放后台，结果用 Toast 报（删列表顶部的词时，页面里的提示行早滚出屏幕了）；
+     * 失败显示核心给的原因（只读模式等），成功后重读列表并回调 [onSuccess]。
+     */
+    fun write(done: String, onSuccess: () -> Unit = {}, op: (uniffi.wind_android.WindCore) -> Unit) {
         scope.launch {
-            message = withContext(Dispatchers.IO) {
+            val error = withContext(Dispatchers.IO) {
                 val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
                 try {
                     op(core)
-                    done
+                    null
                 } catch (e: ConfigException) {
                     (e as? ConfigException.Rejected)?.reason ?: e.toString()
+                } catch (e: Exception) {
+                    // 核心 panic 时 UniFFI 抛的是 InternalException，不兜住设置页就整个崩了
+                    "操作失败：${e.message ?: e}"
                 }
             }
+            Toast.makeText(context, error ?: done, Toast.LENGTH_SHORT).show()
+            if (error == null) onSuccess()
             selected = null
             reload++
         }
@@ -138,34 +175,38 @@ internal fun DictSection(session: ImeSession?) {
                     val code = newCode.trim()
                     val text = newText.trim()
                     if (code.isEmpty() || text.isEmpty()) {
-                        message = "词和编码都要填"
+                        Toast.makeText(context, "词和编码都要填", Toast.LENGTH_SHORT).show()
                     } else {
-                        write("已添加「$text」") { it.userWordAdd(schema.id, code, text) }
-                        newCode = ""
-                        newText = ""
+                        // 成功才清空：被核心拒了（编码不合法、只读模式）不用重填
+                        write("已添加「$text」", onSuccess = {
+                            newCode = ""
+                            newText = ""
+                        }) { it.userWordAdd(schema.id, code, text) }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
             )
         }
     }
-    message?.let {
-        Text(
-            text = it,
-            modifier = Modifier.padding(start = 4.dp),
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        )
-    }
 
+    // 二次确认：第二下要隔开一点（误触双击不算），过一阵没点就复位（几分钟后再点不能直接清）
+    if (confirmClear) {
+        LaunchedEffect(confirmAt) {
+            delay(CONFIRM_RESET_MS)
+            confirmClear = false
+        }
+    }
     SectionTitle("数据")
     Card(modifier = Modifier.fillMaxWidth()) {
         NavRow(
             if (confirmClear) "再点一次确认清空" else "清空个人词",
             if (confirmClear) "「${schema.name}」的个人词全部删除，不能恢复" else "删除当前方案的全部个人词",
         ) {
+            val now = SystemClock.uptimeMillis()
             if (!confirmClear) {
                 confirmClear = true
-            } else {
+                confirmAt = now
+            } else if (now - confirmAt >= CONFIRM_MIN_GAP_MS) {
                 confirmClear = false
                 write("已清空") { it.userWordsClear(schema.id) }
             }

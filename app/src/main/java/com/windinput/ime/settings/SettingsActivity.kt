@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -317,10 +318,12 @@ private fun SettingsCard(title: String, items: List<SettingItem>, values: Settin
     if (title.isNotEmpty()) SectionTitle(title)
     Card(modifier = Modifier.fillMaxWidth()) {
         Column {
-            for (item in normal) ItemRow(item, values)
+            // 按键名定身份：enabled_when 让中间某行出现 / 消失时，各行记住的状态（滑块草稿等）
+            // 不能按位置串到别的行上
+            for (item in normal) key(item.key) { ItemRow(item, values) }
             if (advanced.isNotEmpty()) {
                 NavRow(if (expanded) "进阶 ▴" else "进阶 ▾", null) { expanded = !expanded }
-                if (expanded) for (item in advanced) ItemRow(item, values)
+                if (expanded) for (item in advanced) key(item.key) { ItemRow(item, values) }
             }
         }
     }

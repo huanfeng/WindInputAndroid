@@ -221,6 +221,8 @@ class CandidateBarView(context: Context) : View(context) {
                 invalidate()
             }
             MotionEvent.ACTION_MOVE -> {
+                // 手指竖着滑出候选条：不再算长按（多半是想去按键盘）
+                if (event.y < 0 || event.y > height) removeCallbacks(longPress)
                 val dx = downX - event.x
                 if (!dragging && kotlin.math.abs(dx) > touchSlop) {
                     dragging = true
@@ -265,6 +267,12 @@ class CandidateBarView(context: Context) : View(context) {
             }
         }
         return true
+    }
+
+    /** 输入视图重建（配色变了）时旧条被摘下：待触发的长按不能再弹到新条上 */
+    override fun onDetachedFromWindow() {
+        removeCallbacks(longPress)
+        super.onDetachedFromWindow()
     }
 
     private fun releaseTracker() {

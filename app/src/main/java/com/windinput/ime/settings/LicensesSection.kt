@@ -31,7 +31,7 @@ object Notices {
     const val DIR = "licenses"
 
     /** 有全文的许可证 id（= DIR 下的文件名去掉 .txt） */
-    val FULL_TEXTS = setOf("GPL-3.0", "LGPL-3.0", "Apache-2.0", "MIT", "MPL-2.0")
+    val FULL_TEXTS = setOf("GPL-3.0", "LGPL-3.0", "Apache-2.0", "MIT", "MPL-2.0", "Unicode-3.0")
 
     fun parse(toml: String): List<Notice> {
         val result = Toml.parse(toml)
@@ -64,7 +64,9 @@ internal fun LicensesSection() {
             Notices.parse(context.assets.open("${Notices.DIR}/notices.toml").bufferedReader().use { it.readText() })
         }.getOrDefault(emptyList())
     }
-    var openText by remember { mutableStateOf<String?>(null) }
+    // 记「哪一组展开了哪份全文」：同一许可证出现在几组里（Apache-2.0 数据与程序库都有），
+    // 只按许可证记的话点一下会在每组下面各铺一遍全文
+    var openText by remember { mutableStateOf<Pair<String, String>?>(null) }
     var showCrates by remember { mutableStateOf(false) }
 
     for ((group, items) in notices.groupBy { it.group }) {
@@ -77,7 +79,10 @@ internal fun LicensesSection() {
                         n.name,
                         "${n.usage}\n${n.license}${if (hasText) "（点开看全文）" else ""} · ${n.url}",
                         if (hasText) {
-                            { openText = if (openText == n.license) null else n.license }
+                            {
+                                val key = group to n.license
+                                openText = if (openText == key) null else key
+                            }
                         } else {
                             null
                         },
@@ -85,9 +90,9 @@ internal fun LicensesSection() {
                 }
             }
         }
-        val license = openText
-        if (license != null && items.any { it.license == license }) {
-            LicenseText(assetText("${Notices.DIR}/$license.txt"))
+        val open = openText
+        if (open != null && open.first == group) {
+            LicenseText(assetText("${Notices.DIR}/${open.second}.txt"))
         }
     }
 
@@ -96,9 +101,13 @@ internal fun LicensesSection() {
         Column {
             NavRow(
                 if (showCrates) "收起" else "展开全部 Rust 依赖",
-                "输入法核心链接的第三方 crate 及各自的许可证（MIT / Apache-2.0 / MPL-2.0 等，全文见上）",
+                "输入法核心链接的第三方 crate 及各自的许可证（MIT / Apache-2.0 / MPL-2.0 等）",
             ) { showCrates = !showCrates }
             if (showCrates) {
+                for (id in listOf("MIT", "MPL-2.0", "Unicode-3.0")) {
+                    NavRow("$id 全文", null) { openText = if (openText == RUST to id) null else RUST to id }
+                }
+                openText?.takeIf { it.first == RUST }?.let { LicenseText(assetText("${Notices.DIR}/${it.second}.txt")) }
                 LicenseText(
                     assetText("${Notices.DIR}/rust-crates.txt")
                         .lines()
@@ -109,6 +118,9 @@ internal fun LicensesSection() {
         }
     }
 }
+
+/** Rust 依赖卡在 [openText] 里的组名 */
+private const val RUST = "rust"
 
 @Composable
 private fun assetText(path: String): String {

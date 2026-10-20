@@ -55,6 +55,9 @@ class QuickPanelWindow(
         /** 用户手动开的无痕（本次键盘服务内有效，不落盘） */
         fun incognito(): Boolean
 
+        /** 当前输入框自己要求无痕（密码框、应用置了 NO_PERSONALIZED_LEARNING），手动关不掉 */
+        fun incognitoForced(): Boolean
+
         fun onToggleIncognito()
     }
 
@@ -179,8 +182,10 @@ class QuickPanelWindow(
                 listener.onQuickCommand(EngineCmd.ToggleS2t)
             }
         }
-        // 无痕是键盘自己的状态（引擎只管「这次学不学」），选中态取本端，不等引擎推送
-        add("🕶", "无痕", selected = listener.incognito()) {
+        // 无痕是键盘自己的状态（引擎只管「这次学不学」），选中态取本端，不等引擎推送。
+        // 选中态显示**实际**是否无痕：密码框里条区亮着「🕶 无痕」，这格却灭着，就对不上了
+        val forced = listener.incognitoForced()
+        add("🕶", if (forced) "无痕·本框" else "无痕", selected = listener.incognito() || forced) {
             listener.onToggleIncognito()
             rebuildTiles(context)
         }

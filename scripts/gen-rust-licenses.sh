@@ -10,12 +10,16 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/app/src/main/assets/licenses/rust-crates.txt"
 cd "$ROOT/rust"
+# 先写临时文件、成功再替换：cargo 失败时不能留下一个只有表头的清单还让人以为生成好了
+TMP="$(mktemp)"
+trap 'rm -f "$TMP"' EXIT
 {
     echo "# 由 scripts/gen-rust-licenses.sh 生成，勿手改。每行：crate 版本<TAB>许可证"
     cargo tree -e normal --target aarch64-linux-android -p wind-android \
-        --prefix none --format '{p}|{l}' 2>/dev/null \
+        --prefix none --format '{p}|{l}' \
         | sed 's/ (\*)$//; s/ (proc-macro)$//' \
         | sort -u \
         | awk -F'|' '$1 !~ /^wind-/ { sub(/ \(.*\)$/, "", $1); printf "%s\t%s\n", $1, ($2 == "" ? "见 crate 源码" : $2) }'
-} > "$OUT"
+} > "$TMP"
+mv "$TMP" "$OUT"
 echo "已写入 $OUT（$(($(wc -l < "$OUT") - 1)) 个 crate）"

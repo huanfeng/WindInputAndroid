@@ -920,10 +920,14 @@ class WindInputImeService :
     private fun applyLearningSuspended() {
         val suspended = manualIncognito || fieldSuspendsLearning
         session.setLearningSuspended(suspended)
+        recentEmojiStore.paused = suspended
+        recentSymbolStore.paused = suspended
         barView?.setIncognito(suspended)
     }
 
     override fun incognito(): Boolean = manualIncognito
+
+    override fun incognitoForced(): Boolean = fieldSuspendsLearning
 
     override fun onToggleIncognito() {
         manualIncognito = !manualIncognito

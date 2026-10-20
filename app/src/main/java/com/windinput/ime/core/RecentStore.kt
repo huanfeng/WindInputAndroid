@@ -20,7 +20,12 @@ class RecentStore(context: Context, prefsName: String, private val capacity: Int
     fun list(): List<String> =
         prefs.getString(KEY, null)?.split(SEPARATOR)?.filter { it.isNotEmpty() } ?: emptyList()
 
+    /** 无痕时暂停记录：「最近使用」也是一种输入历史，界面上亮着「🕶 无痕」就不该留下 */
+    @Volatile
+    var paused = false
+
     fun record(item: String) {
+        if (paused) return
         val items = list().toMutableList()
         items.remove(item)
         items.add(0, item)

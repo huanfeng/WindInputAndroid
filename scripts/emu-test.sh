@@ -388,6 +388,21 @@ get_active_schema() {
     line="$(printf '%s\n' "$cfg" | grep -m1 '^active = ' | sed 's/[[:space:]]*$//')"
     printf '%s' "${line:-active = \"wubi86\"}"
 }
+CORE_CFG=files/rust/config/WindInput/config.toml
+WUBI_SHADOW=files/rust/data/wubi86/shadow.dict.yaml
+
+# 核心用户层整文件读 / 写（写经 stdin 灌进 run-as，免得引号层层转义）
+read_core_cfg() { adb_ shell run-as "$PKG" cat "$CORE_CFG"; }
+write_core_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $CORE_CFG'"; }
+
+# 去掉某个 [表] 段（到下一个 [ 开头的行为止）。直接追加同名段会写出重复表定义，核心整个解析失败
+strip_section() {   # 文本 段名
+    printf '%s\n' "$1" | awk -v sec="[$2]" '
+        $0 == sec { skip = 1; next }
+        /^\[/      { skip = 0 }
+        !skip     { print }'
+}
+
 # 用例全按五笔写（aa → 式）。上一次运行若中途断掉（模拟器掉线、被中断），活跃方案可能
 # 停在拼音或英文——它是持久化的，下一次所有用例连环失败，看着像功能坏了（实际遇到过：
 # 拼音残留，aa 出「啊啊」）。开跑前钉回 wubi86，连同中英键记住的「上次中文方案」一起。
@@ -396,6 +411,19 @@ if [[ -n "$schema_now" && "$schema_now" != 'active = "wubi86"' ]]; then
     echo "${Y:-}残留方案 [$schema_now]，改回 wubi86 后重启${N:-}"
     adb_q shell "run-as $PKG sed -i 's/^active = .*/active = \"wubi86\"/' files/rust/config/WindInput/config.toml"
     adb_q shell run-as "$PKG" rm -f shared_prefs/ime_state.xml
+    restart_pad
+fi
+# 同理，[35] / [36] 中途断掉会留下：简入繁出开着（之后所有中文断言拿到繁体）、
+# aa 的置顶 / 隐藏规则（首选不再是「式」）。开跑前一并清掉。
+cfg_now="$(read_core_cfg)"
+if printf '%s\n' "$cfg_now" | grep -qx '\[input.s2t\]'; then
+    echo "${Y}残留 [input.s2t]，清掉后重启${N}"
+    write_core_cfg "$(strip_section "$cfg_now" input.s2t)"
+    restart_pad
+fi
+if adb_ shell run-as "$PKG" cat "$WUBI_SHADOW" | grep -q $'^aa\t'; then
+    echo "${Y}残留 aa 的候选调整规则，清掉后重启${N}"
+    adb_q shell "run-as $PKG sed -i '/^aa\t/d' $WUBI_SHADOW"
     restart_pad
 fi
 SCHEMA_BEFORE="$(get_active_schema)"
@@ -866,17 +894,20 @@ check_match "收起后数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_te
 echo; echo "${Y}[35] 简入繁出：开启后「我们」上屏为「我們」${N}"
 # 要 APK 带上 opencc 数据才有效——没带时开关照样能开，上屏却还是简体，且不报错。
 # 直接写核心用户层再重启进程（等价于设置页写入 + 重载，但不依赖设置页的坐标）；
-# 跑完把原文件写回去，不污染后续用例与下次运行。
-CORE_CFG=files/rust/config/WindInput/config.toml
-cfg_orig="$(adb_ shell run-as "$PKG" cat "$CORE_CFG")"
-printf '%s\n\n[input.s2t]\nenabled = true\n' "$cfg_orig" \
-    | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $CORE_CFG'"
+# 跑完把原文件写回去，不污染后续用例与下次运行；中途退出（die / Ctrl-C）也由 trap 写回。
+cfg_orig="$(read_core_cfg)"
+restore_cfg() { write_core_cfg "$cfg_orig"; }
+trap 'restore_cfg; exit 1' TERM INT
+write_core_cfg "$(strip_section "$cfg_orig" input.s2t)
+[input.s2t]
+enabled = true"
 restart_pad
 wait_chinese >/dev/null
 reset_pad
 for w in t r w u SPACE; do tap_key "$w"; done
 check "简入繁出上屏繁体" "我們" "$(get_pad_text)"
-printf '%s\n' "$cfg_orig" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $CORE_CFG'"
+restore_cfg
+trap 'exit 1' TERM
 restart_pad
 wait_chinese >/dev/null
 
@@ -895,15 +926,19 @@ long_press_candidate() {
     adb_q shell input swipe "$x" "$GEO_BARY" "$x" "$GEO_BARY" 900
     sleep 0.8
 }
+# 先记下第 3 个候选是哪个字：只断言「首选不是式」的话，菜单没弹出、那一下穿透到键盘
+# 多补了一个码，上屏的也是别的字，会假通过
+reset_pad
+tap_key a; tap_key a
+tap_candidate 2
+third="$(get_pad_text)"
 reset_pad
 tap_key a; tap_key a
 long_press_candidate 2
 check "长按候选不上屏" "" "$(get_pad_text)"
 menu_cell 0 0          # 置顶
 tap_key SPACE
-top_after="$(get_pad_text)"
-check_match "置顶后首选换成别的字" '^[\x{4e00}-\x{9fa5}]$' "$top_after"
-[[ "$top_after" != "式" ]] || { echo "  ${R}FAIL${N}  置顶后首选仍是「式」"; FAILED=$((FAILED + 1)); }
+check "置顶后首选就是第 3 个候选「$third」" "$third" "$(get_pad_text)"
 reset_pad
 tap_key a; tap_key a
 long_press_candidate 0

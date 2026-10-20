@@ -137,10 +137,16 @@ object SettingsManifest {
             )
         }
         // 引用的键必须是清单里的开关：写错一个字，二选一就变成能同时开、依赖项就永远不显示
-        val toggles = items.filter { it.type == "toggle" }.map { it.key }.toSet()
+        val toggles = items.filter { it.type == "toggle" }.associateBy { it.key }
         for (item in items) {
             for (ref in listOfNotNull(item.exclusiveWith, item.enabledWhen)) {
                 require(ref in toggles) { "${item.key} 引用的「$ref」不是清单里的开关" }
+            }
+            // 二选一只在引擎项上实现（先关对方、一次重载），写在键盘项上会被静默忽略
+            item.exclusiveWith?.let { other ->
+                require(item.source == SettingSource.ENGINE && toggles.getValue(other).source == SettingSource.ENGINE) {
+                    "${item.key} ↔ $other：exclusive_with 两端都必须是引擎开关"
+                }
             }
         }
         return SettingsManifestData(pages, items)
