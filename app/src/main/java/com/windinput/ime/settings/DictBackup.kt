@@ -1,5 +1,6 @@
 package com.windinput.ime.settings
 
+import java.io.InputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -16,6 +17,27 @@ object DictBackup {
     const val MAX_IMPORT_BYTES = 32L * 1024 * 1024
 
     private val STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
+
+    /**
+     * 读满 [input]，超过 [max] 字节就停下返回 null。
+     *
+     * 不信文件描述符报的长度：网盘一类 SAF 提供方常报「未知」（-1），按长度判大小在那里
+     * 等于没判，接着整份读进内存（再 decode、再跨 JNI 拷一份）——选到一个几百 MB 的文件，
+     * 设置页就 OOM 了，而 OutOfMemoryError 不是 Exception，外层也兜不住。
+     */
+    fun readLimited(input: InputStream, max: Long = MAX_IMPORT_BYTES): ByteArray? {
+        val out = java.io.ByteArrayOutputStream()
+        val buf = ByteArray(64 * 1024)
+        var total = 0L
+        while (true) {
+            val n = input.read(buf)
+            if (n < 0) break
+            total += n
+            if (total > max) return null
+            out.write(buf, 0, n)
+        }
+        return out.toByteArray()
+    }
 
     /** 与电脑版同一套命名：`<方案>-<时间戳>.wdict.yaml`，连着导两次不会互相覆盖 */
     fun fileName(schemaId: String, now: LocalDateTime = LocalDateTime.now()): String =

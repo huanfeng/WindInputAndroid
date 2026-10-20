@@ -37,4 +37,12 @@ class DictBackupTest {
         val text = DictBackup.describe(listOf(DictBackup.Section("userWords", 0, 0, 0, 1)))
         assertEquals("没有导入任何词条：1 行认不出。文本词表每行写「编码<Tab>词」", text)
     }
+
+    /** 读到上限以内照常返回；超出就停下返回 null，不靠文件描述符报的长度 */
+    @Test
+    fun readLimitedStopsPastTheCap() {
+        val small = ByteArray(100) { 1 }
+        assertEquals(100, DictBackup.readLimited(small.inputStream(), max = 100)!!.size)
+        assertEquals(null, DictBackup.readLimited(ByteArray(101).inputStream(), max = 100))
+    }
 }

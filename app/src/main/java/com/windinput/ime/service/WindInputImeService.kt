@@ -818,19 +818,23 @@ class WindInputImeService :
      */
     private fun showCandidateMenu(index: Int) {
         val bar = barView ?: return
-        val title = session.candidateWindow(index, 1).items.firstOrNull().orEmpty()
+        // 标题取已加载的那份（长按的必然是看得见的候选），不为一个字再跨一次 JNI、再算一遍注释
+        val title = loadedCandidates.getOrNull(index)
+            ?: session.candidateWindow(index, 1).items.firstOrNull().orEmpty()
         val sections = session.candidateTooltip(index)
         candidateMenu?.dismiss()
         if (sections.isEmpty()) {
             showCandidateActions(index, title)
             return
         }
+        // 没有可做的操作（核心给的菜单为空）就不放「更多操作」：点了只会让卡片消失
+        val hasActions = session.candidateMenu(index).isNotEmpty()
         candidateMenu = CandidateMenuPopup(bar).also { card ->
             card.showTooltip(
                 title,
                 sections,
                 onCopy = { copyCandidate(title) },
-                onMore = { showCandidateActions(index, title) },
+                onMore = if (hasActions) ({ showCandidateActions(index, title) }) else null,
             )
         }
     }
@@ -905,7 +909,13 @@ class WindInputImeService :
         val page = session.candidateWindow(loadedCandidates.size, CANDIDATE_CHUNK)
         if (page.items.isEmpty()) return
         loadedCandidates = loadedCandidates + page.items
-        loadedComments = loadedComments + page.comments
+        // 与视图同一种对齐：注释一律按候选下标对得上，谁按下标取都不错位
+        if (page.comments.isNotEmpty()) {
+            loadedComments = com.windinput.ime.keyboard.CandidateBarView.alignComments(
+                loadedComments,
+                loadedCandidates.size - page.items.size,
+            ) + page.comments
+        }
         candidateTotal = page.total
         barView?.appendCandidates(page.items, page.comments)
         expandedCandidatesWindow?.appendCandidates(page.items, page.comments)

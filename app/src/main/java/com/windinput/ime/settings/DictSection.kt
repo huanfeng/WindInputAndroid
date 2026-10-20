@@ -272,6 +272,10 @@ private fun BackupCard(schema: SchemaEntry, context: Context, scope: CoroutineSc
         scope.launch {
             val message = try {
                 withContext(Dispatchers.IO) { op() }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                // 离开页面时协程被取消：IO 线程上的 JNI 调用停不下来、照常做完，这里不能把它
+                // 报成「操作失败」（用户会以为没导进去、再导一遍）。照常往上抛
+                throw e
             } catch (e: ConfigException) {
                 (e as? ConfigException.Rejected)?.reason ?: e.toString()
             } catch (e: Exception) {
@@ -285,19 +289,28 @@ private fun BackupCard(schema: SchemaEntry, context: Context, scope: CoroutineSc
 
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-yaml")) { uri ->
         if (uri != null) run {
-            val core = CoreAccess.obtainCore(context) ?: return@run "输入法核心未就绪"
-            val content = core.dictExport(schema.id)
+            // 文件在用户选好位置那一刻就建了：之后任何一步失败都删掉它，不在网盘里留个空文件
+            fun discard(reason: String): String {
+                runCatching { android.provider.DocumentsContract.deleteDocument(context.contentResolver, uri) }
+                return reason
+            }
+            val core = CoreAccess.obtainCore(context) ?: return@run discard("输入法核心未就绪")
+            val content = try {
+                core.dictExport(schema.id)
+            } catch (e: Exception) {
+                discard("")
+                throw e
+            }
             context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(content.toByteArray()) }
-                ?: return@run "无法写入所选位置"
+                ?: return@run discard("无法写入所选位置")
             "已导出"
         }
     }
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) run {
-            val size = context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
-            if (size > DictBackup.MAX_IMPORT_BYTES) return@run "文件太大（超过 32MB），不像是词库备份"
-            val content = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
-                ?: return@run "无法读取所选文件"
+            val bytes = context.contentResolver.openInputStream(uri)?.use { DictBackup.readLimited(it) }
+                ?: return@run "无法读取所选文件，或文件超过 32MB（不像是词库备份）"
+            val content = bytes.decodeToString()
             val core = CoreAccess.obtainCore(context) ?: return@run "输入法核心未就绪"
             val report = core.dictImport(schema.id, content, false)
             withContext(Dispatchers.Main) { onImported() }

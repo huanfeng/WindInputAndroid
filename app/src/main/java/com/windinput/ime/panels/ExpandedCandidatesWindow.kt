@@ -122,7 +122,9 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         /** 追加：只通知新增区间，不动已绑定的 ViewHolder */
         fun append(more: List<String>, moreComments: List<String>) {
             val from = items.size
-            if (moreComments.isNotEmpty()) comments = comments + List(from - comments.size) { "" } + moreComments
+            if (moreComments.isNotEmpty()) {
+                comments = com.windinput.ime.keyboard.CandidateBarView.alignComments(comments, from) + moreComments
+            }
             items = items + more
             notifyItemRangeInserted(from, more.size)
         }

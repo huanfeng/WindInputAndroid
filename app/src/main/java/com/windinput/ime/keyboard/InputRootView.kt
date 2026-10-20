@@ -25,8 +25,10 @@ class InputRootView(context: Context) : LinearLayout(context) {
      * 从 0 起步的话键盘刚弹出那一下按无避让的高度测量，最后一排被手势条盖住，
      * insets 到了才长高（肉眼可见地「先被遮住、再恢复」）。所以先用上次收到的真值，
      * 没有就按当前窗口的 WindowMetrics 估一个，insets 到了再校正（通常不变，不会跳）。
+     * API 30+ 一律按 WindowMetrics 估：它跟着当前横竖屏走，而缓存的是上一个方向的值
+     * （三键导航横屏时导航栏在侧边、底部为 0，带进竖屏首帧就少了一截）。
      */
-    private var insetBottom = lastInsetBottom.takeIf { it >= 0 } ?: estimateBottomInset(context)
+    private var insetBottom = initialInset(context)
 
     /**
      * 用户设的额外留空（px）：底部加在避让占位上（窗口跟着长高，最后一排不被裁），左右用内边距
@@ -83,8 +85,15 @@ class InputRootView(context: Context) : LinearLayout(context) {
     }
 
     companion object {
-        /** 进程内记住上次的真值：转屏、换配色重建输入视图时直接用，不再估 */
+        /** 进程内记住上次的真值：API 26–29 没有 WindowMetrics，重建输入视图时用它 */
         private var lastInsetBottom = -1
+
+        private fun initialInset(context: Context): Int =
+            if (Build.VERSION.SDK_INT >= 30) {
+                estimateBottomInset(context)
+            } else {
+                lastInsetBottom.takeIf { it >= 0 } ?: estimateBottomInset(context)
+            }
 
         private fun estimateBottomInset(context: Context): Int {
             if (Build.VERSION.SDK_INT >= 30) {

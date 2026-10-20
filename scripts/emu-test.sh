@@ -445,16 +445,30 @@ fi
 KB_CFG=files/user/config.toml
 COMMENT_OFF='candidate_comment = false # emu-test'
 write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"; }
-SUITE_KB_ORIG="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -v 'No such file' | grep -vxF "$COMMENT_OFF")"
+SUITE_KB_RAW="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null)"
+SUITE_KB_EXISTED=1
+[[ "$SUITE_KB_RAW" == *"No such file"* ]] && { SUITE_KB_EXISTED=0; SUITE_KB_RAW=""; }
+SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF "$COMMENT_OFF")"
 with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段就补一段
-    if printf '%s\n' "$1" | grep -qx '\[ui.android\]'; then
-        printf '%s\n' "$1" | awk -v line="$COMMENT_OFF" '{ print } $0 == "[ui.android]" { print line }'
+    # 用户自己写过的 candidate_comment 先去掉：留着就是重复键（TOML 错误、取值看解析器心情）
+    local body
+    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*candidate_comment[[:space:]]*=')"
+    # 段头允许带空白与行尾注释（`[ui.android]  # 键盘`）；认不出就会再补一段，TOML 里是重复段
+    if printf '%s\n' "$body" | grep -qE '^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$'; then
+        printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" \
+            '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print line }'
     else
-        printf '%s\n\n[ui.android]\n%s\n' "$1" "$COMMENT_OFF"
+        printf '%s\n\n[ui.android]\n%s\n' "$body" "$COMMENT_OFF"
     fi
 }
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
-restore_suite_kb() { write_kb_cfg "$SUITE_KB_ORIG"; }
+restore_suite_kb() {   # 原来没有这个文件就删掉，不写回一个空文件
+    if (( SUITE_KB_EXISTED )); then
+        write_kb_cfg "$SUITE_KB_ORIG"
+    else
+        adb_q shell run-as "$PKG" rm -f "$KB_CFG"
+    fi
+}
 trap 'restore_suite_kb; exit 1' TERM INT
 restart_pad
 SCHEMA_BEFORE="$(get_active_schema)"

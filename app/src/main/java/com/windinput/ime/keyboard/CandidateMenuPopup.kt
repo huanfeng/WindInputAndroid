@@ -61,7 +61,7 @@ class CandidateMenuPopup(private val anchor: View) {
         title: String,
         sections: List<TooltipSection>,
         onCopy: () -> Unit,
-        onMore: () -> Unit,
+        onMore: (() -> Unit)?,
     ) {
         dismiss()
         if (sections.isEmpty() || anchor.windowToken == null) return
@@ -69,12 +69,12 @@ class CandidateMenuPopup(private val anchor: View) {
         // 操作放在标题行右侧：位置固定，不随下面提示的长短上下跑；提示再长也挤不掉它们
         val content = card(
             title,
-            listOf(
+            listOfNotNull(
                 "复制" to {
                     dismiss()
                     onCopy()
                 },
-                "更多操作 ›" to onMore,
+                onMore?.let { "更多操作 ›" to it },
             ),
         )
         val body = LinearLayout(anchor.context).apply {

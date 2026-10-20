@@ -146,7 +146,7 @@ class CandidateBarView(context: Context) : View(context) {
         if (more.isEmpty()) return
         val from = candidates.size
         // 注释与候选按下标对齐：前面那段若没带注释（中途开了开关），先用空串补齐
-        if (moreComments.isNotEmpty()) comments = comments + List(from - comments.size) { "" } + moreComments
+        if (moreComments.isNotEmpty()) comments = alignComments(comments, from) + moreComments
         candidates = candidates + more
         measureFrom(from)
         invalidate()
@@ -309,8 +309,15 @@ class CandidateBarView(context: Context) : View(context) {
         return itemBounds.indexOfFirst { contentX >= it.left && contentX < it.right }
     }
 
-    private companion object {
+    companion object {
+        /**
+         * 把已有注释对齐到 [size] 条：短了补空串（前一段没带注释，中途开了开关），
+         * 长了截掉（核心两次返回的条数对不上时也不该崩，宁可那几条不显示灰字）。
+         */
+        fun alignComments(comments: List<String>, size: Int): List<String> =
+            if (comments.size >= size) comments.take(size) else comments + List(size - comments.size) { "" }
+
         /** 注释灰字相对候选字号的比例 */
-        const val COMMENT_SCALE = 0.6f
+        private const val COMMENT_SCALE = 0.6f
     }
 }
