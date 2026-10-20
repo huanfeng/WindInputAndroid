@@ -77,6 +77,18 @@ android {
     buildFeatures {
         compose = true
     }
+
+    // release 包直接带版本号命名（WindInputAndroid-0.3.0-dev.N.apk），发出去的文件一眼可辨、
+    // 多个版本放一起不互相覆盖；与发版工作流 dist/ 里的命名一致。debug 包名不动，测试脚本照用
+    applicationVariants.all {
+        val variant = this
+        if (variant.buildType.name == "release") {
+            outputs.all {
+                (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                    "WindInputAndroid-${variant.versionName}.apk"
+            }
+        }
+    }
 }
 
 kotlin {

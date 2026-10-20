@@ -92,7 +92,7 @@ jobs:
           expect=$(keytool -list -keystore keystore/ci.jks -storepass "$KS_PASS" \
                    | grep -oE '\(SHA-256\): [0-9A-F:]+' | tr -d ':' | cut -d' ' -f2 | tr 'A-F' 'a-f')
           actual=$("$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs \
-                   app/build/outputs/apk/release/app-release.apk | grep -oE 'SHA-256 digest: [0-9a-f]+' | cut -d' ' -f3)
+                   app/build/outputs/apk/release/WindInputAndroid-*.apk | grep -oE 'SHA-256 digest: [0-9a-f]+' | cut -d' ' -f3)
           echo "expect=$expect"; echo "actual=$actual"
           [ "$expect" = "$actual" ] || { echo "::error::release 包签名与 secrets 密钥不符"; exit 1; }
           echo "fingerprint=$expect" >> "$GITHUB_OUTPUT"
@@ -104,7 +104,7 @@ jobs:
           V: ${{ steps.v.outputs.version }}
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/WindInputAndroid-$V.apk"
+          cp app/build/outputs/apk/release/WindInputAndroid-*.apk "dist/WindInputAndroid-$V.apk"
           cd dist && sha256sum "WindInputAndroid-$V.apk" > "WindInputAndroid-$V.apk.sha256"
           echo "${{ steps.sign.outputs.fingerprint }}" > "WindInputAndroid-$V.apk.signer-sha256"
           ls -lh
