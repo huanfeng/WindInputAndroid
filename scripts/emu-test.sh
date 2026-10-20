@@ -986,6 +986,23 @@ adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 restart_pad
 
+echo; echo "${Y}[39] 长按中英键弹方案卡片：切到全拼打 ni，再切回五笔${N}"
+# 卡片与候选长按菜单同一组件，格子坐标同 menu_cell；方案顺序按核心给的列表：
+# 清风英文 · 全拼 · 双拼 · 五笔 · 五笔拼音（第 1 行 4 格）
+reset_pad
+read -r lx ly <<< "$(key_center LANG)"
+adb_q shell input swipe "$lx" "$ly" "$lx" "$ly" 900; sleep 0.8
+menu_cell 0 1          # 全拼
+sleep 3
+tap_key n; tap_key i; tap_key SPACE
+check "切到全拼后 ni 出「你」" "你" "$(get_pad_text)"
+reset_pad
+adb_q shell input swipe "$lx" "$ly" "$lx" "$ly" 900; sleep 0.8
+menu_cell 0 3          # 五笔
+sleep 2
+tap_key a; tap_key a; tap_key SPACE
+check "切回五笔 aa 出「式」" "式" "$(get_pad_text)"
+
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then

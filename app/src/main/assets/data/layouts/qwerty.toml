@@ -13,7 +13,7 @@
 #       commit     原样上屏的文本，不经引擎（数字键盘、123 层的半角句点）
 #       chars      简写：连续字符批量展开
 #       action     功能键：shift | backspace | enter | space | switch_symbols | switch_lang
-#                  switch_lang 键面同时写「中」「英」，当前模式高亮；长按开快捷面板
+#                  switch_lang 键面同时写「中」「英」，当前模式高亮；长按弹方案选择
 #                  emoji 打开表情面板；symbol_page 分类符号页；number_pad 九宫格数字键盘
 #       accent     true = 强调色键面（123 层、数字键盘的返回键）
 #       special    功能键灰底（缺省：功能键灰、空格白；九宫格里的小空格写 special = true）

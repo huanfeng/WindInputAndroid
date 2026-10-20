@@ -846,9 +846,44 @@ class WindInputImeService :
     /** 键盘自己的小状态（不属于引擎配置的那种），如中英切换前的中文方案 */
     private val statePrefs by lazy { getSharedPreferences("ime_state", MODE_PRIVATE) }
 
+    /**
+     * 长按中英键：直接弹方案选择卡片（五笔 / 全拼 / 双拼 / 英文…），点一下就切。
+     *
+     * 此前是打开快捷面板——方案只占面板顶上一行，还得再点一下，而快捷面板本来就有工具栏
+     * 入口。卡片与候选长按菜单同一个组件，点外面只收卡片、不按到底下的键。
+     * 切方案走 [DeferredSession] 的后台线程（首次切到拼音要现编词库），不卡主线程。
+     */
     override fun onKeyLongPress(action: KeyAction) {
-        if (action == KeyAction.SwitchLang) {
-            quickPanelWindow?.let { windowManager?.show(it) }
+        if (action != KeyAction.SwitchLang) return
+        val bar = barView ?: return
+        val schemas = session.schemas()
+        if (schemas.isEmpty()) {
+            quickPanelWindow?.let { windowManager?.show(it) } // 核心没起来：退回快捷面板
+            return
+        }
+        val english = modeLabel == "英"
+        val entries = schemas.map { s ->
+            // 英文模式下引擎报的 active 仍是切走前的中文方案，勾要打在英文上
+            val current = if (english) s.id == ENGLISH_SCHEMA_ID else s.active && s.id != ENGLISH_SCHEMA_ID
+            com.windinput.ime.core.CandidateMenuEntry(
+                label = (if (current) "✓ " else "") + s.name.ifEmpty { s.id },
+                action = s.index.toString(),
+                enabled = !current,
+            )
+        }
+        candidateMenu?.dismiss()
+        candidateMenu = CandidateMenuPopup(bar).also { menu ->
+            menu.show("切换方案", entries) { entry ->
+                val target = schemas.firstOrNull { it.index.toString() == entry.action } ?: return@show
+                if (target.id != ENGLISH_SCHEMA_ID) {
+                    statePrefs.edit().putString(KEY_LAST_CHINESE, target.id).apply()
+                } else {
+                    schemas.firstOrNull { it.active && it.id != ENGLISH_SCHEMA_ID }
+                        ?.let { statePrefs.edit().putString(KEY_LAST_CHINESE, it.id).apply() }
+                }
+                abandonComposition()
+                session.runCommand(EngineCmd.SelectSchema(target.index))
+            }
         }
     }
 
