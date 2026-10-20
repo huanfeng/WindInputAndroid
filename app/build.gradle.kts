@@ -85,6 +85,12 @@ kotlin {
     }
 }
 
+// 单测直接读 src/main/assets 下的清单、布局、词库（BundledSchemasTest、LayoutParserTest…），
+// 不声明为输入的话只改资源时 Gradle 判定测试 up-to-date、跳过不跑，缺文件也照样「通过」
+tasks.withType<Test>().configureEach {
+    inputs.dir("src/main/assets").withPathSensitivity(PathSensitivity.RELATIVE)
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
