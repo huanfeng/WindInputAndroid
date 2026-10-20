@@ -23,8 +23,8 @@ android {
         applicationId = "com.windinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 24
-        versionName = "0.3.0-dev.21"
+        versionCode = 25
+        versionName = "0.3.0-dev.22"
     }
 
     // ── 签名 ─────────────────────────────────────────────────────────
