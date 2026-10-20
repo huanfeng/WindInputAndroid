@@ -429,4 +429,172 @@ impl WindCore {
             .map(LayoutInfo::from)
             .collect()
     }
+
+    // ── 设置页：配置读写 ─────────────────────────────────────────────
+    //
+    // 设置页的引擎项**只能走这里**：K 侧自己的 `filesDir/user/config.toml` 引擎根本不读，
+    // 核心的用户层在 `user_root/config/WindInput/config.toml`。
+
+    /// 当前生效配置的全量快照（TOML 文本，四层合并 + 移动端强制项）。
+    pub fn config_snapshot(&self) -> String {
+        self.core.config_snapshot()
+    }
+
+    /// 出厂默认配置的全量快照（TOML 文本）。「恢复默认」与「和默认不同」的标注用它。
+    pub fn config_defaults(&self) -> String {
+        self.core.config_defaults()
+    }
+
+    /// 配置字段注册表：键 → 类型（+ 枚举值域）。K 侧加载设置清单时用它校验键名。
+    pub fn config_registry(&self) -> Vec<ConfigField> {
+        self.core
+            .config_registry()
+            .into_iter()
+            .map(|f| ConfigField {
+                key: f.key,
+                ty: f.ty,
+                options: f.options,
+            })
+            .collect()
+    }
+
+    /// 写一个配置键到用户层。**只写盘**，生效要另发 [`EngineCommand::ReloadConfig`]。
+    pub fn config_set(&self, key: String, value: ConfigValue) -> Result<(), ConfigError> {
+        self.core
+            .config_set(&key, value.into())
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    // ── 设置页：输入统计 ─────────────────────────────────────────────
+
+    /// 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
+    pub fn stats_summary(&self) -> Option<StatsSummaryInfo> {
+        self.core.stats_summary().map(StatsSummaryInfo::from)
+    }
+
+    /// `[from, to]`（`YYYY-MM-DD`，含首尾）每天的字数，缺的日子补零。
+    pub fn stats_daily(&self, from: String, to: String) -> Vec<DailyTotalInfo> {
+        self.core
+            .stats_daily(&from, &to)
+            .into_iter()
+            .map(|d| DailyTotalInfo {
+                date: d.date,
+                total: d.total,
+                chinese: d.chinese,
+                english: d.english,
+            })
+            .collect()
+    }
+
+    /// 清空全部输入统计。
+    pub fn stats_clear(&self) -> Result<(), ConfigError> {
+        self.core
+            .stats_clear()
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+}
+
+/// 配置字段（注册表一行）。`ty` ∈ bool / int / float / str / enum / str_list / map / struct_list。
+#[derive(Debug, uniffi::Record)]
+pub struct ConfigField {
+    pub key: String,
+    pub ty: String,
+    /// `ty == "enum"` 时的值域
+    pub options: Vec<String>,
+}
+
+/// 写入配置的值（[`wind_mobile::config_api::ConfigValue`] 的投影）。表格类（映射、结构列表）
+/// 不在此列，那类项要专门的编辑器。
+#[derive(Debug, uniffi::Enum)]
+pub enum ConfigValue {
+    Bool { v: bool },
+    Int { v: i64 },
+    Float { v: f64 },
+    Str { v: String },
+    StrList { v: Vec<String> },
+}
+
+impl From<ConfigValue> for wind_mobile::config_api::ConfigValue {
+    fn from(v: ConfigValue) -> Self {
+        use wind_mobile::config_api::ConfigValue as M;
+        match v {
+            ConfigValue::Bool { v } => M::Bool(v),
+            ConfigValue::Int { v } => M::Int(v),
+            ConfigValue::Float { v } => M::Float(v),
+            ConfigValue::Str { v } => M::Str(v),
+            ConfigValue::StrList { v } => M::StrList(v),
+        }
+    }
+}
+
+/// 设置写入失败（键不存在、类型不符、写盘失败），`reason` 是核心给的原文。
+#[derive(Debug, uniffi::Error)]
+pub enum ConfigError {
+    Rejected { reason: String },
+}
+
+impl std::fmt::Display for ConfigError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConfigError::Rejected { reason } => f.write_str(reason),
+        }
+    }
+}
+
+impl std::error::Error for ConfigError {}
+
+/// 统计概览（[`wind_mobile::StatsSummary`] 的投影）。速度单位：字 / 分钟。
+#[derive(Debug, uniffi::Record)]
+pub struct StatsSummaryInfo {
+    pub today_chars: u32,
+    pub today_chinese: u32,
+    pub today_english: u32,
+    pub total_chars: u64,
+    pub active_days: u64,
+    pub daily_avg: u64,
+    pub streak_current: u32,
+    pub streak_max: u32,
+    pub week_chars: u64,
+    pub month_chars: u64,
+    pub max_day_chars: u32,
+    pub max_day_date: String,
+    pub avg_code_len: f64,
+    pub first_select_rate: f64,
+    pub today_speed: u32,
+    pub overall_speed: u32,
+    pub max_speed: u32,
+}
+
+impl From<wind_mobile::StatsSummary> for StatsSummaryInfo {
+    fn from(s: wind_mobile::StatsSummary) -> Self {
+        Self {
+            today_chars: s.today_chars,
+            today_chinese: s.today_chinese,
+            today_english: s.today_english,
+            total_chars: s.total_chars,
+            active_days: s.active_days,
+            daily_avg: s.daily_avg,
+            streak_current: s.streak_current,
+            streak_max: s.streak_max,
+            week_chars: s.week_chars,
+            month_chars: s.month_chars,
+            max_day_chars: s.max_day_chars,
+            max_day_date: s.max_day_date,
+            avg_code_len: s.avg_code_len,
+            first_select_rate: s.first_select_rate,
+            today_speed: s.today_speed,
+            overall_speed: s.overall_speed,
+            max_speed: s.max_speed,
+        }
+    }
+}
+
+/// 某一天的输入字数。
+#[derive(Debug, uniffi::Record)]
+pub struct DailyTotalInfo {
+    /// `YYYY-MM-DD`
+    pub date: String,
+    pub total: u32,
+    pub chinese: u32,
+    pub english: u32,
 }

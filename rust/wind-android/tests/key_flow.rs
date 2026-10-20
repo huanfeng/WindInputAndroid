@@ -841,3 +841,68 @@ fn english_schema_shifted_letter_composes() {
     assert_eq!(last.1.first().map(String::as_str), Some("Hell"), "首候选应为原文（保留大小写）");
     assert!(last.1.iter().any(|w| w.starts_with("Hello")), "应补全出 Hello，实得 {:?}", last.1);
 }
+
+/// 设置页写引擎项：`config_set` 写进核心的用户层，快照里读得回来；
+/// 不认识的键当场报错（设置清单写错键名不能「点了没反应」）。
+#[test]
+fn config_set_roundtrips_and_rejects_unknown_key() {
+    use wind_android::{ConfigError, ConfigValue};
+    let Some((core, _rec, _env)) = setup_exclusive("config_set_roundtrip") else {
+        return;
+    };
+    core.config_set(
+        "input.association.max_count".into(),
+        ConfigValue::Int { v: 7 },
+    )
+    .expect("已注册的键应写入成功");
+    let snap = core.config_snapshot();
+    let in_section = snap
+        .split("\n[")
+        .find(|s| s.starts_with("input.association]"))
+        .unwrap_or_default();
+    assert!(
+        in_section.lines().any(|l| l.trim() == "max_count = 7"),
+        "快照的 [input.association] 里应读回 max_count = 7"
+    );
+    let err = core.config_set("no.such.key".into(), ConfigValue::Bool { v: true });
+    assert!(
+        matches!(err, Err(ConfigError::Rejected { .. })),
+        "未注册的键应报错，实得 {err:?}"
+    );
+}
+
+/// 注册表里报成 enum 的键都带值域（设置页据此画选择器）。
+#[test]
+fn config_registry_enums_have_options() {
+    let Some((core, _rec)) = setup("config_registry_enums") else {
+        return;
+    };
+    let reg = core.config_registry();
+    assert!(reg.iter().any(|f| f.key == "input.association.kind"));
+    let empty: Vec<_> = reg
+        .iter()
+        .filter(|f| f.ty == "enum" && f.options.is_empty())
+        .map(|f| f.key.clone())
+        .collect();
+    assert!(empty.is_empty(), "以下枚举键没有选项：{empty:?}");
+}
+
+/// 统计：打字上屏后今日字数随之增加（读的是采集器内存，不必等 flush）。
+#[test]
+fn stats_summary_counts_commits() {
+    let Some((core, _rec, _env)) = setup_exclusive("stats_summary") else {
+        return;
+    };
+    let before = core.stats_summary().map_or(0, |s| s.today_chars);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_SPACE, 0);
+    let after = core.stats_summary().expect("有用户库时应有统计");
+    assert!(
+        after.today_chars > before,
+        "上屏一个字后今日字数应增加：{before} → {}",
+        after.today_chars
+    );
+    let today = core.stats_daily("2000-01-01".into(), "2000-01-03".into());
+    assert_eq!(today.len(), 3, "区间内每天一条，缺的补零");
+}

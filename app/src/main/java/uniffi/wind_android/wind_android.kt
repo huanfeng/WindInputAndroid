@@ -725,6 +725,14 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidates(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_config_defaults(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_config_registry(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_config_set(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_config_snapshot(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_gained(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_lost(
@@ -738,6 +746,12 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_shuangpin_layouts(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_stats_clear(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_stats_daily(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_stats_summary(
     ): Int
     external fun uniffi_wind_android_checksum_constructor_windcore_new(
     ): Int
@@ -782,6 +796,14 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_wind_android_fn_method_windcore_candidates(`ptr`: Long,`offset`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_config_defaults(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_config_registry(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_config_set(`ptr`: Long,`key`: RustBuffer.ByValue,`value`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_config_snapshot(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_focus_gained(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_focus_lost(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -795,6 +817,12 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_select_candidate(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_stats_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_stats_daily(`ptr`: Long,`from`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_stats_summary(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_func_init_logging(`filter`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -935,6 +963,18 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_candidates() != 43261) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_config_defaults() != 33008) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_config_registry() != 56077) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_config_set() != 51426) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_config_snapshot() != 24732) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_focus_gained() != 4561) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -954,6 +994,15 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 61817) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_stats_clear() != 9704) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_stats_daily() != 53830) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_stats_summary() != 63898) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 19999) {
@@ -1217,6 +1266,75 @@ public object FfiConverterInt: FfiConverter<Int, Int> {
 
     override fun write(value: Int, buf: ByteBuffer) {
         buf.putInt(value)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterULong: FfiConverter<ULong, Long> {
+    override fun lift(value: Long): ULong {
+        return value.toULong()
+    }
+
+    override fun read(buf: ByteBuffer): ULong {
+        return lift(buf.getLong())
+    }
+
+    override fun lower(value: ULong): Long {
+        return value.toLong()
+    }
+
+    override fun allocationSize(value: ULong) = 8UL
+
+    override fun write(value: ULong, buf: ByteBuffer) {
+        buf.putLong(value.toLong())
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterLong: FfiConverter<Long, Long> {
+    override fun lift(value: Long): Long {
+        return value
+    }
+
+    override fun read(buf: ByteBuffer): Long {
+        return buf.getLong()
+    }
+
+    override fun lower(value: Long): Long {
+        return value
+    }
+
+    override fun allocationSize(value: Long) = 8UL
+
+    override fun write(value: Long, buf: ByteBuffer) {
+        buf.putLong(value)
+    }
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterDouble: FfiConverter<Double, Double> {
+    override fun lift(value: Double): Double {
+        return value
+    }
+
+    override fun read(buf: ByteBuffer): Double {
+        return buf.getDouble()
+    }
+
+    override fun lower(value: Double): Double {
+        return value
+    }
+
+    override fun allocationSize(value: Double) = 8UL
+
+    override fun write(value: Double, buf: ByteBuffer) {
+        buf.putDouble(value)
     }
 }
 
@@ -1833,6 +1951,26 @@ public interface WindCoreInterface {
     fun `candidates`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow
     
     /**
+     * 出厂默认配置的全量快照（TOML 文本）。「恢复默认」与「和默认不同」的标注用它。
+     */
+    fun `configDefaults`(): kotlin.String
+    
+    /**
+     * 配置字段注册表：键 → 类型（+ 枚举值域）。K 侧加载设置清单时用它校验键名。
+     */
+    fun `configRegistry`(): List<ConfigField>
+    
+    /**
+     * 写一个配置键到用户层。**只写盘**，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    fun `configSet`(`key`: kotlin.String, `value`: ConfigValue)
+    
+    /**
+     * 当前生效配置的全量快照（TOML 文本，四层合并 + 移动端强制项）。
+     */
+    fun `configSnapshot`(): kotlin.String
+    
+    /**
      * 焦点获得（对应 onStartInput）。
      *
      * 词库预热在核心构造时就已启动（不在这里），所以本调用是廉价的。
@@ -1878,6 +2016,21 @@ public interface WindCoreInterface {
      * 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
      */
     fun `shuangpinLayouts`(): List<LayoutInfo>
+    
+    /**
+     * 清空全部输入统计。
+     */
+    fun `statsClear`()
+    
+    /**
+     * `[from, to]`（`YYYY-MM-DD`，含首尾）每天的字数，缺的日子补零。
+     */
+    fun `statsDaily`(`from`: kotlin.String, `to`: kotlin.String): List<DailyTotalInfo>
+    
+    /**
+     * 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
+     */
+    fun `statsSummary`(): StatsSummaryInfo?
     
     companion object
 }
@@ -2028,6 +2181,72 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 出厂默认配置的全量快照（TOML 文本）。「恢复默认」与「和默认不同」的标注用它。
+     */override fun `configDefaults`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_config_defaults(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 配置字段注册表：键 → 类型（+ 枚举值域）。K 侧加载设置清单时用它校验键名。
+     */override fun `configRegistry`(): List<ConfigField> {
+            return FfiConverterSequenceTypeConfigField.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_config_registry(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 写一个配置键到用户层。**只写盘**，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    @Throws(ConfigException::class)override fun `configSet`(`key`: kotlin.String, `value`: ConfigValue)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_config_set(
+        it,
+        
+        FfiConverterString.lower(`key`),
+        FfiConverterTypeConfigValue.lower(`value`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 当前生效配置的全量快照（TOML 文本，四层合并 + 移动端强制项）。
+     */override fun `configSnapshot`(): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_config_snapshot(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 焦点获得（对应 onStartInput）。
      *
      * 词库预热在核心构造时就已启动（不在这里），所以本调用是廉价的。
@@ -2143,6 +2362,56 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_method_windcore_shuangpin_layouts(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 清空全部输入统计。
+     */
+    @Throws(ConfigException::class)override fun `statsClear`()
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_stats_clear(
+        it,
+        _status)
+}
+    }
+    
+    
+
+    
+    /**
+     * `[from, to]`（`YYYY-MM-DD`，含首尾）每天的字数，缺的日子补零。
+     */override fun `statsDaily`(`from`: kotlin.String, `to`: kotlin.String): List<DailyTotalInfo> {
+            return FfiConverterSequenceTypeDailyTotalInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_stats_daily(
+        it,
+        
+        FfiConverterString.lower(`from`),
+        FfiConverterString.lower(`to`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
+     */override fun `statsSummary`(): StatsSummaryInfo? {
+            return FfiConverterOptionalTypeStatsSummaryInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_stats_summary(
         it,
         _status)
 }
@@ -2336,6 +2605,109 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.write(value.`offset`, buf)
             FfiConverterUInt.write(value.`total`, buf)
             FfiConverterUInt.write(value.`selected`, buf)
+    }
+}
+
+
+
+/**
+ * 配置字段（注册表一行）。`ty` ∈ bool / int / float / str / enum / str_list / map / struct_list。
+ */
+data class ConfigField (
+    var `key`: kotlin.String
+    , 
+    var `ty`: kotlin.String
+    , 
+    /**
+     * `ty == "enum"` 时的值域
+     */
+    var `options`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeConfigField: FfiConverterRustBuffer<ConfigField> {
+    override fun read(buf: ByteBuffer): ConfigField {
+        return ConfigField(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: ConfigField) = (
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterString.allocationSize(value.`ty`) +
+            FfiConverterSequenceString.allocationSize(value.`options`)
+    )
+
+    override fun write(value: ConfigField, buf: ByteBuffer) {
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterString.write(value.`ty`, buf)
+            FfiConverterSequenceString.write(value.`options`, buf)
+    }
+}
+
+
+
+/**
+ * 某一天的输入字数。
+ */
+data class DailyTotalInfo (
+    /**
+     * `YYYY-MM-DD`
+     */
+    var `date`: kotlin.String
+    , 
+    var `total`: kotlin.UInt
+    , 
+    var `chinese`: kotlin.UInt
+    , 
+    var `english`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDailyTotalInfo: FfiConverterRustBuffer<DailyTotalInfo> {
+    override fun read(buf: ByteBuffer): DailyTotalInfo {
+        return DailyTotalInfo(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DailyTotalInfo) = (
+            FfiConverterString.allocationSize(value.`date`) +
+            FfiConverterUInt.allocationSize(value.`total`) +
+            FfiConverterUInt.allocationSize(value.`chinese`) +
+            FfiConverterUInt.allocationSize(value.`english`)
+    )
+
+    override fun write(value: DailyTotalInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`date`, buf)
+            FfiConverterUInt.write(value.`total`, buf)
+            FfiConverterUInt.write(value.`chinese`, buf)
+            FfiConverterUInt.write(value.`english`, buf)
     }
 }
 
@@ -2646,6 +3018,346 @@ public object FfiConverterTypeSchemaInfo: FfiConverterRustBuffer<SchemaInfo> {
 
 
 /**
+ * 统计概览（[`wind_mobile::StatsSummary`] 的投影）。速度单位：字 / 分钟。
+ */
+data class StatsSummaryInfo (
+    var `todayChars`: kotlin.UInt
+    , 
+    var `todayChinese`: kotlin.UInt
+    , 
+    var `todayEnglish`: kotlin.UInt
+    , 
+    var `totalChars`: kotlin.ULong
+    , 
+    var `activeDays`: kotlin.ULong
+    , 
+    var `dailyAvg`: kotlin.ULong
+    , 
+    var `streakCurrent`: kotlin.UInt
+    , 
+    var `streakMax`: kotlin.UInt
+    , 
+    var `weekChars`: kotlin.ULong
+    , 
+    var `monthChars`: kotlin.ULong
+    , 
+    var `maxDayChars`: kotlin.UInt
+    , 
+    var `maxDayDate`: kotlin.String
+    , 
+    var `avgCodeLen`: kotlin.Double
+    , 
+    var `firstSelectRate`: kotlin.Double
+    , 
+    var `todaySpeed`: kotlin.UInt
+    , 
+    var `overallSpeed`: kotlin.UInt
+    , 
+    var `maxSpeed`: kotlin.UInt
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeStatsSummaryInfo: FfiConverterRustBuffer<StatsSummaryInfo> {
+    override fun read(buf: ByteBuffer): StatsSummaryInfo {
+        return StatsSummaryInfo(
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterDouble.read(buf),
+            FfiConverterDouble.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterUInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: StatsSummaryInfo) = (
+            FfiConverterUInt.allocationSize(value.`todayChars`) +
+            FfiConverterUInt.allocationSize(value.`todayChinese`) +
+            FfiConverterUInt.allocationSize(value.`todayEnglish`) +
+            FfiConverterULong.allocationSize(value.`totalChars`) +
+            FfiConverterULong.allocationSize(value.`activeDays`) +
+            FfiConverterULong.allocationSize(value.`dailyAvg`) +
+            FfiConverterUInt.allocationSize(value.`streakCurrent`) +
+            FfiConverterUInt.allocationSize(value.`streakMax`) +
+            FfiConverterULong.allocationSize(value.`weekChars`) +
+            FfiConverterULong.allocationSize(value.`monthChars`) +
+            FfiConverterUInt.allocationSize(value.`maxDayChars`) +
+            FfiConverterString.allocationSize(value.`maxDayDate`) +
+            FfiConverterDouble.allocationSize(value.`avgCodeLen`) +
+            FfiConverterDouble.allocationSize(value.`firstSelectRate`) +
+            FfiConverterUInt.allocationSize(value.`todaySpeed`) +
+            FfiConverterUInt.allocationSize(value.`overallSpeed`) +
+            FfiConverterUInt.allocationSize(value.`maxSpeed`)
+    )
+
+    override fun write(value: StatsSummaryInfo, buf: ByteBuffer) {
+            FfiConverterUInt.write(value.`todayChars`, buf)
+            FfiConverterUInt.write(value.`todayChinese`, buf)
+            FfiConverterUInt.write(value.`todayEnglish`, buf)
+            FfiConverterULong.write(value.`totalChars`, buf)
+            FfiConverterULong.write(value.`activeDays`, buf)
+            FfiConverterULong.write(value.`dailyAvg`, buf)
+            FfiConverterUInt.write(value.`streakCurrent`, buf)
+            FfiConverterUInt.write(value.`streakMax`, buf)
+            FfiConverterULong.write(value.`weekChars`, buf)
+            FfiConverterULong.write(value.`monthChars`, buf)
+            FfiConverterUInt.write(value.`maxDayChars`, buf)
+            FfiConverterString.write(value.`maxDayDate`, buf)
+            FfiConverterDouble.write(value.`avgCodeLen`, buf)
+            FfiConverterDouble.write(value.`firstSelectRate`, buf)
+            FfiConverterUInt.write(value.`todaySpeed`, buf)
+            FfiConverterUInt.write(value.`overallSpeed`, buf)
+            FfiConverterUInt.write(value.`maxSpeed`, buf)
+    }
+}
+
+
+
+
+
+/**
+ * 设置写入失败（键不存在、类型不符、写盘失败），`reason` 是核心给的原文。
+ */
+sealed class ConfigException: kotlin.Exception() {
+    
+    class Rejected(
+        
+        val `reason`: kotlin.String
+        ) : ConfigException() {
+        override val message
+            get() = "reason=${ `reason` }"
+    }
+    
+
+    
+
+
+    companion object ErrorHandler : UniffiRustCallStatusErrorHandler<ConfigException> {
+        override fun lift(error_buf: RustBuffer.ByValue): ConfigException = FfiConverterTypeConfigError.lift(error_buf)
+    }
+
+    
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeConfigError : FfiConverterRustBuffer<ConfigException> {
+    override fun read(buf: ByteBuffer): ConfigException {
+        
+
+        return when(buf.getInt()) {
+            1 -> ConfigException.Rejected(
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ConfigException): ULong {
+        return when(value) {
+            is ConfigException.Rejected -> (
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                4UL
+                + FfiConverterString.allocationSize(value.`reason`)
+            )
+        }
+    }
+
+    override fun write(value: ConfigException, buf: ByteBuffer) {
+        when(value) {
+            is ConfigException.Rejected -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`reason`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+
+}
+
+
+
+/**
+ * 写入配置的值（[`wind_mobile::config_api::ConfigValue`] 的投影）。表格类（映射、结构列表）
+ * 不在此列，那类项要专门的编辑器。
+ */
+sealed class ConfigValue {
+    
+    data class Bool(
+        val `v`: kotlin.Boolean) : ConfigValue()
+        
+    {
+        
+
+        companion object
+    }
+    
+    data class Int(
+        val `v`: kotlin.Long) : ConfigValue()
+        
+    {
+        
+
+        companion object
+    }
+    
+    data class Float(
+        val `v`: kotlin.Double) : ConfigValue()
+        
+    {
+        
+
+        companion object
+    }
+    
+    data class Str(
+        val `v`: kotlin.String) : ConfigValue()
+        
+    {
+        
+
+        companion object
+    }
+    
+    data class StrList(
+        val `v`: List<kotlin.String>) : ConfigValue()
+        
+    {
+        
+
+        companion object
+    }
+    
+
+    
+
+    
+    
+
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeConfigValue : FfiConverterRustBuffer<ConfigValue>{
+    override fun read(buf: ByteBuffer): ConfigValue {
+        return when(buf.getInt()) {
+            1 -> ConfigValue.Bool(
+                FfiConverterBoolean.read(buf),
+                )
+            2 -> ConfigValue.Int(
+                FfiConverterLong.read(buf),
+                )
+            3 -> ConfigValue.Float(
+                FfiConverterDouble.read(buf),
+                )
+            4 -> ConfigValue.Str(
+                FfiConverterString.read(buf),
+                )
+            5 -> ConfigValue.StrList(
+                FfiConverterSequenceString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ConfigValue): ULong = when(value) {
+        is ConfigValue.Bool -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterBoolean.allocationSize(value.`v`)
+            )
+        }
+        is ConfigValue.Int -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterLong.allocationSize(value.`v`)
+            )
+        }
+        is ConfigValue.Float -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterDouble.allocationSize(value.`v`)
+            )
+        }
+        is ConfigValue.Str -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`v`)
+            )
+        }
+        is ConfigValue.StrList -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterSequenceString.allocationSize(value.`v`)
+            )
+        }
+    }
+
+    override fun write(value: ConfigValue, buf: ByteBuffer) {
+        when(value) {
+            is ConfigValue.Bool -> {
+                buf.putInt(1)
+                FfiConverterBoolean.write(value.`v`, buf)
+                Unit
+            }
+            is ConfigValue.Int -> {
+                buf.putInt(2)
+                FfiConverterLong.write(value.`v`, buf)
+                Unit
+            }
+            is ConfigValue.Float -> {
+                buf.putInt(3)
+                FfiConverterDouble.write(value.`v`, buf)
+                Unit
+            }
+            is ConfigValue.Str -> {
+                buf.putInt(4)
+                FfiConverterString.write(value.`v`, buf)
+                Unit
+            }
+            is ConfigValue.StrList -> {
+                buf.putInt(5)
+                FfiConverterSequenceString.write(value.`v`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+/**
  * Kotlin 可下达的引擎命令。
  *
  * 刻意是一张**手工挑选的小表**而非桌面菜单的镜像：后者含截图、打开目录、诊断 HUD、
@@ -2830,6 +3542,38 @@ public object FfiConverterTypeEngineCommand : FfiConverterRustBuffer<EngineComma
 /**
  * @suppress
  */
+public object FfiConverterOptionalTypeStatsSummaryInfo: FfiConverterRustBuffer<StatsSummaryInfo?> {
+    override fun read(buf: ByteBuffer): StatsSummaryInfo? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterTypeStatsSummaryInfo.read(buf)
+    }
+
+    override fun allocationSize(value: StatsSummaryInfo?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterTypeStatsSummaryInfo.allocationSize(value)
+        }
+    }
+
+    override fun write(value: StatsSummaryInfo?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterTypeStatsSummaryInfo.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -2848,6 +3592,62 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeConfigField: FfiConverterRustBuffer<List<ConfigField>> {
+    override fun read(buf: ByteBuffer): List<ConfigField> {
+        val len = buf.getInt()
+        return List<ConfigField>(len) {
+            FfiConverterTypeConfigField.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<ConfigField>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeConfigField.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<ConfigField>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeConfigField.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeDailyTotalInfo: FfiConverterRustBuffer<List<DailyTotalInfo>> {
+    override fun read(buf: ByteBuffer): List<DailyTotalInfo> {
+        val len = buf.getInt()
+        return List<DailyTotalInfo>(len) {
+            FfiConverterTypeDailyTotalInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<DailyTotalInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeDailyTotalInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<DailyTotalInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeDailyTotalInfo.write(it, buf)
         }
     }
 }
