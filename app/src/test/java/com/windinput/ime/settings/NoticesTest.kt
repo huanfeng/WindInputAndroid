@@ -15,7 +15,7 @@ class NoticesTest {
         for (id in Notices.FULL_TEXTS) {
             assertTrue("缺少许可证全文 $id.txt", File(dir, "$id.txt").isFile)
         }
-        val unknown = notices.map { it.license }.filter { it !in Notices.FULL_TEXTS }
+        val unknown = notices.map { it.license }.filter { it !in Notices.FULL_TEXTS && it !in Notices.NO_TEXT }
         assertTrue("没有全文的许可证：$unknown", unknown.isEmpty())
     }
 
@@ -33,6 +33,8 @@ class NoticesTest {
             "opencc" to "OpenCC",
             "emoji" to "rime-emoji",
             "pinyin_map.txt" to "pinyin-data",
+            "charsets/common_han.yaml" to "通用规范汉字表",
+            "charsets/emoji.yaml" to "Unicode emoji-data",
         )
         val data = File("src/main/assets/data")
         for ((path, notice) in required) {

@@ -41,6 +41,20 @@ url = "https://github.com/mozillazg/pinyin-data"
 
 [[notice]]
 group = "词库与数据"
+name = "通用规范汉字表"
+usage = "常用字 / 生僻字判定（候选检索范围、设为生僻字）"
+license = "公开标准"
+url = "https://www.gov.cn/zwgk/2013-08/19/content_2469793.htm"
+
+[[notice]]
+group = "词库与数据"
+name = "Unicode emoji-data"
+usage = "判定哪些字符是 Emoji（字符集分类）"
+license = "Unicode-3.0"
+url = "https://www.unicode.org/Public/17.0.0/ucd/emoji/emoji-data.txt"
+
+[[notice]]
+group = "词库与数据"
 name = "OpenCC"
 usage = "简繁转换词典"
 license = "Apache-2.0"

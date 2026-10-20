@@ -33,6 +33,9 @@ object Notices {
     /** 有全文的许可证 id（= DIR 下的文件名去掉 .txt） */
     val FULL_TEXTS = setOf("GPL-3.0", "LGPL-3.0", "Apache-2.0", "MIT", "MPL-2.0", "Unicode-3.0")
 
+    /** 没有许可证文本可附的来源（政府发布的公开标准），声明里写来源即可 */
+    val NO_TEXT = setOf("公开标准")
+
     fun parse(toml: String): List<Notice> {
         val result = Toml.parse(toml)
         require(!result.hasErrors()) { "TOML errors: ${result.errors()}" }
