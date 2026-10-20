@@ -378,10 +378,26 @@ init_geometry
 # 照样 PASS（不过是换了个中文方案，断言只看「是不是汉字」），污染留给**下一次**运行，
 # 现象是「昨天好好的今天全挂」。故把「跑完方案没变」单列成一条不变量来守。
 get_active_schema() {
-    # 首次运行尚未落盘，或非 debug 包没有 run-as → 空
-    adb_ shell run-as "$PKG" cat files/rust/config/WindInput/config.toml \
-        | grep -m1 '^active = ' | sed 's/[[:space:]]*$//'
+    # 用户层没有 active 行 = 用的是出厂默认 wubi86：核心写配置时会把「等于出厂默认」的键
+    # 从用户层删掉，切回五笔后这一行就消失了，不能当成「读不到」。
+    # 非 debug 包没有 run-as → 空（读不到）
+    local cfg
+    cfg="$(adb_ shell run-as "$PKG" cat files/rust/config/WindInput/config.toml)" || return
+    printf '%s\n' "$cfg" | grep -q 'run-as:' && return
+    local line
+    line="$(printf '%s\n' "$cfg" | grep -m1 '^active = ' | sed 's/[[:space:]]*$//')"
+    printf '%s' "${line:-active = \"wubi86\"}"
 }
+# 用例全按五笔写（aa → 式）。上一次运行若中途断掉（模拟器掉线、被中断），活跃方案可能
+# 停在拼音或英文——它是持久化的，下一次所有用例连环失败，看着像功能坏了（实际遇到过：
+# 拼音残留，aa 出「啊啊」）。开跑前钉回 wubi86，连同中英键记住的「上次中文方案」一起。
+schema_now="$(get_active_schema)"
+if [[ -n "$schema_now" && "$schema_now" != 'active = "wubi86"' ]]; then
+    echo "${Y:-}残留方案 [$schema_now]，改回 wubi86 后重启${N:-}"
+    adb_q shell "run-as $PKG sed -i 's/^active = .*/active = \"wubi86\"/' files/rust/config/WindInput/config.toml"
+    adb_q shell run-as "$PKG" rm -f shared_prefs/ime_state.xml
+    restart_pad
+fi
 SCHEMA_BEFORE="$(get_active_schema)"
 
 # ── 建立前置条件：确保处于中文方案 ──────────────────────────────────────
@@ -629,12 +645,13 @@ before="$(get_pad_text)"
 # ⚠ 上屏后条区被**联想候选**（标点）占着，工具栏不可见；这时点条区点到的是联想项
 # （实测把「，」上了屏）。先点一下输入框：光标动 → 组合/联想作废 → 工具栏回来。
 adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 0.8
-# 工具栏只剩入口和收起，文本编辑在快捷面板里：入口 → 面板网格第 2 行第 1 格。
+# 工具栏只剩入口和收起，文本编辑在快捷面板里：入口 → 面板网格第 2 行第 2 格
+# （第 1 行：中文标点 · 全角 · 无痕 · 表情；第 2 行：剪贴板 · 文本编辑 …）。
 # 网格行位置（键盘顶下 158dp）取自 QuickPanelWindow 实测：方案分段行 + 第 1 行开关格。
-# ⚠ 第 1 行若多出「简入繁出」格（s2tShown），文本编辑会后移一格，这里要跟着改。
+# ⚠ 格子顺序一变（多出「简入繁出」格 s2tShown、新增开关）文本编辑就挪位，这里要跟着改。
 adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
 sleep 1
-adb_q shell input tap $(( GEO_W / 8 )) "$(awk -v t="$GEO_KBTOP" -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", t + 158 * d }')"
+adb_q shell input tap $(( GEO_W * 3 / 8 )) "$(awk -v t="$GEO_KBTOP" -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", t + 158 * d }')"
 sleep 1
 cell_h=$(( GEO_ROWPX * 4 / 3 ))
 edit_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 8 )) $(( GEO_KBTOP + cell_h * (2 * $1 + 1) / 2 )); sleep 0.5; }
@@ -845,6 +862,23 @@ adb_q shell input keyevent KEYCODE_BACK; sleep 1
 get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.2
 tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 0
 check_match "收起后数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
+
+echo; echo "${Y}[35] 简入繁出：开启后「我们」上屏为「我們」${N}"
+# 要 APK 带上 opencc 数据才有效——没带时开关照样能开，上屏却还是简体，且不报错。
+# 直接写核心用户层再重启进程（等价于设置页写入 + 重载，但不依赖设置页的坐标）；
+# 跑完把原文件写回去，不污染后续用例与下次运行。
+CORE_CFG=files/rust/config/WindInput/config.toml
+cfg_orig="$(adb_ shell run-as "$PKG" cat "$CORE_CFG")"
+printf '%s\n\n[input.s2t]\nenabled = true\n' "$cfg_orig" \
+    | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $CORE_CFG'"
+restart_pad
+wait_chinese >/dev/null
+reset_pad
+for w in t r w u SPACE; do tap_key "$w"; done
+check "简入繁出上屏繁体" "我們" "$(get_pad_text)"
+printf '%s\n' "$cfg_orig" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $CORE_CFG'"
+restart_pad
+wait_chinese >/dev/null
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"

@@ -745,6 +745,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_shuangpin_layouts(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_stats_clear(
@@ -824,6 +826,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_select_candidate(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_stats_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1007,6 +1011,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 14719) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_learning_suspended() != 58911) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 61817) {
@@ -2040,6 +2047,14 @@ public interface WindCoreInterface {
     fun `selectCandidate`(`index`: kotlin.UInt): KeyResult
     
     /**
+     * 暂停 / 恢复学习（无痕）。宿主每次 onStartInput 都要按当前输入框显式传一次：
+     * `IME_FLAG_NO_PERSONALIZED_LEARNING` 或密码框传 true，其余传 false——开关不落盘，
+     * 不传就会把上一个无痕框的暂停带进普通输入框。暂停期间照常出候选，只是什么都不记
+     * （词频、造词、联想、统计、上屏历史）；用户在设置页手动加词不受影响。
+     */
+    fun `setLearningSuspended`(`on`: kotlin.Boolean)
+    
+    /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
      * 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
      */
@@ -2400,6 +2415,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     }
     )
     }
+    
+
+    
+    /**
+     * 暂停 / 恢复学习（无痕）。宿主每次 onStartInput 都要按当前输入框显式传一次：
+     * `IME_FLAG_NO_PERSONALIZED_LEARNING` 或密码框传 true，其余传 false——开关不落盘，
+     * 不传就会把上一个无痕框的暂停带进普通输入框。暂停期间照常出候选，只是什么都不记
+     * （词频、造词、联想、统计、上屏历史）；用户在设置页手动加词不受影响。
+     */override fun `setLearningSuspended`(`on`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_learning_suspended(
+        it,
+        
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
     
 
     

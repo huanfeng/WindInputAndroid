@@ -382,6 +382,14 @@ impl WindCore {
         self.core.focus_gained();
     }
 
+    /// 暂停 / 恢复学习（无痕）。宿主每次 onStartInput 都要按当前输入框显式传一次：
+    /// `IME_FLAG_NO_PERSONALIZED_LEARNING` 或密码框传 true，其余传 false——开关不落盘，
+    /// 不传就会把上一个无痕框的暂停带进普通输入框。暂停期间照常出候选，只是什么都不记
+    /// （词频、造词、联想、统计、上屏历史）；用户在设置页手动加词不受影响。
+    pub fn set_learning_suspended(&self, on: bool) {
+        self.core.set_learning_suspended(on);
+    }
+
     /// 焦点丢失（对应 onFinishInput）。语义 = 真正离开，清输入态。
     pub fn focus_lost(&self) {
         self.core.focus_lost();

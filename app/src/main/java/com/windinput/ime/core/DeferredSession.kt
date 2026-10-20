@@ -79,6 +79,7 @@ class DeferredSession(
             }
             mainHandler.post {
                 session.listener = listener
+                session.setLearningSuspended(learningSuspended)
                 delegate = session
                 Log.i(TAG, "核心就绪，耗时 ${cost}ms")
                 onReady(session)
@@ -92,6 +93,18 @@ class DeferredSession(
 
     override fun focusLost() {
         delegate?.focusLost()
+    }
+
+    /**
+     * 核心没起来时也要记下：首次弹键盘往往就落在无痕框里（核心构造要一两秒），
+     * 就绪后若不补设，这一框剩下的输入就被学进去了。
+     */
+    @Volatile
+    private var learningSuspended = false
+
+    override fun setLearningSuspended(on: Boolean) {
+        learningSuspended = on
+        delegate?.setLearningSuspended(on)
     }
 
     /** 未就绪 → 交还宿主（字母直接上屏），绝不吞键 */

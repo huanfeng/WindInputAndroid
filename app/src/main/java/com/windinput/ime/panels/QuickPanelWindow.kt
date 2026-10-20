@@ -51,6 +51,11 @@ class QuickPanelWindow(
 
         /** 切到系统语音输入法 */
         fun onVoiceInput()
+
+        /** 用户手动开的无痕（本次键盘服务内有效，不落盘） */
+        fun incognito(): Boolean
+
+        fun onToggleIncognito()
     }
 
     enum class Target { EMOJI, CLIPBOARD, TEXT_EDIT }
@@ -173,6 +178,11 @@ class QuickPanelWindow(
             add("繁", "简入繁出", selected = st?.s2tEnabled ?: false) {
                 listener.onQuickCommand(EngineCmd.ToggleS2t)
             }
+        }
+        // 无痕是键盘自己的状态（引擎只管「这次学不学」），选中态取本端，不等引擎推送
+        add("🕶", "无痕", selected = listener.incognito()) {
+            listener.onToggleIncognito()
+            rebuildTiles(context)
         }
         add("😀", "表情") { listener.onOpenPanel(Target.EMOJI) }
         add("📋", "剪贴板") { listener.onOpenPanel(Target.CLIPBOARD) }

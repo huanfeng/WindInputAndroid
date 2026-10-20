@@ -989,3 +989,26 @@ fn user_word_add_list_type_remove() {
         page.items
     );
 }
+
+/// 无痕：暂停学习时打字照常上屏，但统计不涨；恢复后照常记。
+///
+/// 对照组（恢复后会涨）保证「不涨」不是因为统计本来就没在记。
+#[test]
+fn learning_suspended_records_nothing_until_resumed() {
+    let Some((core, _rec, _env)) = setup_exclusive("learning_suspended") else {
+        return;
+    };
+    let today = |c: &WindCore| c.stats_summary().map_or(0, |s| s.today_chars);
+    core.set_learning_suspended(true);
+    let before = today(&core);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_SPACE, 0);
+    assert_eq!(today(&core), before, "暂停学习时统计不应增加");
+
+    core.set_learning_suspended(false);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_SPACE, 0);
+    assert!(today(&core) > before, "恢复后统计应照常增加");
+}

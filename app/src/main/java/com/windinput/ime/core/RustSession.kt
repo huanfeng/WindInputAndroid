@@ -137,6 +137,8 @@ class RustSession(
 
     override fun focusLost() = core.focusLost()
 
+    override fun setLearningSuspended(on: Boolean) = core.setLearningSuspended(on)
+
     override fun schemas(): List<SchemaEntry> =
         core.schemas().mapIndexed { i, s ->
             SchemaEntry(

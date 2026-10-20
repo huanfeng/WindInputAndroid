@@ -110,6 +110,24 @@ class BarView(
      * 变成了返回」。两个动作共用一格而不是并排两格：这一格的语义恒为
      * 「离开当前这层」，并排反而要用户分辨两个下箭头。
      */
+    /**
+     * 无痕标记：放在空闲工具栏中间那块空地上。无痕是「看不见的状态」，忘了关就一直学不会，
+     * 必须常驻可见；只在工具栏态显示（打字时条区归候选）。
+     */
+    private val incognitoLabel = TextView(context).apply {
+        text = "🕶 无痕"
+        gravity = Gravity.CENTER
+        textSize = 13f
+        setTextColor(Palette.current.hint)
+        // INVISIBLE 不是 GONE：它兼做中间的弹性占位，GONE 掉尾格就挤到左边去了
+        visibility = INVISIBLE
+    }
+
+    /** 学习是否暂停（手动无痕或输入框要求），见 [incognitoLabel] */
+    fun setIncognito(on: Boolean) {
+        incognitoLabel.visibility = if (on) VISIBLE else INVISIBLE
+    }
+
     private val trailingIcon = PanelIcon(context).apply {
         glyph = PanelIcon.Glyph.COLLAPSE
         setOnClickListener {
@@ -313,7 +331,7 @@ class BarView(
             icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) },
             LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT),
         )
-        addView(View(context), LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        addView(incognitoLabel, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         addView(trailingIcon, LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT))
     }
 

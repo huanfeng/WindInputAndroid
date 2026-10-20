@@ -162,6 +162,12 @@ interface ImeSession {
 
     fun focusLost()
 
+    /**
+     * 暂停 / 恢复学习（无痕）：每次 onStartInput 按当前输入框显式设一次，见 [suspendsLearning]。
+     * 暂停期间照常出候选，只是这次输入什么都不记。
+     */
+    fun setLearningSuspended(on: Boolean) = Unit
+
     /** @return true = 会话消费该键；false = 由调用方执行默认行为 */
     fun keyPressed(action: KeyAction, shifted: Boolean): Boolean
 

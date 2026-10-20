@@ -26,6 +26,7 @@ import com.windinput.ime.core.RustSession
 import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
+import com.windinput.ime.core.suspendsLearning
 import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
 import com.windinput.ime.keyboard.InputRootView
@@ -300,6 +301,9 @@ class WindInputImeService :
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        // 先定学习开关再给焦点：焦点一到，引擎就可能开始记东西
+        fieldSuspendsLearning = suspendsLearning(attribute?.inputType ?: 0, attribute?.imeOptions ?: 0)
+        applyLearningSuspended()
         session.focusGained()
     }
 
@@ -322,6 +326,8 @@ class WindInputImeService :
             enterLabel = enterActionLabel(info)
         }
         barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 19).toFloat()
+        // 输入视图可能刚重建（配色变了），无痕标记跟着重设
+        barView?.setIncognito(manualIncognito || fieldSuspendsLearning)
         clipSuggestionEnabled = userConfig.getBoolean("ui.android.clip_suggestion", true)
         inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
         autoCapEnabled = userConfig.getBoolean("ui.android.auto_cap", true)
@@ -868,6 +874,28 @@ class WindInputImeService :
     }
 
     override fun voiceInputAvailable(): Boolean = findVoiceInput() != null
+
+    /** 输入框要求的无痕（应用置了 NO_PERSONALIZED_LEARNING、密码框），每个框重算 */
+    private var fieldSuspendsLearning = false
+
+    /**
+     * 用户在快捷面板手动开的无痕。只活在本次键盘服务里、不落盘：
+     * 忘了关的无痕会让输入法一直「学不会」，进程重启时自动回到正常更安全。
+     */
+    private var manualIncognito = false
+
+    private fun applyLearningSuspended() {
+        val suspended = manualIncognito || fieldSuspendsLearning
+        session.setLearningSuspended(suspended)
+        barView?.setIncognito(suspended)
+    }
+
+    override fun incognito(): Boolean = manualIncognito
+
+    override fun onToggleIncognito() {
+        manualIncognito = !manualIncognito
+        applyLearningSuspended()
+    }
 
     /**
      * 语音输入：**转发给系统里带 voice 子类型的输入法**（通常是 Google 语音输入），
