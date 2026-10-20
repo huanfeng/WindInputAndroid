@@ -442,6 +442,20 @@ impl WindCore {
             .collect()
     }
 
+    /// 第 `index`（全量绝对下标）个候选的提示（编码 / 读音 / 释义…），与电脑版候选悬停气泡
+    /// 同一份段模板。越界或全空返回空列表。长按候选时取来显示。
+    pub fn candidate_tooltip(&self, index: u32) -> Vec<CandidateTooltipInfo> {
+        self.core
+            .candidate_tooltip(index as usize)
+            .into_iter()
+            .map(|s| CandidateTooltipInfo {
+                title: s.title,
+                inline: s.inline,
+                lines: s.lines,
+            })
+            .collect()
+    }
+
     /// 执行一项菜单动作（`move_top` / `delete` / `reset` …）；`copy` 由宿主自己做，这里返回 false。
     /// 执行后核心经 [`UiEventListener`] 推送新的候选。
     pub fn candidate_menu_run(&self, index: u32, action: String) -> bool {
@@ -748,6 +762,14 @@ pub struct UserWordInfo {
 pub struct UserWordPageInfo {
     pub items: Vec<UserWordInfo>,
     pub total: u64,
+}
+
+/// 候选提示的一段：段名（`None` = 无标题）、是否与首行同行、原始行（不截断，宿主自己折行）。
+#[derive(Debug, uniffi::Record)]
+pub struct CandidateTooltipInfo {
+    pub title: Option<String>,
+    pub inline: bool,
+    pub lines: Vec<String>,
 }
 
 /// 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。

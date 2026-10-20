@@ -188,6 +188,9 @@ interface ImeSession {
      * 候选长按菜单（对应电脑版的候选右键菜单，菜单项与文案由核心按候选类型给出）。
      * [index] 是全量里的绝对下标。无候选 / 越界 → 空。
      */
+    /** 第 [index]（绝对下标）个候选的提示段（编码 / 读音 / 释义…），与电脑版悬停气泡同源；没有就空 */
+    fun candidateTooltip(index: Int): List<TooltipSection> = emptyList()
+
     fun candidateMenu(index: Int): List<CandidateMenuEntry> = emptyList()
 
     /**
@@ -220,3 +223,6 @@ interface ImeSession {
  * 与核心约定的动作名，菜单显示用 [label]（核心给的文案，与电脑版右键菜单同一份）。
  */
 data class CandidateMenuEntry(val label: String, val action: String, val enabled: Boolean)
+
+/** 候选提示的一段：[title] 为空 = 无标题；[inline] = 标题与首行写在同一行（`段名: 内容`） */
+data class TooltipSection(val title: String?, val inline: Boolean, val lines: List<String>)

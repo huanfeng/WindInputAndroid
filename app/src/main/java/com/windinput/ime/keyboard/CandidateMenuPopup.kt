@@ -12,9 +12,11 @@ import android.widget.LinearLayout
 import android.widget.PopupWindow
 import android.widget.TextView
 import com.windinput.ime.core.CandidateMenuEntry
+import com.windinput.ime.core.TooltipSection
 
 /**
- * 候选长按菜单：盖在键盘区顶部的一张小卡片——标题是那个候选，下面一格一个动作。
+ * 候选长按卡片：盖在键盘区顶部的一张小卡片——标题是那个候选。先是提示（[showTooltip]），
+ * 「更多操作」再换成一格一个动作的菜单（[show]）；长按中英键的方案卡片也用 [show]。
  *
  * 菜单项与文案全部来自核心（与电脑版候选右键菜单同一份，见 [com.windinput.ime.core.ImeSession.candidateMenu]），
  * 这里只管画。放在**条区之下、键盘区之上**而不是条区上方：IME 窗口以外的区域在多数系统上
@@ -43,8 +45,111 @@ class CandidateMenuPopup(private val anchor: View) {
     ) {
         dismiss()
         if (items.isEmpty() || anchor.windowToken == null) return
+        val content = card(title)
+        content.addView(menuGrid(items, onPick))
+        present(content, dismissOnOutside)
+    }
+
+    /**
+     * 候选长按的第一步：提示卡——候选、各段提示（编码 / 读音 / 释义…，与电脑版悬停气泡同一份
+     * 模板），底部「复制」与「更多操作」。点「更多操作」就地换成 [show] 那张菜单。
+     *
+     * 手机没有悬停，长按就是「想多知道一点这个候选」：先给信息，操作收进第二步——
+     * 置顶、删除这些是低频动作，不该比信息更先跳到眼前。
+     */
+    fun showTooltip(
+        title: String,
+        sections: List<TooltipSection>,
+        onCopy: () -> Unit,
+        onMore: () -> Unit,
+    ) {
+        dismiss()
+        if (sections.isEmpty() || anchor.windowToken == null) return
         val p = Palette.current
-        val content = LinearLayout(anchor.context).apply {
+        // 操作放在标题行右侧：位置固定，不随下面提示的长短上下跑；提示再长也挤不掉它们
+        val content = card(
+            title,
+            listOf(
+                "复制" to {
+                    dismiss()
+                    onCopy()
+                },
+                "更多操作 ›" to onMore,
+            ),
+        )
+        val body = LinearLayout(anchor.context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(4), 0, dp(4), 0)
+        }
+        for (sec in sections) {
+            val head = sec.title?.takeIf { it.isNotEmpty() }
+            if (head != null && !sec.inline) {
+                body.addView(
+                    TextView(anchor.context).apply {
+                        text = head
+                        textSize = 12f
+                        setTextColor(p.accentText)
+                        setPadding(0, dp(6), 0, dp(2))
+                    },
+                )
+            }
+            sec.lines.forEachIndexed { i, line ->
+                body.addView(
+                    TextView(anchor.context).apply {
+                        text = if (head != null && sec.inline && i == 0) "$head：$line" else line
+                        textSize = 15f
+                        setTextColor(p.text)
+                        setTextIsSelectable(false)
+                        setPadding(0, dp(1), 0, dp(1))
+                    },
+                )
+            }
+        }
+        // 提示可能很长（释义、长短语逐字读音）：可滚动，最高到键盘区的大半，按钮行始终看得到
+        val maxBody = ((anchor.rootView.height - anchor.height) * 0.55f).toInt()
+        val scroll = object : android.widget.ScrollView(anchor.context) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                super.onMeasure(
+                    widthMeasureSpec,
+                    View.MeasureSpec.makeMeasureSpec(maxBody.coerceAtLeast(dp(80)), View.MeasureSpec.AT_MOST),
+                )
+            }
+        }.apply {
+            isVerticalScrollBarEnabled = true
+            addView(body)
+        }
+        content.addView(scroll)
+        present(content, dismissOnOutside = true)
+    }
+
+    /** 卡片外壳 + 标题行（那个候选，右侧可带几个操作按钮） */
+    private fun card(title: String, actions: List<Pair<String, () -> Unit>> = emptyList()): LinearLayout {
+        val p = Palette.current
+        val header = LinearLayout(anchor.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, dp(6))
+            addView(
+                TextView(anchor.context).apply {
+                    text = title
+                    textSize = 15f
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextColor(p.text)
+                    setPadding(dp(4), 0, dp(4), 0)
+                },
+                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
+            )
+            for ((label, onClick) in actions) {
+                addView(
+                    actionCell(label, enabled = true, onClick).apply { setPadding(dp(14), 0, dp(14), 0) },
+                    LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36)).apply {
+                        marginStart = dp(6)
+                    },
+                )
+            }
+        }
+        return LinearLayout(anchor.context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(10), dp(10))
             background = GradientDrawable().apply {
@@ -52,35 +157,34 @@ class CandidateMenuPopup(private val anchor: View) {
                 setColor(p.surface)
                 setStroke(dp(1), p.border)
             }
+            addView(header)
         }
-        content.addView(
-            TextView(anchor.context).apply {
-                text = title
-                textSize = 15f
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                setTextColor(p.text)
-                setPadding(dp(4), 0, dp(4), dp(6))
-            },
-        )
+    }
+
+    private fun actionCell(label: String, enabled: Boolean, onClick: () -> Unit): TextView {
+        val p = Palette.current
+        return TextView(anchor.context).apply {
+            text = label
+            textSize = 14f
+            gravity = Gravity.CENTER
+            maxLines = 1
+            setTextColor(if (enabled) p.accentText else p.hint)
+            background = GradientDrawable().apply {
+                cornerRadius = 6 * density
+                setColor(p.key)
+            }
+            isEnabled = enabled
+            setOnClickListener { onClick() }
+        }
+    }
+
+    private fun menuGrid(items: List<CandidateMenuEntry>, onPick: (CandidateMenuEntry) -> Unit): GridLayout {
         val grid = GridLayout(anchor.context).apply { columnCount = COLUMNS }
         for (item in items) {
             grid.addView(
-                TextView(anchor.context).apply {
-                    text = item.label
-                    textSize = 14f
-                    gravity = Gravity.CENTER
-                    maxLines = 1
-                    setTextColor(if (item.enabled) p.accentText else p.hint)
-                    background = GradientDrawable().apply {
-                        cornerRadius = 6 * density
-                        setColor(p.key)
-                    }
-                    isEnabled = item.enabled
-                    setOnClickListener {
-                        dismiss()
-                        onPick(item)
-                    }
+                actionCell(item.label, item.enabled) {
+                    dismiss()
+                    onPick(item)
                 },
                 GridLayout.LayoutParams().apply {
                     width = 0
@@ -90,8 +194,11 @@ class CandidateMenuPopup(private val anchor: View) {
                 },
             )
         }
-        content.addView(grid)
+        return grid
+    }
 
+    /** 把卡片放进铺满条区与键盘的透明底里弹出（见类注释：点外面只收起、不落到键上） */
+    private fun present(content: View, dismissOnOutside: Boolean) {
         val root = anchor.rootView
         // 条区还没量好（刚重建）时宽高为 0，算出的尺寸是负数，PopupWindow 不认
         if (anchor.width <= 0 || root.height <= 0) return

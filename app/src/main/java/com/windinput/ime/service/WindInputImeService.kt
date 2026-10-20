@@ -807,26 +807,52 @@ class WindInputImeService :
     override fun onExpandedCandidateLongPressed(index: Int) = showCandidateMenu(index)
 
     /**
-     * 候选长按菜单。菜单项由核心按候选类型给（普通词：置顶 / 前移 / 删除 / 恢复默认 …；
-     * 上屏历史：删除此历史 …），与电脑版右键菜单同一份。执行后核心会推送新的候选，
-     * 不用这里刷新。「复制」核心不管，在这里写剪贴板。
+     * 候选长按：先弹提示卡（编码 / 读音 / 释义…，与电脑版悬停气泡同一份模板），卡上「更多操作」
+     * 再换成菜单。一段提示都没有的候选（标点、符号）直接给菜单，不弹一张空卡片。
      */
     private fun showCandidateMenu(index: Int) {
         val bar = barView ?: return
-        val items = session.candidateMenu(index)
-        if (items.isEmpty()) return
         val title = session.candidateWindow(index, 1).items.firstOrNull().orEmpty()
+        val sections = session.candidateTooltip(index)
         candidateMenu?.dismiss()
+        if (sections.isEmpty()) {
+            showCandidateActions(index, title)
+            return
+        }
+        candidateMenu = CandidateMenuPopup(bar).also { card ->
+            card.showTooltip(
+                title,
+                sections,
+                onCopy = { copyCandidate(title) },
+                onMore = { showCandidateActions(index, title) },
+            )
+        }
+    }
+
+    /**
+     * 候选操作菜单。菜单项由核心按候选类型给（普通词：置顶 / 前移 / 删除 / 恢复默认 …；
+     * 上屏历史：删除此历史 …），与电脑版右键菜单同一份。执行后核心会推送新的候选，
+     * 不用这里刷新。「复制」核心不管，在这里写剪贴板。
+     */
+    private fun showCandidateActions(index: Int, title: String) {
+        val bar = barView ?: return
+        val items = session.candidateMenu(index)
+        candidateMenu?.dismiss()
+        if (items.isEmpty()) return
         candidateMenu = CandidateMenuPopup(bar).also { menu ->
             menu.show(title, items) { entry ->
                 if (entry.action == "copy") {
-                    getSystemService(android.content.ClipboardManager::class.java)
-                        ?.setPrimaryClip(android.content.ClipData.newPlainText("candidate", title))
+                    copyCandidate(title)
                 } else {
                     session.candidateMenuRun(index, entry.action)
                 }
             }
         }
+    }
+
+    private fun copyCandidate(text: String) {
+        getSystemService(android.content.ClipboardManager::class.java)
+            ?.setPrimaryClip(android.content.ClipData.newPlainText("candidate", text))
     }
 
     override fun onCandidateSelected(index: Int) {

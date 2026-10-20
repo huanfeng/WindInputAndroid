@@ -166,6 +166,9 @@ class DeferredSession(
     override fun candidateMenu(index: Int): List<CandidateMenuEntry> =
         if (busy) emptyList() else delegate?.candidateMenu(index).orEmpty()
 
+    override fun candidateTooltip(index: Int): List<TooltipSection> =
+        if (busy) emptyList() else delegate?.candidateTooltip(index).orEmpty()
+
     override fun candidateMenuRun(index: Int, action: String): Boolean =
         if (busy) false else delegate?.candidateMenuRun(index, action) ?: false
 

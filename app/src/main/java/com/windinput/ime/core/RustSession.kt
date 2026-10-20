@@ -201,6 +201,11 @@ class RustSession(
         return core.candidateMenu(index.toUInt()).map { CandidateMenuEntry(it.label, it.action, it.enabled) }
     }
 
+    override fun candidateTooltip(index: Int): List<TooltipSection> {
+        if (index < 0) return emptyList()
+        return core.candidateTooltip(index.toUInt()).map { TooltipSection(it.title, it.inline, it.lines) }
+    }
+
     override fun candidateMenuRun(index: Int, action: String): Boolean =
         index >= 0 && core.candidateMenuRun(index.toUInt(), action)
 

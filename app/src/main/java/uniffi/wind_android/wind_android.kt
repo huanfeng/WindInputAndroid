@@ -727,6 +727,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidate_menu_run(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_candidate_tooltip(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidates(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_config_defaults(
@@ -820,6 +822,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_candidate_menu_run(`ptr`: Long,`index`: Int,`action`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
+    external fun uniffi_wind_android_fn_method_windcore_candidate_tooltip(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_candidates(`ptr`: Long,`offset`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_config_defaults(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1008,6 +1012,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_candidate_menu_run() != 46847) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_candidate_tooltip() != 30355) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_candidates() != 43261) {
@@ -2032,6 +2039,12 @@ public interface WindCoreInterface {
     fun `candidateMenuRun`(`index`: kotlin.UInt, `action`: kotlin.String): kotlin.Boolean
     
     /**
+     * 第 `index`（全量绝对下标）个候选的提示（编码 / 读音 / 释义…），与电脑版候选悬停气泡
+     * 同一份段模板。越界或全空返回空列表。长按候选时取来显示。
+     */
+    fun `candidateTooltip`(`index`: kotlin.UInt): List<CandidateTooltipInfo>
+    
+    /**
      * 拉取候选全量的一个窗口。**纯读**，不改状态，可随时调。
      *
      * 别在每次按键都拉一大段：序列化与 K 侧的文字测量都在主线程上。
@@ -2327,6 +2340,24 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterUInt.lower(`index`),
         FfiConverterString.lower(`action`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 第 `index`（全量绝对下标）个候选的提示（编码 / 读音 / 释义…），与电脑版候选悬停气泡
+     * 同一份段模板。越界或全空返回空列表。长按候选时取来显示。
+     */override fun `candidateTooltip`(`index`: kotlin.UInt): List<CandidateTooltipInfo> {
+            return FfiConverterSequenceTypeCandidateTooltipInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_candidate_tooltip(
+        it,
+        
+        FfiConverterUInt.lower(`index`),_status)
 }
     }
     )
@@ -2842,6 +2873,52 @@ public object FfiConverterTypeCandidateMenuItemInfo: FfiConverterRustBuffer<Cand
             FfiConverterString.write(value.`label`, buf)
             FfiConverterString.write(value.`action`, buf)
             FfiConverterBoolean.write(value.`enabled`, buf)
+    }
+}
+
+
+
+/**
+ * 候选提示的一段：段名（`None` = 无标题）、是否与首行同行、原始行（不截断，宿主自己折行）。
+ */
+data class CandidateTooltipInfo (
+    var `title`: kotlin.String?
+    , 
+    var `inline`: kotlin.Boolean
+    , 
+    var `lines`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCandidateTooltipInfo: FfiConverterRustBuffer<CandidateTooltipInfo> {
+    override fun read(buf: ByteBuffer): CandidateTooltipInfo {
+        return CandidateTooltipInfo(
+            FfiConverterOptionalString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CandidateTooltipInfo) = (
+            FfiConverterOptionalString.allocationSize(value.`title`) +
+            FfiConverterBoolean.allocationSize(value.`inline`) +
+            FfiConverterSequenceString.allocationSize(value.`lines`)
+    )
+
+    override fun write(value: CandidateTooltipInfo, buf: ByteBuffer) {
+            FfiConverterOptionalString.write(value.`title`, buf)
+            FfiConverterBoolean.write(value.`inline`, buf)
+            FfiConverterSequenceString.write(value.`lines`, buf)
     }
 }
 
@@ -4123,6 +4200,38 @@ public object FfiConverterTypeEngineCommand : FfiConverterRustBuffer<EngineComma
 /**
  * @suppress
  */
+public object FfiConverterOptionalString: FfiConverterRustBuffer<kotlin.String?> {
+    override fun read(buf: ByteBuffer): kotlin.String? {
+        if (buf.get().toInt() == 0) {
+            return null
+        }
+        return FfiConverterString.read(buf)
+    }
+
+    override fun allocationSize(value: kotlin.String?): ULong {
+        if (value == null) {
+            return 1UL
+        } else {
+            return 1UL + FfiConverterString.allocationSize(value)
+        }
+    }
+
+    override fun write(value: kotlin.String?, buf: ByteBuffer) {
+        if (value == null) {
+            buf.put(0)
+        } else {
+            buf.put(1)
+            FfiConverterString.write(value, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterOptionalTypeStatsSummaryInfo: FfiConverterRustBuffer<StatsSummaryInfo?> {
     override fun read(buf: ByteBuffer): StatsSummaryInfo? {
         if (buf.get().toInt() == 0) {
@@ -4201,6 +4310,34 @@ public object FfiConverterSequenceTypeCandidateMenuItemInfo: FfiConverterRustBuf
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeCandidateMenuItemInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeCandidateTooltipInfo: FfiConverterRustBuffer<List<CandidateTooltipInfo>> {
+    override fun read(buf: ByteBuffer): List<CandidateTooltipInfo> {
+        val len = buf.getInt()
+        return List<CandidateTooltipInfo>(len) {
+            FfiConverterTypeCandidateTooltipInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<CandidateTooltipInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeCandidateTooltipInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<CandidateTooltipInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeCandidateTooltipInfo.write(it, buf)
         }
     }
 }

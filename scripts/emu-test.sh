@@ -925,7 +925,7 @@ trap 'exit 1' TERM
 restart_pad
 wait_chinese >/dev/null
 
-echo; echo "${Y}[36] 候选长按菜单：置顶第三个候选，再恢复默认${N}"
+echo; echo "${Y}[36] 候选长按：提示卡 →「更多操作」→ 置顶第三个候选，再恢复默认${N}"
 # 菜单是 IME 窗口里的浮层，uiautomator 看不到，按版式算坐标（CandidateMenuPopup）：
 # 卡片在条区下方 4dp、左右各让 8dp，内边距 10dp，标题一行之后是 4 列格子，
 # 第 1 行中心约在键盘顶下 62dp，行距 46dp（实测）。
@@ -938,6 +938,13 @@ menu_cell() {   # 行 列
 long_press_candidate() {
     local x=$(( 60 + $1 * 120 ))
     adb_q shell input swipe "$x" "$GEO_BARY" "$x" "$GEO_BARY" 900
+    sleep 0.8
+    # 长按先出提示卡（编码 / 读音…），「更多操作」在标题行最右，约键盘顶下 30dp、
+    # 右边距 60dp 处；点它换成菜单。汉字候选都有提示（读音段），这里的候选恒为汉字。
+    # 卡没弹出的话这一下落在第 1 行字母上，后面的菜单格子断言随之失败，不会假通过
+    adb_q shell input tap \
+        "$(awk -v w="$GEO_W" -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", w - 60 * d }')" \
+        "$(awk -v t="$GEO_KBTOP" -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", t + 30 * d }')"
     sleep 0.8
 }
 # 先记下第 3 个候选是哪个字：只断言「首选不是式」的话，菜单没弹出、那一下穿透到键盘
