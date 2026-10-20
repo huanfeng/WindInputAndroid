@@ -308,6 +308,10 @@ private fun PageScreen(
     for ((name, items) in sections) {
         SettingsCard(name, items, values)
     }
+    // Emoji 开着才列附加模块（同电脑版的 enabled_when）
+    if (page.id == "input" && manifest.items.firstOrNull { it.key == EMOJI_ENABLED_KEY }?.let(values::bool) == true) {
+        EmojiModulesSection()
+    }
 }
 
 /** 一张卡片：常用项直接列出，`advanced` 项收进底部的「进阶」折叠区 */
@@ -410,6 +414,9 @@ private fun SchemaSection(session: ImeSession?) {
         }
     }
 }
+
+/** Emoji 候选总开关（附加模块卡片跟着它显示） */
+private const val EMOJI_ENABLED_KEY = "input.emoji.enabled"
 
 /** 双拼方案 id（与 assets/data/schemas/shuangpin.schema.toml 一致） */
 private const val SHUANGPIN_SCHEMA_ID = "shuangpin"
@@ -582,7 +589,12 @@ private fun CandidateTextPreview(textSp: Int) {
 }
 
 @Composable
-private fun ToggleRow(item: SettingItem, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+private fun ToggleRow(item: SettingItem, checked: Boolean, onCheckedChange: (Boolean) -> Unit) =
+    ToggleLine(item.title, item.summary, checked, onCheckedChange)
+
+/** 标题 + 说明 + 开关的一行；整行可点 */
+@Composable
+internal fun ToggleLine(title: String, summary: String?, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -591,8 +603,8 @@ private fun ToggleRow(item: SettingItem, checked: Boolean, onCheckedChange: (Boo
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = item.title)
-            item.summary?.let {
+            Text(text = title)
+            summary?.let {
                 Text(
                     text = it,
                     modifier = Modifier.padding(top = 2.dp),

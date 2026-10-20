@@ -493,6 +493,28 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
+    pub fn emoji_modules(&self) -> Vec<EmojiModuleInfo> {
+        self.core
+            .emoji_modules()
+            .into_iter()
+            .map(|m| EmojiModuleInfo {
+                id: m.id,
+                label: m.label,
+                description: m.description,
+                user: m.user,
+                enabled: m.enabled,
+            })
+            .collect()
+    }
+
+    /// 打开 / 关闭一个 emoji 附加模块。只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+    pub fn set_emoji_module(&self, id: String, on: bool) -> Result<(), ConfigError> {
+        self.core
+            .set_emoji_module(&id, on)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     // ── 设置页：输入统计 ─────────────────────────────────────────────
 
     /// 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
@@ -707,5 +729,15 @@ pub struct UserWordPageInfo {
 pub struct CandidateMenuItemInfo {
     pub label: String,
     pub action: String,
+    pub enabled: bool,
+}
+
+/// 一个 emoji 附加模块。`user` = 用户自己放进 `emoji/` 目录的表。
+#[derive(Debug, uniffi::Record)]
+pub struct EmojiModuleInfo {
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    pub user: bool,
     pub enabled: bool,
 }

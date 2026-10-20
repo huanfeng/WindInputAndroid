@@ -737,6 +737,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_config_snapshot(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_emoji_modules(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_gained(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_lost(
@@ -748,6 +750,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_emoji_module(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(
     ): Int
@@ -822,6 +826,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_config_snapshot(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_emoji_modules(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_focus_gained(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_focus_lost(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -834,6 +840,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_select_candidate(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_set_emoji_module(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1009,6 +1017,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_config_snapshot() != 24732) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_emoji_modules() != 39855) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_focus_gained() != 4561) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1025,6 +1036,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 14719) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_emoji_module() != 22141) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_learning_suspended() != 58911) {
@@ -2032,6 +2046,11 @@ public interface WindCoreInterface {
     fun `configSnapshot`(): kotlin.String
     
     /**
+     * emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
+     */
+    fun `emojiModules`(): List<EmojiModuleInfo>
+    
+    /**
      * 焦点获得（对应 onStartInput）。
      *
      * 词库预热在核心构造时就已启动（不在这里），所以本调用是廉价的。
@@ -2071,6 +2090,11 @@ public interface WindCoreInterface {
      * 以后永远点不到，候选栏的滚动也就失去了意义。
      */
     fun `selectCandidate`(`index`: kotlin.UInt): KeyResult
+    
+    /**
+     * 打开 / 关闭一个 emoji 附加模块。只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    fun `setEmojiModule`(`id`: kotlin.String, `on`: kotlin.Boolean)
     
     /**
      * 暂停 / 恢复学习（无痕）。宿主每次 onStartInput 都要按当前输入框显式传一次：
@@ -2374,6 +2398,22 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
+     */override fun `emojiModules`(): List<EmojiModuleInfo> {
+            return FfiConverterSequenceTypeEmojiModuleInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_emoji_modules(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 焦点获得（对应 onStartInput）。
      *
      * 词库预热在核心构造时就已启动（不在这里），所以本调用是廉价的。
@@ -2478,6 +2518,24 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     }
     )
     }
+    
+
+    
+    /**
+     * 打开 / 关闭一个 emoji 附加模块。只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    @Throws(ConfigException::class)override fun `setEmojiModule`(`id`: kotlin.String, `on`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_emoji_module(
+        it,
+        
+        FfiConverterString.lower(`id`),
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
     
 
     
@@ -3043,6 +3101,62 @@ public object FfiConverterTypeEditOp: FfiConverterRustBuffer<EditOp> {
             FfiConverterString.write(value.`text`, buf)
             FfiConverterUInt.write(value.`count`, buf)
             FfiConverterInt.write(value.`delta`, buf)
+    }
+}
+
+
+
+/**
+ * 一个 emoji 附加模块。`user` = 用户自己放进 `emoji/` 目录的表。
+ */
+data class EmojiModuleInfo (
+    var `id`: kotlin.String
+    , 
+    var `label`: kotlin.String
+    , 
+    var `description`: kotlin.String
+    , 
+    var `user`: kotlin.Boolean
+    , 
+    var `enabled`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeEmojiModuleInfo: FfiConverterRustBuffer<EmojiModuleInfo> {
+    override fun read(buf: ByteBuffer): EmojiModuleInfo {
+        return EmojiModuleInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: EmojiModuleInfo) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterString.allocationSize(value.`description`) +
+            FfiConverterBoolean.allocationSize(value.`user`) +
+            FfiConverterBoolean.allocationSize(value.`enabled`)
+    )
+
+    override fun write(value: EmojiModuleInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterString.write(value.`description`, buf)
+            FfiConverterBoolean.write(value.`user`, buf)
+            FfiConverterBoolean.write(value.`enabled`, buf)
     }
 }
 
@@ -4060,6 +4174,34 @@ public object FfiConverterSequenceTypeEditOp: FfiConverterRustBuffer<List<EditOp
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeEditOp.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeEmojiModuleInfo: FfiConverterRustBuffer<List<EmojiModuleInfo>> {
+    override fun read(buf: ByteBuffer): List<EmojiModuleInfo> {
+        val len = buf.getInt()
+        return List<EmojiModuleInfo>(len) {
+            FfiConverterTypeEmojiModuleInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<EmojiModuleInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeEmojiModuleInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<EmojiModuleInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeEmojiModuleInfo.write(it, buf)
         }
     }
 }

@@ -1077,3 +1077,25 @@ fn candidate_menu_move_top_then_reset() {
     settle();
     assert_eq!(first_of(&core), before[0], "恢复默认后首选回到原来的");
 }
+
+/// Emoji 附加模块：列表里有内置模块；开关写进去后读得回来，不存在的模块报错。
+#[test]
+fn emoji_module_toggle_roundtrips() {
+    use wind_android::ConfigError;
+    let Some((core, _rec, _env)) = setup_exclusive("emoji_modules") else {
+        return;
+    };
+    let state = |c: &WindCore, id: &str| c.emoji_modules().into_iter().find(|m| m.id == id);
+    let before = state(&core, "frost_greek").expect("内置模块「希腊字母」应在列表里");
+    core.set_emoji_module("frost_greek".into(), !before.enabled)
+        .expect("开关应写入成功");
+    assert_eq!(
+        state(&core, "frost_greek").map(|m| m.enabled),
+        Some(!before.enabled),
+        "写入后应读回新值"
+    );
+    assert!(matches!(
+        core.set_emoji_module("no_such".into(), true),
+        Err(ConfigError::Rejected { .. })
+    ));
+}
