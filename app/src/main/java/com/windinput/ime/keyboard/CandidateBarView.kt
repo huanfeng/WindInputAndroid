@@ -140,6 +140,22 @@ class CandidateBarView(context: Context) : View(context) {
         invalidate()
     }
 
+    /**
+     * 核心扩容重建后整份替换：内容可能整体变了，全部重量；**滚动位置保留**（夹回新范围）——
+     * 用户正往后滑，跳回开头会以为列表被清空了。
+     */
+    fun replaceCandidates(items: List<String>, itemComments: List<String>) {
+        candidates = items
+        comments = itemComments
+        pressedIndex = -1
+        loadingMore = false
+        itemBounds.clear()
+        contentWidth = 0f
+        measureFrom(0)
+        scrollX = scrollX.coerceIn(0f, maxScroll())
+        invalidate()
+    }
+
     /** 续取到货：**只量新来的这一段**，已有的量过就不再动 */
     fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
         loadingMore = false

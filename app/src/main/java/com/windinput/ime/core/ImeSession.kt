@@ -108,6 +108,11 @@ data class CandidatePage(
     val selected: Int,
     /** 与 [items] 一一对应的注释灰字；没开「候选显示编码提示」时为空 */
     val comments: List<String> = emptyList(),
+    /**
+     * 这次拉取让核心扩容重建了候选（滑到尾部、首批没取够）：池子变大后词频重排可能改了
+     * 前面的顺序，已显示的那段要整份重取，不能只把新的一段接在旧列表后面。
+     */
+    val rebuilt: Boolean = false,
 )
 
 /**

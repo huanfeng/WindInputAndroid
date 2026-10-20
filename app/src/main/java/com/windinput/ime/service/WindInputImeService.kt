@@ -313,6 +313,9 @@ class WindInputImeService :
     /** 已从核心取到的候选（绝对下标即列表下标，选词直接用它） */
     private var loadedCandidates: List<String> = emptyList()
 
+    /** 核心单次拉取的硬上限（`candidate_pull::MAX_WINDOW`），整份重取时按它分段 */
+    private val CANDIDATE_WINDOW_MAX = 200
+
     /** 与 [loadedCandidates] 对应的注释灰字（开了「候选显示编码提示」才有） */
     private var loadedComments: List<String> = emptyList()
 
@@ -907,6 +910,30 @@ class WindInputImeService :
     override fun onNeedMoreCandidates() {
         if (loadedCandidates.size >= candidateTotal) return
         val page = session.candidateWindow(loadedCandidates.size, CANDIDATE_CHUNK)
+        if (page.rebuilt) {
+            // 核心扩容重建了：已显示的前段可能换了顺序，整份重取到同样的长度再加一段，
+            // 原地替换（保留滚动位置）——只往后接的话，按下标选词会选到别的词
+            // 分段取：核心单次最多给 MAX_WINDOW（200）条，已显示的可能比这还多
+            val target = loadedCandidates.size + CANDIDATE_CHUNK
+            val items = ArrayList<String>(target)
+            val comments = ArrayList<String>(target)
+            var total = page.total
+            while (items.size < target) {
+                val w = session.candidateWindow(items.size, minOf(target - items.size, CANDIDATE_WINDOW_MAX))
+                if (w.items.isEmpty()) break
+                // 注释可能比候选短（开关中途切换）：按下标补齐后再接，保证两边一一对应
+                comments += com.windinput.ime.keyboard.CandidateBarView.alignComments(w.comments, w.items.size)
+                    .takeIf { w.comments.isNotEmpty() } ?: List(w.items.size) { "" }
+                items += w.items
+                total = w.total
+            }
+            loadedCandidates = items
+            loadedComments = comments
+            candidateTotal = total
+            barView?.replaceCandidates(items, comments)
+            expandedCandidatesWindow?.replaceCandidates(items, comments)
+            return
+        }
         if (page.items.isEmpty()) return
         loadedCandidates = loadedCandidates + page.items
         // 与视图同一种对齐：注释一律按候选下标对得上，谁按下标取都不错位

@@ -3196,6 +3196,11 @@ data class CandidateWindow (
      * 只有 [`WindCore::candidates_with_comments`] 填，否则为空
      */
     var `comments`: List<kotlin.String>
+    , 
+    /**
+     * 本次拉取触发了核心扩容重建：前面已取到的候选可能变了，宿主须整份重取已显示的范围
+     */
+    var `rebuilt`: kotlin.Boolean
     
 ){
     
@@ -3217,6 +3222,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -3225,7 +3231,8 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.allocationSize(value.`offset`) +
             FfiConverterUInt.allocationSize(value.`total`) +
             FfiConverterUInt.allocationSize(value.`selected`) +
-            FfiConverterSequenceString.allocationSize(value.`comments`)
+            FfiConverterSequenceString.allocationSize(value.`comments`) +
+            FfiConverterBoolean.allocationSize(value.`rebuilt`)
     )
 
     override fun write(value: CandidateWindow, buf: ByteBuffer) {
@@ -3234,6 +3241,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.write(value.`total`, buf)
             FfiConverterUInt.write(value.`selected`, buf)
             FfiConverterSequenceString.write(value.`comments`, buf)
+            FfiConverterBoolean.write(value.`rebuilt`, buf)
     }
 }
 

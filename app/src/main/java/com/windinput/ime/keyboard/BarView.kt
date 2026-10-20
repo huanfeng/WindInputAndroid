@@ -321,6 +321,12 @@ class BarView(
     }
 
     /** 续取到货：只把新的一段交给候选栏（不重量已有项，见 CandidateBarView 的说明） */
+    /** 核心扩容重建后整份替换（保留滚动位置），见 [CandidateBarView.replaceCandidates] */
+    fun replaceCandidates(items: List<String>, comments: List<String>) {
+        candidateBar.replaceCandidates(items, comments)
+        hasCandidates = items.isNotEmpty()
+    }
+
     fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
         if (more.isEmpty()) return
         candidateBar.appendCandidates(more, moreComments)

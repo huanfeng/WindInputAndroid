@@ -60,6 +60,12 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         grid?.scrollToPosition(0)
     }
 
+    /** 核心扩容重建后整份替换，**不回到顶部**（用户正往下滑） */
+    fun replaceCandidates(items: List<String>, comments: List<String>) {
+        loadingMore = false
+        adapter.submit(items, comments)
+    }
+
     /**
      * 续取到货：**只通知新增区间**。
      *

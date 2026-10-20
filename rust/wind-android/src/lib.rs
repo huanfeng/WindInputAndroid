@@ -259,6 +259,8 @@ pub struct CandidateWindow {
     /// 与 items 一一对应的注释灰字（码表剩余编码、拼音候选反查码…）；
     /// 只有 [`WindCore::candidates_with_comments`] 填，否则为空
     pub comments: Vec<String>,
+    /// 本次拉取触发了核心扩容重建：前面已取到的候选可能变了，宿主须整份重取已显示的范围
+    pub rebuilt: bool,
 }
 
 impl From<CoreCandidateWindow> for CandidateWindow {
@@ -269,6 +271,7 @@ impl From<CoreCandidateWindow> for CandidateWindow {
             total: w.total as u32,
             selected: w.selected as u32,
             comments: w.comments,
+            rebuilt: w.rebuilt,
         }
     }
 }

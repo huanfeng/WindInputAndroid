@@ -229,6 +229,7 @@ class RustSession(
             total = w.total.toInt(),
             selected = w.selected.toInt(),
             comments = w.comments,
+            rebuilt = w.rebuilt,
         )
     }
 
