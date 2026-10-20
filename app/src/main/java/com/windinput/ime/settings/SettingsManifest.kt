@@ -1,84 +1,127 @@
 package com.windinput.ime.settings
 
 import android.util.Log
-import com.windinput.ime.core.DataDirs
+import android.content.Context
 import org.tomlj.Toml
 
-/**
- * 设置清单：TOML → 数据模型，驱动设置页生成。
- * 三端对齐机制见 docs/architecture.md §3.3（platform 字段门控）。
- */
+/** 一级页面（首页的一行）。格式见 assets/data/settings_manifest.toml 头部注释 */
+data class SettingPage(
+    val id: String,
+    val title: String,
+    /** 首页分段：shared（与电脑版相同）/ android（手机键盘）/ tail（收尾） */
+    val segment: String,
+)
+
+/** 设置项写到哪里 */
+enum class SettingSource {
+    /** 引擎配置：经核心 `config_set` 写进核心用户层 */
+    ENGINE,
+
+    /** 键盘自己的配置：K 侧 `filesDir/user/config.toml`，引擎不读 */
+    ANDROID,
+}
+
 data class SettingItem(
+    val page: String,
+    /** 卡片名 */
+    val section: String,
     val key: String,
+    val source: SettingSource,
+    /** toggle / select / int */
     val type: String,
     val title: String,
     val summary: String?,
+    /** 仅 android 项；引擎项的值来自核心 */
     val defaultValue: Any?,
-    val platform: String?,
-    /** int 类型的取值范围与步长 */
     val min: Int? = null,
     val max: Int? = null,
     val step: Int = 1,
-    /** select 类型的选项：(value, label)，value 即写入配置的字符串 */
+    val unit: String? = null,
+    /** select 的选项：(value, label)，value 一律是字符串，写入时按键的类型转换 */
     val options: List<Pair<String, String>> = emptyList(),
-    /** 改动后要通知引擎重读配置（引擎侧的键；UI 侧的键不需要，Service 每次弹出都重读） */
-    val reload: Boolean = false,
+    /** 收进卡片底部的「进阶」折叠区 */
+    val advanced: Boolean = false,
 )
 
-data class SettingGroup(
-    val title: String,
+data class SettingsManifestData(
+    val pages: List<SettingPage>,
     val items: List<SettingItem>,
-)
+) {
+    fun itemsOf(page: String): List<SettingItem> = items.filter { it.page == page }
+
+    /** 某页的卡片，按清单里首次出现的顺序 */
+    fun sectionsOf(page: String): List<Pair<String, List<SettingItem>>> =
+        itemsOf(page).groupBy { it.section }.toList()
+}
 
 object SettingsManifest {
 
     private const val TAG = "SettingsManifest"
 
-    /** 从数据目录加载清单（user 覆盖 data），失败返回空列表 */
-    fun load(dirs: DataDirs): List<SettingGroup> {
-        val file = dirs.resolveDataFile("settings_manifest.toml") ?: return emptyList()
+    /**
+     * 直接从 APK 的 assets 读清单，**不走**数据目录：数据目录里的出厂数据要等核心启动时
+     * 才按版本重拷，设置页比它早——升级后第一次打开读到的是上一版的清单（格式一变就整页空白）。
+     * 清单是 App 自己的界面描述，不需要用户覆盖层。
+     */
+    fun load(context: Context): SettingsManifestData {
         return try {
-            parse(file.readText())
+            parse(context.assets.open("data/settings_manifest.toml").bufferedReader().use { it.readText() })
         } catch (e: Exception) {
             Log.w(TAG, "settings manifest parse failed", e)
-            emptyList()
+            SettingsManifestData(emptyList(), emptyList())
         }
     }
 
-    fun parse(toml: String): List<SettingGroup> {
+    /** 纯函数解析，可在 JVM 单测里直接跑。清单写错（缺字段、页面不存在）直接抛错 */
+    fun parse(toml: String): SettingsManifestData {
         val result = Toml.parse(toml)
         if (result.hasErrors()) {
             throw IllegalArgumentException("TOML errors: ${result.errors()}")
         }
-        val groups = result.getArray("group") ?: return emptyList()
-        return (0 until groups.size()).map { g ->
-            val group = groups.getTable(g)
-            val items = group.getArray("item")
-            SettingGroup(
-                title = group.getString("title") ?: "",
-                items = (0 until (items?.size() ?: 0)).map { i ->
-                    val item = items!!.getTable(i)
-                    SettingItem(
-                        key = requireNotNull(item.getString("key")) { "item 缺少 key" },
-                        type = item.getString("type") ?: "toggle",
-                        title = item.getString("title") ?: "",
-                        summary = item.getString("summary"),
-                        defaultValue = item.get("default"),
-                        platform = item.getString("platform"),
-                        min = item.getLong("min")?.toInt(),
-                        max = item.getLong("max")?.toInt(),
-                        step = item.getLong("step")?.toInt() ?: 1,
-                        options = item.getArray("options")?.let { arr ->
-                            (0 until arr.size()).map { o ->
-                                val t = arr.getTable(o)
-                                requireNotNull(t.getString("value")) { "option 缺少 value" } to
-                                    (t.getString("label") ?: t.getString("value")!!)
-                            }
-                        } ?: emptyList(),
-                        reload = item.getBoolean("reload") ?: false,
-                    )
-                },
+        val pageArr = result.getArray("page")
+        val pages = (0 until (pageArr?.size() ?: 0)).map { i ->
+            val t = pageArr!!.getTable(i)
+            SettingPage(
+                id = requireNotNull(t.getString("id")) { "page 缺少 id" },
+                title = t.getString("title") ?: "",
+                segment = t.getString("segment") ?: "shared",
             )
         }
+        val pageIds = pages.map { it.id }.toSet()
+        val itemArr = result.getArray("item")
+        val items = (0 until (itemArr?.size() ?: 0)).map { i ->
+            val t = itemArr!!.getTable(i)
+            val key = requireNotNull(t.getString("key")) { "item 缺少 key" }
+            val page = requireNotNull(t.getString("page")) { "$key 缺少 page" }
+            require(page in pageIds) { "$key 的 page「$page」不存在" }
+            val source = when (val s = t.getString("source")) {
+                "engine" -> SettingSource.ENGINE
+                "android" -> SettingSource.ANDROID
+                else -> throw IllegalArgumentException("$key 的 source「$s」不认识")
+            }
+            SettingItem(
+                page = page,
+                section = t.getString("section") ?: "",
+                key = key,
+                source = source,
+                type = t.getString("type") ?: "toggle",
+                title = t.getString("title") ?: "",
+                summary = t.getString("summary"),
+                defaultValue = t.get("default"),
+                min = t.getLong("min")?.toInt(),
+                max = t.getLong("max")?.toInt(),
+                step = t.getLong("step")?.toInt() ?: 1,
+                unit = t.getString("unit"),
+                options = t.getArray("options")?.let { arr ->
+                    (0 until arr.size()).map { o ->
+                        val opt = arr.getTable(o)
+                        val value = requireNotNull(opt.getString("value")) { "$key 的选项缺少 value" }
+                        value to (opt.getString("label") ?: value)
+                    }
+                } ?: emptyList(),
+                advanced = t.getBoolean("advanced") ?: false,
+            )
+        }
+        return SettingsManifestData(pages, items)
     }
 }

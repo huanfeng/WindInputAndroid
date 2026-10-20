@@ -46,4 +46,8 @@ object CoreAccess {
             null
         }
     }
+
+    /** 设置页的数据面（配置读写、统计）。阻塞，后台线程调用 */
+    fun obtainCore(context: Context): uniffi.wind_android.WindCore? =
+        (obtain(context) as? RustSession)?.core
 }

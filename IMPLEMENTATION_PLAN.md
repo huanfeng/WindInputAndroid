@@ -132,6 +132,49 @@
   [34] 收键盘后联想不残留。全部 45 项通过。
 - 落地细节记在 `docs/android-ime-features.md` §14.9。
 
+## Stage S（插队，2026-10-20）：设置重构
+> 用户反馈「现在的选项太乱」，原定 v0.4 的设置重构提前到 Stage 5 之前做。
+> 设计见 `docs/mobile-ux-reference.md` §6；共用项的分类名、卡片名、标题取电脑版清单
+> （`wind-setting/src/assets/settings_manifest.toml`），安卓清单只记「显示哪些键、放哪一档、是否进阶」。
+
+**已查明的现状**：设置页写的是 K 侧自己的 `filesDir/user/config.toml`，引擎读的是
+`filesDir/rust/config/WindInput/config.toml`——两个文件互不相通，引擎项必须走核心的 `config_set`。
+
+### S1 绑定层与数据接口
+- 主仓：统计汇总的计算从 `wind-webdata` 挪进 `wind-store`（两端共用一份），`wind-mobile` 开
+  `stats_summary / stats_daily / stats_clear`；修 `config_registry` 里 `LayoutEnum` 选项为空。
+- 本仓 `wind-android` 投影 `config_snapshot / config_defaults / config_registry / config_set`、统计三项。
+- Kotlin：设置页的「引擎配置」访问层（读快照、写入 + ReloadConfig）。
+- 测试：绑定层用例（写一个键 → 快照里读回；统计汇总结构）。
+
+### S2 清单与页面框架
+- 新清单格式：页 → 卡片 → 项，`source = engine | android`、`advanced`；首页三段 + 每项一行摘要，二级页面。
+- 现有 `ui.android.*` 项搬进「键盘布局 / 按键与手势 / 工具栏与剪贴板 / 外观」；英文三开关进「方案 → 英文」。
+- 测试：清单解析单测；每个页面能打开（emu）。
+
+### S3 引擎设置页
+- 方案（方案列表 + 码表 / 拼音（含模糊音）/ 混输 / 英文 / 临时拼音 / 临时英文卡）、输入（默认状态、标点、联想、简繁、Emoji）、
+  高级、关于。条目从电脑版清单挑手机有意义的，标题照抄；联想写 `mobile.association.*`。
+- 比对脚本：安卓清单里的共用项标题与电脑版不一致就报错。
+
+### S4 统计页
+- 概览数字 + 近 30 天每日字数图 + 统计开关 / 清空，形状照电脑版统计页。
+
+### S5 词库页（视主仓接口情况，可能后置）
+
+**Status**: In Progress — S1、S2 完成，S3、S4 首版完成（2026-10-20）
+- S1：主仓 46102baa（统计报表挪进 wind-store 两端共用、wind-mobile 开 stats_*、config_set 校验键名、
+  LayoutEnum 选项）；绑定层投影配置读写与统计，用例 3 条。
+- S2：清单改为 `[[page]]` + `[[item]]`（page / section / source / advanced），从 APK assets 直接读
+  （数据目录里的出厂副本要等核心启动才重拷，升级后首开会读到旧格式）；首页三段 + 摘要，二级页按卡片分组、
+  「进阶」折叠。清单单测 6 条、快照摊平单测 2 条。
+- S3 首版：方案页（方案列表 + 码表 / 拼音 / 模糊音 / 混输 / 英文）、输入页（默认状态、字符与标点、
+  标点配对、联想）、高级（日志级别）。`scripts/check-settings-labels.py` 比对共用项标题，当前一致。
+  **没放进来的**：简繁转换、Emoji——APK 里没带 opencc / emoji 数据，开了也没效果，带上数据后再加；
+  临时拼音 / 临时英文——触发键是实体键盘语义，手机上怎么触发另议。
+- S4 首版：概览数字、近 30 天柱状图、清空（两次确认）、启用统计开关。
+- 待做：词库页（主仓 wind-mobile 尚无个人词接口）；外观改走核心主题（`ui.theme.*`）；键盘高度改滑块预览。
+
 ## Stage 5: 真机走查 → v0.3.0
 **Goal**: 小米真机按「微信聊天 / 浏览器搜索 / 登录框 / 备忘录长文」四个场景逐项走查
 Stage 1–4，再列一轮「还不像手机」的清单。处理完首要项后打 tag v0.3.0。
@@ -142,9 +185,7 @@ Stage 1–4，再列一轮「还不像手机」的清单。处理完首要项后
 ---
 
 ## 推到 v0.4 及以后（原 v0.3 草案）
-- **设置重构**（按 `docs/mobile-ux-reference.md` §6）：
-  - 先补绑定：`config_snapshot / config_defaults / config_registry / config_set` 和主题接口；主仓 `wind-mobile` 开统计查询（summary / daily / clear）。
-  - 设置清单加 `page / section / advanced / source` 字段。首页分三段：与电脑版同名的「方案 / 输入 / 外观 / 统计 / 词库」（方案只做按类型的全局值，单个方案的细节覆盖不做），安卓专属的「键盘布局 / 按键与手势 / 工具栏与剪贴板」，最后是「高级 / 关于」。共用项的分类名和标题取自电脑版清单。
+- ~~设置重构~~ → 已提前为上面的 Stage S。
 - **键盘内操作**（同文 §5）：工具栏入口 → 整块功能面板；长按中英键弹出方案切换气泡；首次弹出先选方案；「方案」一词保留，与电脑版一致
 - 候选长按菜单（置顶/删除/恢复/反查；主仓需开 `CandidateOp` 入口）
 - 隐私模式（主仓需加暂停学习）——Stage 4 的 History 学习上线后优先级上升

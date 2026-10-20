@@ -19,7 +19,8 @@ import uniffi.wind_android.WindCore
  * - 候选点选：骨架期合成数字键（页内 1-9），走正向通道拿上屏文本
  */
 class RustSession(
-    private val core: WindCore,
+    /** 设置页也直接用它读写配置、查统计（见 settings/CoreAccess） */
+    internal val core: WindCore,
 ) : ImeSession {
 
     companion object {

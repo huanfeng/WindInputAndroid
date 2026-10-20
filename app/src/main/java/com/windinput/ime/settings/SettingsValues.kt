@@ -1,0 +1,127 @@
+package com.windinput.ime.settings
+
+import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
+import com.windinput.ime.core.UserConfig
+import uniffi.wind_android.ConfigException
+import uniffi.wind_android.ConfigValue
+import uniffi.wind_android.EngineCommand
+import uniffi.wind_android.WindCore
+
+/**
+ * 设置页的值：按设置项的来源分两条路读写。
+ *
+ * - **引擎项**：读核心的配置快照（四层合并后的生效值），写走 `config_set`，写完发 ReloadConfig
+ *   让核心即时重读。⚠ 不能写 K 侧的 `filesDir/user/config.toml`——引擎根本不读那个文件，
+ *   核心的用户层在 `filesDir/rust/config/WindInput/config.toml`。
+ * - **键盘项**：读写 [UserConfig]，下次弹出键盘时 Service 重读。
+ *
+ * 核心未就绪（[core] 为 null）时引擎项一律不显示：显示一个读不到值、写了也没用的开关，
+ * 比不显示更糟。
+ *
+ * 所有方法都可能做 IO，调用方放后台线程；[version] 每次写入后自增，供 Compose 重组。
+ */
+class SettingsValues(
+    private val userConfig: UserConfig,
+    private val core: WindCore?,
+) {
+    private companion object {
+        const val TAG = "SettingsValues"
+    }
+
+    /** 值变化的版本号：Compose 读它，写入后递增触发重组 */
+    var version by mutableIntStateOf(0)
+        private set
+
+    @Volatile
+    private var engine: Map<String, Any> = emptyMap()
+
+    /** 核心注册表：键 → 类型（bool / int / float / str / enum …） */
+    @Volatile
+    private var types: Map<String, String> = emptyMap()
+
+    val engineReady: Boolean get() = core != null && types.isNotEmpty()
+
+    /** 读核心的注册表与快照（后台线程） */
+    fun load() {
+        val c = core ?: return
+        types = c.configRegistry().associate { it.key to it.ty }
+        engine = runCatching { ConfigSnapshot.flatten(c.configSnapshot()) }
+            .onFailure { Log.w(TAG, "配置快照解析失败", it) }
+            .getOrDefault(emptyMap())
+        version++
+    }
+
+    /**
+     * 这一项现在能不能显示：键盘项总能；引擎项要核心就绪且键在注册表里。
+     * 清单里写错的引擎键在这里被挡掉并记一条警告——不显示一个「点了没反应」的开关。
+     */
+    fun available(item: SettingItem): Boolean {
+        if (item.source == SettingSource.ANDROID) return true
+        if (!engineReady) return false
+        return (item.key in types).also { known ->
+            if (!known) Log.w(TAG, "设置清单里的引擎键不在核心注册表里：${item.key}")
+        }
+    }
+
+    private fun raw(item: SettingItem): Any? = when (item.source) {
+        SettingSource.ENGINE -> engine[item.key]
+        SettingSource.ANDROID -> userConfig.readAll()[item.key] ?: item.defaultValue
+    }
+
+    fun bool(item: SettingItem): Boolean = when (val v = raw(item)) {
+        is Boolean -> v
+        is String -> v == "true"
+        else -> false
+    }
+
+    fun int(item: SettingItem): Int = when (val v = raw(item)) {
+        is Number -> v.toInt()
+        is String -> v.toIntOrNull() ?: 0
+        else -> 0
+    }
+
+    /** select 的当前值，与选项的 value 同形（字符串） */
+    fun choice(item: SettingItem): String = raw(item)?.toString() ?: ""
+
+    /** 写入。返回错误说明（成功为 null）。后台线程调用 */
+    fun set(item: SettingItem, value: Any): String? {
+        val err = when (item.source) {
+            SettingSource.ENGINE -> setEngine(item.key, value)
+            SettingSource.ANDROID -> {
+                userConfig.put(item.key, androidValue(item, value))
+                null
+            }
+        }
+        version++
+        return err
+    }
+
+    private fun setEngine(key: String, value: Any): String? {
+        val c = core ?: return "输入法核心未就绪"
+        val cv = when (types[key]) {
+            "bool" -> ConfigValue.Bool(value == true || value == "true")
+            "int" -> ConfigValue.Int(value.toString().toLong())
+            "float" -> ConfigValue.Float(value.toString().toDouble())
+            else -> ConfigValue.Str(value.toString())
+        }
+        return try {
+            c.configSet(key, cv)
+            c.runCommand(EngineCommand.ReloadConfig)
+            engine = ConfigSnapshot.flatten(c.configSnapshot())
+            null
+        } catch (e: ConfigException) {
+            Log.w(TAG, "写入 $key 失败", e)
+            (e as? ConfigException.Rejected)?.reason ?: e.toString()
+        }
+    }
+
+    /** 键盘项按默认值的类型存：默认是整数的 select（如长按速度）存成整数，Service 按整数读 */
+    private fun androidValue(item: SettingItem, value: Any): Any = when (item.defaultValue) {
+        is Boolean -> value == true || value == "true"
+        is Long, is Int -> value.toString().toLong()
+        else -> value.toString()
+    }
+}

@@ -1,179 +1,793 @@
-# 设置清单：驱动设置页生成（方法论同桌面 wind-setting 的 settings_manifest）。
+# 安卓设置清单：驱动设置页生成（结构与取舍见 docs/mobile-ux-reference.md §6）。
 #
-# [[group]]        分组，title 为组标题
-# [[group.item]]   设置项：
-#   key      配置键（点分路径，写入用户层 config.toml，与桌面配置域对齐）
-#   type     toggle（后续扩展：select/number/action）
+# [[page]]   一级页面（首页的一行）
+#   id       页面标识；schema / stats / about 另有代码画的专属区块
 #   title    标题
-#   summary  说明（可选）
-#   default  默认值
-#   platform 平台门控（可选；"android" = 仅安卓，缺省 = 通用）
+#   segment  首页分段：shared（与电脑版相同）/ android（手机键盘）/ tail（收尾）
 #
-# 占位清单：Rust 核心接入后，通用逻辑域设置项(schema/input/keys)将与桌面清单合并。
+# [[item]]   设置项，按出现顺序归入 page → section（卡片）
+#   page     所属页面 id
+#   section  卡片名。共用项照抄电脑版清单（wind-setting/src/assets/settings_manifest.toml）
+#   key      配置键（点分路径）
+#   source   engine = 引擎配置（经核心 config_set 写进核心用户层，键须在核心注册表里）
+#            android = 键盘自己的配置（filesDir/user/config.toml，只有 K 侧读）
+#   type     toggle / select / int
+#   title    标题。共用项照抄电脑版的 label；键盘专属项写看得见的行为
+#   summary  说明（可选）
+#   default  默认值（仅 android 项；引擎项的当前值与默认值都来自核心）
+#   options  select 的选项 [{ value, label }]；value 一律写字符串，写入时按键的类型转换
+#   min / max / step / unit   int 的范围、步长、单位
+#   advanced true = 收进卡片底部的「进阶」折叠区（工程参数）
+#
+# 引擎项写入后会发 ReloadConfig 让核心即时重读；键盘项在下次弹出键盘时生效。
 
-[[group]]
-title = "键盘"
+# ── 与电脑版相同 ─────────────────────────────────────────────
 
-[[group.item]]
-key = "ui.android.haptic"
+[[page]]
+id = "schema"
+title = "方案"
+segment = "shared"
+
+[[page]]
+id = "input"
+title = "输入"
+segment = "shared"
+
+[[page]]
+id = "ui"
+title = "外观"
+segment = "shared"
+
+[[page]]
+id = "stats"
+title = "统计"
+segment = "shared"
+
+# ── 手机键盘（安卓专属）──────────────────────────────────────
+
+[[page]]
+id = "keyboard"
+title = "键盘布局"
+segment = "android"
+
+[[page]]
+id = "keys"
+title = "按键与手势"
+segment = "android"
+
+[[page]]
+id = "toolbar"
+title = "工具栏与剪贴板"
+segment = "android"
+
+# ── 收尾 ─────────────────────────────────────────────────────
+
+[[page]]
+id = "advanced"
+title = "高级"
+segment = "tail"
+
+[[page]]
+id = "about"
+title = "关于"
+segment = "tail"
+
+# ═══ 方案 ═══════════════════════════════════════════════════════
+# 方案列表与双拼布局由代码画在页首；下面是按方案类型的全局值（电脑版的四张卡）。
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.auto_commit_at_full"
+source = "engine"
 type = "toggle"
-title = "按键震动"
-summary = "点按键盘时的触觉反馈"
-default = true
-platform = "android"
+title = "全码唯一自动上屏"
 
-[[group.item]]
-key = "ui.android.key_preview"
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.clear_on_empty_max"
+source = "engine"
 type = "toggle"
-title = "按键气泡"
-summary = "点按时显示按键放大气泡"
-default = false
-platform = "android"
+title = "满码空码清空"
 
-[[group.item]]
-key = "ui.android.row_height_portrait"
-type = "int"
-title = "键高（竖屏）"
-summary = "单行键位高度，dp"
-default = 56
-min = 40
-max = 72
-step = 2
-platform = "android"
-
-[[group.item]]
-key = "ui.android.row_height_landscape"
-type = "int"
-title = "键高（横屏）"
-summary = "单行键位高度，dp"
-default = 44
-min = 36
-max = 64
-step = 2
-platform = "android"
-
-[[group.item]]
-key = "ui.android.sound"
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.top_code_commit"
+source = "engine"
 type = "toggle"
-title = "按键音"
-summary = "点按键盘时播放系统按键音，音量随系统触摸音量"
-default = false
-platform = "android"
+title = "顶码上屏"
 
-[[group.item]]
-key = "ui.android.long_press_delay"
-type = "int"
-title = "长按判定时长"
-summary = "按住多久算长按（弹出符号气泡 / 开始连删），毫秒"
-default = 300
-min = 150
-max = 600
-step = 50
-platform = "android"
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.punct_commit"
+source = "engine"
+type = "toggle"
+title = "标点顶码上屏"
 
-[[group]]
-title = "英文输入"
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.show_code_hint"
+source = "engine"
+type = "toggle"
+title = "显示编码提示"
 
-[[group.item]]
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.single_char"
+source = "engine"
+type = "toggle"
+title = "单字输入"
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.frequency.enabled"
+source = "engine"
+type = "toggle"
+title = "词频调整"
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.auto_phrase.enabled"
+source = "engine"
+type = "toggle"
+title = "自动造词"
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.english_merge.enable"
+source = "engine"
+type = "toggle"
+title = "英文候选"
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.auto_commit_min_len"
+source = "engine"
+type = "select"
+title = "自动上屏最短码长"
+advanced = true
+options = [
+  { value = "0", label = "满码（跟随方案）" },
+  { value = "1", label = "1 码" },
+  { value = "2", label = "2 码" },
+  { value = "3", label = "3 码" },
+  { value = "4", label = "4 码" },
+  { value = "5", label = "5 码" },
+]
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.short_code_yield_level"
+source = "engine"
+type = "select"
+title = "出简让全"
+advanced = true
+options = [
+  { value = "0", label = "关闭" },
+  { value = "2", label = "一、二级简码" },
+  { value = "3", label = "全部简码" },
+]
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.frequency.strategy"
+source = "engine"
+type = "select"
+title = "调频策略"
+advanced = true
+options = [
+  { value = "top", label = "置顶" },
+  { value = "step", label = "步进" },
+  { value = "position", label = "位次渐进" },
+]
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.use_smart_compose"
+source = "engine"
+type = "toggle"
+title = "智能组词"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.abbrev.enabled"
+source = "engine"
+type = "toggle"
+title = "启用简拼"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.shuangpin.allow_full_pinyin"
+source = "engine"
+type = "toggle"
+title = "双拼时允许全拼输入"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.single_char"
+source = "engine"
+type = "toggle"
+title = "单字输入"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.frequency.enabled"
+source = "engine"
+type = "toggle"
+title = "词频调整"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.auto_learn.enabled"
+source = "engine"
+type = "toggle"
+title = "自动学习"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.english_merge.enable"
+source = "engine"
+type = "toggle"
+title = "英文候选"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.code_hint_source"
+source = "engine"
+type = "select"
+title = "编码提示来源"
+advanced = true
+options = [
+  { value = "auto", label = "自动" },
+  { value = "codetable", label = "码表反查" },
+  { value = "shuangpin", label = "双拼编码" },
+  { value = "off", label = "不显示" },
+]
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.enabled"
+source = "engine"
+type = "toggle"
+title = "模糊音"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.zh_z"
+source = "engine"
+type = "toggle"
+title = "zh ↔ z"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.ch_c"
+source = "engine"
+type = "toggle"
+title = "ch ↔ c"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.sh_s"
+source = "engine"
+type = "toggle"
+title = "sh ↔ s"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.n_l"
+source = "engine"
+type = "toggle"
+title = "n ↔ l"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.r_l"
+source = "engine"
+type = "toggle"
+title = "r ↔ l"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.f_h"
+source = "engine"
+type = "toggle"
+title = "f ↔ h"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.an_ang"
+source = "engine"
+type = "toggle"
+title = "an ↔ ang"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.en_eng"
+source = "engine"
+type = "toggle"
+title = "en ↔ eng"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.in_ing"
+source = "engine"
+type = "toggle"
+title = "in ↔ ing"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.ian_iang"
+source = "engine"
+type = "toggle"
+title = "ian ↔ iang"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.uan_uang"
+source = "engine"
+type = "toggle"
+title = "uan ↔ uang"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.un_ong"
+source = "engine"
+type = "toggle"
+title = "un ↔ ong"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.eng_ong"
+source = "engine"
+type = "toggle"
+title = "eng ↔ ong"
+
+[[item]]
+page = "schema"
+section = "混输"
+key = "schema.mix.enable_english"
+source = "engine"
+type = "toggle"
+title = "启用英文候选"
+
+[[item]]
+page = "schema"
+section = "混输"
+key = "schema.mix.show_source_hint"
+source = "engine"
+type = "toggle"
+title = "显示候选来源标记"
+
+[[item]]
+page = "schema"
+section = "混输"
+key = "schema.mix.enable_pinyin_abbrev"
+source = "engine"
+type = "toggle"
+title = "启用拼音简拼"
+
+[[item]]
+page = "schema"
+section = "英文"
+key = "schema.english.raw_candidate"
+source = "engine"
+type = "select"
+title = "首候选为输入原文"
+options = [
+  { value = "always", label = "总是" },
+  { value = "in_dict", label = "仅词库词" },
+  { value = "off", label = "不显示" },
+]
+
+[[item]]
+page = "schema"
+section = "英文"
+key = "schema.english.case_variants"
+source = "engine"
+type = "toggle"
+title = "生成大小写变形候选"
+
+# 英文卡里手机才有的三项（键盘侧实现）。引擎的 schema.english.commit_space 不放进来：
+# 键盘已经自己补空格（还会把空格挪到句末标点后面），两边都开就是两个空格。
+[[item]]
+page = "schema"
+section = "英文"
 key = "ui.android.auto_cap"
+source = "android"
 type = "toggle"
 title = "句首自动大写"
-summary = "英文模式下在句首、输入框开头自动切大写（输入框声明了要大写时才生效，密码 / 网址 / 邮箱框不生效）"
+summary = "在句首、输入框开头自动切大写（输入框要求大写时才生效，密码 / 网址 / 邮箱框不生效）"
 default = true
-platform = "android"
 
-[[group.item]]
+[[item]]
+page = "schema"
+section = "英文"
 key = "ui.android.double_space_period"
+source = "android"
 type = "toggle"
 title = "双击空格输入句号"
-summary = "快速点两下空格：英文模式输入「. 」，中文模式输入「。」"
+summary = "快速点两下空格：英文输入「. 」，中文输入「。」"
 default = true
-platform = "android"
 
-[[group.item]]
+[[item]]
+page = "schema"
+section = "英文"
 key = "ui.android.auto_space"
+source = "android"
 type = "toggle"
-title = "英文选词后自动加空格"
-summary = "英文模式下空格或点候选上屏一个词后自动补空格；紧接着打句末标点时空格挪到标点后面"
+title = "选词后自动加空格"
+summary = "上屏一个英文词后自动补空格；紧接着打句末标点时，空格挪到标点后面"
 default = true
-platform = "android"
 
-[[group]]
-title = "外观"
+# ═══ 输入 ═══════════════════════════════════════════════════════
 
-[[group.item]]
-key = "ui.android.theme"
+[[item]]
+page = "input"
+section = "默认状态"
+key = "input.default.remember_last_state"
+source = "engine"
+type = "toggle"
+title = "记忆前次状态"
+
+[[item]]
+page = "input"
+section = "默认状态"
+key = "input.default.chinese_mode"
+source = "engine"
 type = "select"
-title = "深浅色"
-summary = "键盘配色"
+title = "初始语言模式"
+options = [
+  { value = "true", label = "中文" },
+  { value = "false", label = "英文" },
+]
+
+[[item]]
+page = "input"
+section = "默认状态"
+key = "input.default.full_width"
+source = "engine"
+type = "select"
+title = "初始字符宽度"
+options = [
+  { value = "false", label = "半角" },
+  { value = "true", label = "全角" },
+]
+
+[[item]]
+page = "input"
+section = "默认状态"
+key = "input.default.chinese_punct"
+source = "engine"
+type = "select"
+title = "初始标点模式"
+options = [
+  { value = "true", label = "中文标点" },
+  { value = "false", label = "英文标点" },
+]
+
+[[item]]
+page = "input"
+section = "字符与标点"
+key = "input.filter_mode"
+source = "engine"
+type = "select"
+title = "候选检索范围"
+options = [
+  { value = "smart", label = "智能" },
+  { value = "general", label = "常用字" },
+  { value = "gb18030", label = "全部字符" },
+]
+
+[[item]]
+page = "input"
+section = "字符与标点"
+key = "input.punct.smart_after_digit"
+source = "engine"
+type = "toggle"
+title = "数字后智能标点"
+
+[[item]]
+page = "input"
+section = "字符与标点"
+key = "input.symbol.smart_mode"
+source = "engine"
+type = "toggle"
+title = "中文标点智能符号"
+
+[[item]]
+page = "input"
+section = "标点配对"
+key = "input.auto_pair.chinese"
+source = "engine"
+type = "toggle"
+title = "中文标点自动配对"
+
+[[item]]
+page = "input"
+section = "标点配对"
+key = "input.auto_pair.english"
+source = "engine"
+type = "toggle"
+title = "英文标点自动配对"
+
+# 联想写移动端覆盖键 mobile.association.*（手机默认智能 + 持续，与电脑版的取值各管各的）
+[[item]]
+page = "input"
+section = "联想输入"
+key = "mobile.association.kind"
+source = "engine"
+type = "select"
+title = "联想类型"
+options = [
+  { value = "smart", label = "智能联想" },
+  { value = "word", label = "词语联想" },
+  { value = "off", label = "关闭" },
+]
+
+[[item]]
+page = "input"
+section = "联想输入"
+key = "mobile.association.mode"
+source = "engine"
+type = "select"
+title = "连续联想"
+options = [
+  { value = "continuous", label = "持续联想" },
+  { value = "one_shot", label = "一次性" },
+]
+
+[[item]]
+page = "input"
+section = "联想输入"
+key = "mobile.association.punct"
+source = "engine"
+type = "toggle"
+title = "标点联想"
+summary = "上屏后在联想里给出常接的标点，省去切到符号键盘"
+
+[[item]]
+page = "input"
+section = "联想输入"
+key = "input.association.max_count"
+source = "engine"
+type = "int"
+title = "候选条数上限"
+min = 1
+max = 20
+advanced = true
+
+[[item]]
+page = "input"
+section = "联想输入"
+key = "input.association.backspace_cancels_only"
+source = "engine"
+type = "toggle"
+title = "退格仅取消联想"
+advanced = true
+
+# ═══ 外观 ═══════════════════════════════════════════════════════
+# 主题暂用键盘自己的深浅色（键盘配色还没接核心的主题系统，接上后改走 ui.theme.*）
+
+[[item]]
+page = "ui"
+section = "主题"
+key = "ui.android.theme"
+source = "android"
+type = "select"
+title = "主题风格"
 default = "system"
 options = [
   { value = "system", label = "跟随系统" },
   { value = "light", label = "浅色" },
   { value = "dark", label = "深色" },
 ]
-platform = "android"
 
-[[group.item]]
+[[item]]
+page = "ui"
+section = "候选字体"
 key = "ui.android.candidate_text_sp"
+source = "android"
 type = "int"
 title = "候选字号"
-summary = "候选栏文字大小，sp"
 default = 19
 min = 15
 max = 24
-step = 1
-platform = "android"
+unit = "sp"
 
-[[group]]
-title = "手势"
+# ═══ 统计（概览由代码画）═══════════════════════════════════════
 
-[[group.item]]
-key = "ui.android.gesture_space_cursor"
+[[item]]
+page = "stats"
+section = "统计设置"
+key = "stats.enabled"
+source = "engine"
 type = "toggle"
-title = "空格左右滑动移光标"
-default = true
-platform = "android"
+title = "启用输入统计"
 
-[[group.item]]
-key = "ui.android.gesture_backspace_select"
+# ═══ 键盘布局 ═══════════════════════════════════════════════════
+
+[[item]]
+page = "keyboard"
+section = "键盘高度"
+key = "ui.android.row_height_portrait"
+source = "android"
+type = "int"
+title = "竖屏"
+summary = "每一行键的高度"
+default = 56
+min = 40
+max = 72
+step = 2
+unit = "dp"
+
+[[item]]
+page = "keyboard"
+section = "键盘高度"
+key = "ui.android.row_height_landscape"
+source = "android"
+type = "int"
+title = "横屏"
+summary = "每一行键的高度"
+default = 44
+min = 36
+max = 64
+step = 2
+unit = "dp"
+
+[[item]]
+page = "keyboard"
+section = "编码与按键"
+key = "ui.android.inline_preedit"
+source = "android"
 type = "toggle"
-title = "退格左滑批量删除"
-summary = "有编码时清空编码，没有编码时选中并删除光标前的文字"
-default = true
-platform = "android"
+title = "编码也显示在输入框里"
+summary = "打字时把编码同时写进输入框（默认只在候选栏上方显示）"
+default = false
 
-[[group.item]]
-key = "ui.android.gesture_swipe_symbols"
-type = "toggle"
-title = "字母键上滑出符号"
-summary = "在字母键上往上滑，输入数字或符号"
-default = true
-platform = "android"
-
-[[group.item]]
+[[item]]
+page = "keyboard"
+section = "编码与按键"
 key = "ui.android.show_swipe_hints"
+source = "android"
 type = "toggle"
 title = "字母键显示上滑符号"
 summary = "在字母键右上角用小字标出上滑能输入的数字或符号"
 default = false
-platform = "android"
 
-[[group]]
-title = "候选与剪贴板"
+# ═══ 按键与手势 ═════════════════════════════════════════════════
 
-[[group.item]]
-key = "ui.android.inline_preedit"
+[[item]]
+page = "keys"
+section = "按键反馈"
+key = "ui.android.haptic"
+source = "android"
 type = "toggle"
-title = "编码嵌入输入框"
-summary = "打字时把编码同时显示在输入框里（默认只在编码栏显示）"
-default = false
-platform = "android"
+title = "按键振动"
+default = true
 
-[[group.item]]
+[[item]]
+page = "keys"
+section = "按键反馈"
+key = "ui.android.sound"
+source = "android"
+type = "toggle"
+title = "按键声音"
+summary = "音量随系统触摸音量"
+default = false
+
+[[item]]
+page = "keys"
+section = "按键反馈"
+key = "ui.android.key_preview"
+source = "android"
+type = "toggle"
+title = "按键气泡"
+summary = "点按时在手指上方显示放大的键"
+default = false
+
+[[item]]
+page = "keys"
+section = "按键反馈"
+key = "ui.android.long_press_delay"
+source = "android"
+type = "select"
+title = "长按速度"
+summary = "按住多久弹出符号气泡、开始连续删除"
+default = 300
+options = [
+  { value = "200", label = "快" },
+  { value = "300", label = "中" },
+  { value = "450", label = "慢" },
+]
+
+[[item]]
+page = "keys"
+section = "手势"
+key = "ui.android.gesture_space_cursor"
+source = "android"
+type = "toggle"
+title = "空格左右滑动移光标"
+default = true
+
+[[item]]
+page = "keys"
+section = "手势"
+key = "ui.android.gesture_backspace_select"
+source = "android"
+type = "toggle"
+title = "退格左滑批量删除"
+summary = "有编码时清空编码，没有编码时选中并删除光标前的文字"
+default = true
+
+[[item]]
+page = "keys"
+section = "手势"
+key = "ui.android.gesture_swipe_symbols"
+source = "android"
+type = "toggle"
+title = "字母键上滑出符号"
+summary = "在字母键上往上滑，输入数字或符号"
+default = true
+
+# ═══ 工具栏与剪贴板 ═════════════════════════════════════════════
+
+[[item]]
+page = "toolbar"
+section = "剪贴板"
 key = "ui.android.clip_suggestion"
+source = "android"
 type = "toggle"
 title = "复制后提示粘贴"
 summary = "复制新内容后在候选栏位置显示一条粘贴建议，30 秒后自动消失"
 default = true
-platform = "android"
+
+# ═══ 高级 ═══════════════════════════════════════════════════════
+
+[[item]]
+page = "advanced"
+section = "调试"
+key = "debug.log_level"
+source = "engine"
+type = "select"
+title = "输入法服务日志级别"
+options = [
+  { value = "off", label = "关闭" },
+  { value = "error", label = "错误" },
+  { value = "warn", label = "警告" },
+  { value = "info", label = "信息" },
+  { value = "debug", label = "调试" },
+  { value = "trace", label = "跟踪" },
+]
