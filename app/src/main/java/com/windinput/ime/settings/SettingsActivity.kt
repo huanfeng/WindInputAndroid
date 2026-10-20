@@ -9,6 +9,8 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -33,11 +35,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,7 +47,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -195,6 +196,9 @@ private data class Route(val page: String? = null, val sub: String? = null) {
     val depth: Int get() = if (page == null) 0 else if (sub == null) 1 else 2
 
     fun up(): Route = if (sub != null) copy(sub = null) else Route()
+
+    /** 存页面状态用的键（SaveableStateHolder 要求可放进 Bundle） */
+    val key: String get() = "$page/$sub"
 }
 
 /** 词库页的两个二级页（不来自清单，代码画）；名字即路由，DictSection 的入口用同一份 */
@@ -259,7 +263,13 @@ private fun SettingsApp(
     var routePage by rememberSaveable { mutableStateOf<String?>(null) }
     var routeSub by rememberSaveable { mutableStateOf<String?>(null) }
     val route = Route(routePage, routeSub)
+    // 每一层的可保存状态（滚动位置、标题栏收起、搜索词…）按路由存住：进下一级再返回，
+    // 上一级停在离开时的位置，而不是回到顶上
+    val stateHolder = rememberSaveableStateHolder()
     fun go(r: Route) {
+        // 退出的那一层不再留状态：下次进来从顶上开始，只有「还在栈里」的上级保持原位
+        if (r.depth < route.depth) stateHolder.removeState(route.key)
+        if (r.depth == 0 && route.depth == 2) stateHolder.removeState(route.up().key)
         routePage = r.page
         routeSub = r.sub
     }
@@ -278,43 +288,45 @@ private fun SettingsApp(
     val schemaState = remember(session) { session?.let { SchemaState(it, appScope) } }
     LaunchedEffect(schemaState) { schemaState?.refresh() }
 
-    // 预测性返回：侧滑过程中当前页跟手右移（progress 0→1），松手才真正退一层；
-    // 中途放弃（CancellationException）就弹回原位
-    var backProgress by remember { mutableFloatStateOf(0f) }
+    // 页面切换走可拖动的过渡：平时 animateTo 正常播放；预测性返回时按手势进度 seekTo 上一层，
+    // 侧滑过程中上一层就画在下面、跟手滑出来（系统返回预览的样子），松手才真正退一层，
+    // 中途放弃就弹回当前页
+    val transitionState = remember { SeekableTransitionState(route) }
+    LaunchedEffect(route) { transitionState.animateTo(route) }
     PredictiveBackHandler(enabled = route.depth > 0) { events ->
+        val target = route.up()
         try {
-            events.collect { backProgress = it.progress }
-            go(route.up())
+            events.collect { transitionState.seekTo(it.progress, target) }
+            go(target)
         } catch (e: CancellationException) {
+            // 本协程已取消，回弹动画另起一个
+            appScope.launch { transitionState.animateTo(route) }
             throw e
-        } finally {
-            backProgress = 0f
         }
     }
+    val transition = rememberTransition(transitionState, label = "settings-route")
 
-    AnimatedContent(
-        targetState = route,
+    transition.AnimatedContent(
         transitionSpec = {
-            // 进深一层从右滑入，退一层往右滑出——与系统设置的方向一致
+            // 层叠式（HyperOS / 系统设置同款）：深的一层总压在上面、整页从右边进出，
+            // 浅的一层在下面只带一点视差。侧滑返回时就是当前页被手指拖开、露出下面的上一级
             val forward = targetState.depth > initialState.depth
-            val dir = if (forward) 1 else -1
-            (slideInHorizontally(tween(260)) { it * dir / 3 } togetherWith
-                slideOutHorizontally(tween(260)) { -it * dir / 3 })
+            if (forward) {
+                (slideInHorizontally(tween(300)) { it } togetherWith
+                    slideOutHorizontally(tween(300)) { -it / 4 })
+                    .apply { targetContentZIndex = 1f }
+            } else {
+                (slideInHorizontally(tween(300)) { -it / 4 } togetherWith
+                    slideOutHorizontally(tween(300)) { it })
+                    .apply { targetContentZIndex = -1f }
+            }
         },
-        label = "settings-route",
     ) { r ->
+        stateHolder.SaveableStateProvider(r.key) {
         Screen(
             route = r,
             title = screenTitle(manifest, r),
             onBack = if (r.depth > 0) ({ go(r.up()) }) else null,
-            modifier = if (r == route) {
-                Modifier.graphicsLayer {
-                    translationX = size.width * 0.12f * backProgress
-                    alpha = 1f - 0.2f * backProgress
-                }
-            } else {
-                Modifier
-            },
         ) {
             val page = manifest.pages.firstOrNull { it.id == r.page }
             when {
@@ -322,6 +334,7 @@ private fun SettingsApp(
                 r.sub == null -> PageScreen(manifest, page, values, session, schemaState, versionName) { go(r.copy(sub = it)) }
                 else -> SubScreen(manifest, page, r.sub, values, session, schemaState)
             }
+        }
         }
     }
 }
