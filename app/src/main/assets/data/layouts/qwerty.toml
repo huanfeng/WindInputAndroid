@@ -29,6 +29,10 @@
 id = "qwerty"
 name = "26 键"
 
+# 默认布局对照豆包（真机截图，2026-10-20）：首行上滑出数字、其余字母上滑出常用标点，
+# 角标默认显示；逗号、句号各占一键——中文里最常用的两个标点不该藏在长按或上滑里。
+# 标点一律写 ASCII，中英形态由模式决定：\ → 、  ^ → …  ` → ·  " → “”  ' → ‘’
+
 [[rows]]
 keys = "qwertyuiop"
 swipe = "1234567890"
@@ -37,27 +41,27 @@ swipe = "1234567890"
 # 第 2 行两侧各缩进半个键，键宽与第 1 行相同（大众布局）
 key = [
   { spacer = 0.5 },
-  { chars = "asdfghjkl", swipe = "@#$%&-+()" },
+  { chars = "asdfghjkl", swipe = "-/:;()~\"'" },
   { spacer = 0.5 },
 ]
 
 [[rows]]
 key = [
   { label = "⇧", action = "shift", width = 1.5 },
-  { chars = "zxcvbnm", swipe = "*\"':;!?" },
+  { chars = "zxcvbnm", swipe = "@`#\\?!^" },
   { label = "⌫", action = "backspace", width = 1.5 },
 ]
 
 [[rows]]
-# 大众布局（豆包 / 微信，见 docs/android-ime-features.md §14.1），总权重 10 与字母行对齐：
-# 123(2) · 逗号句号合一(1) · 空格(4) · 中英(1) · 回车(2)。
-# 标点一律写 ASCII：中英形态由模式决定（KeyboardView 显示 / 引擎输出），布局只说「这是逗号」。
+# 符号 · 123 · 逗号 · 空格 · 句号 · 中英 · 回车，宽度按豆包实测比例，总权重 10 与字母行对齐。
 # 回车的文字随输入框变（发送 / 搜索…），这里的 label 是多行框的缺省「换行」。
 key = [
-  { label = "123", action = "switch_symbols", width = 2 },
-  { text = ",", swipe_up = ".", long_press = ".,?!:;", en_text = ".", en_swipe_up = "'" },
-  { label = "空格", action = "space", width = 4 },
+  { label = "符号", action = "symbol_page", width = 1.35 },
+  { label = "123", action = "switch_symbols", width = 1.15 },
+  { text = ",", long_press = ",;:、" },
+  { label = "空格", action = "space", width = 2.95 },
+  { text = ".", long_press = ".?!…" },
   # 中英切换固定在回车左侧（主流输入法的位置约定，肌肉记忆在这）
-  { label = "中英", action = "switch_lang" },
-  { label = "换行", action = "enter", width = 2 },
+  { label = "中英", action = "switch_lang", width = 1.15 },
+  { label = "换行", action = "enter", width = 1.4 },
 ]

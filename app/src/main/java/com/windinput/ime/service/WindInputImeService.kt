@@ -338,7 +338,7 @@ class WindInputImeService :
             spaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_space_cursor", true)
             backspaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
             swipeSymbolsEnabled = userConfig.getBoolean("ui.android.gesture_swipe_symbols", true)
-            showSwipeHints = userConfig.getBoolean("ui.android.show_swipe_hints", false)
+            showSwipeHints = userConfig.getBoolean("ui.android.show_swipe_hints", true)
             enterLabel = enterActionLabel(info)
         }
         barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 19).toFloat()

@@ -18,7 +18,7 @@ import com.windinput.ime.core.CandidateMenuEntry
  *
  * 菜单项与文案全部来自核心（与电脑版候选右键菜单同一份，见 [com.windinput.ime.core.ImeSession.candidateMenu]），
  * 这里只管画。放在**条区之下、键盘区之上**而不是条区上方：IME 窗口以外的区域在多数系统上
- * 收不到触摸（PreeditPopup 能伸出去是因为它不可点），菜单必须落在窗口里才点得到。
+ * 收不到触摸，菜单必须落在窗口里才点得到。
  *
  * 点菜单外任何地方即收起，**不执行任何动作**：浮层是一层从条区顶边铺到输入视图底部的透明底，
  * 卡片放在上面。只用 outsideTouchable 做不到——不可聚焦的 PopupWindow 不拦外面的触摸，那一下照样

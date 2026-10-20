@@ -60,14 +60,14 @@ ROW_KEYS=(
     # 第 2 行两侧各有半键占位（_SP_，不可点）
     "_SP_ a s d f g h j k l _SP_"
     "SHIFT z x c v b n m BS"
-    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步：123 · 逗号句号合一 · 空格 · 中英 · 回车
-    "SYM COMMA SPACE LANG ENTER"
+    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步：符号 · 123 · 逗号 · 空格 · 句号 · 中英 · 回车
+    "SYMPAGE SYM COMMA SPACE PERIOD LANG ENTER"
 )
 ROW_W=(
     "1 1 1 1 1 1 1 1 1 1"
     "0.5 1 1 1 1 1 1 1 1 1 0.5"
     "1.5 1 1 1 1 1 1 1 1.5"
-    "2 1 4 1 2"
+    "1.35 1.15 1 2.95 1 1.15 1.4"
 )
 NROWS=${#ROW_KEYS[@]}
 
@@ -86,17 +86,17 @@ init_geometry() {
             GEO_PANELHEADERY GEO_PANELBACKX < <(awk -v h="$h" -v dpi="$dpi" 'BEGIN{
         d = dpi / 160.0
         rowPx     = int(56 * d + 0.5)   # KeyboardDimens.rowHeightDp 默认值
-        # 条区只有主行（BarView.MAIN_ROW_DP）；编码栏是浮层不占高度，故 codeBarPx = 0
-        codeBarPx = 0
-        mainRowPx = int(44 * d + 0.5)
+        # 条区 = 编码行（BarView.PREEDIT_DP）+ 候选行（BarView.MAIN_ROW_DP）；工具栏占满两者
+        codeBarPx = int(20 * d + 0.5)
+        mainRowPx = int(40 * d + 0.5)
         # 底部 insets（手势条/导航栏）：InputRootView 的 bottomSpacer 高度
         insetPx   = int(48 * d + 0.5)
         kbBottom  = h - insetPx
         kbTop     = kbBottom - 4 * rowPx
         # 候选行在条区下半：条区顶 = kbTop-(编码栏+主行)，候选行中心再下移半个主行
         barY      = kbTop - int(mainRowPx / 2)
-        # 编码浮层中心（组合中才可见，伸出 IME 窗口顶部 28dp）
-        codeBarY  = kbTop - mainRowPx - int(14 * d)
+        # 编码行中心（候选态才有，在条区顶上）
+        codeBarY  = kbTop - mainRowPx - int(codeBarPx / 2)
         # 面板 header 中心：面板打开时**条区整个让位**，面板从条区位置起画，
         # 其 header 与条区等高（BarView.TOTAL_DP）。写成 kbTop+xx 会点进键盘区。
         panelHdrY = kbTop - codeBarPx - mainRowPx + int((codeBarPx + mainRowPx) / 2)
@@ -578,8 +578,8 @@ tap_key LANG
 sleep 4
 tap_key h; tap_key i; tap_key SPACE
 check "英文空格上屏原文 + 自动空格" "hi " "$(get_pad_text)"
-tap_key COMMA
-# 逗号句号合一键：英文模式点按出句点（中文模式出「，」，见 [4]）；自动补的空格挪到句点后面
+tap_key PERIOD
+# 句号键：英文模式出半角句点；自动补的空格挪到句点后面
 check "英文句点吃掉自动空格" "hi. " "$(get_pad_text)"
 
 tap_key LANG

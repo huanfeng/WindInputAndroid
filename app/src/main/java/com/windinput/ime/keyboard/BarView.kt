@@ -10,19 +10,24 @@ import android.widget.LinearLayout
 import android.widget.TextView
 
 /**
- * 键盘上方的条区：**一行**（候选 / 工具栏 / 剪贴板建议 三态），高度恒定 [TOTAL_DP]。
+ * 键盘上方的条区，高度恒定 [TOTAL_DP]，三态（候选 / 工具栏 / 剪贴板建议）叠在同一块地方：
  *
  * ```
- *   ╭ 五 aa 1/3 ╮                  编码栏：浮层（PreeditPopup），伸出窗口顶部，不占高度
  * ┌──────────────────────────────┐
- * │ 式  戒  工  ...            ∨ │  主行：候选 / 工具栏 / 剪贴板建议
+ * │ 五 aa                    1/3 │  编码行（PREEDIT_DP，只在候选态）
+ * │ 式  戒  工  ...            ∨ │  候选行
+ * ├──────────────────────────────┤
+ * │ ⠿          🕶 无痕          ∨ │  或：工具栏，占满整个条区高度、图标居中
  * └──────────────────────────────┘
  * ```
  *
  * **高度为什么必须恒定**：条区高度直接决定 IME 窗口高度。若编码出现时整体变高，
- * 每次起手打字键盘都会向上跳一下、宿主界面跟着 reflow。此前编码栏是条区里的一行，
- * 为了恒定空闲时也得把那 26dp 占着——工具栏 70dp 高，真机上明显太高。现在编码栏
- * 是浮层，条区只剩主行。
+ * 每次起手打字键盘都会向上跳一下、宿主界面跟着 reflow。
+ *
+ * **编码为什么放在窗口里**：此前编码栏是伸出 IME 窗口顶部的浮层，盖在应用的正文上，
+ * 正好挡住正在输入的那一行（真机反馈「特别容易遮挡」）。豆包 / Gboard 都是在条区顶上
+ * 留一条细行写编码、候选行紧贴其下，工具栏态则整块条区归图标——条区比单行候选高一点，
+ * 换来的是什么都不挡。
  *
  * 主行三态优先级：候选 > 剪贴板建议 > 工具栏；建议条 30s 超时自动消失。
  *
@@ -52,11 +57,14 @@ class BarView(
     enum class ToolbarAction { QUICK_PANEL, HIDE_IME }
 
     companion object {
-        /** 主行高度（dp）：候选/工具栏 */
-        const val MAIN_ROW_DP = 44f
+        /** 候选态顶上的编码行高度（dp） */
+        const val PREEDIT_DP = 20f
 
-        /** 条区总高 = 主行；编码栏是浮层不计入。恒定不随组合态变化 */
-        const val TOTAL_DP = MAIN_ROW_DP
+        /** 候选行高度（dp） */
+        const val MAIN_ROW_DP = 40f
+
+        /** 条区总高：编码行 + 候选行；工具栏态整块归工具栏。恒定不随组合态变化 */
+        const val TOTAL_DP = PREEDIT_DP + MAIN_ROW_DP
 
         private const val SUGGESTION_TIMEOUT_MS = 30_000L
 
@@ -78,11 +86,48 @@ class BarView(
 
     private val density = resources.displayMetrics.density
 
-    // ── 编码栏（浮层）──────────────────────────────────────────────
-    private val preeditPopup = PreeditPopup(this)
+    // ── 编码行 ───────────────────────────────────────────────────
+    private val modeLabel = TextView(context).apply {
+        textSize = 11f
+        gravity = Gravity.CENTER
+        setTextColor(Palette.current.onAccent)
+        background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = 3 * density
+            setColor(Palette.current.accent)
+        }
+        setPadding(dp(4), 0, dp(4), 0)
+    }
+    private val preeditText = TextView(context).apply {
+        textSize = 14f
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.START // 长编码保留末尾（正在打的那几码）
+        gravity = Gravity.CENTER_VERTICAL
+        setTextColor(Palette.current.preedit)
+        setPadding(dp(6), 0, dp(6), 0)
+    }
+    private val pagerText = TextView(context).apply {
+        textSize = 11f
+        gravity = Gravity.CENTER_VERTICAL
+        setTextColor(Palette.current.hint)
+        setPadding(dp(6), 0, dp(12), 0)
+    }
+    private val preeditRow = LinearLayout(context).apply {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding(dp(10), dp(2), 0, 0)
+        setBackgroundColor(Palette.current.surface)
+        addView(modeLabel, LayoutParams(LayoutParams.WRAP_CONTENT, dp(15)))
+        addView(preeditText, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        addView(pagerText, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+    }
 
-    /** 核心构造期的提示是否正在显示（与真编码共用同一个浮层） */
+    /** 核心构造期 / 切方案现编词库时的提示（显示在工具栏中间，见 [refreshCenterNote]） */
     private var preparing = false
+
+    /** 当前编码（展开态下候选行让位给工具栏，编码改在工具栏中间显示） */
+    private var currentPreedit = ""
+
+    private var incognito = false
 
     // ── 主行 ─────────────────────────────────────────────────────
     private val mainRow: FrameLayout
@@ -125,7 +170,24 @@ class BarView(
 
     /** 学习是否暂停（手动无痕或输入框要求），见 [incognitoLabel] */
     fun setIncognito(on: Boolean) {
-        incognitoLabel.visibility = if (on) VISIBLE else INVISIBLE
+        incognito = on
+        refreshCenterNote()
+    }
+
+    /**
+     * 工具栏中间那一格写什么：准备词库 > 展开态的编码 > 无痕。
+     * 三者都只在工具栏态可见，共用一格免得互相挤。
+     */
+    private fun refreshCenterNote() {
+        val text = when {
+            preparing -> PREPARING_TEXT
+            expanded && currentPreedit.isNotEmpty() -> currentPreedit
+            incognito -> "🕶 无痕"
+            else -> ""
+        }
+        incognitoLabel.text = text
+        incognitoLabel.setTextColor(if (preparing) Palette.current.preedit else Palette.current.hint)
+        incognitoLabel.visibility = if (text.isEmpty()) INVISIBLE else VISIBLE
     }
 
     private val trailingIcon = PanelIcon(context).apply {
@@ -140,8 +202,8 @@ class BarView(
     init {
         orientation = VERTICAL
 
-        // ── 主行：候选（含展开钮） ──
-        candidateRow = LinearLayout(context).apply {
+        // ── 候选态：编码行 + 候选行（含展开钮） ──
+        val candidateLine = LinearLayout(context).apply {
             orientation = HORIZONTAL
             addView(
                 candidateBar,
@@ -151,6 +213,12 @@ class BarView(
                 expandButton,
                 LayoutParams(dp(44), LayoutParams.MATCH_PARENT),
             )
+        }
+        candidateRow = LinearLayout(context).apply {
+            orientation = VERTICAL
+            setBackgroundColor(Palette.current.surface)
+            addView(preeditRow, LayoutParams(MATCH, dp(PREEDIT_DP)))
+            addView(candidateLine, LayoutParams(MATCH, 0, 1f))
         }
 
         // ── 主行：剪贴板建议 ──
@@ -217,19 +285,21 @@ class BarView(
         candidateBar.setCandidates(items)
         hasCandidates = items.isNotEmpty()
 
-        if (preedit.isEmpty()) {
-            if (!preparing) preeditPopup.dismiss()
-        } else {
-            preparing = false
-            preeditPopup.show(preedit, modeLabel, if (totalPages > 1) "$page/$totalPages" else "")
-        }
+        currentPreedit = preedit
+        if (preedit.isNotEmpty()) preparing = false
+        preeditText.text = preedit
+        this.modeLabel.text = modeLabel
+        this.modeLabel.visibility = if (modeLabel.isEmpty() || preedit.isEmpty()) GONE else VISIBLE
+        pagerText.text = if (preedit.isNotEmpty() && totalPages > 1) "$page/$totalPages" else ""
+        refreshCenterNote()
 
         // 展开态下主行归工具栏管：候选正在下方网格里铺开，条上不再重复一份
         if (expanded) {
             // 但 hasCandidates 已更新——收起时要据此决定回候选态还是工具栏态
             return
         }
-        if (hasCandidates) {
+        // 有编码没候选（生僻码、打错码）也停在候选态：编码行要让用户看到自己打了什么
+        if (hasCandidates || preedit.isNotEmpty()) {
             applyState(State.CANDIDATES)
         } else if (state == State.CANDIDATES) {
             applyState(State.TOOLBAR)
@@ -251,6 +321,7 @@ class BarView(
         this.expanded = expanded
         trailingIcon.glyph =
             if (expanded) PanelIcon.Glyph.BACK else PanelIcon.Glyph.COLLAPSE
+        refreshCenterNote()
         applyState(
             when {
                 expanded -> State.TOOLBAR
@@ -261,31 +332,20 @@ class BarView(
     }
 
     /**
-     * 核心尚在后台构造：编码栏位置显示提示条。
+     * 核心尚在后台构造 / 切方案现编词库：工具栏中间写一行提示。
      *
      * 不弹 Toast、不禁用键盘——用户此时按键会直接上屏英文（宿主默认行为），
      * 键盘照常可用，只是没有中文候选。给一行静态提示即可，别打断输入。
      */
     fun setPreparing(preparing: Boolean) {
         this.preparing = preparing
-        if (preparing) preeditPopup.show(PREPARING_TEXT, "", "") else preeditPopup.dismiss()
+        refreshCenterNote()
     }
 
-    /** 收掉编码浮层。键盘收起 / 面板切换时必须调：浮层是独立窗口，不随条区隐藏 */
+    /** 键盘收起 / 面板切换：撤掉「准备中」提示（编码行随候选态一起走，不用单独收） */
     fun hidePreedit() {
         preparing = false
-        preeditPopup.dismiss()
-    }
-
-    override fun onDetachedFromWindow() {
-        hidePreedit()
-        super.onDetachedFromWindow()
-    }
-
-    override fun setVisibility(visibility: Int) {
-        super.setVisibility(visibility)
-        // 面板打开时条区让位（GONE），编码浮层跟着收；它锚在条区上，条区不在了它就没有落点
-        if (visibility != VISIBLE) hidePreedit()
+        refreshCenterNote()
     }
 
     /** 复制新内容后的建议条（候选优先级更高，仅空闲时展示） */

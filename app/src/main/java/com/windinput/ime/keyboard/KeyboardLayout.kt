@@ -104,28 +104,28 @@ object KeyboardLayouts {
     private val halfSpacer = KeyDef("", KeyAction.Spacer, widthWeight = 0.5f)
 
     /**
-     * 字母层底栏，按豆包 / 微信的大众布局（docs/android-ime-features.md §14.1）：
-     * `123`(2) · `，。`合一(1) · 空格(4) · 中英(1) · 回车(2)，总权重 10 与字母行对齐。
+     * 字母层底栏，按豆包默认布局（真机截图，docs/android-ime-features.md §14.12）：
+     * 符号 · 123 · 逗号 · 空格 · 句号 · 中英 · 回车，宽度按实测比例，总权重 10 与字母行对齐。
+     * 逗号、句号各占一键：中文里最常用的两个标点，不该藏在合一键的上滑里。
      * **标点一律写 ASCII**（中英形态由 [Punct] 按模式派生，见该文件说明）。
      */
     private val lettersBottomRow: List<KeyDef> = listOf(
-        KeyDef("123", KeyAction.SwitchSymbols, widthWeight = 2f, isSpecial = true),
-        KeyDef(
-            ",", KeyAction.Text(','),
-            swipeUp = '.', longPress = ".,?!:;", enText = '.', enSwipeUp = '\'',
-        ),
-        KeyDef("空格", KeyAction.Space, widthWeight = 4f),
-        KeyDef("中英", KeyAction.SwitchLang, isSpecial = true),
-        KeyDef("换行", KeyAction.Enter, widthWeight = 2f, isSpecial = true),
+        KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.35f, isSpecial = true),
+        KeyDef("123", KeyAction.SwitchSymbols, widthWeight = 1.15f, isSpecial = true),
+        KeyDef(",", KeyAction.Text(','), longPress = ",;:、"),
+        KeyDef("空格", KeyAction.Space, widthWeight = 2.95f),
+        KeyDef(".", KeyAction.Text('.'), longPress = ".?!…"),
+        KeyDef("中英", KeyAction.SwitchLang, widthWeight = 1.15f, isSpecial = true),
+        KeyDef("换行", KeyAction.Enter, widthWeight = 1.4f, isSpecial = true),
     )
 
     /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
     val qwerty: List<List<KeyDef>> = listOf(
         charKeys("qwertyuiop", "1234567890"),
-        listOf(halfSpacer) + charKeys("asdfghjkl", "@#$%&-+()") + listOf(halfSpacer),
+        listOf(halfSpacer) + charKeys("asdfghjkl", "-/:;()~\"'") + listOf(halfSpacer),
         buildList {
             add(KeyDef("⇧", KeyAction.Shift, widthWeight = 1.5f, isSpecial = true))
-            addAll(charKeys("zxcvbnm", "*\"':;!?"))
+            addAll(charKeys("zxcvbnm", "@`#\\?!^"))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
         lettersBottomRow,

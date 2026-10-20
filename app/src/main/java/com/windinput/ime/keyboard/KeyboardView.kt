@@ -148,11 +148,11 @@ class KeyboardView(context: Context) : View(context) {
         }
 
     /**
-     * 字母键右上角是否画上滑字符角标（设置项 ui.android.show_swipe_hints，默认关，
-     * 大众布局不画）。上滑功能本身不受影响；非字母键（如逗号句号合一键）的角标始终画，
-     * 那是用户知道「上滑出句号」的唯一提示。
+     * 字母键顶上是否画上滑字符角标（设置项 ui.android.show_swipe_hints，默认开：
+     * 豆包、微信的默认布局都画，首行一排 1–0 让数字一眼可得）。关掉只是不画，上滑功能
+     * 本身不受影响；非字母键的角标始终画。
      */
-    var showSwipeHints = false
+    var showSwipeHints = true
         set(value) {
             if (field == value) return
             field = value
@@ -497,22 +497,27 @@ class KeyboardView(context: Context) : View(context) {
             }
             val label = displayLabel(key)
             textPaint.textSize = labelSizePx(label)
-            val textY = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2
+            val isLetter = (key.action as? KeyAction.Text)?.char?.isLetter() == true
+            val hint = if (isLetter && !showSwipeHints) null else key.swipeFor(englishMode)
+            // 有角标的字母键：主字下移一点，给顶上居中的角标让出位置（豆包的排法）
+            val shiftDown = if (hint != null && isLetter) 4 * density else 0f
+            val textY = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2 + shiftDown
             // 水平按**字形包围盒**居中，而不是按字符前进宽度居中：全角标点「，」「。」的
             // 字形挤在字模左下角，按前进宽度居中会明显偏左（真机反馈的就是这个）。
             // 竖向仍按 ascent/descent 居中——按包围盒居竖向会让 q 与 a 的基线上下乱跳。
             textPaint.getTextBounds(label, 0, label.length, glyphBounds)
             canvas.drawText(label, rect.centerX() - glyphBounds.exactCenterX(), textY, textPaint)
-            // 右上角副字符角标（按当前模式显示中英形态）；字母键的角标受开关控制
-            val isLetter = (key.action as? KeyAction.Text)?.char?.isLetter() == true
-            if (isLetter && !showSwipeHints) continue
-            key.swipeFor(englishMode)?.let { hint ->
-                canvas.drawText(
-                    Punct.display(hint, chinesePunct),
-                    rect.right - 5 * density,
-                    rect.top + 13 * density,
-                    hintPaint,
-                )
+            // 副字符角标（按当前模式显示中英形态）：字母键在顶上居中（豆包、微信都这么排，
+            // 一眼扫过去数字行就是一排 1–0），其余键仍在右上角；字母键的角标受开关控制
+            if (hint != null) {
+                val text = Punct.display(hint, chinesePunct)
+                if (isLetter) {
+                    hintPaint.textAlign = Paint.Align.CENTER
+                    canvas.drawText(text, rect.centerX(), rect.top + 12 * density, hintPaint)
+                    hintPaint.textAlign = Paint.Align.RIGHT
+                } else {
+                    canvas.drawText(text, rect.right - 5 * density, rect.top + 13 * density, hintPaint)
+                }
             }
         }
     }
