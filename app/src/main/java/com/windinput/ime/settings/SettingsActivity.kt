@@ -441,7 +441,9 @@ private fun HomeScreen(
             for (p in pages) {
                 NavRow(
                     title = p.title,
-                    summary = if (p.id == "stats" && todayChars != null) {
+                    summary = if (p.id == "stats" && statsOff(manifest, values)) {
+                        "统计已关闭"
+                    } else if (p.id == "stats" && todayChars != null) {
                         "今日已输入 $todayChars 字"
                     } else {
                         pageSummary(manifest, p, values, schemaState, versionName)
@@ -474,6 +476,12 @@ private fun pageSummary(
         else -> sectionList(manifest, page.id)
     }
 }
+
+/** 输入统计关着时首页不写「今日 0 字」——那读起来像「今天没打字」 */
+private fun statsOff(manifest: SettingsManifestData, values: SettingsValues): Boolean =
+    manifest.items.firstOrNull { it.key == "stats.enabled" }
+        ?.takeIf { values.available(it) }
+        ?.let { !values.bool(it) } ?: false
 
 private fun sectionList(manifest: SettingsManifestData, pageId: String): String =
     manifest.sectionsOf(pageId).map { it.first }.filter { it.isNotEmpty() }.take(4).joinToString(" · ")
