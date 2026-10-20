@@ -680,19 +680,19 @@ class WindInputImeService :
         }
         autoSpaced = false
         val composingBefore = composing
-        // 联想态（没有编码、候选条上是联想）按空格：两家都是收起联想、出空格，
-        // 不选联想词。引擎默认的 `space_commits = true` 是桌面语义（实体键盘上空格选词顺手），
-        // 这里先发 Esc 收起联想，再按普通空格走下去（双击空格出「。」也就自然成立）。
-        // ⚠ 权宜：正路是主仓 `[mobile.association]` 加 `space_commits = false`，但那要连带改
-        // 设置程序的配置快照，见 IMPLEMENTATION_PLAN.md。
-        val assocSpace = action == KeyAction.Space && !directInput && !composing &&
-            loadedCandidates.isNotEmpty()
-        if (assocSpace) session.reset()
-        if (!assocSpace && !directInput && session.keyPressed(action, shifted)) {
-            // 英文方案：有编码时空格上屏原文（引擎只出词本身），这里补上词后的空格
-            if (english && composingBefore && action == KeyAction.Space) {
-                lastSpaceAt = android.os.SystemClock.uptimeMillis()
-                commitAutoSpace()
+        // 联想态（没有编码、候选条上是联想）按空格：两家都是收起联想、出空格，不选联想词。
+        // 这由核心的移动端强制项 `input.association.space_commits = false` 保证（wind-mobile
+        // `apply_mobile_overrides`，重载配置后也会再套上）：引擎收起联想、自己出那个空格。
+        if (!directInput && session.keyPressed(action, shifted)) {
+            if (action == KeyAction.Space) {
+                if (english && composingBefore) {
+                    // 英文方案：有编码时空格上屏原文（引擎只出词本身），这里补上词后的空格
+                    lastSpaceAt = android.os.SystemClock.uptimeMillis()
+                    commitAutoSpace()
+                } else if (!composingBefore) {
+                    // 联想态的空格由引擎出：照样记下时间，下一下空格才能换成「。」
+                    lastSpaceAt = android.os.SystemClock.uptimeMillis()
+                }
             }
             return
         }
