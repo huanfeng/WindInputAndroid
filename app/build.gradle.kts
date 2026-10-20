@@ -101,4 +101,6 @@ dependencies {
     // UniFFI 生成绑定的运行时依赖（JNA 需 @aar 变体）
     implementation(libs.jna) { artifact { type = "aar" } }
     implementation(libs.kotlinx.coroutines)
+
+    testImplementation(libs.junit)
 }

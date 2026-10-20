@@ -83,6 +83,7 @@ class RustSession(
                                 UiEvent.Candidates(
                                     items = update.items,
                                     preedit = update.preedit,
+                                    preeditCaret = update.preeditCaret.toInt(),
                                     modeLabel = update.modeLabel,
                                     selected = update.selected.toInt(),
                                     page = update.page.toInt(),

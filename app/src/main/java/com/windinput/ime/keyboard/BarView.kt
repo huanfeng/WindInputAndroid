@@ -49,7 +49,7 @@ class BarView(
         fun onPasteSuggestion(text: String)
     }
 
-    enum class ToolbarAction { QUICK_PANEL, EMOJI, CLIPBOARD, TEXT_EDIT, SETTINGS, HIDE_IME }
+    enum class ToolbarAction { QUICK_PANEL, HIDE_IME }
 
     companion object {
         /** 主行高度（dp）：候选/工具栏 */
@@ -62,20 +62,8 @@ class BarView(
 
         private const val PREPARING_TEXT = "词库准备中…"
 
-        /**
-         * 工具栏图标与动作（顺序即从左到右）。**尾格不在此列**——它是可变的
-         * （收起键盘 ↔ 返回），见 [trailingIcon]。
-         *
-         * 曾经最左还有一格模式指示（「五」/「英」），已删：键盘底栏有了中英切换键，
-         * 模式就写在那个键面上，条上再挂一份既重复又占宽。
-         */
-        private val TOOLBAR_ITEMS = listOf(
-            PanelIcon.Glyph.GRID to ToolbarAction.QUICK_PANEL,
-            PanelIcon.Glyph.EMOJI to ToolbarAction.EMOJI,
-            PanelIcon.Glyph.CLIPBOARD to ToolbarAction.CLIPBOARD,
-            PanelIcon.Glyph.TEXT_EDIT to ToolbarAction.TEXT_EDIT,
-            PanelIcon.Glyph.SETTINGS to ToolbarAction.SETTINGS,
-        )
+        /** 工具栏两端图标格的宽度（dp）：入口在最左、尾格在最右，中间留空 */
+        const val TOOLBAR_ICON_DP = 52
 
         /** ViewGroup.LayoutParams.MATCH_PARENT 的短名（类内无法裸用继承来的常量） */
         private const val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -314,20 +302,19 @@ class BarView(
     private fun dp(value: Int): Int = (value * density).toInt()
 
     /**
-     * 空闲工具栏：左端是快捷面板入口（点它进方案/开关/设置的全功能页），
-     * 中间放高频面板入口，尾格见 [trailingIcon]。全部等宽。
+     * 空闲工具栏，按大众布局（豆包 / 微信，docs/android-ime-features.md §14.1）只放两格：
+     * 左端是快捷面板入口（表情、剪贴板、文本编辑、设置都在面板里），右端是尾格
+     * （见 [trailingIcon]），中间留空。此前常驻 6 个等宽图标，空闲时满屏是按钮。
      */
     private fun buildToolbar(): View = LinearLayout(context).apply {
         orientation = HORIZONTAL
         setBackgroundColor(Palette.current.surface)
-
-        for ((glyph, action) in TOOLBAR_ITEMS) {
-            addView(
-                icon(glyph) { listener.onToolbarAction(action) },
-                LayoutParams(0, LayoutParams.MATCH_PARENT, 1f),
-            )
-        }
-        addView(trailingIcon, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        addView(
+            icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) },
+            LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT),
+        )
+        addView(View(context), LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        addView(trailingIcon, LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT))
     }
 
     private fun icon(glyph: PanelIcon.Glyph, onClick: () -> Unit): PanelIcon =

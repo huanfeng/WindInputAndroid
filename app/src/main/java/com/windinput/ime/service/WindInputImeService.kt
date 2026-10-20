@@ -138,6 +138,7 @@ class WindInputImeService :
                     // 就绪时若已在输入，补一次焦点，否则引擎收不到当前会话
                     if (currentInputConnection != null) ready.focusGained()
                     barView?.setPreparing(false)
+                    refreshSchemaKeys()
                 },
             ).also { it.start() }
         } else {
@@ -224,6 +225,16 @@ class WindInputImeService :
         const val ENGLISH_SCHEMA_ID = "english"
 
         /**
+         * 有编码时 ⇧ 变「分词」的方案。只有全拼：分隔符 `auto` 档下全拼用反引号
+         * （见 KeyboardView.SPLIT_CHAR）；双拼的反引号出厂归辅助码、`'` 归选词键，
+         * `auto` 退化为不启用，发什么都不是分词。码表方案没有分词语义。
+         *
+         * ⚠ 按 id 判断是权宜：绑定层的 SchemaInfo 还没带引擎类型和分隔符设置。
+         * 补上后改为问引擎「当前方案的分隔键是哪个」，见 IMPLEMENTATION_PLAN.md。
+         */
+        val SPLIT_SCHEMAS = setOf("pinyin")
+
+        /**
          * 每次按键预取的候选条数。
          *
          * **这是个性能参数，别随手调大。** 候选全量可达上千条，每条都要跨 JNI
@@ -270,6 +281,7 @@ class WindInputImeService :
             spaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_space_cursor", true)
             backspaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
             swipeSymbolsEnabled = userConfig.getBoolean("ui.android.gesture_swipe_symbols", true)
+            showSwipeHints = userConfig.getBoolean("ui.android.show_swipe_hints", false)
             enterLabel = enterActionLabel(info)
         }
         barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 19).toFloat()
@@ -278,6 +290,7 @@ class WindInputImeService :
         selecting = false
         windowManager?.showKeyboard()
         applyEditorScene(info)
+        refreshSchemaKeys()
     }
 
     /**
@@ -391,6 +404,27 @@ class WindInputImeService :
             ?.setLayer(if (numericScene) KeyboardLayer.NUMBER else KeyboardLayer.LETTERS)
     }
 
+    /**
+     * 把模式与当前方案同步到键盘：中英键、空格上的方案名、⇧ 能否当「分词」。
+     *
+     * 除了 Status 推送，核心就绪和每次弹出键盘时也要调：核心起来后**不会**主动推一次
+     * 初始状态（工具栏推送按「有变化才发」去重），只靠推送的话，刚装好、刚重启时
+     * 空格上一直是空的。
+     */
+    private fun refreshSchemaKeys() {
+        val english = modeLabel == "英"
+        val active = session.schemas().firstOrNull { it.active }
+        // ⚠ 别写成 keyboardView.apply { modeLabel = modeLabel }：块内的 modeLabel
+        // 解析成视图自己的属性，等于自赋值，英文模式永远进不去
+        keyboardWindow?.keyboardView?.let { kv ->
+            kv.modeLabel = modeLabel
+            // 空格上的灰字：英文模式写「英文」（EngineCmd.English 改的是模式，
+            // 引擎报的 active 仍是切走前的中文方案），否则写当前方案名
+            kv.spaceLabel = if (english) "英文" else active?.name.orEmpty()
+            kv.splitEnabled = !english && active?.id in SPLIT_SCHEMAS
+        }
+    }
+
     // ── 会话事件 → 编辑器/候选条 ───────────────────────────────────
 
     private fun onUiEvent(event: UiEvent) {
@@ -408,7 +442,8 @@ class WindInputImeService :
                 }
                 loadedCandidates = page.items
                 candidateTotal = page.total
-                composing = event.preedit.isNotEmpty()
+                composing = event.composing
+                keyboardWindow?.keyboardView?.composing = composing
 
                 barView?.setCandidateFrame(
                     items = loadedCandidates,
@@ -427,7 +462,7 @@ class WindInputImeService :
             }
             is UiEvent.Status -> {
                 modeLabel = event.iconLabel.ifEmpty { if (event.chineseMode) "中" else "英" }
-                keyboardWindow?.keyboardView?.modeLabel = modeLabel
+                refreshSchemaKeys()
                 // 键面标点形态跟引擎的真值走：英文模式或关了中文标点，键面就显示 ASCII
                 keyboardWindow?.keyboardView?.chinesePunct = event.chineseMode && event.chinesePunct
                 quickPanelWindow?.updateStatus(event)
@@ -575,6 +610,9 @@ class WindInputImeService :
      * 现在这条路行为是正确的，只是少了英文补全。
      */
     private fun toggleLanguage() {
+        // 有编码时先把字母原文上屏再切（两家相同）：用户在中文里打了半截想改打英文，
+        // 码不该被吞掉。有编码时回车就是「上屏原文」（见回车键「确定」），直接复用。
+        if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
         val schemas = session.schemas()
         val active = schemas.firstOrNull { it.active }
         if (modeLabel == "英") {
@@ -643,10 +681,6 @@ class WindInputImeService :
         val wm = windowManager ?: return
         when (action) {
             BarView.ToolbarAction.QUICK_PANEL -> quickPanelWindow?.let { wm.show(it) }
-            BarView.ToolbarAction.EMOJI -> emojiWindow?.let { wm.show(it) }
-            BarView.ToolbarAction.CLIPBOARD -> clipboardWindow?.let { wm.show(it) }
-            BarView.ToolbarAction.TEXT_EDIT -> textEditingWindow?.let { wm.show(it) }
-            BarView.ToolbarAction.SETTINGS -> openSettings()
             BarView.ToolbarAction.HIDE_IME -> requestHideSelf(0)
         }
     }

@@ -23,6 +23,14 @@ class KeyboardView(context: Context) : View(context) {
     private companion object {
         const val TAG = "WindKeyboard"
 
+        /**
+         * 「分词」键发的字符。**是反引号不是 `'`**：出厂二三候选键是 `;` `'`
+         * （`select_key_groups = semicolon_quote`），`'` 被占时引擎的分隔符 `auto` 档改用
+         * 反引号（主仓 `manual_separator_key_of`）。发 `'` 实测是「选第三候选上屏」。
+         * 引擎把两者都显示成 `'`。
+         */
+        const val SPLIT_CHAR = '`'
+
         /** 按下高亮的最小可见时长；约 4 帧，短于此人眼捕捉不到 */
         const val MIN_HIGHLIGHT_MS = 70L
     }
@@ -75,8 +83,10 @@ class KeyboardView(context: Context) : View(context) {
     /**
      * 中文标点形态开关：键面、角标、长按气泡里的标点按它显示成「，。？」还是「,.?」。
      * 真值来自引擎推送（chineseMode && chinesePunct），本地不自记——见 [Punct] 说明。
+     * 初值取中文：与 [englishMode] 的初值一致；核心起来后不主动推初始状态，
+     * 初值为 false 时，刚装好的键盘上逗号键显示成半角「,」。
      */
-    var chinesePunct = false
+    var chinesePunct = true
         set(value) {
             if (field == value) return
             field = value
@@ -87,7 +97,7 @@ class KeyboardView(context: Context) : View(context) {
         context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
 
     /**
-     * 当前方案短称（「五」/「拼」/「英」），中英键直接显示它。
+     * 当前方案短称（「五」/「拼」/「英」）；是「英」即英文模式（见 [englishMode]）。
      *
      * 值由引擎推送（Service 转发），**本地不自记**——方案切换、密码框强制英文都发生在
      * 引擎内部，本地记第二份必然与引擎漂移。用短称而不是 `chineseMode` 布尔：
@@ -97,12 +107,62 @@ class KeyboardView(context: Context) : View(context) {
         set(value) {
             if (field == value) return
             field = value
-            invalidate()
+            englishMode = value == "英"
         }
 
     /** 回车键动作标签（imeOptions 驱动：发送/搜索/下一项…），null = 缺省 label */
     var enterLabel: String? = null
         set(value) {
+            field = value
+            invalidate()
+        }
+
+    /**
+     * 英文模式（中英键显示「英」时）。决定字母键面大小写（中文大写、英文小写，大众布局）、
+     * 中英键哪个字高亮，以及逗号句号合一键输出哪一个。随 [modeLabel] 自动更新。
+     */
+    var englishMode = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    /**
+     * 引擎里有未上屏的编码。有编码时回车写「确定」（上屏编码原文），
+     * 可分词的方案（见 [splitEnabled]）⇧ 写「分词」。
+     */
+    var composing = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    /** 当前方案有可用的音节分隔键（见 [SPLIT_CHAR]）。只有它为真，有编码时 ⇧ 才变「分词」 */
+    var splitEnabled = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    /**
+     * 字母键右上角是否画上滑字符角标（设置项 ui.android.show_swipe_hints，默认关，
+     * 大众布局不画）。上滑功能本身不受影响；非字母键（如逗号句号合一键）的角标始终画，
+     * 那是用户知道「上滑出句号」的唯一提示。
+     */
+    var showSwipeHints = false
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    /** 空格上的灰色小字：当前方案名。空串 = 不画 */
+    var spaceLabel = ""
+        set(value) {
+            if (field == value) return
             field = value
             invalidate()
         }
@@ -151,8 +211,8 @@ class KeyboardView(context: Context) : View(context) {
         textSize = 11 * density
     }
 
-    /** 每次 layout 重算的键位命中区域 */
-    private data class KeyBounds(val key: KeyDef, val rect: RectF)
+    /** 每次 layout 重算的键位命中区域；[row] 用于落在空白处时找同一行最近的键 */
+    private data class KeyBounds(val key: KeyDef, val rect: RectF, val row: Int)
 
     private val keyBounds = mutableListOf<KeyBounds>()
     private var pressedKey: KeyDef? = null
@@ -233,10 +293,11 @@ class KeyboardView(context: Context) : View(context) {
     private val longPressRunnable = Runnable {
         val key = pressedKey ?: return@Runnable
         val rect = pressedRect ?: return@Runnable
-        if (key.longPress.isNotEmpty()) {
+        val popup = popupChars(key)
+        if (popup.isNotEmpty()) {
             popupManager.dismissPreview()
             // 气泡里显示中英形态，抬手时按**下标**映回布局里的 ASCII 字符再喂引擎
-            popupManager.showPopup(rect, key.longPress.map { Punct.display(it, chinesePunct) })
+            popupManager.showPopup(rect, popup.map { Punct.display(it, chinesePunct) })
             repeatHaptic()
         } else if (hasLongPressAction(key.action)) {
             // 功能键长按走独立回调（没有字符气泡可弹）。置位后抬手不补单击，
@@ -249,6 +310,16 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun hasLongPressAction(action: KeyAction): Boolean =
         action == KeyAction.SwitchLang
+
+    /**
+     * 长按气泡的字符集。字母键固定是「小写 / 大写」两个形态（豆包的做法）：上滑字符已经有
+     * 上滑这条路，长按再给一遍是重复；而单个大写字母在中文模式下原本要按两次 ⇧ 才打得出。
+     */
+    private fun popupChars(key: KeyDef): String {
+        if (key.longPress.isNotEmpty()) return key.longPress
+        val c = (key.action as? KeyAction.Text)?.char ?: return ""
+        return if (c in 'a'..'z') "$c${c.uppercaseChar()}" else ""
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
@@ -277,13 +348,17 @@ class KeyboardView(context: Context) : View(context) {
             val top = (rowIndex * rowHeightPx).toFloat()
             for (key in row) {
                 val keyWidth = unit * key.widthWeight
-                keyBounds += KeyBounds(
-                    key,
-                    RectF(
-                        x + keyGapPx, top + keyGapPx,
-                        x + keyWidth - keyGapPx, top + rowHeightPx - keyGapPx,
-                    ),
-                )
+                // 占位空白只占宽度，不进命中表也不绘制
+                if (key.action != KeyAction.Spacer) {
+                    keyBounds += KeyBounds(
+                        key,
+                        RectF(
+                            x + keyGapPx, top + keyGapPx,
+                            x + keyWidth - keyGapPx, top + rowHeightPx - keyGapPx,
+                        ),
+                        rowIndex,
+                    )
+                }
                 x += keyWidth
             }
         }
@@ -300,15 +375,26 @@ class KeyboardView(context: Context) : View(context) {
                 else -> keyColor
             }
             canvas.drawRoundRect(rect, keyRadiusPx, keyRadiusPx, keyPaint)
+            if (key.action == KeyAction.SwitchLang) {
+                drawLangKey(canvas, rect)
+                continue
+            }
+            if (key.action == KeyAction.Space && spaceLabel.isNotEmpty()) {
+                drawCentered(canvas, spaceLabel, rect, smallPaint)
+                continue
+            }
             val label = displayLabel(key)
+            textPaint.textSize = labelSizePx(label)
             val textY = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2
             // 水平按**字形包围盒**居中，而不是按字符前进宽度居中：全角标点「，」「。」的
             // 字形挤在字模左下角，按前进宽度居中会明显偏左（真机反馈的就是这个）。
             // 竖向仍按 ascent/descent 居中——按包围盒居竖向会让 q 与 a 的基线上下乱跳。
             textPaint.getTextBounds(label, 0, label.length, glyphBounds)
             canvas.drawText(label, rect.centerX() - glyphBounds.exactCenterX(), textY, textPaint)
-            // 右上角副字符角标（按当前模式显示中英形态）
-            key.swipeUp?.let { hint ->
+            // 右上角副字符角标（按当前模式显示中英形态）；字母键的角标受开关控制
+            val isLetter = (key.action as? KeyAction.Text)?.char?.isLetter() == true
+            if (isLetter && !showSwipeHints) continue
+            key.swipeFor(englishMode)?.let { hint ->
                 canvas.drawText(
                     Punct.display(hint, chinesePunct),
                     rect.right - 5 * density,
@@ -319,28 +405,70 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    /** 有编码且方案支持分词：⇧ 这一格临时当「分词」用（发 [SPLIT_CHAR]） */
+    private val splitMode get() = composing && splitEnabled
+
     private fun displayLabel(key: KeyDef): String {
-        if (key.action == KeyAction.Enter && enterLabel != null) {
-            return enterLabel!!
+        if (key.action == KeyAction.Enter) {
+            // 有编码时回车上屏编码原文，键面写「确定」（两家相同）
+            if (composing) return "确定"
+            enterLabel?.let { return it }
         }
-        // 中英键显示**当前**方案短称，而不是「中/英」这种两可的静态字样：
-        // 用户要一眼看出现在在哪个方案，而不是这个键能切到哪去
-        if (key.action == KeyAction.SwitchLang) {
-            return modeLabel
-        }
-        if (key.action == KeyAction.Shift && shiftLocked) {
-            return "⇪"
+        if (key.action == KeyAction.Shift) {
+            if (splitMode) return "分词"
+            if (shiftLocked) return "⇪"
         }
         val action = key.action
+        val ch = key.textFor(englishMode)
         // 标点键：键面随模式显示中英形态（布局里写的是 ASCII）
-        if (action is KeyAction.Text && !action.char.isLetterOrDigit()) {
-            return Punct.display(action.char, chinesePunct)
+        if (ch != null && !ch.isLetterOrDigit()) {
+            return Punct.display(ch, chinesePunct)
         }
-        return if ((shifted || shiftLocked) && action is KeyAction.Text && action.char.isLetter()) {
+        // 字母键面：中文模式大写、英文模式小写（键面本身就是模式提示）；英文下按 ⇧ 变大写
+        val upper = !englishMode || shifted || shiftLocked
+        return if (upper && action is KeyAction.Text && action.char.isLetter()) {
             key.label.uppercase()
         } else {
             key.label
         }
+    }
+
+    /** 两个字以上的功能键（换行 / 发送 / 分词 / 123）字号收小，免得挤出键帽 */
+    private fun labelSizePx(label: String): Float =
+        (if (label.length >= 2) 16 else 20) * density
+
+    private val smallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = hintColor
+        textSize = 12 * density
+    }
+
+    private fun drawCentered(canvas: Canvas, text: String, rect: RectF, paint: Paint) {
+        paint.getTextBounds(text, 0, text.length, glyphBounds)
+        val y = rect.centerY() - (paint.ascent() + paint.descent()) / 2
+        canvas.drawText(text, rect.centerX() - glyphBounds.exactCenterX(), y, paint)
+    }
+
+    /**
+     * 中英键：键面同时写「中」「英」，左上大字、右下小字，**当前模式那个字**在前面用正文色，
+     * 另一个用提示色（两家的做法）。用户一眼看出现在在哪，也知道点了会去哪。
+     */
+    private fun drawLangKey(canvas: Canvas, rect: RectF) {
+        val (major, minor) = if (englishMode) "英" to "中" else "中" to "英"
+        textPaint.textSize = 17 * density
+        canvas.drawText(
+            major,
+            rect.left + rect.width() * 0.18f,
+            rect.top + rect.height() * 0.50f,
+            textPaint,
+        )
+        smallPaint.textSize = 11 * density
+        canvas.drawText(
+            minor,
+            rect.left + rect.width() * 0.52f,
+            rect.top + rect.height() * 0.80f,
+            smallPaint,
+        )
+        smallPaint.textSize = 12 * density
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -373,7 +501,7 @@ class KeyboardView(context: Context) : View(context) {
                         repeating = true
                         handler.postDelayed(repeatRunnable, longPressDelayMs.toLong())
                     }
-                    if (key.longPress.isNotEmpty() || hasLongPressAction(key.action)) {
+                    if (popupChars(key).isNotEmpty() || hasLongPressAction(key.action)) {
                         handler.postDelayed(longPressRunnable, longPressDelayMs.toLong())
                     }
                 }
@@ -425,11 +553,12 @@ class KeyboardView(context: Context) : View(context) {
                 }
 
                 // 上滑副字符：位移超阈值且以纵向为主
-                if (swipeSymbolsEnabled && key.swipeUp != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
+                val swipeChar = key.swipeFor(englishMode)
+                if (swipeSymbolsEnabled && swipeChar != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
                     swipeConsumed = true
                     cancelTimers()
                     popupManager.dismissAll()
-                    listener?.onKeyAction(KeyAction.Text(key.swipeUp), shifted = false)
+                    listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
                     clearPressed()
                     return true
                 }
@@ -440,7 +569,8 @@ class KeyboardView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_UP -> {
                 val key = pressedKey
-                val popupChoice = popupManager.popupSelectedIndex()?.let { key?.longPress?.getOrNull(it) }
+                val popupChoice = popupManager.popupSelectedIndex()
+                    ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
                 val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
                 val wasSpaceSwipe = spaceSwipeActive
                 val wasBackspaceSwipe = backspaceSwipeActive
@@ -448,6 +578,9 @@ class KeyboardView(context: Context) : View(context) {
                 when {
                     swipeConsumed || wasSpaceSwipe -> Unit
                     wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
+                    // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
+                    popupChoice != null && popupChoice.isUpperCase() ->
+                        listener?.onKeyAction(KeyAction.Text(popupChoice.lowercaseChar()), shifted = true)
                     popupChoice != null ->
                         listener?.onKeyAction(KeyAction.Text(popupChoice), shifted = false)
                     key != null && !skipTap -> handleKey(key)
@@ -510,8 +643,17 @@ class KeyboardView(context: Context) : View(context) {
         clearPressed()
     }
 
-    private fun findBounds(x: Float, y: Float): KeyBounds? =
-        keyBounds.firstOrNull { it.rect.contains(x, y) }
+    /**
+     * 命中的键。落在键缝或占位空白里时，归同一行水平距离最近的键——第 2 行缩进的
+     * 半个键位、键与键之间的 3dp 缝都不该是「点空」。
+     */
+    private fun findBounds(x: Float, y: Float): KeyBounds? {
+        keyBounds.firstOrNull { it.rect.contains(x, y) }?.let { return it }
+        val row = (y / rowHeightPx).toInt()
+        return keyBounds
+            .filter { it.row == row }
+            .minByOrNull { kotlin.math.abs(it.rect.centerX() - x) }
+    }
 
     private fun findKey(x: Float, y: Float): KeyDef? = findBounds(x, y)?.key
 
@@ -536,6 +678,10 @@ class KeyboardView(context: Context) : View(context) {
     private fun handleKey(key: KeyDef) {
         when (key.action) {
             KeyAction.Shift -> {
+                if (splitMode) {
+                    listener?.onKeyAction(KeyAction.Text(SPLIT_CHAR), shifted = false)
+                    return
+                }
                 val now = android.os.SystemClock.uptimeMillis()
                 when {
                     shiftLocked -> {
@@ -559,7 +705,12 @@ class KeyboardView(context: Context) : View(context) {
                 )
             }
             else -> {
-                listener?.onKeyAction(key.action, shifted || shiftLocked)
+                // 逗号句号合一键：英文模式点按改出句点
+                val action = key.textFor(englishMode)
+                    ?.takeIf { it != (key.action as? KeyAction.Text)?.char }
+                    ?.let { KeyAction.Text(it) }
+                    ?: key.action
+                listener?.onKeyAction(action, shifted || shiftLocked)
                 // 单次 Shift：出字后自动复位（锁定态保持）
                 if (shifted && !shiftLocked && key.action is KeyAction.Text) {
                     shifted = false

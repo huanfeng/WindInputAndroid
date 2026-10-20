@@ -120,8 +120,16 @@ platform = "android"
 key = "ui.android.gesture_swipe_symbols"
 type = "toggle"
 title = "字母键上滑出符号"
-summary = "关闭后仅长按可出副字符"
+summary = "在字母键上往上滑，输入数字或符号"
 default = true
+platform = "android"
+
+[[group.item]]
+key = "ui.android.show_swipe_hints"
+type = "toggle"
+title = "字母键显示上滑符号"
+summary = "在字母键右上角用小字标出上滑能输入的数字或符号"
+default = false
 platform = "android"
 
 [[group]]

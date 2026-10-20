@@ -24,8 +24,14 @@ sealed interface KeyAction {
      */
     data object SwitchLang : KeyAction
 
-    /** 打开表情面板（底栏左侧；也是让空格居中的那块配重，见 bottomRow） */
+    /** 打开表情面板（符号层底栏） */
     data object Emoji : KeyAction
+
+    /**
+     * 占位空白：不绘制、不响应。用于第 2 行两侧各缩进半个键（大众布局）。
+     * 落在空白里的触点归最近的键（见 KeyboardView.findBounds），边缘不会点空。
+     */
+    data object Spacer : KeyAction
 }
 
 data class KeyDef(
@@ -39,7 +45,18 @@ data class KeyDef(
     val swipeUp: Char? = null,
     /** 长按气泡字符集（每字符一项，横移选择）；空 = 无气泡 */
     val longPress: String = "",
-)
+    /** 英文模式下改输出的字符（`，。`合一键：中文点按是逗号，英文是句点）；null = 同 [action] */
+    val enText: Char? = null,
+    /** 英文模式下的上滑字符；null = 同 [swipeUp] */
+    val enSwipeUp: Char? = null,
+) {
+    /** 按当前模式取点按输出的字符；非字符键为 null */
+    fun textFor(english: Boolean): Char? =
+        if (english && enText != null) enText else (action as? KeyAction.Text)?.char
+
+    /** 按当前模式取上滑字符 */
+    fun swipeFor(english: Boolean): Char? = if (english && enSwipeUp != null) enSwipeUp else swipeUp
+}
 
 enum class KeyboardLayer { LETTERS, SYMBOLS, NUMBER }
 
@@ -53,6 +70,10 @@ object KeyboardDimens {
 
 object KeyboardLayouts {
 
+    /**
+     * 字符键批量展开。字母键的长按气泡由视图按「小写 / 大写」自动生成（主流做法），
+     * 这里只给非字母键挂上滑字符兼长按。
+     */
     private fun charKeys(chars: String, swipes: String = ""): List<KeyDef> =
         chars.mapIndexed { i, c ->
             val swipe = swipes.getOrNull(i)
@@ -60,16 +81,29 @@ object KeyboardLayouts {
                 c.toString(),
                 KeyAction.Text(c),
                 swipeUp = swipe,
-                longPress = swipe?.toString() ?: "",
+                longPress = if (c.isLetter()) "" else swipe?.toString() ?: "",
             )
         }
 
+    private val halfSpacer = KeyDef("", KeyAction.Spacer, widthWeight = 0.5f)
+
     /**
-     * 底栏。**标点一律写 ASCII**（中英形态由 [Punct] 按模式派生，见该文件说明）。
-     *
-     * 权重两侧对称：`1.3+1+1 = 1+1+1.3`，空格正好居中——此前左 2.5 / 右 3.8，空格明显
-     * 偏左。表情键是补上的那块配重，同时也是主流布局里表情的常规位置。
+     * 字母层底栏，按豆包 / 微信的大众布局（docs/android-ime-features.md §14.1）：
+     * `123`(2) · `，。`合一(1) · 空格(4) · 中英(1) · 回车(2)，总权重 10 与字母行对齐。
+     * **标点一律写 ASCII**（中英形态由 [Punct] 按模式派生，见该文件说明）。
      */
+    private val lettersBottomRow: List<KeyDef> = listOf(
+        KeyDef("123", KeyAction.SwitchSymbols, widthWeight = 2f, isSpecial = true),
+        KeyDef(
+            ",", KeyAction.Text(','),
+            swipeUp = '.', longPress = ".,?!:;", enText = '.', enSwipeUp = '\'',
+        ),
+        KeyDef("空格", KeyAction.Space, widthWeight = 4f),
+        KeyDef("中英", KeyAction.SwitchLang, isSpecial = true),
+        KeyDef("换行", KeyAction.Enter, widthWeight = 2f, isSpecial = true),
+    )
+
+    /** 符号层底栏（Stage 2 重做 123 层前沿用旧形态；表情入口在这里） */
     private fun bottomRow(switchLabel: String): List<KeyDef> = listOf(
         KeyDef(switchLabel, KeyAction.SwitchSymbols, widthWeight = 1.3f, isSpecial = true),
         KeyDef("☺", KeyAction.Emoji, isSpecial = true),
@@ -84,13 +118,13 @@ object KeyboardLayouts {
     /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
     val qwerty: List<List<KeyDef>> = listOf(
         charKeys("qwertyuiop", "1234567890"),
-        charKeys("asdfghjkl", "@#$%&-+()"),
+        listOf(halfSpacer) + charKeys("asdfghjkl", "@#$%&-+()") + listOf(halfSpacer),
         buildList {
             add(KeyDef("⇧", KeyAction.Shift, widthWeight = 1.5f, isSpecial = true))
             addAll(charKeys("zxcvbnm", "*\"':;!?"))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
-        bottomRow("?123"),
+        lettersBottomRow,
     )
 
     /** 符号/数字层（占位集合，正式键位随布局 TOML 化调整） */

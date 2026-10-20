@@ -57,16 +57,17 @@ die() { echo "$*" >&2; kill -s TERM "$TOP_PID" 2>/dev/null; exit 1; }
 # ── 键盘布局：与 KeyboardLayouts.qwerty 保持一致 ────────────────────────
 ROW_KEYS=(
     "q w e r t y u i o p"
-    "a s d f g h j k l"
+    # 第 2 行两侧各有半键占位（_SP_，不可点）
+    "_SP_ a s d f g h j k l _SP_"
     "SHIFT z x c v b n m BS"
-    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步（两侧对称，空格居中；中英键在回车左侧）
-    "SYM EMOJI COMMA SPACE PERIOD LANG ENTER"
+    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步：123 · 逗号句号合一 · 空格 · 中英 · 回车
+    "SYM COMMA SPACE LANG ENTER"
 )
 ROW_W=(
     "1 1 1 1 1 1 1 1 1 1"
-    "1 1 1 1 1 1 1 1 1"
+    "0.5 1 1 1 1 1 1 1 1 1 0.5"
     "1.5 1 1 1 1 1 1 1 1.5"
-    "1.3 1 1 3.4 1 1 1.3"
+    "2 1 4 1 2"
 )
 NROWS=${#ROW_KEYS[@]}
 
@@ -428,11 +429,10 @@ echo; echo "${Y}[9] 快捷面板往返${N}"
 # 区，实测正好点中「英」格，测试自己把引擎切成了英文模式，污染后面所有用例。
 # 面板上任何坐标都可能是功能键，只点自己放的「返回」才安全。
 reset_pad
-# 工具栏 = 6 个等宽图标（BarView.TOOLBAR_ITEMS 5 个 + 尾格），快捷面板入口是**第 1 格**。
-# ⚠ 这里曾按「模式指示(1.2) + 6 图标」算成 W*1.7/7.2；那一格删掉后坐标指向了别的图标，
-# 用例照样 PASS（打开的是表情面板，返回键位置相同），只是验的东西悄悄换了。
-# 布局改了必须同步这行。
-adb_q shell input tap $(( GEO_W / 12 )) "$GEO_BARY"
+# 工具栏只有两格：最左是快捷面板入口，宽 BarView.TOOLBAR_ICON_DP(52dp)，点它的中心。
+# ⚠ 这里曾按「6 个等宽图标」算成 W/12；布局改了必须同步这行，否则可能点中别的入口，
+# 用例照样 PASS（返回键位置相同），只是验的东西悄悄换了。
+adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
 sleep 0.8
 panel_h="$(get_ime_height)"
 # ⚠ 坐标取自 GEO_PANELHEADERY/GEO_PANELBACKX，别自己算：面板打开时条区让位、面板
@@ -468,8 +468,8 @@ sleep 4
 tap_key h; tap_key i; tap_key SPACE
 check_match "英文模式出拉丁字符" '^[A-Za-z ]+$' "$(get_pad_text)"
 tap_key COMMA
-# 键面写的是 ASCII，英文模式引擎不吃，宿主直输——出来必须是半角逗号
-check_match "英文模式逗号是半角" '^[A-Za-z ]+,$' "$(get_pad_text)"
+# 逗号句号合一键：英文模式点按出句点（中文模式出「，」，见 [4]）。宿主直输，必须是半角
+check_match "英文模式合一键出半角句点" '^[A-Za-z ]+\.$' "$(get_pad_text)"
 
 tap_key LANG
 sleep 3
@@ -562,7 +562,12 @@ before="$(get_pad_text)"
 # ⚠ 上屏后条区被**联想候选**（标点）占着，工具栏不可见；这时点条区点到的是联想项
 # （实测把「，」上了屏）。先点一下输入框：光标动 → 组合/联想作废 → 工具栏回来。
 adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 0.8
-adb_q shell input tap $(( GEO_W * 7 / 12 )) "$GEO_BARY"      # 工具栏第 4 格 = 文本编辑
+# 工具栏只剩入口和收起，文本编辑在快捷面板里：入口 → 面板网格第 2 行第 1 格。
+# 网格行位置（键盘顶下 158dp）取自 QuickPanelWindow 实测：方案分段行 + 第 1 行开关格。
+# ⚠ 第 1 行若多出「简入繁出」格（s2tShown），文本编辑会后移一格，这里要跟着改。
+adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
+sleep 1
+adb_q shell input tap $(( GEO_W / 8 )) "$(awk -v t="$GEO_KBTOP" -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", t + 158 * d }')"
 sleep 1
 cell_h=$(( GEO_ROWPX * 4 / 3 ))
 edit_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 8 )) $(( GEO_KBTOP + cell_h * (2 * $1 + 1) / 2 )); sleep 0.5; }
@@ -590,6 +595,43 @@ adb_q shell input swipe "$bs_x" "$bs_y" $(( bs_x - GEO_W / 3 )) "$bs_y" 250
 sleep 0.6
 tap_key SPACE                                # 编码已清 → 空格出空格
 check_match "正文保留一字且编码已清" '^[\x{4e00}-\x{9fa5}] $' "$(get_pad_text)"
+
+echo; echo "${Y}[19] 有编码时回车上屏编码原文${N}"
+# 大众布局：有编码时回车键写「确定」，按下上屏字母原文（键面文字 uiautomator 看不到，验行为）
+reset_pad
+tap_key a; tap_key a; tap_key ENTER
+check "回车上屏编码原文" "aa" "$(get_pad_text)"
+
+echo; echo "${Y}[20] 第 2 行缩进的半键空白归最近的键${N}"
+# 第 2 行两侧各缩进半个键（布局 spacer），落在空白里的触点归同一行最近的键（a / l），不能点空
+reset_pad
+row2_y="$(awk -v kb="$GEO_KBBOTTOM" -v rp="$GEO_ROWPX" 'BEGIN{ printf "%d", kb - 2.5 * rp }')"
+adb_q shell input tap 8 "$row2_y"; sleep 0.4
+adb_q shell input tap 8 "$row2_y"; sleep 0.4
+tap_key SPACE
+check_match "左侧空白两次 = aa 出字" "$CN" "$(get_pad_text)"
+
+echo; echo "${Y}[21] 长按字母出大写${N}"
+# 字母长按气泡是「小写 / 大写」，大写在右；按住不抬手右移一格再松开即选中大写。
+# 用 motionevent 而不是 swipe：swipe 一按下就开始移动，气泡还没弹出手指已经划走了。
+reset_pad
+read -r ex ey <<< "$(key_center e)"
+shift_px="$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 25 * d }')"
+adb_q shell input motionevent DOWN "$ex" "$ey"; sleep 0.8
+adb_q shell input motionevent MOVE $(( ex + shift_px )) "$ey"; sleep 0.2
+adb_q shell input motionevent UP $(( ex + shift_px )) "$ey"; sleep 0.6
+check "长按 e 右移选中 E" "E" "$(get_pad_text)"
+
+echo; echo "${Y}[22] 有编码时切中英先上屏字母原文${N}"
+reset_pad
+tap_key a; tap_key a; tap_key LANG
+sleep 3
+check "切英文前编码原文上屏" "aa" "$(get_pad_text)"
+# 收尾切回中文（方案选择持久化，留在英文会污染后续运行），并确认真的回来了
+tap_key LANG; sleep 3
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+check_match "切回中文出汉字" "$CN" "$(get_pad_text)"
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"

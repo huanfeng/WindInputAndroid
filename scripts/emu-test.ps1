@@ -29,10 +29,11 @@ function Adb { & $adb -s $Serial @args }
 # ── 键盘布局：与 KeyboardLayouts.qwerty 保持一致 ────────────────────────
 $rows = @(
     @{ keys = @("q","w","e","r","t","y","u","i","o","p"); weights = @(1,1,1,1,1,1,1,1,1,1) },
-    @{ keys = @("a","s","d","f","g","h","j","k","l");     weights = @(1,1,1,1,1,1,1,1,1) },
+    # 第 2 行两侧各有半键占位（_SP_，不可点）
+    @{ keys = @("_SP_","a","s","d","f","g","h","j","k","l","_SP_"); weights = @(0.5,1,1,1,1,1,1,1,1,1,0.5) },
     @{ keys = @("SHIFT","z","x","c","v","b","n","m","BS"); weights = @(1.5,1,1,1,1,1,1,1,1.5) },
-    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步（中英键在回车左侧）
-    @{ keys = @("SYM","EMOJI","COMMA","SPACE","PERIOD","LANG","ENTER"); weights = @(1.3,1,1,3.4,1,1,1.3) }
+    # 底栏权重须与 assets/data/layouts/qwerty.toml 同步：123 · 逗号句号合一 · 空格 · 中英 · 回车
+    @{ keys = @("SYM","COMMA","SPACE","LANG","ENTER"); weights = @(2,1,4,1,2) }
 )
 
 $script:geo = $null
@@ -340,11 +341,9 @@ Write-Host "`n[9] 快捷面板往返" -ForegroundColor Yellow
 # 区，实测正好点中「英」格，测试自己把引擎切成了英文模式，污染后面所有用例。
 # 面板上任何坐标都可能是功能键，只点自己放的「返回」才安全。
 Reset-Pad
-# 工具栏 = 6 个等宽图标（BarView.TOOLBAR_ITEMS 5 个 + 尾格），快捷面板入口是**第 1 格**。
-# ⚠ 这里曾按「模式指示(1.2) + 6 图标」算成 W*1.7/7.2；那一格删掉后坐标指向了别的图标，
-# 用例照样 PASS（打开的是表情面板，返回键位置相同），只是验的东西悄悄换了。
-# 布局改了必须同步这行。
-Adb shell input tap ([int]($script:geo.W / 12)) $script:geo.BarY | Out-Null
+# 工具栏只有两格：最左是快捷面板入口，宽 BarView.TOOLBAR_ICON_DP(52dp)，点它的中心。
+# ⚠ 这里曾按「6 个等宽图标」算成 W/12；布局改了必须同步这行。
+Adb shell input tap ([int](26 * $script:geo.Density)) $script:geo.BarY | Out-Null
 Start-Sleep -Milliseconds 800
 $panelH = Get-ImeHeight
 # ⚠ 坐标取自 $geo.PanelHeaderY/PanelBackX，别自己算：面板打开时条区让位、面板
