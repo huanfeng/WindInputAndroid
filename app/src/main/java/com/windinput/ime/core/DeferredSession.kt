@@ -24,6 +24,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * `keyPressed` 返回 `false`，宿主执行默认行为——字母直接上屏。这比「吞掉按键」或
  * 「卡住等待」都好：用户至多是头一两秒打出的字没经过中文引擎，而不是键盘假死。
  * 就绪后自动切换到真会话，无需重启输入法。
+ *
+ * # 切方案同样异步
+ *
+ * 第一次切到某个方案时核心要现编它的词库：白霜拼音约 60 万条，模拟器上主线程卡 4.75 秒
+ * （283 帧），真机再慢一点就是 ANR。所以可能现编词库的命令（切方案、切英文、重载配置、
+ * 换双拼布局）一律丢到 [worker] 上跑；跑的期间与核心未就绪同样处理——按键交还宿主、
+ * 候选给空、提示「词库准备中」。其余不取返回值的调用（焦点、复位、无痕…）在忙时也排进
+ * 同一条线程：顺序不乱，主线程也不会去抢那把被现编词库占着的锁。
  */
 class DeferredSession(
     private val dataDir: File,
@@ -38,6 +46,8 @@ class DeferredSession(
     private val prepareData: () -> Unit,
     /** 就绪后回调（主线程），供 UI 撤掉「准备中」提示 */
     private val onReady: (ImeSession) -> Unit,
+    /** 切方案等后台命令开始 / 全部做完（主线程）。做完时 UI 要重读方案与状态 */
+    private val onBusyChanged: (Boolean) -> Unit = {},
 ) : ImeSession {
 
     private companion object {
@@ -58,6 +68,45 @@ class DeferredSession(
 
     /** 是否已就绪（UI 据此显示准备中提示） */
     val ready: Boolean get() = delegate != null
+
+    /** 跑切方案这类可能现编词库的命令；单线程 = 排进来的调用按提交顺序执行 */
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { Thread(it, "wind-core-switch") }
+
+    /** 排在 [worker] 上还没做完的调用数。只在主线程读写 */
+    private var pending = 0
+
+    /** 后台命令进行中：此时核心可能正占着锁现编词库，主线程不碰它 */
+    val busy: Boolean get() = pending > 0
+
+    /** 忙时 [schemas] 给最近一次读到的列表，不去等锁 */
+    @Volatile
+    private var lastSchemas: List<SchemaEntry> = emptyList()
+
+    private fun enqueue(what: String, work: (ImeSession) -> Unit) {
+        val d = delegate ?: return
+        if (pending++ == 0) onBusyChanged(true)
+        worker.execute {
+            try {
+                work(d)
+            } catch (e: Throwable) {
+                Log.e(TAG, "后台执行 $what 失败", e)
+            } finally {
+                mainHandler.post { if (--pending == 0) onBusyChanged(false) }
+            }
+        }
+    }
+
+    /** 不取返回值的调用：忙时排队（保序），不忙直接做 */
+    private fun call(what: String, work: (ImeSession) -> Unit) {
+        val d = delegate ?: return
+        if (busy) enqueue(what, work) else work(d)
+    }
+
+    private fun mayBuildDict(cmd: EngineCmd): Boolean = when (cmd) {
+        is EngineCmd.SelectSchema, EngineCmd.English, EngineCmd.ReloadConfig,
+        is EngineCmd.SetShuangpinLayout -> true
+        EngineCmd.TogglePunct, EngineCmd.ToggleWidth, EngineCmd.ToggleS2t -> false
+    }
 
     /** 启动后台构造（幂等） */
     fun start() {
@@ -87,13 +136,9 @@ class DeferredSession(
         }, "wind-core-init").start()
     }
 
-    override fun focusGained() {
-        delegate?.focusGained()
-    }
+    override fun focusGained() = call("focusGained") { it.focusGained() }
 
-    override fun focusLost() {
-        delegate?.focusLost()
-    }
+    override fun focusLost() = call("focusLost") { it.focusLost() }
 
     /**
      * 核心没起来时也要记下：首次弹键盘往往就落在无痕框里（核心构造要一两秒），
@@ -104,40 +149,40 @@ class DeferredSession(
 
     override fun setLearningSuspended(on: Boolean) {
         learningSuspended = on
-        delegate?.setLearningSuspended(on)
+        call("setLearningSuspended") { it.setLearningSuspended(on) }
     }
 
-    /** 未就绪 → 交还宿主（字母直接上屏），绝不吞键 */
+    /** 未就绪 / 切方案中 → 交还宿主（字母直接上屏），绝不吞键、绝不等锁 */
     override fun keyPressed(action: KeyAction, shifted: Boolean): Boolean =
-        delegate?.keyPressed(action, shifted) ?: false
+        if (busy) false else delegate?.keyPressed(action, shifted) ?: false
 
     override fun candidateSelected(index: Int): Boolean =
-        delegate?.candidateSelected(index) ?: false
+        if (busy) false else delegate?.candidateSelected(index) ?: false
 
     override fun candidateWindow(offset: Int, limit: Int): CandidatePage =
-        delegate?.candidateWindow(offset, limit) ?: CandidatePage(emptyList(), offset, 0, 0)
+        (if (busy) null else delegate?.candidateWindow(offset, limit))
+            ?: CandidatePage(emptyList(), offset, 0, 0)
 
     override fun candidateMenu(index: Int): List<CandidateMenuEntry> =
-        delegate?.candidateMenu(index).orEmpty()
+        if (busy) emptyList() else delegate?.candidateMenu(index).orEmpty()
 
     override fun candidateMenuRun(index: Int, action: String): Boolean =
-        delegate?.candidateMenuRun(index, action) ?: false
+        if (busy) false else delegate?.candidateMenuRun(index, action) ?: false
 
-    override fun reset() {
-        delegate?.reset()
+    override fun reset() = call("reset") { it.reset() }
+
+    override fun schemas(): List<SchemaEntry> {
+        if (busy) return lastSchemas
+        return delegate?.schemas().orEmpty().also { lastSchemas = it }
     }
 
-    override fun schemas(): List<SchemaEntry> = delegate?.schemas() ?: emptyList()
-
     override fun shuangpinLayouts(): List<LayoutEntry> =
-        delegate?.shuangpinLayouts() ?: emptyList()
+        if (busy) emptyList() else delegate?.shuangpinLayouts().orEmpty()
 
     override fun runCommand(cmd: EngineCmd) {
-        delegate?.runCommand(cmd)
+        if (mayBuildDict(cmd)) enqueue(cmd.toString()) { it.runCommand(cmd) } else call(cmd.toString()) { it.runCommand(cmd) }
     }
 
     /** 未就绪时不必记：就绪回调里 Service 会按当前方案再设一次 */
-    override fun setLatinSchema(on: Boolean) {
-        delegate?.setLatinSchema(on)
-    }
+    override fun setLatinSchema(on: Boolean) = call("setLatinSchema") { it.setLatinSchema(on) }
 }

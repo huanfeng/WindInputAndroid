@@ -155,6 +155,18 @@ class WindInputImeService :
                     barView?.setPreparing(false)
                     refreshSchemaKeys()
                 },
+                // 切方案时核心可能在现编词库（首次切到拼音模拟器上近 5 秒）：期间与未就绪同样提示，
+                // 做完重读方案（空格键上的方案名、中英键的去向）
+                // 有缓存的切换只要几毫秒，过 300ms 还没完才提示，免得每切一次闪一下
+                onBusyChanged = { busy ->
+                    if (busy) {
+                        switchHandler.postDelayed(showSwitching, SWITCH_HINT_DELAY_MS)
+                    } else {
+                        switchHandler.removeCallbacks(showSwitching)
+                        barView?.setPreparing(false)
+                        refreshSchemaKeys()
+                    }
+                },
             ).also { it.start() }
         } else {
             FakeSession()
@@ -237,6 +249,9 @@ class WindInputImeService :
 
     private companion object {
         const val TAG = "WindIme"
+
+        /** 切方案超过这么久还没完才提示「词库准备中」 */
+        const val SWITCH_HINT_DELAY_MS = 300L
 
         /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
         const val ENGLISH_SCHEMA_ID = "english"
@@ -712,6 +727,9 @@ class WindInputImeService :
     }
 
     private var candidateMenu: CandidateMenuPopup? = null
+
+    private val switchHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val showSwitching = Runnable { barView?.setPreparing(true) }
 
     override fun onCandidateLongPressed(index: Int) = showCandidateMenu(index)
 

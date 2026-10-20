@@ -355,24 +355,40 @@ private fun ItemRow(item: SettingItem, values: SettingsValues) {
 @Composable
 private fun SchemaSection(session: ImeSession?) {
     val core = session ?: return
+    val scope = rememberCoroutineScope()
     var schemas by remember { mutableStateOf<List<SchemaEntry>>(core.schemas()) }
     var layouts by remember { mutableStateOf<List<LayoutEntry>>(core.shuangpinLayouts()) }
+    var switching by remember { mutableStateOf<String?>(null) }
     if (schemas.isEmpty()) return
 
-    SectionTitle("输入方案")
+    /**
+     * 切方案 / 换布局放后台：第一次切到某方案时核心现编词库，白霜拼音在模拟器上要近 5 秒，
+     * 放主线程就是整页卡死（真机上会 ANR）。做完回读真值。
+     */
+    fun switchTo(label: String, cmd: EngineCmd) {
+        if (switching != null) return
+        switching = label
+        scope.launch {
+            val (s, l) = withContext(Dispatchers.IO) {
+                core.runCommand(cmd)
+                core.schemas() to core.shuangpinLayouts()
+            }
+            // 真值一律回读，不本地翻转：切换可能被引擎拒绝（方案损坏、
+            // 词库缺失），本地先行打勾会造出一个和引擎不一致的选中态。
+            schemas = s
+            layouts = l
+            switching = null
+        }
+    }
+
+    SectionTitle(switching?.let { "正在切换到「$it」…（首次使用要准备词库，稍候）" } ?: "输入方案")
     Card(modifier = Modifier.fillMaxWidth()) {
         Column {
             for (s in schemas) {
                 ChoiceRow(
                     title = s.name.ifEmpty { s.id },
                     selected = s.active,
-                    onClick = {
-                        core.runCommand(EngineCmd.SelectSchema(s.index))
-                        // 真值一律回读，不本地翻转：切换可能被引擎拒绝（方案损坏、
-                        // 词库缺失），本地先行打勾会造出一个和引擎不一致的选中态。
-                        schemas = core.schemas()
-                        layouts = core.shuangpinLayouts()
-                    },
+                    onClick = { switchTo(s.name.ifEmpty { s.id }, EngineCmd.SelectSchema(s.index)) },
                 )
             }
         }
@@ -387,10 +403,7 @@ private fun SchemaSection(session: ImeSession?) {
                     ChoiceRow(
                         title = l.name.ifEmpty { l.id },
                         selected = l.active,
-                        onClick = {
-                            core.runCommand(EngineCmd.SetShuangpinLayout(l.id))
-                            layouts = core.shuangpinLayouts()
-                        },
+                        onClick = { switchTo(l.name.ifEmpty { l.id }, EngineCmd.SetShuangpinLayout(l.id)) },
                     )
                 }
             }
