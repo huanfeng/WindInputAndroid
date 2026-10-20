@@ -880,6 +880,37 @@ printf '%s\n' "$cfg_orig" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat 
 restart_pad
 wait_chinese >/dev/null
 
+echo; echo "${Y}[36] 候选长按菜单：置顶第三个候选，再恢复默认${N}"
+# 菜单是 IME 窗口里的浮层，uiautomator 看不到，按版式算坐标（CandidateMenuPopup）：
+# 卡片在条区下方 4dp、左右各让 8dp，内边距 10dp，标题一行之后是 4 列格子，
+# 第 1 行中心约在键盘顶下 62dp，行距 46dp（实测）。
+menu_cell() {   # 行 列
+    adb_q shell input tap \
+        "$(awk -v w="$GEO_W" -v d="$GEO_DENSITY" -v c="$2" 'BEGIN{ inner = w - 36 * d; printf "%d", 18 * d + inner / 4 * (c + 0.5) }')" \
+        "$(awk -v t="$GEO_KBTOP" -v d="$GEO_DENSITY" -v r="$1" 'BEGIN{ printf "%d", t + (62 + 46 * r) * d }')"
+    sleep 0.6
+}
+long_press_candidate() {
+    local x=$(( 60 + $1 * 120 ))
+    adb_q shell input swipe "$x" "$GEO_BARY" "$x" "$GEO_BARY" 900
+    sleep 0.8
+}
+reset_pad
+tap_key a; tap_key a
+long_press_candidate 2
+check "长按候选不上屏" "" "$(get_pad_text)"
+menu_cell 0 0          # 置顶
+tap_key SPACE
+top_after="$(get_pad_text)"
+check_match "置顶后首选换成别的字" '^[\x{4e00}-\x{9fa5}]$' "$top_after"
+[[ "$top_after" != "式" ]] || { echo "  ${R}FAIL${N}  置顶后首选仍是「式」"; FAILED=$((FAILED + 1)); }
+reset_pad
+tap_key a; tap_key a
+long_press_candidate 0
+menu_cell 1 0          # 恢复默认（第 2 行第 1 格）
+tap_key SPACE
+check "恢复默认后首选回到「式」" "式" "$(get_pad_text)"
+
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then

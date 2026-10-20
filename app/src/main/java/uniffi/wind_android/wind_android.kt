@@ -723,6 +723,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_toast(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_candidate_menu(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_candidate_menu_run(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidates(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_config_defaults(
@@ -804,6 +808,10 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_constructor_windcore_new(`dataDir`: RustBuffer.ByValue,`userRoot`: RustBuffer.ByValue,`schema`: RustBuffer.ByValue,`listener`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
+    external fun uniffi_wind_android_fn_method_windcore_candidate_menu(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_candidate_menu_run(`ptr`: Long,`index`: Int,`action`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_wind_android_fn_method_windcore_candidates(`ptr`: Long,`offset`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_config_defaults(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -978,6 +986,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_toast() != 36283) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_candidate_menu() != 58187) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_candidate_menu_run() != 46847) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_candidates() != 43261) {
@@ -1978,6 +1992,18 @@ public object FfiConverterTypeUiEventListener: FfiConverter<UiEventListener, Lon
 public interface WindCoreInterface {
     
     /**
+     * 候选长按菜单：按候选类型给出菜单项（文案、启用态与电脑版右键菜单同一份）。
+     * `index` 是绝对下标；无候选或越界时为空。
+     */
+    fun `candidateMenu`(`index`: kotlin.UInt): List<CandidateMenuItemInfo>
+    
+    /**
+     * 执行一项菜单动作（`move_top` / `delete` / `reset` …）；`copy` 由宿主自己做，这里返回 false。
+     * 执行后核心经 [`UiEventListener`] 推送新的候选。
+     */
+    fun `candidateMenuRun`(`index`: kotlin.UInt, `action`: kotlin.String): kotlin.Boolean
+    
+    /**
      * 拉取候选全量的一个窗口。**纯读**，不改状态，可随时调。
      *
      * 别在每次按键都拉一大段：序列化与 K 侧的文字测量都在主线程上。
@@ -2221,6 +2247,43 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
             UniffiLib.uniffi_wind_android_fn_clone_windcore(handle, status)
         }
     }
+
+    
+    /**
+     * 候选长按菜单：按候选类型给出菜单项（文案、启用态与电脑版右键菜单同一份）。
+     * `index` 是绝对下标；无候选或越界时为空。
+     */override fun `candidateMenu`(`index`: kotlin.UInt): List<CandidateMenuItemInfo> {
+            return FfiConverterSequenceTypeCandidateMenuItemInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_candidate_menu(
+        it,
+        
+        FfiConverterUInt.lower(`index`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 执行一项菜单动作（`move_top` / `delete` / `reset` …）；`copy` 由宿主自己做，这里返回 false。
+     * 执行后核心经 [`UiEventListener`] 推送新的候选。
+     */override fun `candidateMenuRun`(`index`: kotlin.UInt, `action`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_candidate_menu_run(
+        it,
+        
+        FfiConverterUInt.lower(`index`),
+        FfiConverterString.lower(`action`),_status)
+}
+    }
+    )
+    }
+    
 
     
     /**
@@ -2615,6 +2678,52 @@ public object FfiConverterTypeWindCore: FfiConverter<WindCore, Long> {
 
     override fun write(value: WindCore, buf: ByteBuffer) {
         buf.putLong(lower(value))
+    }
+}
+
+
+
+/**
+ * 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
+ */
+data class CandidateMenuItemInfo (
+    var `label`: kotlin.String
+    , 
+    var `action`: kotlin.String
+    , 
+    var `enabled`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeCandidateMenuItemInfo: FfiConverterRustBuffer<CandidateMenuItemInfo> {
+    override fun read(buf: ByteBuffer): CandidateMenuItemInfo {
+        return CandidateMenuItemInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: CandidateMenuItemInfo) = (
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterString.allocationSize(value.`action`) +
+            FfiConverterBoolean.allocationSize(value.`enabled`)
+    )
+
+    override fun write(value: CandidateMenuItemInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterString.write(value.`action`, buf)
+            FfiConverterBoolean.write(value.`enabled`, buf)
     }
 }
 
@@ -3839,6 +3948,34 @@ public object FfiConverterSequenceString: FfiConverterRustBuffer<List<kotlin.Str
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterString.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeCandidateMenuItemInfo: FfiConverterRustBuffer<List<CandidateMenuItemInfo>> {
+    override fun read(buf: ByteBuffer): List<CandidateMenuItemInfo> {
+        val len = buf.getInt()
+        return List<CandidateMenuItemInfo>(len) {
+            FfiConverterTypeCandidateMenuItemInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<CandidateMenuItemInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeCandidateMenuItemInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<CandidateMenuItemInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeCandidateMenuItemInfo.write(it, buf)
         }
     }
 }

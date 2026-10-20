@@ -196,6 +196,14 @@ class RustSession(
         return result.consumed
     }
 
+    override fun candidateMenu(index: Int): List<CandidateMenuEntry> {
+        if (index < 0) return emptyList()
+        return core.candidateMenu(index.toUInt()).map { CandidateMenuEntry(it.label, it.action, it.enabled) }
+    }
+
+    override fun candidateMenuRun(index: Int, action: String): Boolean =
+        index >= 0 && core.candidateMenuRun(index.toUInt(), action)
+
     override fun candidateWindow(offset: Int, limit: Int): CandidatePage {
         val t0 = SystemClock.elapsedRealtimeNanos()
         val w = core.candidates(offset.toUInt(), limit.toUInt())

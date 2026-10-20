@@ -30,6 +30,9 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
     interface Listener {
         fun onExpandedCandidateSelected(index: Int)
 
+        /** 长按某个候选：弹候选菜单（与候选栏长按同一个菜单） */
+        fun onExpandedCandidateLongPressed(index: Int) = Unit
+
         /** 滚到接近底部、且核心那边还有更多：请求续取一段 */
         fun onNeedMoreCandidates()
     }
@@ -42,7 +45,10 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
     }
 
     private var grid: RecyclerView? = null
-    private val adapter = CandidateAdapter { listener.onExpandedCandidateSelected(it) }
+    private val adapter = CandidateAdapter(
+        onClick = { listener.onExpandedCandidateSelected(it) },
+        onLongClick = { listener.onExpandedCandidateLongPressed(it) },
+    )
 
     /** 已请求续取、尚未到货：挡住重复请求 */
     private var loadingMore = false
@@ -98,6 +104,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
 
     private class CandidateAdapter(
         private val onClick: (Int) -> Unit,
+        private val onLongClick: (Int) -> Unit,
     ) : RecyclerView.Adapter<CandidateAdapter.Holder>() {
 
         private var items: List<String> = emptyList()
@@ -134,6 +141,10 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         override fun onBindViewHolder(holder: Holder, position: Int) {
             holder.view.text = items[position]
             holder.view.setOnClickListener { onClick(position) }
+            holder.view.setOnLongClickListener {
+                onLongClick(position)
+                true
+            }
         }
 
         override fun getItemCount() = items.size

@@ -1012,3 +1012,50 @@ fn learning_suspended_records_nothing_until_resumed() {
     core.key_down(VK_SPACE, 0);
     assert!(today(&core) > before, "恢复后统计应照常增加");
 }
+
+/// 候选长按菜单：按绝对下标取菜单、置顶后它成为首选、恢复默认后回原位。
+#[test]
+fn candidate_menu_move_top_then_reset() {
+    let Some((core, _rec, _env)) = setup_exclusive("candidate_menu") else {
+        return;
+    };
+    let first_of = |c: &WindCore| {
+        c.candidates(0, 3)
+            .items
+            .first()
+            .cloned()
+            .unwrap_or_default()
+    };
+    core.key_down(VK_A, 0);
+    core.key_down(VK_A, 0);
+    settle();
+    let before = core.candidates(0, 5).items;
+    assert!(before.len() >= 3, "aa 应有多个候选，实得 {before:?}");
+    let target = before[2].clone();
+
+    let menu = core.candidate_menu(2);
+    assert!(
+        menu.iter().any(|m| m.action == "move_top" && m.enabled),
+        "普通词条的菜单应有可用的置顶，实得 {menu:?}"
+    );
+    assert!(core.candidate_menu(9999).is_empty(), "越界下标应无菜单");
+
+    assert!(core.candidate_menu_run(2, "move_top".into()), "置顶应执行");
+    assert!(
+        !core.candidate_menu_run(0, "copy".into()),
+        "复制由宿主做，核心不执行"
+    );
+    // 重打一遍码：规则落盘后对新的组合也生效
+    core.key_down(0x1B, 0);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_A, 0);
+    settle();
+    assert_eq!(first_of(&core), target, "置顶后应成为首选");
+
+    assert!(core.candidate_menu_run(0, "reset".into()), "恢复默认应执行");
+    core.key_down(0x1B, 0);
+    core.key_down(VK_A, 0);
+    core.key_down(VK_A, 0);
+    settle();
+    assert_eq!(first_of(&core), before[0], "恢复默认后首选回到原来的");
+}

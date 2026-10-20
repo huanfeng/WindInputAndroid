@@ -428,6 +428,26 @@ impl WindCore {
         self.core.select_candidate(index as usize).into()
     }
 
+    /// 候选长按菜单：按候选类型给出菜单项（文案、启用态与电脑版右键菜单同一份）。
+    /// `index` 是绝对下标；无候选或越界时为空。
+    pub fn candidate_menu(&self, index: u32) -> Vec<CandidateMenuItemInfo> {
+        self.core
+            .candidate_menu(index as usize)
+            .into_iter()
+            .map(|m| CandidateMenuItemInfo {
+                label: m.label,
+                action: m.action,
+                enabled: m.enabled,
+            })
+            .collect()
+    }
+
+    /// 执行一项菜单动作（`move_top` / `delete` / `reset` …）；`copy` 由宿主自己做，这里返回 false。
+    /// 执行后核心经 [`UiEventListener`] 推送新的候选。
+    pub fn candidate_menu_run(&self, index: u32, action: String) -> bool {
+        self.core.candidate_menu_run(index as usize, &action)
+    }
+
     /// 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
     /// 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
     pub fn shuangpin_layouts(&self) -> Vec<LayoutInfo> {
@@ -680,4 +700,12 @@ pub struct UserWordInfo {
 pub struct UserWordPageInfo {
     pub items: Vec<UserWordInfo>,
     pub total: u64,
+}
+
+/// 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
+#[derive(Debug, uniffi::Record)]
+pub struct CandidateMenuItemInfo {
+    pub label: String,
+    pub action: String,
+    pub enabled: bool,
 }

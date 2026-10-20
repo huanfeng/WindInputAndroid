@@ -35,6 +35,25 @@ class CandidateBarView(context: Context) : View(context) {
 
     interface Listener {
         fun onCandidateSelected(index: Int)
+
+        /** 长按某个候选：弹候选菜单（置顶 / 删除 …） */
+        fun onCandidateLongPressed(index: Int) = Unit
+    }
+
+    /**
+     * 长按计时：按下即排，拖动 / 抬手 / 取消即撤。触发后本次抬手不再算点选——
+     * 否则用户长按出菜单、松手的同时就把这个词上屏了。
+     */
+    private var longPressFired = false
+    private val longPress = Runnable {
+        val index = pressedIndex
+        if (index >= 0 && !dragging) {
+            longPressFired = true
+            pressedIndex = -1
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            invalidate()
+            listener?.onCandidateLongPressed(index)
+        }
     }
 
     var listener: Listener? = null
@@ -192,8 +211,10 @@ class CandidateBarView(context: Context) : View(context) {
                 downX = event.x
                 dragging = false
                 pressedIndex = findIndex(event.x)
+                longPressFired = false
                 if (pressedIndex >= 0) {
                     performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 }
                 // 候选条在可滚动时要拦住父容器的横向手势，否则拖动会被上层吃掉
                 parent?.requestDisallowInterceptTouchEvent(maxScroll() > 0)
@@ -205,6 +226,7 @@ class CandidateBarView(context: Context) : View(context) {
                     dragging = true
                     // 一旦判定为拖动就取消按下态：本次抬手不再算点选
                     pressedIndex = -1
+                    removeCallbacks(longPress)
                 }
                 if (dragging) {
                     scrollX = (scrollX + dx).coerceIn(0f, maxScroll())
@@ -214,7 +236,8 @@ class CandidateBarView(context: Context) : View(context) {
                 }
             }
             MotionEvent.ACTION_UP -> {
-                val index = pressedIndex
+                removeCallbacks(longPress)
+                val index = if (longPressFired) -1 else pressedIndex
                 pressedIndex = -1
                 if (dragging) {
                     tracker.computeCurrentVelocity(1000, maxFlingVelocity.toFloat())
@@ -235,6 +258,7 @@ class CandidateBarView(context: Context) : View(context) {
                 invalidate()
             }
             MotionEvent.ACTION_CANCEL -> {
+                removeCallbacks(longPress)
                 pressedIndex = -1
                 releaseTracker()
                 invalidate()

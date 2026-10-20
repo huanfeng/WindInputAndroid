@@ -184,6 +184,18 @@ interface ImeSession {
     fun candidateWindow(offset: Int, limit: Int): CandidatePage =
         CandidatePage(emptyList(), offset, 0, 0)
 
+    /**
+     * 候选长按菜单（对应电脑版的候选右键菜单，菜单项与文案由核心按候选类型给出）。
+     * [index] 是全量里的绝对下标。无候选 / 越界 → 空。
+     */
+    fun candidateMenu(index: Int): List<CandidateMenuEntry> = emptyList()
+
+    /**
+     * 执行一项菜单动作；执行后核心推送新的候选。`copy` 不经核心，由调用方自己写剪贴板。
+     * @return 核心是否执行了
+     */
+    fun candidateMenuRun(index: Int, action: String): Boolean = false
+
     /** 复位会话状态（清空组合区与候选） */
     fun reset()
 
@@ -202,3 +214,9 @@ interface ImeSession {
      */
     fun setLatinSchema(on: Boolean) = Unit
 }
+
+/**
+ * 候选菜单的一项。[action] ∈ move_top / move_up / move_down / delete / reset / toggle_common / copy，
+ * 与核心约定的动作名，菜单显示用 [label]（核心给的文案，与电脑版右键菜单同一份）。
+ */
+data class CandidateMenuEntry(val label: String, val action: String, val enabled: Boolean)

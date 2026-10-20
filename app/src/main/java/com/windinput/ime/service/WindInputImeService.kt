@@ -29,6 +29,7 @@ import com.windinput.ime.core.UserConfig
 import com.windinput.ime.core.suspendsLearning
 import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
+import com.windinput.ime.keyboard.CandidateMenuPopup
 import com.windinput.ime.keyboard.InputRootView
 import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
@@ -386,6 +387,7 @@ class WindInputImeService :
      * 忘了它——接着按的第一个键就拼进了那串旧码，出来的字完全对不上。
      */
     override fun onFinishInputView(finishingInput: Boolean) {
+        candidateMenu?.dismiss()
         abandonComposition()
         // 编码浮层是独立窗口，不随 IME 窗口隐藏，必须显式收
         barView?.hidePreedit()
@@ -518,6 +520,8 @@ class WindInputImeService :
 
     private fun onUiEvent(event: UiEvent) {
         val ic = currentInputConnection
+        // 候选一变，菜单记着的下标就指向别的词了——收起，宁可让用户再长按一次
+        if (event !is UiEvent.Edits) candidateMenu?.dismiss()
         when (event) {
             is UiEvent.Edits -> applyEdits(ic ?: return, event.ops)
             is UiEvent.Candidates -> {
@@ -704,6 +708,35 @@ class WindInputImeService :
             }
             // Shift/SwitchSymbols 由 KeyboardView 内部消化，不会到达这里
             else -> Unit
+        }
+    }
+
+    private var candidateMenu: CandidateMenuPopup? = null
+
+    override fun onCandidateLongPressed(index: Int) = showCandidateMenu(index)
+
+    override fun onExpandedCandidateLongPressed(index: Int) = showCandidateMenu(index)
+
+    /**
+     * 候选长按菜单。菜单项由核心按候选类型给（普通词：置顶 / 前移 / 删除 / 恢复默认 …；
+     * 上屏历史：删除此历史 …），与电脑版右键菜单同一份。执行后核心会推送新的候选，
+     * 不用这里刷新。「复制」核心不管，在这里写剪贴板。
+     */
+    private fun showCandidateMenu(index: Int) {
+        val bar = barView ?: return
+        val items = session.candidateMenu(index)
+        if (items.isEmpty()) return
+        val title = session.candidateWindow(index, 1).items.firstOrNull().orEmpty()
+        candidateMenu?.dismiss()
+        candidateMenu = CandidateMenuPopup(bar).also { menu ->
+            menu.show(title, items) { entry ->
+                if (entry.action == "copy") {
+                    getSystemService(android.content.ClipboardManager::class.java)
+                        ?.setPrimaryClip(android.content.ClipData.newPlainText("candidate", title))
+                } else {
+                    session.candidateMenuRun(index, entry.action)
+                }
+            }
         }
     }
 
