@@ -421,6 +421,18 @@ if [[ -z "$probe" ]]; then
 fi
 check_match "已处于中文方案" "$CN" "$probe"
 
+# 英文方案就绪探针：打 hi + 空格，得到 hi（可能首字母大写）即就绪。返回探到的文本
+wait_english() {
+    local i t
+    for ((i = 0; i < 6; i++)); do
+        reset_pad
+        tap_key h; tap_key i; tap_key SPACE
+        t="$(get_pad_text)"
+        printf '%s' "$t" | grep -qP '^[Hh]i ' && { reset_pad; printf '%s' "$t"; return; }
+        sleep 2
+    done
+}
+
 echo; echo "${Y}[1] 五笔组合上屏：aa + 空格${N}"
 reset_pad
 tap_key a; tap_key a; tap_key SPACE
@@ -515,18 +527,16 @@ else
 fi
 
 echo; echo "${Y}[11] 中英切换键${N}"
-# 底栏中英键：切英文后字母直出，再点回中文恢复出汉字。
-# ⚠ 目前英文走的是**系统英文模式**（无候选）。英文方案带补全尚未打通
-#（候选走英文引擎、上屏走中文码表），见主仓 key_flow.rs 里标 ignore 的那条用例。
+# 底栏中英键切到**英文方案**（带补全）：空格上屏所打原文并自动补空格，再点回中文恢复出汉字。
 reset_pad
 tap_key LANG
 # 切换要走引擎，等待给足
 sleep 4
 tap_key h; tap_key i; tap_key SPACE
-check_match "英文模式出拉丁字符" '^[A-Za-z ]+$' "$(get_pad_text)"
+check "英文空格上屏原文 + 自动空格" "hi " "$(get_pad_text)"
 tap_key COMMA
-# 逗号句号合一键：英文模式点按出句点（中文模式出「，」，见 [4]）。宿主直输，必须是半角
-check_match "英文模式合一键出半角句点" '^[A-Za-z ]+\.$' "$(get_pad_text)"
+# 逗号句号合一键：英文模式点按出句点（中文模式出「，」，见 [4]）；自动补的空格挪到句点后面
+check "英文句点吃掉自动空格" "hi. " "$(get_pad_text)"
 
 tap_key LANG
 sleep 3
@@ -755,6 +765,50 @@ sym_cell 0 0
 check "最近第一格是上次点的「。」" "。" "$(get_pad_text)"
 adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
 tap_cell 3 "${SYM_W[3]}" 0
+
+echo; echo "${Y}[27] 英文补全：点候选上屏补全词并自动加空格${N}"
+reset_pad
+tap_key LANG; sleep 4
+tap_key b; tap_key e; tap_key a; tap_key u
+# 候选条是自绘的，按宽度粗估：首项是原文 beau，屏幕中间落在其后的补全词上（Beaumont / beautiful）
+adb_q shell input tap $(( GEO_W / 2 )) "$GEO_BARY"; sleep 0.6
+check_match "点补全词上屏" '^[Bb]eau[a-z]+ $' "$(get_pad_text)"
+
+echo; echo "${Y}[28] 英文句首自动大写、双击空格出句号${N}"
+# 句子框（第 5 场景，CAP_SENTENCES）：句首的 h 自动大写，打完 hi 双击空格得「. 」，下一句又自动大写
+restart_pad
+tap_text "切换场景"; tap_text "切换场景"; tap_text "切换场景"; tap_text "切换场景"
+get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.5
+[[ -n "$(wait_english)" ]] || die "重启后英文方案未就绪"
+tap_key h; tap_key i
+read -r sp_x sp_y <<< "$(key_center SPACE)"
+# 两下空格要在 600ms 内：放进同一个 adb shell 里连发
+adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
+# 自动大写的 H 进的是英文组合（补全不断），空格上屏后才读得到
+tap_key h; tap_key SPACE
+check "句首大写 + 双空格句号 + 下一句又大写" "Hi. H " "$(get_pad_text)"
+restart_pad
+
+echo; echo "${Y}[29] 密码框不自动大写、不出句号${N}"
+restart_pad
+tap_text "切换场景"; tap_text "切换场景"; tap_text "切换场景"
+get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.5
+tap_key h; tap_key i
+adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
+check "密码框原样直输（不大写、不补全、不出句号）" "hi  " "$(get_pad_text)"
+restart_pad
+[[ -n "$(wait_english)" ]] || die "重启后英文方案未就绪"
+# 收尾回中文（方案选择持久化，留在英文会污染下次运行）
+reset_pad; tap_key LANG; sleep 4
+[[ -n "$(wait_chinese)" ]] || die "收尾切回中文失败"
+
+echo; echo "${Y}[30] 中文模式双击空格出「。」${N}"
+# 不从汉字后面测：上屏汉字后进联想态，空格归引擎选联想词（Stage 4 处理）。
+# 从 123 层打一个数字再回字母层，光标前是「1」，双击空格应换成「。」
+reset_pad
+tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 0
+adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
+check "数字后双空格换成句号" "1。" "$(get_pad_text)"
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"

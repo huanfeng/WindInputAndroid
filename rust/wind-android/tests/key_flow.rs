@@ -441,23 +441,10 @@ fn switch_back_to_chinese_still_composes() {
 
 /// 切到**英文方案**后，上屏必须走英文而不是中文码表。
 ///
-/// ⚠ **当前已知失败，标 ignore**（英文方案带候选尚未打通，见下方证据）。
-/// 移动端的中英键暂时降级为「系统英文模式」（字母直出、无候选），行为正确但少了补全。
-///
-/// 已查明的证据（供后续接手）：
-/// - `SelectSchema` 后 `engine_mgr` 报 `active=english`，候选列表也确实是英文的
-///   （真机截图：`hi / Hi-Fi / hibernate / hibernation`，1/13 页）
-/// - 但空格上屏得到「步」——`hi` 的五笔字。即**候选来自英文引擎、上屏走中文码表**
-/// - 试过让 `select_schema` 按引擎类型设 `chinese_mode=false`：上屏对了，但字母
-///   不再进引擎（吃键判定把它当系统英文模式），候选整个没了
-/// - 推测：方案切换没有真正改变输入路径，英文候选可能来自「临时英文/mix 补全」
-///   而非切换后的主引擎。需要读懂 `EngineManager::switch_schema` 与候选合成的关系
-#[ignore = "英文方案带候选未打通：候选走英文引擎、上屏走中文码表"]
-///
-/// 真机现象（已修）：切到英文方案后候选正确显示 `hi / Hi-Fi / hibernate`，
-/// 按空格上屏的却是「步」——`hi` 在五笔里的字。根因是 `select_schema` 一律把
-/// `chinese_mode` 置真，制造出「english 引擎 + chinese_mode=true」这个核心
-/// 未定义的组合：候选走英文引擎、上屏走中文路径。
+/// 真机现象（主仓已修，2026-10 起本测试转绿）：切到英文方案后候选正确显示
+/// `hi / Hi-Fi / hibernate`，按空格上屏的却是「步」——`hi` 在五笔里的字。根因是
+/// `select_schema` 一律把 `chinese_mode` 置真，制造出「english 引擎 + chinese_mode=true」
+/// 这个核心未定义的组合：候选走英文引擎、上屏走中文路径。
 ///
 /// 桌面从没暴露这个问题，因为英文引擎在那边只经「临时英文」进入（本就 false）。
 #[test]
@@ -775,4 +762,82 @@ fn select_candidate_out_of_range_is_passthrough() {
     let r = core.select_candidate(total + 5);
     assert!(!r.consumed, "越界选词应交还宿主");
     assert!(r.ops.is_empty(), "越界选词不应产生编辑指令");
+}
+
+/// 英文方案的补全是**前缀匹配**，首候选恒为所打原文（v0.3 Stage 3 的前置核对）。
+///
+/// 移动端英文输入靠它：打 `beau` 候选要出 `beautiful`，而空格要上屏 `beau` 本身
+/// （手机上的习惯是空格出原文、点候选才换词）。
+#[test]
+fn english_schema_prefix_completion() {
+    use wind_android::EngineCommand;
+    let Some((core, rec, _env)) = setup_exclusive("english_schema_prefix_completion") else {
+        return;
+    };
+    let Some(en) = core.schemas().iter().position(|s| s.id == "english") else {
+        eprintln!("跳过：未安装英文方案");
+        return;
+    };
+    core.run_command(EngineCommand::SelectSchema { index: en as u32 });
+    settle();
+    rec.candidates.lock().unwrap().clear();
+    for vk in [0x42u32, 0x45, 0x41, 0x55] {
+        core.key_down(vk, 0); // b e a u
+    }
+    settle();
+    let items = rec
+        .candidates
+        .lock()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|(_, items)| !items.is_empty())
+        .map(|(_, items)| items.clone())
+        .unwrap_or_default();
+    eprintln!("beau 候选：{items:?}");
+    assert_eq!(items.first().map(String::as_str), Some("beau"), "首候选应为原文");
+    assert!(
+        items.iter().any(|w| w.to_ascii_lowercase().starts_with("beau") && w.len() > 4),
+        "应有以 beau 开头的补全，实得 {items:?}",
+    );
+    let r = core.key_down(VK_SPACE, 0);
+    let text: String = r.ops.iter().filter(|o| o.kind == 0).map(|o| o.text.clone()).collect();
+    eprintln!("空格上屏：{text:?}");
+    assert!(text.starts_with("beau"), "空格应上屏原文，实得 {text:?}");
+}
+
+/// 英文方案下 Shift+字母（句首自动大写、手按 ⇧）要进引擎组合，不能直出：
+/// 直出的话大写字母先上屏、后面的字母另起一段编码，`Hello` 的补全就断了。
+#[test]
+fn english_schema_shifted_letter_composes() {
+    use wind_android::EngineCommand;
+    let Some((core, rec, _env)) = setup_exclusive("english_schema_shifted_letter_composes") else {
+        return;
+    };
+    let Some(en) = core.schemas().iter().position(|s| s.id == "english") else {
+        eprintln!("跳过：未安装英文方案");
+        return;
+    };
+    core.run_command(EngineCommand::SelectSchema { index: en as u32 });
+    settle();
+    rec.candidates.lock().unwrap().clear();
+    let first = core.key_down(0x48, 0x0001); // Shift+H
+    eprintln!("Shift+H：consumed={} ops={:?}", first.consumed, first.ops.iter().map(|o| (o.kind, o.text.clone())).collect::<Vec<_>>());
+    for vk in [0x45u32, 0x4C, 0x4C] {
+        core.key_down(vk, 0); // e l l
+    }
+    settle();
+    let last = rec
+        .candidates
+        .lock()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|(_, items)| !items.is_empty())
+        .cloned()
+        .unwrap_or_default();
+    eprintln!("Hell 编码={:?} 候选={:?}", last.0, last.1);
+    assert!(first.consumed && first.ops.iter().all(|o| o.kind != 0), "Shift+H 应进组合而不是直接上屏");
+    assert_eq!(last.1.first().map(String::as_str), Some("Hell"), "首候选应为原文（保留大小写）");
+    assert!(last.1.iter().any(|w| w.starts_with("Hello")), "应补全出 Hello，实得 {:?}", last.1);
 }

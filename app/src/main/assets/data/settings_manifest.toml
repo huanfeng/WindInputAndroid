@@ -72,6 +72,33 @@ step = 50
 platform = "android"
 
 [[group]]
+title = "英文输入"
+
+[[group.item]]
+key = "ui.android.auto_cap"
+type = "toggle"
+title = "句首自动大写"
+summary = "英文模式下在句首、输入框开头自动切大写（输入框声明了要大写时才生效，密码 / 网址 / 邮箱框不生效）"
+default = true
+platform = "android"
+
+[[group.item]]
+key = "ui.android.double_space_period"
+type = "toggle"
+title = "双击空格输入句号"
+summary = "快速点两下空格：英文模式输入「. 」，中文模式输入「。」"
+default = true
+platform = "android"
+
+[[group.item]]
+key = "ui.android.auto_space"
+type = "toggle"
+title = "英文选词后自动加空格"
+summary = "英文模式下空格或点候选上屏一个词后自动补空格；紧接着打句末标点时空格挪到标点后面"
+default = true
+platform = "android"
+
+[[group]]
 title = "外观"
 
 [[group.item]]

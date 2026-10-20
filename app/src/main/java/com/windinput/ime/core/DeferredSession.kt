@@ -116,4 +116,9 @@ class DeferredSession(
     override fun runCommand(cmd: EngineCmd) {
         delegate?.runCommand(cmd)
     }
+
+    /** 未就绪时不必记：就绪回调里 Service 会按当前方案再设一次 */
+    override fun setLatinSchema(on: Boolean) {
+        delegate?.setLatinSchema(on)
+    }
 }

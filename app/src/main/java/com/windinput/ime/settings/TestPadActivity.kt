@@ -33,7 +33,10 @@ class TestPadActivity : Activity() {
         Scene("普通文本（多行，回车换行）", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED),
         Scene("搜索框（回车应显示「搜索」）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH),
         Scene("数字框（应切数字层）", InputType.TYPE_CLASS_NUMBER, EditorInfo.IME_ACTION_UNSPECIFIED),
-        Scene("密码框（应强制英文直输）", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD, EditorInfo.IME_ACTION_DONE),
+        // 用「可见密码」：同样走直输分支，但字不变成圆点，脚本读得出来
+        Scene("密码框（可见密码，应强制英文直输）", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, EditorInfo.IME_ACTION_DONE),
+        // 聊天类应用的输入框大多带 CAP_SENTENCES：英文句首自动大写只在这种框里生效
+        Scene("句子框（英文句首应自动大写）", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED),
     )
 
     private data class Scene(val label: String, val inputType: Int, val imeOptions: Int)

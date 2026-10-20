@@ -189,4 +189,10 @@ interface ImeSession {
 
     /** 下达引擎命令；结果经 [UiEvent.Status] 异步回报 */
     fun runCommand(cmd: EngineCmd) = Unit
+
+    /**
+     * 当前是不是英文方案。英文方案下 Shift+字母**进引擎组合**（保留大小写，`Hell` 照样补全
+     * 出 `Hello`）；中文方案下仍直接上屏——那里引擎的 Shift+字母是「临时英文」语义。
+     */
+    fun setLatinSchema(on: Boolean) = Unit
 }

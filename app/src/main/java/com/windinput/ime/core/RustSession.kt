@@ -165,6 +165,14 @@ class RustSession(
         core.runCommand(native)
     }
 
+    /** 见 [ImeSession.setLatinSchema] */
+    @Volatile
+    private var latinSchema = false
+
+    override fun setLatinSchema(on: Boolean) {
+        latinSchema = on
+    }
+
     override fun keyPressed(action: KeyAction, shifted: Boolean): Boolean {
         val (vk, mods) = toVk(action, shifted) ?: return false
         return dispatch(vk, mods)
@@ -253,8 +261,10 @@ class RustSession(
         is KeyAction.Text -> {
             val c = action.char
             when {
-                // Shift 态大写字母骨架期绕过引擎直输（引擎的 Shift+字母 是「临时英文」语义）
                 c in 'a'..'z' && !shifted -> (0x41u + (c - 'a').toUInt()) to 0u
+                // 英文方案：大写字母也进组合（句首自动大写后补全不能断）
+                c in 'a'..'z' && latinSchema -> (0x41u + (c - 'a').toUInt()) to MOD_SHIFT
+                // 中文方案：Shift 态大写字母绕过引擎直输（引擎的 Shift+字母 是「临时英文」语义）
                 c in 'a'..'z' -> null
                 else -> Punct.vkOf(c)?.let { (vk, shift) -> vk to (if (shift) MOD_SHIFT else 0u) }
             }

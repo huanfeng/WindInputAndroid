@@ -188,6 +188,9 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 大写锁定（Shift 双击） */
     private var shiftLocked = false
+
+    /** 当前的单次 Shift 是自动大写给的（不是用户按的）：条件消失时要自己撤回 */
+    private var autoShifted = false
     private var lastShiftTapTime = 0L
 
     // ── 配色取自键盘域调色板（Service 按系统深浅色注入，见 Palette） ──
@@ -782,6 +785,27 @@ class KeyboardView(context: Context) : View(context) {
     private fun findKey(x: Float, y: Float): KeyDef? = findBounds(x, y)?.key
 
     /**
+     * 自动首字母大写（英文模式句首 / 输入框开头，由 Service 按 `getCursorCapsMode` 判定）。
+     * 给的是**单次** Shift：键面变大写，打一个字母后复位，和用户按一次 ⇧ 一样。
+     * 条件消失（删回了句中、挪了光标）时只撤回自己给的那次，用户手按的 ⇧ 不动。
+     */
+    fun setAutoCaps(on: Boolean) {
+        if (shiftLocked || layer != KeyboardLayer.LETTERS) return
+        when {
+            on && !shifted -> {
+                shifted = true
+                autoShifted = true
+            }
+            !on && autoShifted -> {
+                shifted = false
+                autoShifted = false
+            }
+            else -> return
+        }
+        invalidate()
+    }
+
+    /**
      * 切换布局层（EditorInfo 场景感知 / 符号键共用入口）。
      * [returnTo]：进数字键盘时记下「←」回哪一层。
      */
@@ -791,6 +815,7 @@ class KeyboardView(context: Context) : View(context) {
         layer = newLayer
         shifted = false
         shiftLocked = false
+        autoShifted = false
         reloadLayout()
     }
 
@@ -811,6 +836,7 @@ class KeyboardView(context: Context) : View(context) {
                     return
                 }
                 val now = android.os.SystemClock.uptimeMillis()
+                autoShifted = false
                 when {
                     shiftLocked -> {
                         shiftLocked = false
@@ -843,6 +869,7 @@ class KeyboardView(context: Context) : View(context) {
                 // 单次 Shift：出字后自动复位（锁定态保持）
                 if (shifted && !shiftLocked && key.action is KeyAction.Text) {
                     shifted = false
+                    autoShifted = false
                     invalidate()
                 }
             }

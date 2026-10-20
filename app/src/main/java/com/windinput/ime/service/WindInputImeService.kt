@@ -86,6 +86,20 @@ class WindInputImeService :
     /** 剪贴板建议条开关（设置项 ui.android.clip_suggestion） */
     private var clipSuggestionEnabled = true
 
+    /** 英文输入三个开关（设置项 ui.android.auto_cap / double_space_period / auto_space） */
+    private var autoCapEnabled = true
+    private var doubleSpacePeriod = true
+    private var autoSpaceEnabled = true
+
+    /**
+     * 光标前那个空格是英文选词后**自动补**的。紧接着打句末标点时要把它挪到标点后面
+     * （`word ` + `.` → `word. `），否则就成了「word .」。按了别的键即作废。
+     */
+    private var autoSpaced = false
+
+    /** 上一次按空格的时刻，双击空格出句号用；按了别的键清零 */
+    private var lastSpaceAt = 0L
+
     private lateinit var layoutRepository: LayoutRepository
     private lateinit var userConfig: UserConfig
     private lateinit var clipboardStore: ClipboardStore
@@ -115,14 +129,6 @@ class WindInputImeService :
      * 方案短称才是这里要的真值。
      */
     private var modeLabel = "中"
-
-    /**
-     * 切到英文之前的中文方案下标，用于原路切回。
-     *
-     * ⚠ 不能默认 0：方案列表按文件名排序，`english` 恰好排在最前，默认 0 会让
-     * 「切回中文」实际切到英文。`-1` 表示未记录，回退时按 id 找第一个非英文方案。
-     */
-    private var lastChineseSchema = -1
 
     override fun onCreate() {
         super.onCreate()
@@ -233,6 +239,10 @@ class WindInputImeService :
         /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
         const val ENGLISH_SCHEMA_ID = "english"
 
+        /** 英文切回中文时，找不到切走前的方案（首次安装就在英文里）就回出厂默认方案 */
+        const val DEFAULT_CHINESE_SCHEMA_ID = "wubi86"
+        const val KEY_LAST_CHINESE = "last_chinese_schema"
+
         /**
          * 有编码时 ⇧ 变「分词」的方案。只有全拼：分隔符 `auto` 档下全拼用反引号
          * （见 KeyboardView.SPLIT_CHAR）；双拼的反引号出厂归辅助码、`'` 归选词键，
@@ -249,6 +259,12 @@ class WindInputImeService :
          */
         val NUMBER_SIDE_SYMBOLS = listOf("+", "-", "*", "/", "%", "=", ",", ":", "@", "#", "(", ")")
         val PHONE_SIDE_SYMBOLS = listOf("*", "#", "+", "-", "(", ")", ",", ";")
+
+        /** 英文里紧跟单词、后面该带空格的标点（自动补的空格遇到它们要挪到后面） */
+        val AUTO_SPACE_PUNCT = setOf('.', ',', '?', '!', ';', ':')
+
+        /** 双击空格出句号：两下空格的最大间隔 */
+        const val DOUBLE_SPACE_MS = 600L
 
         /**
          * 每次按键预取的候选条数。
@@ -303,10 +319,52 @@ class WindInputImeService :
         barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 19).toFloat()
         clipSuggestionEnabled = userConfig.getBoolean("ui.android.clip_suggestion", true)
         inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
+        autoCapEnabled = userConfig.getBoolean("ui.android.auto_cap", true)
+        doubleSpacePeriod = userConfig.getBoolean("ui.android.double_space_period", true)
+        autoSpaceEnabled = userConfig.getBoolean("ui.android.auto_space", true)
         selecting = false
+        autoSpaced = false
+        lastSpaceAt = 0L
         windowManager?.showKeyboard()
         applyEditorScene(info)
         refreshSchemaKeys()
+    }
+
+    /** 光标动了（上屏、删除、点击挪光标）：重新判断要不要句首大写 */
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        updateAutoCaps()
+    }
+
+    /**
+     * 句首自动大写：英文模式、没在打字、输入框声明了大写（`CAP_*` 标志，由
+     * `getCursorCapsMode` 结合光标前文判定句首）时给键盘一个单次 Shift。
+     * 网址、邮箱、密码框不给——这几类本就不带 `CAP_*`，这里再明确排除一次。
+     */
+    private fun updateAutoCaps() {
+        val kv = keyboardWindow?.keyboardView ?: return
+        val info = currentInputEditorInfo
+        val ic = currentInputConnection
+        val on = autoCapEnabled && modeLabel == "英" && !directInput && !composing &&
+            info != null && ic != null && !noAutoCapField(info) &&
+            ic.getCursorCapsMode(info.inputType) != 0
+        kv.setAutoCaps(on)
+    }
+
+    private fun noAutoCapField(info: EditorInfo): Boolean {
+        val variation = info.inputType and InputType.TYPE_MASK_VARIATION
+        return (info.inputType and InputType.TYPE_MASK_CLASS) != InputType.TYPE_CLASS_TEXT ||
+            variation in setOf(
+                InputType.TYPE_TEXT_VARIATION_URI,
+                InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+            )
     }
 
     /**
@@ -436,11 +494,13 @@ class WindInputImeService :
         // 解析成视图自己的属性，等于自赋值，英文模式永远进不去
         keyboardWindow?.keyboardView?.let { kv ->
             kv.modeLabel = modeLabel
-            // 空格上的灰字：英文模式写「英文」（EngineCmd.English 改的是模式，
-            // 引擎报的 active 仍是切走前的中文方案），否则写当前方案名
+            // 空格上的灰字：英文写「英文」（引擎没装英文方案时退回系统英文模式，
+            // 那时 active 仍是切走前的中文方案），否则写当前方案名
             kv.spaceLabel = if (english) "英文" else active?.name.orEmpty()
             kv.splitEnabled = !english && active?.id in SPLIT_SCHEMAS
         }
+        session.setLatinSchema(english)
+        updateAutoCaps()
     }
 
     // ── 会话事件 → 编辑器/候选条 ───────────────────────────────────
@@ -462,6 +522,8 @@ class WindInputImeService :
                 candidateTotal = page.total
                 composing = event.composing
                 keyboardWindow?.keyboardView?.composing = composing
+                // 打完一个词（编码清空）后再判一次句首大写：上屏回调可能早于这一帧
+                updateAutoCaps()
 
                 barView?.setCandidateFrame(
                     items = loadedCandidates,
@@ -576,7 +638,26 @@ class WindInputImeService :
             commitDirect(action.text)
             return
         }
-        if (!directInput && session.keyPressed(action, shifted)) return
+        val english = modeLabel == "英" && !directInput
+        if (action != KeyAction.Space) lastSpaceAt = 0L
+        // 自动补的空格遇到句末标点：挪到标点后面（`word ` + `.` → `word. `）
+        val ch = (action as? KeyAction.Text)?.char
+        if (english && autoSpaced && !composing && ch != null && ch in AUTO_SPACE_PUNCT) {
+            val ic = currentInputConnection ?: return
+            if (ic.getTextBeforeCursor(1, 0) == " ") ic.deleteSurroundingText(1, 0)
+            ic.commitText("$ch ", 1)
+            return
+        }
+        autoSpaced = false
+        val composingBefore = composing
+        if (!directInput && session.keyPressed(action, shifted)) {
+            // 英文方案：有编码时空格上屏原文（引擎只出词本身），这里补上词后的空格
+            if (english && composingBefore && action == KeyAction.Space) {
+                lastSpaceAt = android.os.SystemClock.uptimeMillis()
+                commitAutoSpace()
+            }
+            return
+        }
         val ic = currentInputConnection
         if (ic == null) {
             android.util.Log.w(TAG, "默认行为无法执行：currentInputConnection 为 null action=$action")
@@ -587,7 +668,12 @@ class WindInputImeService :
                 val ch = if (shifted) action.char.uppercaseChar() else action.char
                 ic.commitText(ch.toString(), 1)
             }
-            KeyAction.Space -> ic.commitText(" ", 1)
+            KeyAction.Space -> {
+                if (directInput || !doubleSpacePeriod || !tryDoubleSpacePeriod(ic)) {
+                    ic.commitText(" ", 1)
+                    lastSpaceAt = android.os.SystemClock.uptimeMillis()
+                }
+            }
             KeyAction.Backspace -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             // 与 enterActionLabel 共用 enterPerformsAction：键面写什么，按下就做什么
             KeyAction.Enter -> {
@@ -603,7 +689,35 @@ class WindInputImeService :
     }
 
     override fun onCandidateSelected(index: Int) {
+        val english = modeLabel == "英" && !directInput && composing
         session.candidateSelected(index)
+        if (english) commitAutoSpace()
+    }
+
+    /** 英文选词 / 空格上屏一个词之后补的空格（设置项 ui.android.auto_space） */
+    private fun commitAutoSpace() {
+        if (!autoSpaceEnabled) return
+        currentInputConnection?.commitText(" ", 1)
+        autoSpaced = true
+    }
+
+    /**
+     * 双击空格：光标前是「字 + 空格」且两次空格间隔够短，就把那个空格换成句号——
+     * 英文出「. 」（后面接着打下一句），中文出「。」（中文句号后不加空格）。
+     * 换完清零计时，第三下空格就是普通空格，不会连环换。
+     */
+    private fun tryDoubleSpacePeriod(ic: android.view.inputmethod.InputConnection): Boolean {
+        if (android.os.SystemClock.uptimeMillis() - lastSpaceAt > DOUBLE_SPACE_MS) return false
+        val before = ic.getTextBeforeCursor(2, 0) ?: return false
+        if (before.length < 2 || before[1] != ' ' || !Character.isLetterOrDigit(before[0])) return false
+        val english = modeLabel == "英"
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(1, 0)
+        ic.commitText(if (english) ". " else "。", 1)
+        ic.endBatchEdit()
+        lastSpaceAt = 0L
+        autoSpaced = english
+        return true
     }
 
     /**
@@ -624,16 +738,12 @@ class WindInputImeService :
     }
 
     /**
-     * 中英键：中文方案 ↔ 系统英文模式。
+     * 中英键：中文方案 ↔ **英文方案**（带词库补全：打 `beau` 出 `beautiful`）。
      *
-     * ⚠ **暂用系统英文模式（字母直出、无候选），而非英文方案。**
-     * 切到英文**方案**（带词库补全）目前会出现「候选来自英文引擎、上屏却走中文码表」
-     * ——真机实测打 `hi` 候选正确显示 hi/Hi-Fi/hibernate，空格上屏却得到「步」
-     * （`hi` 的五笔字）。核心侧的方案切换与候选合成的关系尚未理清，见主仓
-     * `wind-android/tests/key_flow.rs::english_schema_commits_latin_not_hanzi`
-     * （已标 ignore 并留了完整证据）。
-     *
-     * 现在这条路行为是正确的，只是少了英文补全。
+     * 曾经只能切「系统英文模式」（字母直出、无候选）：切到英文方案后候选来自英文引擎、
+     * 上屏却走中文码表。主仓已修（`rust/wind-android/tests/key_flow.rs`
+     * `english_schema_commits_latin_not_hanzi` 转绿），现在走方案。引擎里没装英文方案时
+     * 仍退回系统英文模式。
      */
     private fun toggleLanguage() {
         // 有编码时先把字母原文上屏再切（两家相同）：用户在中文里打了半截想改打英文，
@@ -642,21 +752,27 @@ class WindInputImeService :
         val schemas = session.schemas()
         val active = schemas.firstOrNull { it.active }
         if (modeLabel == "英") {
-            // 优先问引擎「现在活跃的是哪个方案」：`EngineCmd.English` 改的是**模式**
-            // 不是方案，引擎报的 active 仍是切走前那个中文方案，这是最可靠的真值。
-            // 其次才用离开前记下的下标（核心尚未就绪时记不到）。
+            // 回到切走前的中文方案。系统英文模式下引擎报的 active 仍是那个中文方案；
+            // 英文方案下 active 是英文，只能靠切走时记下的 id（持久化：输入法进程在
+            // 英文里被杀掉后也能原路回去）。
             //
             // ⚠ 绝不要退化成「列表里第一个非英文方案」：方案按文件名排序，
             // 装上拼音后第一个非英文是 pinyin——五笔用户切一次英文再切回来就掉进全拼。
-            val target = active?.takeIf { it.id != ENGLISH_SCHEMA_ID }?.index
-                ?: lastChineseSchema.takeIf { it >= 0 }
+            val lastId = statePrefs.getString(KEY_LAST_CHINESE, null)
+            val target = active?.takeIf { it.id != ENGLISH_SCHEMA_ID }
+                ?: schemas.firstOrNull { it.id == lastId }
+                ?: schemas.firstOrNull { it.id == DEFAULT_CHINESE_SCHEMA_ID }
                 ?: return
-            session.runCommand(EngineCmd.SelectSchema(target))
+            session.runCommand(EngineCmd.SelectSchema(target.index))
             return
         }
-        lastChineseSchema = active?.index ?: -1
-        session.runCommand(EngineCmd.English)
+        active?.let { statePrefs.edit().putString(KEY_LAST_CHINESE, it.id).apply() }
+        val english = schemas.firstOrNull { it.id == ENGLISH_SCHEMA_ID }
+        session.runCommand(english?.let { EngineCmd.SelectSchema(it.index) } ?: EngineCmd.English)
     }
+
+    /** 键盘自己的小状态（不属于引擎配置的那种），如中英切换前的中文方案 */
+    private val statePrefs by lazy { getSharedPreferences("ime_state", MODE_PRIVATE) }
 
     override fun onKeyLongPress(action: KeyAction) {
         if (action == KeyAction.SwitchLang) {
@@ -804,7 +920,9 @@ class WindInputImeService :
     }
 
     override fun onExpandedCandidateSelected(index: Int) {
+        val english = modeLabel == "英" && !directInput && composing
         session.candidateSelected(index)
+        if (english) commitAutoSpace()
         // 选中即原位返回：展开候选的唯一去向就是选一个词
         windowManager?.showKeyboard()
     }
