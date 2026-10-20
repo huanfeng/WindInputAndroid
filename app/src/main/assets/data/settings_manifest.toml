@@ -3,11 +3,14 @@
 # [[page]]   一级页面（首页的一行）
 #   id       页面标识；schema / stats / dict / about 另有代码画的专属区块
 #   title    标题
-#   segment  首页分段：shared（与电脑版相同）/ android（手机键盘）/ tail（收尾）
+#   segment  首页分段：shared（清风引擎：与电脑版共用的引擎设置）/ android（手机键盘）/ tail（其他）
+#   icon     首页图标名（见 SettingsIcons.kt；单测核对每个名字都能解析）
+#   subpages true = 页内每个 section 是一个二级入口，点进去才是那一组设置；
+#            false（缺省）= 页内各 section 直接分组列出（项少的页）
 #
 # [[item]]   设置项，按出现顺序归入 page → section（卡片）
 #   page     所属页面 id
-#   section  卡片名。共用项照抄电脑版清单（wind-setting/src/assets/settings_manifest.toml）
+#   section  卡片名（subpages 页里是二级入口名）。共用项照抄电脑版清单（wind-setting/src/assets/settings_manifest.toml）
 #   key      配置键（点分路径）
 #   source   engine = 引擎配置（经核心 config_set 写进核心用户层，键须在核心注册表里）
 #            android = 键盘自己的配置（filesDir/user/config.toml，只有 K 侧读）
@@ -24,32 +27,39 @@
 #
 # 引擎项写入后会发 ReloadConfig 让核心即时重读；键盘项在下次弹出键盘时生效。
 
-# ── 与电脑版相同 ─────────────────────────────────────────────
+# ── 清风引擎（与电脑版共用的引擎设置）─────────────────────────
 
 [[page]]
 id = "schema"
 title = "方案"
 segment = "shared"
+icon = "Layers"
+subpages = true
 
 [[page]]
 id = "input"
 title = "输入"
 segment = "shared"
+icon = "Tune"
+subpages = true
 
 [[page]]
 id = "ui"
 title = "外观"
 segment = "shared"
+icon = "Theme"
 
 [[page]]
 id = "stats"
 title = "统计"
 segment = "shared"
+icon = "Months"
 
 [[page]]
 id = "dict"
 title = "词库"
 segment = "shared"
+icon = "Notes"
 
 # ── 手机键盘（安卓专属）──────────────────────────────────────
 
@@ -57,16 +67,19 @@ segment = "shared"
 id = "keyboard"
 title = "键盘布局"
 segment = "android"
+icon = "GridView"
 
 [[page]]
 id = "keys"
 title = "按键与手势"
 segment = "android"
+icon = "Tasks"
 
 [[page]]
 id = "toolbar"
 title = "工具栏与剪贴板"
 segment = "android"
+icon = "Paste"
 
 # ── 收尾 ─────────────────────────────────────────────────────
 
@@ -74,11 +87,13 @@ segment = "android"
 id = "advanced"
 title = "高级"
 segment = "tail"
+icon = "Settings"
 
 [[page]]
 id = "about"
 title = "关于"
 segment = "tail"
+icon = "Info"
 
 # ═══ 方案 ═══════════════════════════════════════════════════════
 # 方案列表与双拼布局由代码画在页首；下面是按方案类型的全局值（电脑版的四张卡）。
@@ -803,8 +818,8 @@ key = "ui.android.show_swipe_hints"
 source = "android"
 type = "toggle"
 title = "字母键显示上滑符号"
-summary = "在字母键右上角用小字标出上滑能输入的数字或符号"
-default = false
+summary = "在字母键顶上用小字标出上滑能输入的数字或符号"
+default = true
 
 # ═══ 按键与手势 ═════════════════════════════════════════════════
 

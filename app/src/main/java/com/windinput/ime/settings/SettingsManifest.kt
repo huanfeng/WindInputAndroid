@@ -8,8 +8,12 @@ import org.tomlj.Toml
 data class SettingPage(
     val id: String,
     val title: String,
-    /** 首页分段：shared（与电脑版相同）/ android（手机键盘）/ tail（收尾） */
+    /** 首页分段：shared（清风引擎）/ android（手机键盘）/ tail（其他） */
     val segment: String,
+    /** 首页图标名，见 [SettingsIcons] */
+    val icon: String? = null,
+    /** true = 页内每个 section 是一个二级入口（项多的页：方案、输入），点进去才是那组设置 */
+    val subpages: Boolean = false,
 )
 
 /** 设置项写到哪里 */
@@ -94,6 +98,8 @@ object SettingsManifest {
                 id = requireNotNull(t.getString("id")) { "page 缺少 id" },
                 title = t.getString("title") ?: "",
                 segment = t.getString("segment") ?: "shared",
+                icon = t.getString("icon"),
+                subpages = t.getBoolean("subpages") ?: false,
             )
         }
         val pageIds = pages.map { it.id }.toSet()

@@ -1,26 +1,38 @@
 package com.windinput.ime.settings
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +44,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,24 +56,45 @@ import com.windinput.ime.core.ImeSession
 import com.windinput.ime.core.LayoutEntry
 import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UserConfig
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Slider
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
-import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.RadioButtonLocation
+import top.yukonga.miuix.kmp.preference.RadioButtonPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.ThemeController
+import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.io.File
 
 /**
  * 设置页：由设置清单（assets/data/settings_manifest.toml）驱动生成，结构见
- * docs/mobile-ux-reference.md §6——首页三段（与电脑版相同 / 手机键盘 / 收尾），
- * 每段一行一个页面并带一行摘要；点进去是按卡片分组的设置项，工程参数收在「进阶」里。
+ * docs/mobile-ux-reference.md §6。
  *
- * 方案列表、统计概览、词库、关于是代码画的专属区块，其余全部来自清单。
+ * 层级：首页四组（开始使用 / 清风引擎 / 手机键盘 / 其他），每行带图标；点进去是一页。
+ * 项多的页（方案、输入，清单里 `subpages = true`）再分一层：页内每个 section 一个二级入口，
+ * 点进去才是那组开关——首页和一级页都在一屏内看完，不用在一条长列表里找。
+ * 方案列表、统计、词库、关于是代码画的专属区块，其余全部来自清单。
+ *
+ * 用到的新版系统能力：edge-to-edge（内容画到系统栏下，标题栏与底部留出 insets）、
+ * 预测性返回（Android 13+ 侧滑返回时当前页跟手右移，松手才真正返回）、
+ * 莫奈取色（Android 12+ 跟随壁纸主色，低版本回落 miuix 默认色）。
  */
 class SettingsActivity : ComponentActivity() {
 
@@ -87,6 +123,7 @@ class SettingsActivity : ComponentActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         val dirs = (application as WindInputApp).dataDirs
         val userConfig = UserConfig(File(dirs.userDir, "config.toml"))
@@ -94,9 +131,13 @@ class SettingsActivity : ComponentActivity() {
         val versionName = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
         }.getOrNull().orEmpty()
+        // 莫奈取色要 Android 12（S）的系统调色板；更早的系统用 miuix 默认配色，深浅色照样跟系统
+        val theme = ThemeController(
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) ColorSchemeMode.MonetSystem else ColorSchemeMode.System,
+        )
 
         setContent {
-            MiuixTheme {
+            MiuixTheme(controller = theme) {
                 SettingsApp(
                     setup = imeSetup.value,
                     manifest = manifest,
@@ -118,14 +159,14 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
-/** 首页状态卡上的三个动作 */
+/** 首页「开始使用」的三个动作 */
 private class SettingsActions(
     val enableIme: () -> Unit,
     val switchIme: () -> Unit,
     val openTestPad: () -> Unit,
 )
 
-/** 首页状态卡处在哪一步（docs/mobile-ux-reference.md §6.3） */
+/** 首页「开始使用」处在哪一步（docs/mobile-ux-reference.md §6.3） */
 enum class ImeSetup {
     /** 第 1 步：去系统设置里启用 */
     ENABLE,
@@ -145,6 +186,23 @@ enum class ImeSetup {
     }
 }
 
+/**
+ * 导航位置：首页（[page] 为 null）→ 一级页 → 二级页（[sub]）。最多两层，用两个字符串
+ * 存住即可（转屏、进程回收后 rememberSaveable 能恢复），不必上导航库。
+ */
+private data class Route(val page: String? = null, val sub: String? = null) {
+    val depth: Int get() = if (page == null) 0 else if (sub == null) 1 else 2
+
+    fun up(): Route = if (sub != null) copy(sub = null) else Route()
+}
+
+/** 词库页的两个二级页（不来自清单，代码画） */
+private const val DICT_WORDS = "我的词条"
+private const val DICT_ADD = "添加词条"
+
+/** 方案页里代码画的二级页 */
+private const val SUB_LAYOUTS = "双拼布局"
+
 @Composable
 private fun SettingsApp(
     setup: ImeSetup,
@@ -156,7 +214,13 @@ private fun SettingsApp(
     val context = LocalContext.current
     var session by remember { mutableStateOf<ImeSession?>(null) }
     var values by remember { mutableStateOf(SettingsValues(userConfig, null)) }
-    var pageId by rememberSaveable { mutableStateOf<String?>(null) }
+    var routePage by rememberSaveable { mutableStateOf<String?>(null) }
+    var routeSub by rememberSaveable { mutableStateOf<String?>(null) }
+    val route = Route(routePage, routeSub)
+    fun go(r: Route) {
+        routePage = r.page
+        routeSub = r.sub
+    }
 
     // 核心构造在后台线程（首次约 1 秒）。未就绪时键盘项照常可改，引擎项先不显示
     LaunchedEffect(Unit) {
@@ -168,38 +232,99 @@ private fun SettingsApp(
         values = v
     }
 
-    BackHandler(enabled = pageId != null) { pageId = null }
-    val page = manifest.pages.firstOrNull { it.id == pageId }
+    // 预测性返回：侧滑过程中当前页跟手右移（progress 0→1），松手才真正退一层；
+    // 中途放弃（CancellationException）就弹回原位
+    var backProgress by remember { mutableFloatStateOf(0f) }
+    PredictiveBackHandler(enabled = route.depth > 0) { events ->
+        try {
+            events.collect { backProgress = it.progress }
+            go(route.up())
+        } catch (e: CancellationException) {
+            throw e
+        } finally {
+            backProgress = 0f
+        }
+    }
 
+    AnimatedContent(
+        targetState = route,
+        transitionSpec = {
+            // 进深一层从右滑入，退一层往右滑出——与系统设置的方向一致
+            val forward = targetState.depth > initialState.depth
+            val dir = if (forward) 1 else -1
+            (slideInHorizontally(tween(260)) { it * dir / 3 } togetherWith
+                slideOutHorizontally(tween(260)) { -it * dir / 3 })
+        },
+        label = "settings-route",
+    ) { r ->
+        Screen(
+            route = r,
+            title = screenTitle(manifest, r),
+            onBack = if (r.depth > 0) ({ go(r.up()) }) else null,
+            modifier = if (r == route) {
+                Modifier.graphicsLayer {
+                    translationX = size.width * 0.12f * backProgress
+                    alpha = 1f - 0.2f * backProgress
+                }
+            } else {
+                Modifier
+            },
+        ) {
+            val page = manifest.pages.firstOrNull { it.id == r.page }
+            when {
+                page == null -> HomeScreen(setup, manifest, values, session, versionName, actions) { go(Route(it)) }
+                r.sub == null -> PageScreen(manifest, page, values, session, versionName) { go(r.copy(sub = it)) }
+                else -> SubScreen(manifest, page, r.sub, values, session)
+            }
+        }
+    }
+}
+
+private fun screenTitle(manifest: SettingsManifestData, r: Route): String =
+    r.sub ?: manifest.pages.firstOrNull { it.id == r.page }?.title ?: "清风输入法"
+
+/**
+ * 一屏：miuix 大标题栏（随滚动收成小标题）+ 可滚动内容。内容画到导航栏下（edge-to-edge），
+ * 末尾垫一段导航栏高度，最后一行不会被手势条挡住。
+ */
+@Composable
+private fun Screen(
+    route: Route,
+    title: String,
+    onBack: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val scrollBehavior = MiuixScrollBehavior()
     Scaffold(
+        modifier = modifier,
         topBar = {
-            SmallTopAppBar(
-                title = page?.title ?: "清风输入法",
+            TopAppBar(
+                title = title,
+                scrollBehavior = scrollBehavior,
                 navigationIcon = {
-                    if (page != null) {
-                        Text(
-                            text = "‹",
-                            modifier = Modifier
-                                .clickable { pageId = null }
-                                .padding(horizontal = 16.dp),
-                        )
+                    if (onBack != null) {
+                        IconButton(onClick = onBack, modifier = Modifier.padding(start = 12.dp)) {
+                            Icon(MiuixIcons.Back, contentDescription = "返回")
+                        }
                     }
                 },
             )
         },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            if (page == null) {
-                HomeScreen(setup, manifest, values, session, versionName, actions) { pageId = it }
-            } else {
-                PageScreen(manifest, page, values, session, versionName)
+        key(route) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .padding(top = padding.calculateTopPadding())
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                content()
+                Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
         }
     }
@@ -208,9 +333,9 @@ private fun SettingsApp(
 // ── 首页 ─────────────────────────────────────────────────────────
 
 private val SEGMENT_TITLES = listOf(
-    "shared" to "与电脑版相同",
+    "shared" to "清风引擎",
     "android" to "手机键盘",
-    "tail" to "",
+    "tail" to "其他",
 )
 
 @Composable
@@ -223,41 +348,54 @@ private fun HomeScreen(
     actions: SettingsActions,
     onOpen: (String) -> Unit,
 ) {
-    // 状态卡：没装好时只给「下一步该做什么」，装好了给「试一试」——新用户不用猜自己卡在哪
+    // 开始使用：三行常在——装好了也要能再跳（换了系统设置、想在别的框里试打）。
+    // 没完成的那一步用强调色写「下一步」，新用户不用猜自己卡在哪
+    SmallTitle("开始使用")
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            when (setup) {
-                ImeSetup.ENABLE -> {
-                    NavRow("第 1 步：启用清风输入法", "去系统设置的输入法列表里打开「清风输入法」", actions.enableIme)
-                    NavRow("第 2 步：切换为当前输入法", "启用后回到这里再点", null)
-                }
-                ImeSetup.SWITCH -> {
-                    NavRow("✓ 已启用", null, null)
-                    NavRow("第 2 步：切换为当前输入法", "弹出系统的输入法选择框，选「清风输入法」", actions.switchIme)
-                }
-                ImeSetup.READY -> {
-                    NavRow("试一试", "普通 / 搜索 / 数字 / 密码 / 句子五种场景的输入框", actions.openTestPad)
-                    NavRow("切换输入法", "弹出系统的输入法选择框", actions.switchIme)
-                }
-            }
-        }
+        val enabled = setup != ImeSetup.ENABLE
+        NavRow(
+            title = "启用输入法",
+            summary = if (enabled) "已启用 ✓" else "下一步：在系统的输入法列表里打开「清风输入法」",
+            icon = if (enabled) SettingsIcons.enabled else SettingsIcons.enable,
+            highlight = !enabled,
+            onClick = actions.enableIme,
+        )
+        NavRow(
+            title = "切换输入法",
+            summary = when (setup) {
+                ImeSetup.READY -> "当前正在使用清风输入法 ✓"
+                ImeSetup.SWITCH -> "下一步：在弹出的选择框里选「清风输入法」"
+                ImeSetup.ENABLE -> "启用后再切换"
+            },
+            icon = SettingsIcons.switchIme,
+            highlight = setup == ImeSetup.SWITCH,
+            onClick = actions.switchIme,
+        )
+        NavRow(
+            title = "试一试",
+            summary = "普通 / 搜索 / 数字 / 密码 / 句子五种场景的输入框",
+            icon = SettingsIcons.tryIt,
+            onClick = actions.openTestPad,
+        )
     }
     for ((segment, title) in SEGMENT_TITLES) {
         val pages = manifest.pages.filter { it.segment == segment }
         if (pages.isEmpty()) continue
-        if (title.isNotEmpty()) SectionTitle(title)
+        SmallTitle(title)
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column {
-                for (p in pages) {
-                    NavRow(p.title, pageSummary(manifest, p, values, session, versionName)) { onOpen(p.id) }
-                }
+            for (p in pages) {
+                NavRow(
+                    title = p.title,
+                    summary = pageSummary(manifest, p, values, session, versionName),
+                    icon = SettingsIcons.page(p.icon),
+                ) { onOpen(p.id) }
             }
         }
     }
 }
 
 /**
- * 首页每一行的摘要：几个页面给出当前状态（方案名、今日字数、版本），
+ * 首页每一行的摘要：几个页面给出当前状态（方案名、版本），
  * 其余列出前几张卡片的名字，让人知道点进去有什么。
  */
 private fun pageSummary(
@@ -271,7 +409,7 @@ private fun pageSummary(
     return when (page.id) {
         "schema" -> session?.schemas()?.firstOrNull { it.active }?.name?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
-        "dict" -> "个人词：查看 · 搜索 · 加词 · 删除"
+        "dict" -> "我的词条 · 添加词条"
         "about" -> "版本 $versionName"
         else -> sectionList(manifest, page.id)
     }
@@ -280,7 +418,7 @@ private fun pageSummary(
 private fun sectionList(manifest: SettingsManifestData, pageId: String): String =
     manifest.sectionsOf(pageId).map { it.first }.filter { it.isNotEmpty() }.take(4).joinToString(" · ")
 
-// ── 二级页面 ─────────────────────────────────────────────────────
+// ── 一级页面 ─────────────────────────────────────────────────────
 
 @Composable
 private fun PageScreen(
@@ -289,28 +427,72 @@ private fun PageScreen(
     values: SettingsValues,
     session: ImeSession?,
     versionName: String,
+    onOpenSub: (String) -> Unit,
 ) {
     when (page.id) {
-        "schema" -> SchemaSection(session)
+        "schema" -> SchemaSection(session, onOpenSub)
         "stats" -> StatsSection()
-        "dict" -> DictSection(session)
+        "dict" -> DictOverview(session, onOpen = onOpenSub)
         "about" -> AboutSection(versionName)
     }
     @Suppress("UNUSED_EXPRESSION") values.version // 开关变了，依赖它的项跟着显示 / 隐藏
-    val sections = manifest.sectionsOf(page.id)
-        .map { (name, items) ->
-            name to items.filter { values.available(it) && values.visible(it, manifest.items) }
-        }
-        .filter { it.second.isNotEmpty() }
+    val sections = visibleSections(manifest, page.id, values)
     if (sections.isEmpty() && !values.engineReady && manifest.itemsOf(page.id).isNotEmpty()) {
         Text(text = "正在启动输入法核心…", modifier = Modifier.padding(start = 4.dp))
     }
-    for ((name, items) in sections) {
-        SettingsCard(name, items, values)
+    if (page.subpages) {
+        // 每组一个入口，副标题列出组里前几项，点进去才是开关
+        if (sections.isNotEmpty()) {
+            SmallTitle(if (page.id == "schema") "方案设置" else "分类")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                for ((name, items) in sections) {
+                    NavRow(
+                        title = name,
+                        summary = items.take(3).joinToString(" · ") { it.title },
+                        icon = SettingsIcons.section(name),
+                    ) { onOpenSub(name) }
+                }
+            }
+        }
+    } else {
+        for ((name, items) in sections) SettingsCard(name, items, values)
     }
-    // Emoji 开着才列附加模块（同电脑版的 enabled_when）
-    if (page.id == "input" && manifest.items.firstOrNull { it.key == EMOJI_ENABLED_KEY }?.let(values::bool) == true) {
-        EmojiModulesSection()
+}
+
+private fun visibleSections(
+    manifest: SettingsManifestData,
+    pageId: String,
+    values: SettingsValues,
+): List<Pair<String, List<SettingItem>>> =
+    manifest.sectionsOf(pageId)
+        .map { (name, items) -> name to items.filter { values.available(it) && values.visible(it, manifest.items) } }
+        .filter { it.second.isNotEmpty() }
+
+// ── 二级页面 ─────────────────────────────────────────────────────
+
+@Composable
+private fun SubScreen(
+    manifest: SettingsManifestData,
+    page: SettingPage,
+    sub: String,
+    values: SettingsValues,
+    session: ImeSession?,
+) {
+    when {
+        page.id == "schema" && sub == SUB_LAYOUTS -> ShuangpinLayouts(session)
+        page.id == "dict" && sub == DICT_WORDS -> DictWords(session)
+        page.id == "dict" && sub == DICT_ADD -> DictAdd(session)
+        else -> {
+            @Suppress("UNUSED_EXPRESSION") values.version
+            val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
+            if (items.isNotEmpty()) SettingsCard("", items, values)
+            // Emoji 开着才列附加模块（同电脑版的 enabled_when）
+            if (sub == EMOJI_SECTION &&
+                manifest.items.firstOrNull { it.key == EMOJI_ENABLED_KEY }?.let(values::bool) == true
+            ) {
+                EmojiModulesSection()
+            }
+        }
     }
 }
 
@@ -319,16 +501,14 @@ private fun PageScreen(
 private fun SettingsCard(title: String, items: List<SettingItem>, values: SettingsValues) {
     var expanded by rememberSaveable(title) { mutableStateOf(false) }
     val (advanced, normal) = items.partition { it.advanced }
-    if (title.isNotEmpty()) SectionTitle(title)
+    if (title.isNotEmpty()) SmallTitle(title)
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            // 按键名定身份：enabled_when 让中间某行出现 / 消失时，各行记住的状态（滑块草稿等）
-            // 不能按位置串到别的行上
-            for (item in normal) key(item.key) { ItemRow(item, values) }
-            if (advanced.isNotEmpty()) {
-                NavRow(if (expanded) "进阶 ▴" else "进阶 ▾", null) { expanded = !expanded }
-                if (expanded) for (item in advanced) key(item.key) { ItemRow(item, values) }
-            }
+        // 按键名定身份：enabled_when 让中间某行出现 / 消失时，各行记住的状态（滑块草稿等）
+        // 不能按位置串到别的行上
+        for (item in normal) key(item.key) { ItemRow(item, values) }
+        if (advanced.isNotEmpty()) {
+            NavRow(if (expanded) "进阶 ▴" else "进阶 ▾", "工程参数，一般不用改") { expanded = !expanded }
+            if (expanded) for (item in advanced) key(item.key) { ItemRow(item, values) }
         }
     }
 }
@@ -341,9 +521,9 @@ private fun ItemRow(item: SettingItem, values: SettingsValues) {
         scope.launch { withContext(Dispatchers.IO) { values.set(item, v) } }
     }
     when (item.type) {
-        "toggle" -> ToggleRow(item, values.bool(item)) { write(it) }
+        "toggle" -> ToggleLine(item.title, item.summary, values.bool(item)) { write(it) }
         "int" -> IntRow(item, values.int(item)) { write(it) }
-        "select" -> SelectRows(item, values.choice(item)) { write(it) }
+        "select" -> SelectRow(item, values.choice(item)) { write(it) }
     }
 }
 
@@ -357,7 +537,7 @@ private fun ItemRow(item: SettingItem, values: SettingsValues) {
  * 以及删掉某个方案后设置页还列着一个选不动的死项。
  */
 @Composable
-private fun SchemaSection(session: ImeSession?) {
+private fun SchemaSection(session: ImeSession?, onOpenSub: (String) -> Unit) {
     val core = session ?: return
     val scope = rememberCoroutineScope()
     var schemas by remember { mutableStateOf<List<SchemaEntry>>(core.schemas()) }
@@ -366,7 +546,7 @@ private fun SchemaSection(session: ImeSession?) {
     if (schemas.isEmpty()) return
 
     /**
-     * 切方案 / 换布局放后台：第一次切到某方案时核心现编词库，白霜拼音在模拟器上要近 5 秒，
+     * 切方案放后台：第一次切到某方案时核心现编词库，白霜拼音在模拟器上要近 5 秒，
      * 放主线程就是整页卡死（真机上会 ANR）。做完回读真值。
      */
     fun switchTo(label: String, cmd: EngineCmd) {
@@ -385,38 +565,61 @@ private fun SchemaSection(session: ImeSession?) {
         }
     }
 
-    SectionTitle(switching?.let { "正在切换到「$it」…（首次使用要准备词库，稍候）" } ?: "输入方案")
+    SmallTitle(switching?.let { "正在切换到「$it」…（首次使用要准备词库，稍候）" } ?: "输入方案")
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            for (s in schemas) {
-                ChoiceRow(
-                    title = s.name.ifEmpty { s.id },
-                    selected = s.active,
-                    onClick = { switchTo(s.name.ifEmpty { s.id }, EngineCmd.SelectSchema(s.index)) },
-                )
-            }
+        for (s in schemas) {
+            ChoiceRow(
+                title = s.name.ifEmpty { s.id },
+                selected = s.active,
+                onClick = { switchTo(s.name.ifEmpty { s.id }, EngineCmd.SelectSchema(s.index)) },
+            )
         }
     }
 
-    // 双拼布局只在**当前用的是双拼**时列出：十来个布局对其他方案的用户只是一长串噪声
+    // 双拼布局是二级页：十几个布局摊在方案页上只会把下面的设置挤出屏幕。
+    // 只在**当前用的是双拼**时给入口——别的方案用不上它
     if (layouts.isNotEmpty() && schemas.any { it.id == SHUANGPIN_SCHEMA_ID && it.active }) {
-        SectionTitle("双拼布局")
         Card(modifier = Modifier.fillMaxWidth()) {
-            Column {
-                for (l in layouts) {
-                    ChoiceRow(
-                        title = l.name.ifEmpty { l.id },
-                        selected = l.active,
-                        onClick = { switchTo(l.name.ifEmpty { l.id }, EngineCmd.SetShuangpinLayout(l.id)) },
-                    )
-                }
-            }
+            NavRow(
+                title = SUB_LAYOUTS,
+                summary = layouts.firstOrNull { it.active }?.let { "当前：${it.name.ifEmpty { it.id }}" },
+                icon = SettingsIcons.section(SUB_LAYOUTS),
+            ) { onOpenSub(SUB_LAYOUTS) }
         }
     }
 }
 
-/** Emoji 候选总开关（附加模块卡片跟着它显示） */
+@Composable
+private fun ShuangpinLayouts(session: ImeSession?) {
+    val core = session ?: return
+    val scope = rememberCoroutineScope()
+    var layouts by remember { mutableStateOf<List<LayoutEntry>>(core.shuangpinLayouts()) }
+    var busy by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        for (l in layouts) {
+            ChoiceRow(
+                title = l.name.ifEmpty { l.id },
+                selected = l.active,
+                onClick = {
+                    if (!busy) {
+                        busy = true
+                        scope.launch {
+                            layouts = withContext(Dispatchers.IO) {
+                                core.runCommand(EngineCmd.SetShuangpinLayout(l.id))
+                                core.shuangpinLayouts()
+                            }
+                            busy = false
+                        }
+                    }
+                },
+            )
+        }
+    }
+}
+
+/** Emoji 候选总开关（附加模块卡片跟着它显示）与它所在的二级页 */
 private const val EMOJI_ENABLED_KEY = "input.emoji.enabled"
+private const val EMOJI_SECTION = "Emoji/OpenCC"
 
 /** 双拼方案 id（与 assets/data/schemas/shuangpin.schema.toml 一致） */
 private const val SHUANGPIN_SCHEMA_ID = "shuangpin"
@@ -427,77 +630,89 @@ private const val SHUANGPIN_SCHEMA_ID = "shuangpin"
 private fun AboutSection(versionName: String) {
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column {
-            NavRow("清风输入法", "版本 $versionName", null)
-            NavRow(
-                if (showLicenses) "开源许可 ▴" else "开源许可 ▾",
-                "随包分发的词库数据与程序库的来源和许可证",
-            ) { showLicenses = !showLicenses }
-        }
+        NavRow("清风输入法", "版本 $versionName", icon = SettingsIcons.page("Info"))
+        NavRow(
+            if (showLicenses) "开源许可 ▴" else "开源许可 ▾",
+            "随包分发的词库数据与程序库的来源和许可证",
+            icon = SettingsIcons.licenses,
+        ) { showLicenses = !showLicenses }
     }
     if (showLicenses) LicensesSection()
 }
 
-// ── 通用行 ───────────────────────────────────────────────────────
+// ── 通用行（miuix-preference）────────────────────────────────────
 
 @Composable
-internal fun SectionTitle(text: String) {
-    Text(text = text, modifier = Modifier.padding(start = 4.dp, top = 4.dp))
-}
+internal fun SectionTitle(text: String) = SmallTitle(text)
 
-/** 标题 + 一行摘要的行；[onClick] 为 null 时不可点 */
+/** 行首图标：统一大小与色调 */
 @Composable
-internal fun NavRow(title: String, summary: String?, onClick: (() -> Unit)?) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(16.dp),
-    ) {
-        Text(text = title)
-        if (!summary.isNullOrEmpty()) {
-            Text(
-                text = summary,
-                modifier = Modifier.padding(top = 4.dp),
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
-    }
-}
-
-@Composable
-private fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(text = title, modifier = Modifier.weight(1f))
-        if (selected) Text(text = "✓")
-    }
+private fun RowIcon(icon: ImageVector) {
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        modifier = Modifier.padding(end = 14.dp).size(24.dp),
+        tint = MiuixTheme.colorScheme.onBackground,
+    )
 }
 
 /**
- * 单选项：标题一行 + 每个选项一行打勾（与方案区同一形态）。
- * 不做下拉菜单：选项就三五个，全部摊开比藏进菜单少一次点击，也和 miuix 的列表风格一致。
+ * 标题 + 摘要的行。[onClick] 为 null 时是纯展示行（无箭头、不可点）；
+ * [highlight] 把摘要染成强调色（「开始使用」里没完成的那一步）。
  */
 @Composable
-private fun SelectRows(item: SettingItem, value: String, onValueChange: (String) -> Unit) {
-    Column(modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, end = 16.dp)) {
-        Text(text = item.title)
-        item.summary?.let {
-            Text(
-                text = it,
-                modifier = Modifier.padding(top = 2.dp),
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            )
-        }
+internal fun NavRow(
+    title: String,
+    summary: String?,
+    icon: ImageVector? = null,
+    highlight: Boolean = false,
+    onClick: (() -> Unit)? = null,
+) {
+    val start: (@Composable () -> Unit)? = icon?.let { { RowIcon(it) } }
+    val summaryColor = if (highlight) {
+        top.yukonga.miuix.kmp.basic.BasicComponentDefaults.summaryColor(color = MiuixTheme.colorScheme.primary)
+    } else {
+        top.yukonga.miuix.kmp.basic.BasicComponentDefaults.summaryColor()
     }
-    for ((optValue, label) in item.options) {
-        ChoiceRow(title = label, selected = optValue == value, onClick = { onValueChange(optValue) })
+    if (onClick != null) {
+        ArrowPreference(
+            title = title,
+            summary = summary?.ifEmpty { null },
+            summaryColor = summaryColor,
+            startAction = start,
+            onClick = onClick,
+        )
+    } else {
+        BasicComponent(title = title, summary = summary?.ifEmpty { null }, summaryColor = summaryColor, startAction = start)
     }
+}
+
+/** 单选的一行：选中项右侧打勾（方案、双拼布局） */
+@Composable
+private fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
+    RadioButtonPreference(
+        title = title,
+        selected = selected,
+        onClick = onClick,
+        radioButtonLocation = RadioButtonLocation.End,
+    )
+}
+
+/**
+ * 单选设置项：一行，右侧显示当前值，点开是下拉菜单。此前把选项全部摊开成多行打勾，
+ * 一个三选一就占四行，二级页一屏装不下；下拉保持一项一行。
+ */
+@Composable
+private fun SelectRow(item: SettingItem, value: String, onValueChange: (String) -> Unit) {
+    val labels = item.options.map { it.second }
+    val index = item.options.indexOfFirst { it.first == value }.coerceAtLeast(0)
+    WindowDropdownPreference(
+        items = labels,
+        selectedIndex = index,
+        title = item.title,
+        summary = item.summary,
+        onSelectedIndexChange = { i -> item.options.getOrNull(i)?.let { onValueChange(it.first) } },
+    )
 }
 
 /**
@@ -588,30 +803,13 @@ private fun CandidateTextPreview(textSp: Int) {
     )
 }
 
-@Composable
-private fun ToggleRow(item: SettingItem, checked: Boolean, onCheckedChange: (Boolean) -> Unit) =
-    ToggleLine(item.title, item.summary, checked, onCheckedChange)
-
 /** 标题 + 说明 + 开关的一行；整行可点 */
 @Composable
 internal fun ToggleLine(title: String, summary: String?, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = title)
-            summary?.let {
-                Text(
-                    text = it,
-                    modifier = Modifier.padding(top = 2.dp),
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                )
-            }
-        }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
-    }
+    SwitchPreference(
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        title = title,
+        summary = summary,
+    )
 }

@@ -129,4 +129,30 @@ class SettingsManifestTest {
             """.trimIndent(),
         )
     }
+
+    /** 每个页面都有图标，且名字在 SettingsIcons 里登记过（写错就是首页一行落回通用图标） */
+    @Test
+    fun everyPageIconResolves() {
+        val m = bundled
+        for (p in m.pages) {
+            assertTrue("${p.id} 缺 icon", p.icon != null)
+            assertTrue("${p.id} 的 icon「${p.icon}」没登记", p.icon in SettingsIcons.PAGE_ICON_NAMES)
+        }
+    }
+
+    /** 分二级页的页：每组都有专属图标，且至少一项（空组会是一个点进去什么都没有的入口） */
+    @Test
+    fun subpageSectionsHaveIconsAndItems() {
+        val m = bundled
+        val subPages = m.pages.filter { it.subpages }
+        assertTrue("至少方案、输入两页分二级", subPages.map { it.id }.containsAll(listOf("schema", "input")))
+        for (p in subPages) {
+            for ((name, items) in m.sectionsOf(p.id)) {
+                assertTrue("${p.id} 有无名 section", name.isNotEmpty())
+                assertTrue("${p.id}/$name 没有专属图标", name in SettingsIcons.SECTION_ICON_NAMES)
+                assertTrue("${p.id}/$name 是空组", items.isNotEmpty())
+            }
+        }
+    }
 }
+

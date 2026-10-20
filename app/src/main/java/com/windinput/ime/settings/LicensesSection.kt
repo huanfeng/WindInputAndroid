@@ -78,7 +78,7 @@ internal fun LicensesSection() {
                     NavRow(
                         n.name,
                         "${n.usage}\n${n.license}${if (hasText) "（点开看全文）" else ""} · ${n.url}",
-                        if (hasText) {
+                        onClick = if (hasText) {
                             {
                                 val key = group to n.license
                                 openText = if (openText == key) null else key

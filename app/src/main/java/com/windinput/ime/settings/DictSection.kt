@@ -51,14 +51,28 @@ private const val CONFIRM_MIN_GAP_MS = 600L
 private const val CONFIRM_RESET_MS = 5000L
 
 /**
- * 词库页：当前方案的个人词（自己加的、打字时学到的）。查看、搜索、删除、加词、清空。
+ * 词库页：当前方案的个人词（自己加的、打字时学到的）。
+ *
+ * 分层而不平铺：一级页只有概况与两个入口（我的词条 / 添加词条），列表、搜索、删除、清空
+ * 在「我的词条」里，加词表单在「添加词条」里——此前三块摊在一页，列表一长加词框就沉到底。
  *
  * 实现与电脑版「词库」页同一份（核心的用户词模块）：拼音族共用一个库、拼音码的
  * ü 归一与音节切分都在核心里做，这里只管显示。
  * 只管**当前方案**：手机上换方案在「方案」页，词库跟着当前方案走，省掉一个方案选择器。
  */
+private enum class DictMode { OVERVIEW, WORDS, ADD }
+
 @Composable
-internal fun DictSection(session: ImeSession?) {
+internal fun DictOverview(session: ImeSession?, onOpen: (String) -> Unit) = DictSection(session, DictMode.OVERVIEW, onOpen)
+
+@Composable
+internal fun DictWords(session: ImeSession?) = DictSection(session, DictMode.WORDS) {}
+
+@Composable
+internal fun DictAdd(session: ImeSession?) = DictSection(session, DictMode.ADD) {}
+
+@Composable
+private fun DictSection(session: ImeSession?, mode: DictMode, onOpen: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // 当前方案走 JNI，不放在重组路径上（搜索框每敲一字就重组一次）
@@ -70,11 +84,17 @@ internal fun DictSection(session: ImeSession?) {
         SectionTitle("正在启动输入法核心…")
         return
     }
-    DictContent(current, context, scope)
+    DictContent(current, context, scope, mode, onOpen)
 }
 
 @Composable
-private fun DictContent(schema: SchemaEntry, context: Context, scope: CoroutineScope) {
+private fun DictContent(
+    schema: SchemaEntry,
+    context: Context,
+    scope: CoroutineScope,
+    mode: DictMode,
+    onOpen: (String) -> Unit,
+) {
 
     var query by remember { mutableStateOf("") }
     var words by remember { mutableStateOf<List<UserWordInfo>>(emptyList()) }
@@ -123,7 +143,18 @@ private fun DictContent(schema: SchemaEntry, context: Context, scope: CoroutineS
         }
     }
 
-    SectionTitle("${schema.name.ifEmpty { schema.id }} · 个人词 $total 条")
+    val schemaName = schema.name.ifEmpty { schema.id }
+    if (mode == DictMode.OVERVIEW) {
+        SectionTitle("当前方案：$schemaName")
+        Card(modifier = Modifier.fillMaxWidth()) {
+            NavRow("我的词条", "共 $total 条 · 搜索、删除、清空", icon = SettingsIcons.words) { onOpen("我的词条") }
+            NavRow("添加词条", "手动加一个词和它的编码", icon = SettingsIcons.addWord) { onOpen("添加词条") }
+        }
+        return
+    }
+
+    if (mode == DictMode.WORDS) {
+    SectionTitle("$schemaName · 共 $total 条")
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             TextField(
@@ -152,7 +183,10 @@ private fun DictContent(schema: SchemaEntry, context: Context, scope: CoroutineS
         }
     }
 
-    SectionTitle("加词")
+    }
+
+    if (mode == DictMode.ADD) {
+    SectionTitle("加到「$schemaName」")
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextField(
@@ -189,6 +223,9 @@ private fun DictContent(schema: SchemaEntry, context: Context, scope: CoroutineS
         }
     }
 
+    }
+
+    if (mode != DictMode.WORDS) return
     // 二次确认：第二下要隔开一点（误触双击不算），过一阵没点就复位（几分钟后再点不能直接清）
     if (confirmClear) {
         LaunchedEffect(confirmAt) {
@@ -201,6 +238,8 @@ private fun DictContent(schema: SchemaEntry, context: Context, scope: CoroutineS
         NavRow(
             if (confirmClear) "再点一次确认清空" else "清空个人词",
             if (confirmClear) "「${schema.name}」的个人词全部删除，不能恢复" else "删除当前方案的全部个人词",
+            icon = SettingsIcons.clear,
+            highlight = confirmClear,
         ) {
             val now = SystemClock.uptimeMillis()
             if (!confirmClear) {
