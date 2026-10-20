@@ -197,6 +197,8 @@ class WindInputImeService :
         Palette.apply(this, userConfig.getString("ui.android.theme", "system"))
         // 根视图自理手势条/导航栏避让（IME 窗口不吃系统自动 padding）
         val root = InputRootView(this)
+        inputRoot = root
+        applyGaps()
 
         val bar = BarView(this, candidateListener = this, listener = this)
         barView = bar
@@ -366,6 +368,7 @@ class WindInputImeService :
         selecting = false
         autoSpaced = false
         lastSpaceAt = 0L
+        applyGaps()
         windowManager?.showKeyboard()
         applyEditorScene(info)
         refreshSchemaKeys()
@@ -779,6 +782,17 @@ class WindInputImeService :
      * 就把首次使用的卡片收掉了。
      */
     private var schemaPicker: CandidateMenuPopup? = null
+
+    private var inputRoot: InputRootView? = null
+
+    /** 键盘边距（设置页「键盘布局 → 边距」）；每次弹出键盘重读，改完不用重启 */
+    private fun applyGaps() {
+        val d = resources.displayMetrics.density
+        inputRoot?.setGaps(
+            bottomPx = (userConfig.getInt("ui.android.keyboard_bottom_gap", 0) * d).toInt(),
+            sidePx = (userConfig.getInt("ui.android.keyboard_side_gap", 0) * d).toInt(),
+        )
+    }
 
     private val switchHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val showSwitching = Runnable { barView?.setPreparing(true) }

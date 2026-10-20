@@ -803,6 +803,34 @@ preview = "keyboard_rows"
 
 [[item]]
 page = "keyboard"
+section = "边距"
+key = "ui.android.keyboard_bottom_gap"
+source = "android"
+type = "int"
+title = "底部留空"
+summary = "键盘离屏幕底部（手势条）再远一点，防误触"
+default = 0
+min = 0
+max = 48
+step = 4
+unit = "dp"
+
+[[item]]
+page = "keyboard"
+section = "边距"
+key = "ui.android.keyboard_side_gap"
+source = "android"
+type = "int"
+title = "左右留边"
+summary = "大屏手机上把键盘往中间收一点"
+default = 0
+min = 0
+max = 32
+step = 2
+unit = "dp"
+
+[[item]]
+page = "keyboard"
 section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"

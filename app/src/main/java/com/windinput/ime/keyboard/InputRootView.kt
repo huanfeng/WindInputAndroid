@@ -21,6 +21,26 @@ class InputRootView(context: Context) : LinearLayout(context) {
     private val bottomSpacer = View(context)
     private var insetBottom = -1
 
+    /**
+     * 用户设的额外留空（px）：底部加在避让占位上（窗口跟着长高，最后一排不被裁），左右用内边距
+     * （只收窄内容，不影响窗口高度）。设置项 ui.android.keyboard_bottom_gap / keyboard_side_gap。
+     */
+    fun setGaps(bottomPx: Int, sidePx: Int) {
+        extraBottom = bottomPx
+        setPadding(sidePx, 0, sidePx, 0)
+        applySpacer()
+    }
+
+    private var extraBottom = 0
+
+    private fun applySpacer() {
+        val h = insetBottom.coerceAtLeast(0) + extraBottom
+        if (bottomSpacer.layoutParams.height != h) {
+            bottomSpacer.layoutParams = bottomSpacer.layoutParams.apply { height = h }
+            requestLayout()
+        }
+    }
+
     init {
         orientation = VERTICAL
         // 与键盘同色，否则底部露出异色带
@@ -49,8 +69,7 @@ class InputRootView(context: Context) : LinearLayout(context) {
         }
         if (bottom != insetBottom) {
             insetBottom = bottom
-            bottomSpacer.layoutParams = bottomSpacer.layoutParams.apply { height = bottom }
-            requestLayout()
+            applySpacer()
         }
         return super.onApplyWindowInsets(insets)
     }
