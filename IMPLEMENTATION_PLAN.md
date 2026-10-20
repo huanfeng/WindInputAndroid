@@ -186,8 +186,10 @@
   五种许可证附全文；Rust 依赖清单由 `scripts/gen-rust-licenses.sh` 从 cargo tree 生成。
   单测核对「assets/data 里的每类数据都有声明」。
 - 首页状态卡按启用进度只给下一步（第 1 步启用 / 第 2 步切换 / 试一试），回到本页即重查。
-- 没做：Emoji「附加模块」开关——`input.emoji.modules` 是映射型配置，`config_set` 只收标量与字符串列表，
-  要先在主仓给映射型键开写入口。
+- Emoji「附加模块」开关：主仓 1a537b7a 单开 `emoji_modules / set_emoji_module`（映射型配置），输入页
+  Emoji 开着时多一张卡。
+- 联想态空格：主仓 2de07cda 移动端强制 `space_commits = false`，并让宿主的配置改写在重载后仍生效
+  （此前设置页每改一项、强制项就悄悄回到桌面默认）；键盘侧的 Esc 权宜已删。
 - 待做：外观改走核心主题——核心的调色板是候选窗语义色（text / accent …），没有键面、功能键这些
   键盘域颜色；要先在主题格式里定键盘域节点（architecture §3.4），APK 也还没带 themes 数据。
 
