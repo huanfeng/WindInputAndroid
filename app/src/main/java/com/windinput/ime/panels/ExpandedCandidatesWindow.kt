@@ -54,9 +54,9 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
     private var loadingMore = false
 
     /** 会话候选更新入口（附着与否都先存着）：新一轮候选，回到顶部 */
-    fun setCandidates(items: List<String>) {
+    fun setCandidates(items: List<String>, comments: List<String> = emptyList()) {
         loadingMore = false
-        adapter.submit(items)
+        adapter.submit(items, comments)
         grid?.scrollToPosition(0)
     }
 
@@ -66,10 +66,10 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
      * 不用 `notifyDataSetChanged`——那会让 RecyclerView 丢弃全部 ViewHolder 重新绑定，
      * 用户正在滑动时表现为一顿，而且滚动位置也保不住。
      */
-    fun appendCandidates(more: List<String>) {
+    fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
         loadingMore = false
         if (more.isEmpty()) return
-        adapter.append(more)
+        adapter.append(more, moreComments)
     }
 
     override fun onCreateView(context: Context): View {
@@ -109,15 +109,20 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
 
         private var items: List<String> = emptyList()
 
+        /** 与 [items] 按下标对应的编码提示灰字；可以比它短（没开提示时为空） */
+        private var comments: List<String> = emptyList()
+
         @Suppress("NotifyDataSetChanged")
-        fun submit(newItems: List<String>) {
+        fun submit(newItems: List<String>, newComments: List<String>) {
             items = newItems
+            comments = newComments
             notifyDataSetChanged()
         }
 
         /** 追加：只通知新增区间，不动已绑定的 ViewHolder */
-        fun append(more: List<String>) {
+        fun append(more: List<String>, moreComments: List<String>) {
             val from = items.size
+            if (moreComments.isNotEmpty()) comments = comments + List(from - comments.size) { "" } + moreComments
             items = items + more
             notifyItemRangeInserted(from, more.size)
         }
@@ -139,7 +144,17 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         }
 
         override fun onBindViewHolder(holder: Holder, position: Int) {
-            holder.view.text = items[position]
+            val comment = comments.getOrNull(position).orEmpty()
+            holder.view.text = if (comment.isEmpty()) {
+                items[position]
+            } else {
+                // 与候选栏同一种排法：字后跟小一号灰字（码表剩余编码 / 拼音反查码）
+                android.text.SpannableString("${items[position]} $comment").apply {
+                    val start = items[position].length + 1
+                    setSpan(android.text.style.RelativeSizeSpan(0.6f), start, length, 0)
+                    setSpan(android.text.style.ForegroundColorSpan(Palette.current.hint), start, length, 0)
+                }
+            }
             holder.view.setOnClickListener { onClick(position) }
             holder.view.setOnLongClickListener {
                 onLongClick(position)

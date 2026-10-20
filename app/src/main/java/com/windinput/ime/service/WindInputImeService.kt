@@ -606,7 +606,7 @@ class WindInputImeService :
                     page = event.page,
                     totalPages = event.totalPages,
                 )
-                expandedCandidatesWindow?.setCandidates(loadedCandidates)
+                expandedCandidatesWindow?.setCandidates(loadedCandidates, loadedComments)
                 // 候选清空时若停留在展开面板，收回键盘
                 if (loadedCandidates.isEmpty() &&
                     windowManager?.current === expandedCandidatesWindow
@@ -908,7 +908,7 @@ class WindInputImeService :
         loadedComments = loadedComments + page.comments
         candidateTotal = page.total
         barView?.appendCandidates(page.items, page.comments)
-        expandedCandidatesWindow?.appendCandidates(page.items)
+        expandedCandidatesWindow?.appendCandidates(page.items, page.comments)
     }
 
     /**
