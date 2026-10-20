@@ -121,7 +121,16 @@
 **Tests**:
 - Rust（主仓）：History provider 学习与排序；本仓 `key_flow.rs` 联想闭环
 - emu-test：上屏后候选条出联想、点选上屏
-**Status**: Not Started
+**Status**: Complete（2026-10-20）
+- 主仓 cf6a2b60：History 源新增「下一词」行——相邻两次整体上屏记 A→B（与联想历史同表），
+  断点（标点 / 原码上屏、取消、焦点得失、宿主直通键）清上文；只在智能联想档出。
+  主仓用例 `tests/assoc_next_word.rs` 六条，wind-assoc / wind-coordinator / wind-mobile 全量测试通过。
+- Bigram 出厂数据冷启动未做（数据来源与许可另议），按计划后置。
+- 联想态空格改为收起联想 + 出空格：K 侧先发 Esc 再出空格（权宜；正路是主仓移动端
+  `space_commits = false`，要连带改 wind-setting 的配置快照，并入 v0.4 设置重构）。
+- emu-test 新增 [31] 学会下一词后点联想首位、[32] 联想态空格 / 双击「。」、[33] 联想态退格先收联想、
+  [34] 收键盘后联想不残留。全部 45 项通过。
+- 落地细节记在 `docs/android-ime-features.md` §14.9。
 
 ## Stage 5: 真机走查 → v0.3.0
 **Goal**: 小米真机按「微信聊天 / 浏览器搜索 / 登录框 / 备忘录长文」四个场景逐项走查

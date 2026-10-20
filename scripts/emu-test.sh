@@ -803,12 +803,48 @@ reset_pad; tap_key LANG; sleep 4
 [[ -n "$(wait_chinese)" ]] || die "收尾切回中文失败"
 
 echo; echo "${Y}[30] 中文模式双击空格出「。」${N}"
-# 不从汉字后面测：上屏汉字后进联想态，空格归引擎选联想词（Stage 4 处理）。
-# 从 123 层打一个数字再回字母层，光标前是「1」，双击空格应换成「。」
+# 数字后面也要成立（汉字后面的情形见 [32]）：从 123 层打一个数字再回字母层，
+# 光标前是「1」，双击空格应换成「。」
 reset_pad
 tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 0
 adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
 check "数字后双空格换成句号" "1。" "$(get_pad_text)"
+
+echo; echo "${Y}[31] 上屏后联想：学会「我们 → 一直」后点联想首位${N}"
+# 下一词学习（主仓 learn_next_word）：相邻上屏两次「我们」「一直」，第三次上屏「我们」联想首位应是「一直」
+reset_pad
+for w in t r w u SPACE g g f h SPACE t r w u SPACE g g f h SPACE t r w u SPACE; do tap_key "$w"; done
+sleep 0.5
+tap_candidate 0
+check_match "联想首位整词上屏" '我们一直我们一直我们一直$' "$(get_pad_text)"
+
+echo; echo "${Y}[32] 联想态按空格出空格，双击出「。」${N}"
+# 两家在联想态按空格都是收起联想、出空格，不选联想词
+reset_pad
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+tap_key SPACE
+check_match "联想态空格出空格" '^[\x{4e00}-\x{9fa5}] $' "$(get_pad_text)"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
+check_match "汉字后双击空格出「。」" '^[\x{4e00}-\x{9fa5}]。$' "$(get_pad_text)"
+
+echo; echo "${Y}[33] 联想态按退格先收联想、不删正文${N}"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+tap_key BS
+check_match "第一下退格只收联想" '^[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
+tap_key BS
+check "第二下退格才删字" "" "$(get_pad_text)"
+
+echo; echo "${Y}[34] 收起键盘后联想不残留${N}"
+# 联想还在的话，数字键会选联想词；收起再弹出后数字应原样上屏
+reset_pad
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+adb_q shell input keyevent KEYCODE_BACK; sleep 1
+get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.2
+tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 0
+check_match "收起后数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"
