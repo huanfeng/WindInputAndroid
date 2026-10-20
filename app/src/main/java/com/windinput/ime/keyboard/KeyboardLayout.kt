@@ -158,12 +158,14 @@ object KeyboardLayouts {
             add(KeyDef(".", KeyAction.Commit("."), enText = ';'))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
+        // 与字母层底行同宽对齐：「返回」正好落在字母层「123」那一格（哪里进、哪里回）；
+        // 「1234」在左下，与数字键盘左下的「返回」同位
         listOf(
-            KeyDef("←", KeyAction.SwitchSymbols, widthWeight = 1.5f, isSpecial = true, isAccent = true),
+            KeyDef("1234", KeyAction.NumberPad, widthWeight = 1.35f, isSpecial = true),
+            KeyDef("返回", KeyAction.SwitchSymbols, widthWeight = 1.15f, isSpecial = true, isAccent = true),
             KeyDef("☺", KeyAction.Emoji, isSpecial = true),
-            KeyDef("1234", KeyAction.NumberPad, widthWeight = 1.5f, isSpecial = true),
-            KeyDef("空格", KeyAction.Space, widthWeight = 4f),
-            KeyDef("换行", KeyAction.Enter, widthWeight = 2f, isSpecial = true),
+            KeyDef("空格", KeyAction.Space, widthWeight = 5.1f),
+            KeyDef("换行", KeyAction.Enter, widthWeight = 1.4f, isSpecial = true),
         ),
     )
 
@@ -183,7 +185,7 @@ object KeyboardLayouts {
         listOf(sideSpacer, digit('7'), digit('8'), digit('9'),
             KeyDef("换行", KeyAction.Enter, isSpecial = true, rowSpan = 2)),
         listOf(
-            KeyDef("←", KeyAction.SwitchSymbols, isSpecial = true, isAccent = true),
+            KeyDef("返回", KeyAction.SwitchSymbols, isSpecial = true, isAccent = true),
             KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.4f, isSpecial = true),
             digit('0'),
             KeyDef(".", KeyAction.Commit("."), widthWeight = 1.4f),

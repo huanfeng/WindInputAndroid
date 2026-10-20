@@ -30,11 +30,13 @@ key = [
   { label = "⌫", action = "backspace", width = 1.5 },
 ]
 
+# 底行与字母层底行同宽对齐，切换键「哪里进、哪里回」：
+#   字母层「123」那一格 = 这里的「返回」；这里左下「1234」那一格 ≈ 数字键盘左下的「返回」
 [[rows]]
 key = [
-  { label = "←", action = "switch_symbols", width = 1.5, accent = true },
+  { label = "1234", action = "number_pad", width = 1.35 },
+  { label = "返回", action = "switch_symbols", width = 1.15, accent = true },
   { label = "☺", action = "emoji" },
-  { label = "1234", action = "number_pad", width = 1.5 },
-  { label = "空格", action = "space", width = 4 },
-  { label = "换行", action = "enter", width = 2 },
+  { label = "空格", action = "space", width = 5.1 },
+  { label = "换行", action = "enter", width = 1.4 },
 ]

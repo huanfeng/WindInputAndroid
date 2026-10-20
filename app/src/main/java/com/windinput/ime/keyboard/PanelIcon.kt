@@ -5,7 +5,6 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 
@@ -85,7 +84,7 @@ class PanelIcon(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 pressed = true
-                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                KeyHaptics.tap(this)
                 invalidate()
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {

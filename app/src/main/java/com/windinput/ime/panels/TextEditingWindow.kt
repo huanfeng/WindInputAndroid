@@ -1,9 +1,9 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.KeyHaptics
 import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -45,7 +45,7 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
             val rowView = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
             for ((label, action) in row) {
                 val btn = cellButton(context, label) {
-                    it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    KeyHaptics.tap(it)
                     listener.onEditAction(action)
                     refreshSelectState()
                 }

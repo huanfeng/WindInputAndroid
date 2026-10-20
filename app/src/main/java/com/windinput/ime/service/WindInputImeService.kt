@@ -27,6 +27,7 @@ import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.core.suspendsLearning
+import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
 import com.windinput.ime.keyboard.CandidateMenuPopup
@@ -167,6 +168,8 @@ class WindInputImeService :
                         switchHandler.removeCallbacks(showSwitching)
                         barView?.setPreparing(false)
                         refreshSchemaKeys()
+                        // 切方案期间推来的状态读到的是旧方案列表，切完补刷一次
+                        quickPanelWindow?.refresh()
                     }
                 },
             ).also { it.start() }
@@ -345,8 +348,10 @@ class WindInputImeService :
         if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current) {
             setInputView(onCreateInputView())
         }
+        KeyHaptics.init(this)
+        KeyHaptics.enabled = userConfig.getBoolean("ui.android.haptic", true)
+        KeyHaptics.strength = userConfig.getInt("ui.android.haptic_strength", KeyHaptics.DEFAULT_STRENGTH)
         keyboardWindow?.keyboardView?.apply {
-            hapticEnabled = userConfig.getBoolean("ui.android.haptic", true)
             soundEnabled = userConfig.getBoolean("ui.android.sound", false)
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
             longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)

@@ -1,5 +1,6 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.KeyHaptics
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
@@ -8,7 +9,6 @@ import android.graphics.drawable.StateListDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -95,10 +95,10 @@ class SymbolWindow(
         val sideWidth = context.resources.displayMetrics.widthPixels * 15 / 100
 
         bottom.addView(
-            keyCell(context, "←", palette.accent, palette.onAccent).apply {
+            keyCell(context, "返回", palette.accent, palette.onAccent).apply {
                 contentDescription = "symbol-back"
                 setOnClickListener {
-                    it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    KeyHaptics.tap(it)
                     listener.onSymbolBack()
                 }
             },
@@ -185,7 +185,7 @@ class SymbolWindow(
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     v.isPressed = true
-                    v.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    KeyHaptics.tap(v)
                     listener.onSymbolBackspace()
                     handler.postDelayed(repeat, REPEAT_START_MS)
                 }
@@ -228,7 +228,7 @@ class SymbolWindow(
             val symbol = items[position]
             holder.view.text = symbol
             holder.view.setOnClickListener {
-                it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                KeyHaptics.tap(it)
                 onClick(symbol)
             }
         }

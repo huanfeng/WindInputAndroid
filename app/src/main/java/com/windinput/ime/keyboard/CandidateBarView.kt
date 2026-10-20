@@ -213,7 +213,7 @@ class CandidateBarView(context: Context) : View(context) {
                 pressedIndex = findIndex(event.x)
                 longPressFired = false
                 if (pressedIndex >= 0) {
-                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    KeyHaptics.tap(this)
                     postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 }
                 // 候选条在可滚动时要拦住父容器的横向手势，否则拖动会被上层吃掉

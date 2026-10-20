@@ -19,7 +19,14 @@ import android.widget.LinearLayout
 class InputRootView(context: Context) : LinearLayout(context) {
 
     private val bottomSpacer = View(context)
-    private var insetBottom = -1
+
+    /**
+     * 当前的避让高度。**不能从 0 起步**：系统的 insets 要等窗口第一次布局之后才派发，
+     * 从 0 起步的话键盘刚弹出那一下按无避让的高度测量，最后一排被手势条盖住，
+     * insets 到了才长高（肉眼可见地「先被遮住、再恢复」）。所以先用上次收到的真值，
+     * 没有就按当前窗口的 WindowMetrics 估一个，insets 到了再校正（通常不变，不会跳）。
+     */
+    private var insetBottom = lastInsetBottom.takeIf { it >= 0 } ?: estimateBottomInset(context)
 
     /**
      * 用户设的额外留空（px）：底部加在避让占位上（窗口跟着长高，最后一排不被裁），左右用内边距
@@ -46,7 +53,7 @@ class InputRootView(context: Context) : LinearLayout(context) {
         // 与键盘同色，否则底部露出异色带
         setBackgroundColor(Palette.current.background)
         fitsSystemWindows = false
-        addView(bottomSpacer, LayoutParams(LayoutParams.MATCH_PARENT, 0))
+        addView(bottomSpacer, LayoutParams(LayoutParams.MATCH_PARENT, insetBottom))
     }
 
     /** 占位 View 必须始终在最后一个（子 View 由 Service 依次 addView） */
@@ -67,10 +74,33 @@ class InputRootView(context: Context) : LinearLayout(context) {
             @Suppress("DEPRECATION")
             insets.systemWindowInsetBottom
         }
+        lastInsetBottom = bottom
         if (bottom != insetBottom) {
             insetBottom = bottom
             applySpacer()
         }
         return super.onApplyWindowInsets(insets)
+    }
+
+    companion object {
+        /** 进程内记住上次的真值：转屏、换配色重建输入视图时直接用，不再估 */
+        private var lastInsetBottom = -1
+
+        private fun estimateBottomInset(context: Context): Int {
+            if (Build.VERSION.SDK_INT >= 30) {
+                // 估不出来就退回 0（旧行为）：只是首帧不准，insets 到了照样校正，不值得因此崩
+                return runCatching {
+                    val wm = context.getSystemService(android.view.WindowManager::class.java)
+                    val insets = wm.currentWindowMetrics.windowInsets
+                    maxOf(
+                        insets.getInsets(WindowInsets.Type.navigationBars()).bottom,
+                        insets.getInsets(WindowInsets.Type.systemGestures()).bottom,
+                    )
+                }.getOrDefault(0)
+            }
+            // 26–29：没有 WindowMetrics，取系统资源里的导航栏高度
+            val id = context.resources.getIdentifier("navigation_bar_height", "dimen", "android")
+            return if (id != 0) context.resources.getDimensionPixelSize(id) else 0
+        }
     }
 }

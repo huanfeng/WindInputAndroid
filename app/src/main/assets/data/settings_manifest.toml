@@ -863,6 +863,21 @@ default = true
 [[item]]
 page = "keys"
 section = "按键反馈"
+key = "ui.android.haptic_strength"
+source = "android"
+type = "int"
+title = "振动强度"
+summary = "越小越轻；手机不支持调幅时改为缩短振动时长"
+enabled_when = "ui.android.haptic"
+default = 30
+min = 5
+max = 100
+step = 5
+unit = "%"
+
+[[item]]
+page = "keys"
+section = "按键反馈"
 key = "ui.android.sound"
 source = "android"
 type = "toggle"

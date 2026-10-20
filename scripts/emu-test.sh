@@ -163,8 +163,8 @@ SYM_W=(
     "1 1 1 1 1 1 1 1 1 1"
     # 符号 · 。 ， 、 ？ ！ 半角句点 · ⌫
     "1.5 1 1 1 1 1 1 1.5"
-    # ← · 表情 · 1234 · 空格 · 换行
-    "1.5 1 1.5 4 2"
+    # 1234 · 返回 · 表情 · 空格 · 换行（与字母层底行同宽对齐）
+    "1.35 1.15 1 5.1 1.4"
 )
 # 九宫格数字键盘（number.toml）：左列 · 三列数字 · 右列，四行同权重
 NUM_W="1 1.4 1.4 1.4 1"
@@ -765,14 +765,14 @@ reset_pad
 tap_key SYM
 tap_cell 0 "${SYM_W[0]}" 0; tap_cell 2 "${SYM_W[2]}" 6; tap_cell 0 "${SYM_W[0]}" 1; tap_cell 2 "${SYM_W[2]}" 1
 check "1 . 2 。" "1.2。" "$(get_pad_text)"
-tap_cell 3 "${SYM_W[3]}" 0
+tap_cell 3 "${SYM_W[3]}" 1
 tap_key a; tap_key a; tap_key SPACE
 check_match "← 回到字母层继续打中文" '^1\.2。[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
 
 echo; echo "${Y}[24] 九宫格数字键盘${N}"
 # 123 层「1234」进九宫格，算式不用切层：数字、句点在格子里，* 在左列第 3 项
 reset_pad
-tap_key SYM; tap_cell 3 "${SYM_W[3]}" 2
+tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0
 tap_cell 0 "$NUM_W" 1; tap_cell 0 "$NUM_W" 2; tap_cell 3 "$NUM_W" 3; tap_cell 1 "$NUM_W" 2
 side_x="$(awk -v W="$GEO_W" 'BEGIN{ printf "%d", W / 6.2 / 2 }')"
 side_y="$(awk -v top="$GEO_KBTOP" -v rp="$GEO_ROWPX" 'BEGIN{ printf "%d", top + 0.75 * rp * 2.5 }')"
@@ -780,7 +780,7 @@ adb_q shell input tap "$side_x" "$side_y"; sleep 0.4
 tap_cell 0 "$NUM_W" 3
 check "12.5*3" "12.5*3" "$(get_pad_text)"
 # ← 回进来的那一层（123 层），再 ← 回字母层
-tap_cell 3 "$NUM_W" 0; tap_cell 3 "${SYM_W[3]}" 0
+tap_cell 3 "$NUM_W" 0; tap_cell 3 "${SYM_W[3]}" 1
 # 数字框直接调起九宫格：第 3 场景（测试台场景按钮循环），按九宫格坐标打 5 0
 restart_pad
 tap_text "切换场景"; tap_text "切换场景"
@@ -813,7 +813,7 @@ check_match "符号页退格" '^[\x{4e00}-\x{9fa5}]，$' "$(get_pad_text)"
 adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
 tap_cell 0 "${SYM_W[0]}" 0
 check_match "← 回到 123 层" '^[\x{4e00}-\x{9fa5}]，1$' "$(get_pad_text)"
-tap_cell 3 "${SYM_W[3]}" 0
+tap_cell 3 "${SYM_W[3]}" 1
 
 echo; echo "${Y}[26] 最近使用置首、重启后保留${N}"
 restart_pad
@@ -823,7 +823,7 @@ tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0; sleep 0.6
 sym_cell 0 0
 check "最近第一格是上次点的「。」" "。" "$(get_pad_text)"
 adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
-tap_cell 3 "${SYM_W[3]}" 0
+tap_cell 3 "${SYM_W[3]}" 1
 
 echo; echo "${Y}[27] 英文补全：点候选上屏补全词并自动加空格${N}"
 reset_pad
@@ -865,7 +865,7 @@ echo; echo "${Y}[30] 中文模式双击空格出「。」${N}"
 # 数字后面也要成立（汉字后面的情形见 [32]）：从 123 层打一个数字再回字母层，
 # 光标前是「1」，双击空格应换成「。」
 reset_pad
-tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 0
+tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 1
 adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
 check "数字后双空格换成句号" "1。" "$(get_pad_text)"
 
@@ -902,7 +902,7 @@ reset_pad
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 adb_q shell input keyevent KEYCODE_BACK; sleep 1
 get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.2
-tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 0
+tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 1
 check_match "收起后数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 
 echo; echo "${Y}[35] 简入繁出：开启后「我们」上屏为「我們」${N}"
@@ -995,6 +995,16 @@ check "返回两层回到首页" "yes" "$(has_text 开始使用)"
 tap_text "词库"
 tap_text "我的词条"
 check "我的词条页有清空入口" "yes" "$(has_text 清空个人词)"
+adb_q shell input keyevent BACK; sleep 1
+adb_q shell input keyevent BACK; sleep 1
+# 下拉项：miuix 的下拉弹窗要 activity ≥ 1.12 提供的 NavigationEventDispatcher，
+# 缺了一点开就崩（dev.17 及以前所有下拉都这样）。只打开看选项、按返回收起，不改值
+tap_text "输入"
+tap_text "默认状态"
+tap_text "初始语言模式"
+check "下拉项点开不崩、列出选项" "yes" "$(has_text 英文)"
+adb_q shell input keyevent BACK; sleep 1
+check "返回先收起下拉，仍在本页" "yes" "$(has_text 初始字符宽度)"
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1

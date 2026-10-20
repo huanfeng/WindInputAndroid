@@ -132,7 +132,13 @@ class QuickPanelWindow(
     }
 
     /** 每次进入面板刷新一次：方案可能在别处（键盘快捷键/设置页）被切过 */
-    override fun onAttached() {
+    override fun onAttached() = refresh()
+
+    /**
+     * 重画方案行与功能格子。切方案在后台做，引擎推状态时后台任务还没收尾、方案列表还是
+     * 切之前的缓存——所以后台切完（忙状态解除）时 Service 再叫一次这里。
+     */
+    fun refresh() {
         val ctx = schemaRow?.context ?: return
         rebuildSchemas(ctx)
         rebuildTiles(ctx)
