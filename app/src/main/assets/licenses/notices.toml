@@ -1,0 +1,96 @@
+# 「开源许可」页的条目。随包分发的每一份第三方数据与程序库都要在这里有一条。
+#
+# [[notice]]
+#   group    分组：核心 / 词库与数据 / 程序库
+#   name     名称
+#   usage    在本输入法里用来做什么
+#   license  许可证；有全文的写 licenses/ 下的文件名去掉 .txt（GPL-3.0 / LGPL-3.0 /
+#            Apache-2.0 / MIT / MPL-2.0），点开显示全文
+#   url      来源
+#
+# 数据条目的来源与加工方式以主仓 WindInput/NOTICE.md 为准；往 assets/data 里加了新数据，
+# 先去那边找它的条目，再抄到这里。Rust 依赖不逐条手写，见 scripts/gen-rust-licenses.sh。
+
+[[notice]]
+group = "核心"
+name = "清风输入法核心（WindInput）"
+usage = "输入引擎、词库加载、配置与统计"
+license = "GPL-3.0"
+url = "https://github.com/huanfeng/WindInput"
+
+[[notice]]
+group = "词库与数据"
+name = "极点五笔 for Rime（rime-wubi86-jidian）"
+usage = "五笔 86 码表与扩展词库（按词频重新赋权排序，词条本身未改）"
+license = "Apache-2.0"
+url = "https://github.com/KyleBing/rime-wubi86-jidian"
+
+[[notice]]
+group = "词库与数据"
+name = "白霜拼音（rime-frost）"
+usage = "拼音词库（字表、基础词库、扩展词库、纠错）、英文词库、Emoji 附加表"
+license = "GPL-3.0"
+url = "https://github.com/gaboolic/rime-frost"
+
+[[notice]]
+group = "词库与数据"
+name = "pinyin-data"
+usage = "汉字普通话读音，生成拼音映射"
+license = "MIT"
+url = "https://github.com/mozillazg/pinyin-data"
+
+[[notice]]
+group = "词库与数据"
+name = "OpenCC"
+usage = "简繁转换词典"
+license = "Apache-2.0"
+url = "https://github.com/BYVoid/OpenCC"
+
+[[notice]]
+group = "词库与数据"
+name = "rime-emoji"
+usage = "Emoji 候选的词表（原样分发，未修改）"
+license = "LGPL-3.0"
+url = "https://github.com/rime/rime-emoji"
+
+[[notice]]
+group = "程序库"
+name = "AndroidX / Jetpack Compose"
+usage = "设置界面"
+license = "Apache-2.0"
+url = "https://developer.android.com/jetpack/androidx"
+
+[[notice]]
+group = "程序库"
+name = "Kotlin 标准库与 kotlinx.coroutines"
+usage = "程序语言运行时"
+license = "Apache-2.0"
+url = "https://github.com/Kotlin/kotlinx.coroutines"
+
+[[notice]]
+group = "程序库"
+name = "miuix"
+usage = "设置界面的控件与主题"
+license = "Apache-2.0"
+url = "https://github.com/miuix-kotlin-multiplatform/miuix"
+
+[[notice]]
+group = "程序库"
+name = "tomlj"
+usage = "读取配置与设置清单"
+license = "Apache-2.0"
+url = "https://github.com/tomlj/tomlj"
+
+[[notice]]
+group = "程序库"
+name = "JNA（Java Native Access）"
+usage = "调用输入法核心（LGPL-2.1 与 Apache-2.0 双许可，此处取 Apache-2.0）"
+license = "Apache-2.0"
+url = "https://github.com/java-native-access/jna"
+
+[[notice]]
+group = "程序库"
+name = "UniFFI"
+usage = "生成核心与界面之间的调用接口"
+license = "MPL-2.0"
+url = "https://github.com/mozilla/uniffi-rs"

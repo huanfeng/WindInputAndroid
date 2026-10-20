@@ -18,6 +18,8 @@
 #   options  select 的选项 [{ value, label }]；value 一律写字符串，写入时按键的类型转换
 #   min / max / step / unit   int 的范围、步长、单位
 #   advanced true = 收进卡片底部的「进阶」折叠区（工程参数）
+#   exclusive_with  另一个开关键：本项打开时把它关掉（二选一，照电脑版清单）
+#   enabled_when    另一个开关键：它开着时本项才显示（电脑版写 "键 == true"，这里只写键）
 #   preview  int 项拖动时的预览：keyboard_rows（按所选行高画四行键）/ candidate_text（按所选字号写一行候选）
 #
 # 引擎项写入后会发 ReloadConfig 让核心即时重读；键盘项在下次弹出键盘时生效。
@@ -603,6 +605,114 @@ source = "engine"
 type = "toggle"
 title = "退格仅取消联想"
 advanced = true
+
+# 简繁两个方向互斥（exclusive_with，开一个自动关另一个），同卡三行才看得出是二选一。
+[[item]]
+page = "input"
+section = "简繁转换"
+key = "input.s2t.enabled"
+source = "engine"
+type = "toggle"
+title = "启用简入繁出"
+summary = "候选与上屏均输出繁体。开启会自动关闭「繁入简出」"
+exclusive_with = "input.t2s.enabled"
+
+[[item]]
+page = "input"
+section = "简繁转换"
+key = "input.s2t.variant"
+source = "engine"
+type = "select"
+title = "转换变体"
+enabled_when = "input.s2t.enabled"
+options = [
+  { value = "s2t", label = "标准繁体" },
+  { value = "s2tw", label = "台湾繁体" },
+  { value = "s2twp", label = "台湾繁体（含词汇）" },
+  { value = "s2hk", label = "香港繁体" },
+]
+
+[[item]]
+page = "input"
+section = "简繁转换"
+key = "input.t2s.enabled"
+source = "engine"
+type = "toggle"
+title = "启用繁入简出"
+summary = "词库和候选是繁体时，上屏转成简体。开启会自动关闭「简入繁出」"
+exclusive_with = "input.s2t.enabled"
+
+[[item]]
+page = "input"
+section = "Emoji/OpenCC"
+key = "input.emoji.enabled"
+source = "engine"
+type = "toggle"
+title = "启用 Emoji/OpenCC 候选"
+summary = "打出词语后，在候选中追加对应的 emoji（如「开心」→ 😄）。首次开启时建立索引，稍候片刻"
+
+[[item]]
+page = "input"
+section = "Emoji/OpenCC"
+key = "input.emoji.show_as"
+source = "engine"
+type = "select"
+title = "显示位置"
+enabled_when = "input.emoji.enabled"
+options = [
+  { value = "after", label = "紧随词后" },
+  { value = "tail", label = "列表末尾" },
+]
+
+[[item]]
+page = "input"
+section = "Emoji/OpenCC"
+key = "input.emoji.max_per_word"
+source = "engine"
+type = "int"
+title = "每词上限"
+summary = "一个词最多追加的 emoji 个数"
+min = 1
+max = 10
+enabled_when = "input.emoji.enabled"
+
+[[item]]
+page = "input"
+section = "Emoji/OpenCC"
+key = "input.emoji.categories"
+source = "engine"
+type = "toggle"
+title = "启用分类词"
+summary = "「动物」「水果」等分类词会带出整组 emoji，数量受每词上限约束"
+enabled_when = "input.emoji.enabled"
+
+[[item]]
+page = "input"
+section = "Emoji/OpenCC"
+key = "input.emoji.scope"
+source = "engine"
+type = "select"
+title = "适用范围"
+advanced = true
+enabled_when = "input.emoji.enabled"
+options = [
+  { value = "exact", label = "仅完整词" },
+  { value = "all", label = "全部候选" },
+  { value = "off", label = "不追加" },
+]
+
+[[item]]
+page = "input"
+section = "Emoji/OpenCC"
+key = "input.emoji.min_word_chars"
+source = "engine"
+type = "int"
+title = "最少字数"
+summary = "候选少于此字数时不追加。默认 2，即不为单字追加"
+min = 1
+max = 8
+advanced = true
+enabled_when = "input.emoji.enabled"
 
 # ═══ 外观 ═══════════════════════════════════════════════════════
 # 主题暂用键盘自己的深浅色（键盘配色还没接核心的主题系统，接上后改走 ui.theme.*）

@@ -43,6 +43,10 @@ data class SettingItem(
     val advanced: Boolean = false,
     /** int 项拖动时的预览：keyboard_rows（按所选行高画四行键）/ candidate_text（按所选字号写一行候选） */
     val preview: String? = null,
+    /** 二选一的另一个开关键：本项打开时把它关掉（照电脑版清单的 exclusive_with） */
+    val exclusiveWith: String? = null,
+    /** 另一个开关键：它开着时本项才显示（照电脑版清单的 enabled_when，这里只写键） */
+    val enabledWhen: String? = null,
 )
 
 data class SettingsManifestData(
@@ -128,7 +132,16 @@ object SettingsManifest {
                 preview = t.getString("preview")?.also {
                     require(it in PREVIEWS) { "$key 的 preview「$it」不认识" }
                 },
+                exclusiveWith = t.getString("exclusive_with"),
+                enabledWhen = t.getString("enabled_when"),
             )
+        }
+        // 引用的键必须是清单里的开关：写错一个字，二选一就变成能同时开、依赖项就永远不显示
+        val toggles = items.filter { it.type == "toggle" }.map { it.key }.toSet()
+        for (item in items) {
+            for (ref in listOfNotNull(item.exclusiveWith, item.enabledWhen)) {
+                require(ref in toggles) { "${item.key} 引用的「$ref」不是清单里的开关" }
+            }
         }
         return SettingsManifestData(pages, items)
     }

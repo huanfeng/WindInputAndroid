@@ -236,8 +236,11 @@ private fun PageScreen(
         "dict" -> DictSection(session)
         "about" -> AboutSection(versionName)
     }
+    @Suppress("UNUSED_EXPRESSION") values.version // 开关变了，依赖它的项跟着显示 / 隐藏
     val sections = manifest.sectionsOf(page.id)
-        .map { (name, items) -> name to items.filter(values::available) }
+        .map { (name, items) ->
+            name to items.filter { values.available(it) && values.visible(it, manifest.items) }
+        }
         .filter { it.second.isNotEmpty() }
     if (sections.isEmpty() && !values.engineReady && manifest.itemsOf(page.id).isNotEmpty()) {
         Text(text = "正在启动输入法核心…", modifier = Modifier.padding(start = 4.dp))
@@ -340,11 +343,17 @@ private const val SHUANGPIN_SCHEMA_ID = "shuangpin"
 
 @Composable
 private fun AboutSection(versionName: String) {
+    var showLicenses by rememberSaveable { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column {
             NavRow("清风输入法", "版本 $versionName", null)
+            NavRow(
+                if (showLicenses) "开源许可 ▴" else "开源许可 ▾",
+                "随包分发的词库数据与程序库的来源和许可证",
+            ) { showLicenses = !showLicenses }
         }
     }
+    if (showLicenses) LicensesSection()
 }
 
 // ── 通用行 ───────────────────────────────────────────────────────

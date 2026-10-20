@@ -104,4 +104,29 @@ class SettingsManifestTest {
         assertEquals(72, snapToStep(80f, 40, 72, 2))
         assertEquals(19, snapToStep(19.4f, 15, 24, 1))
     }
+
+    /** 简繁二选一要互相指向，否则只有一个方向会自动关掉另一个 */
+    @Test
+    fun exclusivePairsPointAtEachOther() {
+        val pairs = bundled.items.filter { it.exclusiveWith != null }.associate { it.key to it.exclusiveWith }
+        assertTrue("清单里应有二选一项", pairs.isNotEmpty())
+        for ((a, b) in pairs) assertEquals("$a ↔ $b 应双向", a, pairs[b])
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun enabledWhenMustReferToAToggle() {
+        SettingsManifest.parse(
+            """
+            [[page]]
+            id = "a"
+            [[item]]
+            page = "a"
+            key = "input.x"
+            source = "engine"
+            type = "select"
+            options = [{ value = "1" }]
+            enabled_when = "input.no_such"
+            """.trimIndent(),
+        )
+    }
 }

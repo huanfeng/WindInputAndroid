@@ -66,6 +66,16 @@ class SettingsValues(
         }
     }
 
+    /**
+     * 这一项现在该不该显示：[SettingItem.enabledWhen] 指向的开关关着就藏起来。
+     * 照电脑版的 enabled_when，只是电脑版置灰、手机上直接不显示——屏幕小，一列灰掉的选项只是噪声。
+     */
+    fun visible(item: SettingItem, all: List<SettingItem>): Boolean {
+        val dep = item.enabledWhen ?: return true
+        val depItem = all.firstOrNull { it.key == dep } ?: return true
+        return bool(depItem)
+    }
+
     private fun raw(item: SettingItem): Any? = when (item.source) {
         SettingSource.ENGINE -> engine[item.key]
         SettingSource.ANDROID -> userConfig.readAll()[item.key] ?: item.defaultValue
@@ -88,8 +98,10 @@ class SettingsValues(
 
     /** 写入。返回错误说明（成功为 null）。后台线程调用 */
     fun set(item: SettingItem, value: Any): String? {
+        // 二选一：打开本项时先关掉另一项（两边都是引擎项，一次重载）
+        val partner = item.exclusiveWith?.takeIf { value == true || value == "true" }
         val err = when (item.source) {
-            SettingSource.ENGINE -> setEngine(item.key, value)
+            SettingSource.ENGINE -> setEngine(item.key, value, partner)
             SettingSource.ANDROID -> {
                 userConfig.put(item.key, androidValue(item, value))
                 null
@@ -99,7 +111,7 @@ class SettingsValues(
         return err
     }
 
-    private fun setEngine(key: String, value: Any): String? {
+    private fun setEngine(key: String, value: Any, turnOff: String? = null): String? {
         val c = core ?: return "输入法核心未就绪"
         val cv = when (types[key]) {
             "bool" -> ConfigValue.Bool(value == true || value == "true")
@@ -108,6 +120,7 @@ class SettingsValues(
             else -> ConfigValue.Str(value.toString())
         }
         return try {
+            if (turnOff != null && engine[turnOff] == true) c.configSet(turnOff, ConfigValue.Bool(false))
             c.configSet(key, cv)
             c.runCommand(EngineCommand.ReloadConfig)
             engine = ConfigSnapshot.flatten(c.configSnapshot())
