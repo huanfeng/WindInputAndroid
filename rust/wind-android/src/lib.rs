@@ -493,6 +493,32 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 方案的附加词库（拼音细胞词库、五笔 Emoji / 行政区域…）及当前开关；不含主库。
+    pub fn schema_dicts(&self, schema_id: String) -> Vec<SchemaDictItem> {
+        self.core
+            .schema_dicts(&schema_id)
+            .into_iter()
+            .map(|d| SchemaDictItem {
+                id: d.id,
+                label: d.label,
+                description: d.description,
+                enabled: d.enabled,
+            })
+            .collect()
+    }
+
+    /// 开 / 关一个附加词库：落盘到方案覆盖并即时生效（已加载的引擎热切换或重建）。
+    pub fn set_schema_dict_enabled(
+        &self,
+        schema_id: String,
+        dict_id: String,
+        on: bool,
+    ) -> Result<(), ConfigError> {
+        self.core
+            .set_schema_dict_enabled(&schema_id, &dict_id, on)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     /// emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
     pub fn emoji_modules(&self) -> Vec<EmojiModuleInfo> {
         self.core
@@ -739,5 +765,14 @@ pub struct EmojiModuleInfo {
     pub label: String,
     pub description: String,
     pub user: bool,
+    pub enabled: bool,
+}
+
+/// 方案的一个附加词库。`id` 原样回传给 [`WindCore::set_schema_dict_enabled`]。
+#[derive(Debug, uniffi::Record)]
+pub struct SchemaDictItem {
+    pub id: String,
+    pub label: String,
+    pub description: String,
     pub enabled: bool,
 }

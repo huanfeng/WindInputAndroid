@@ -28,7 +28,7 @@ url = "https://github.com/KyleBing/rime-wubi86-jidian"
 [[notice]]
 group = "词库与数据"
 name = "白霜拼音（rime-frost）"
-usage = "拼音词库（字表、基础词库、扩展词库、纠错）、英文词库、Emoji 附加表"
+usage = "拼音词库（字表、基础词库、扩展词库、纠错、16 个可选细胞词库）、英文词库、Emoji 附加表"
 license = "GPL-3.0"
 url = "https://github.com/gaboolic/rime-frost"
 

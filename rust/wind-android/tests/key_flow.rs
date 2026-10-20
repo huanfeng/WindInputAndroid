@@ -1099,3 +1099,31 @@ fn emoji_module_toggle_roundtrips() {
         Err(ConfigError::Rejected { .. })
     ));
 }
+
+/// 方案附加词库：拼音列出细胞词库，开关写入后读回；不存在的库报错。
+#[test]
+fn schema_dict_toggle_roundtrips() {
+    use wind_android::ConfigError;
+    let Some((core, _rec, _env)) = setup_exclusive("schema_dicts") else {
+        return;
+    };
+    let idiom = |c: &WindCore| {
+        c.schema_dicts("pinyin".into())
+            .into_iter()
+            .find(|d| d.id == "cell_idiom")
+    };
+    let before = idiom(&core).expect("拼音方案应列出成语细胞词库");
+    core.set_schema_dict_enabled("pinyin".into(), "cell_idiom".into(), !before.enabled)
+        .expect("开关应写入成功");
+    assert_eq!(
+        idiom(&core).map(|d| d.enabled),
+        Some(!before.enabled),
+        "写入后应读回新值"
+    );
+    core.set_schema_dict_enabled("pinyin".into(), "cell_idiom".into(), before.enabled)
+        .expect("恢复原值");
+    assert!(matches!(
+        core.set_schema_dict_enabled("pinyin".into(), "no_such".into(), true),
+        Err(ConfigError::Rejected { .. })
+    ));
+}

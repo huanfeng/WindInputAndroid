@@ -396,6 +396,13 @@ private fun HomeScreen(
     actions: SettingsActions,
     onOpen: (String) -> Unit,
 ) {
+    // 「统计」一行写今日字数：比列卡片名（只有一张「统计设置」）有用。统计走 JNI，后台取
+    val context = LocalContext.current
+    val todayChars by androidx.compose.runtime.produceState<UInt?>(null) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { CoreAccess.obtainCore(context)?.statsSummary()?.todayChars }.getOrNull()
+        }
+    }
     // 开始使用：三行常在——装好了也要能再跳（换了系统设置、想在别的框里试打）。
     // 没完成的那一步用强调色写「下一步」，新用户不用猜自己卡在哪
     SmallTitle("开始使用")
@@ -434,7 +441,11 @@ private fun HomeScreen(
             for (p in pages) {
                 NavRow(
                     title = p.title,
-                    summary = pageSummary(manifest, p, values, schemaState, versionName),
+                    summary = if (p.id == "stats" && todayChars != null) {
+                        "今日已输入 $todayChars 字"
+                    } else {
+                        pageSummary(manifest, p, values, schemaState, versionName)
+                    },
                     icon = SettingsIcons.page(p.icon),
                 ) { onOpen(p.id) }
             }
@@ -537,6 +548,9 @@ private fun SubScreen(
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
             if (items.isNotEmpty()) SettingsCard("", items, values)
+            // 方案的附加词库挂在对应的二级页底下：拼音细胞词库在「拼音」，五笔附加库在「码表」
+            if (page.id == "schema" && sub == "拼音") SchemaDictsSection("细胞词库", listOf("pinyin", "shuangpin"))
+            if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
             // Emoji 开着才列附加模块（同电脑版的 enabled_when）
             if (sub == EMOJI_SECTION &&
                 manifest.items.firstOrNull { it.key == EMOJI_ENABLED_KEY }?.let(values::bool) == true

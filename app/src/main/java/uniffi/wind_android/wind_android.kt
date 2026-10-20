@@ -747,6 +747,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_run_command(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_schema_dicts(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(
@@ -754,6 +756,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_set_emoji_module(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_shuangpin_layouts(
     ): Int
@@ -836,6 +840,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_schema_dicts(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_select_candidate(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
@@ -843,6 +849,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_emoji_module(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1032,6 +1040,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_run_command() != 36173) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_schema_dicts() != 30261) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1042,6 +1053,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_learning_suspended() != 58911) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled() != 12394) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 61817) {
@@ -2077,6 +2091,11 @@ public interface WindCoreInterface {
     fun `runCommand`(`cmd`: EngineCommand)
     
     /**
+     * 方案的附加词库（拼音细胞词库、五笔 Emoji / 行政区域…）及当前开关；不含主库。
+     */
+    fun `schemaDicts`(`schemaId`: kotlin.String): List<SchemaDictItem>
+    
+    /**
      * 可选方案列表。下标即 [`EngineCommand::SelectSchema`] 的 `index`
      * ——顺序取自引擎管理器，与协调器内部的选择下标同源，K 侧不要自行排序。
      */
@@ -2103,6 +2122,11 @@ public interface WindCoreInterface {
      * （词频、造词、联想、统计、上屏历史）；用户在设置页手动加词不受影响。
      */
     fun `setLearningSuspended`(`on`: kotlin.Boolean)
+    
+    /**
+     * 开 / 关一个附加词库：落盘到方案覆盖并即时生效（已加载的引擎热切换或重建）。
+     */
+    fun `setSchemaDictEnabled`(`schemaId`: kotlin.String, `dictId`: kotlin.String, `on`: kotlin.Boolean)
     
     /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
@@ -2484,6 +2508,23 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 方案的附加词库（拼音细胞词库、五笔 Emoji / 行政区域…）及当前开关；不含主库。
+     */override fun `schemaDicts`(`schemaId`: kotlin.String): List<SchemaDictItem> {
+            return FfiConverterSequenceTypeSchemaDictItem.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_schema_dicts(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 可选方案列表。下标即 [`EngineCommand::SelectSchema`] 的 `index`
      * ——顺序取自引擎管理器，与协调器内部的选择下标同源，K 侧不要自行排序。
      */override fun `schemas`(): List<SchemaInfo> {
@@ -2551,6 +2592,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     UniffiLib.uniffi_wind_android_fn_method_windcore_set_learning_suspended(
         it,
         
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 开 / 关一个附加词库：落盘到方案覆盖并即时生效（已加载的引擎热切换或重建）。
+     */
+    @Throws(ConfigException::class)override fun `setSchemaDictEnabled`(`schemaId`: kotlin.String, `dictId`: kotlin.String, `on`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterString.lower(`dictId`),
         FfiConverterBoolean.lower(`on`),_status)
 }
     }
@@ -3335,6 +3395,57 @@ public object FfiConverterTypeLayoutInfo: FfiConverterRustBuffer<LayoutInfo> {
             FfiConverterString.write(value.`id`, buf)
             FfiConverterString.write(value.`name`, buf)
             FfiConverterBoolean.write(value.`active`, buf)
+    }
+}
+
+
+
+/**
+ * 方案的一个附加词库。`id` 原样回传给 [`WindCore::set_schema_dict_enabled`]。
+ */
+data class SchemaDictItem (
+    var `id`: kotlin.String
+    , 
+    var `label`: kotlin.String
+    , 
+    var `description`: kotlin.String
+    , 
+    var `enabled`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemaDictItem: FfiConverterRustBuffer<SchemaDictItem> {
+    override fun read(buf: ByteBuffer): SchemaDictItem {
+        return SchemaDictItem(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemaDictItem) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`label`) +
+            FfiConverterString.allocationSize(value.`description`) +
+            FfiConverterBoolean.allocationSize(value.`enabled`)
+    )
+
+    override fun write(value: SchemaDictItem, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`label`, buf)
+            FfiConverterString.write(value.`description`, buf)
+            FfiConverterBoolean.write(value.`enabled`, buf)
     }
 }
 
@@ -4230,6 +4341,34 @@ public object FfiConverterSequenceTypeLayoutInfo: FfiConverterRustBuffer<List<La
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeLayoutInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSchemaDictItem: FfiConverterRustBuffer<List<SchemaDictItem>> {
+    override fun read(buf: ByteBuffer): List<SchemaDictItem> {
+        val len = buf.getInt()
+        return List<SchemaDictItem>(len) {
+            FfiConverterTypeSchemaDictItem.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SchemaDictItem>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSchemaDictItem.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SchemaDictItem>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSchemaDictItem.write(it, buf)
         }
     }
 }
