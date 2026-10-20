@@ -41,6 +41,8 @@ data class SettingItem(
     val options: List<Pair<String, String>> = emptyList(),
     /** 收进卡片底部的「进阶」折叠区 */
     val advanced: Boolean = false,
+    /** int 项拖动时的预览：keyboard_rows（按所选行高画四行键）/ candidate_text（按所选字号写一行候选） */
+    val preview: String? = null,
 )
 
 data class SettingsManifestData(
@@ -57,6 +59,9 @@ data class SettingsManifestData(
 object SettingsManifest {
 
     private const val TAG = "SettingsManifest"
+
+    /** 设置页认识的预览种类 */
+    val PREVIEWS = setOf("keyboard_rows", "candidate_text")
 
     /**
      * 直接从 APK 的 assets 读清单，**不走**数据目录：数据目录里的出厂数据要等核心启动时
@@ -120,6 +125,9 @@ object SettingsManifest {
                     }
                 } ?: emptyList(),
                 advanced = t.getBoolean("advanced") ?: false,
+                preview = t.getString("preview")?.also {
+                    require(it in PREVIEWS) { "$key 的 preview「$it」不认识" }
+                },
             )
         }
         return SettingsManifestData(pages, items)

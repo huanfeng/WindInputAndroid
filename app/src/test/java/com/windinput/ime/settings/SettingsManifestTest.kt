@@ -65,4 +65,43 @@ class SettingsManifestTest {
             """.trimIndent(),
         )
     }
+
+    @Test
+    fun heightAndFontSizeItemsCarryPreview() {
+        val previews = bundled.items.filter { it.preview != null }.associate { it.key to it.preview }
+        assertEquals(
+            mapOf(
+                "ui.android.candidate_text_sp" to "candidate_text",
+                "ui.android.row_height_portrait" to "keyboard_rows",
+                "ui.android.row_height_landscape" to "keyboard_rows",
+            ),
+            previews,
+        )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun unknownPreviewIsRejected() {
+        SettingsManifest.parse(
+            """
+            [[page]]
+            id = "a"
+            [[item]]
+            page = "a"
+            key = "ui.android.x"
+            source = "android"
+            type = "int"
+            preview = "nope"
+            """.trimIndent(),
+        )
+    }
+
+    /** 滑块的浮点值吸附到 min 起算的步长网格，且不出范围 */
+    @Test
+    fun sliderSnapsToStepGrid() {
+        assertEquals(56, snapToStep(56.9f, 40, 72, 2))
+        assertEquals(58, snapToStep(57.1f, 40, 72, 2))
+        assertEquals(40, snapToStep(30f, 40, 72, 2))
+        assertEquals(72, snapToStep(80f, 40, 72, 2))
+        assertEquals(19, snapToStep(19.4f, 15, 24, 1))
+    }
 }

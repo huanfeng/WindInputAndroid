@@ -18,6 +18,7 @@
 #   options  select 的选项 [{ value, label }]；value 一律写字符串，写入时按键的类型转换
 #   min / max / step / unit   int 的范围、步长、单位
 #   advanced true = 收进卡片底部的「进阶」折叠区（工程参数）
+#   preview  int 项拖动时的预览：keyboard_rows（按所选行高画四行键）/ candidate_text（按所选字号写一行候选）
 #
 # 引擎项写入后会发 ReloadConfig 让核心即时重读；键盘项在下次弹出键盘时生效。
 
@@ -626,6 +627,7 @@ default = 19
 min = 15
 max = 24
 unit = "sp"
+preview = "candidate_text"
 
 # ═══ 统计（概览由代码画）═══════════════════════════════════════
 
@@ -652,6 +654,7 @@ min = 40
 max = 72
 step = 2
 unit = "dp"
+preview = "keyboard_rows"
 
 [[item]]
 page = "keyboard"
@@ -666,6 +669,7 @@ min = 36
 max = 64
 step = 2
 unit = "dp"
+preview = "keyboard_rows"
 
 [[item]]
 page = "keyboard"

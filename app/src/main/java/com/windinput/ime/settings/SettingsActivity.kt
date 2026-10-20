@@ -6,18 +6,21 @@ import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -25,8 +28,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.ImeSession
@@ -38,6 +45,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
@@ -399,40 +407,92 @@ private fun SelectRows(item: SettingItem, value: String, onValueChange: (String)
     }
 }
 
+/**
+ * 数值项：标题与当前值一行，下面一条滑块。拖动时只改本地草稿（预览跟着变），
+ * 松手才写入——拖一下就写几十次配置文件没有意义。
+ * 带 [SettingItem.preview] 的项在拖动后显示预览：行高画出四行键，字号写一行候选。
+ */
 @Composable
 private fun IntRow(item: SettingItem, value: Int, onValueChange: (Int) -> Unit) {
-    val min = item.min ?: Int.MIN_VALUE
-    val max = item.max ?: Int.MAX_VALUE
-    Row(
+    val min = item.min ?: 0
+    val max = item.max ?: 100
+    var draft by remember(value) { mutableIntStateOf(value) }
+    var touched by remember { mutableStateOf(false) }
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = item.title)
+                item.summary?.let {
+                    Text(
+                        text = it,
+                        modifier = Modifier.padding(top = 2.dp),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    )
+                }
+            }
+            Text(text = if (item.unit != null) "$draft ${item.unit}" else draft.toString())
+        }
+        Slider(
+            value = draft.toFloat(),
+            onValueChange = {
+                draft = snapToStep(it, min, max, item.step)
+                touched = true
+            },
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            valueRange = min.toFloat()..max.toFloat(),
+            steps = ((max - min) / item.step - 1).coerceAtLeast(0),
+            onValueChangeFinished = { if (draft != value) onValueChange(draft) },
+        )
+        when (item.preview) {
+            "keyboard_rows" -> if (touched) KeyboardRowsPreview(draft)
+            "candidate_text" -> CandidateTextPreview(draft)
+        }
+    }
+}
+
+/** 滑块值吸附到步长网格上（min 起算） */
+internal fun snapToStep(raw: Float, min: Int, max: Int, step: Int): Int {
+    val s = step.coerceAtLeast(1)
+    val snapped = min + Math.round((raw - min) / s) * s
+    return snapped.coerceIn(min, max)
+}
+
+/** 按所选行高（dp，真实尺寸）画四行键：10 / 9 / 9 / 5 个，只为让人看出键盘有多高 */
+@Composable
+private fun KeyboardRowsPreview(rowHeightDp: Int) {
+    val keyColor = MiuixTheme.colorScheme.dividerLine
+    Canvas(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(top = 12.dp)
+            .height((rowHeightDp * PREVIEW_ROWS.size).dp),
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(text = item.title)
-            item.summary?.let {
-                Text(
-                    text = it,
-                    modifier = Modifier.padding(top = 2.dp),
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        val rowH = size.height / PREVIEW_ROWS.size
+        val gap = 3.dp.toPx()
+        PREVIEW_ROWS.forEachIndexed { r, keys ->
+            val slot = size.width / 10f
+            val indent = (10 - keys) * slot / 2
+            for (k in 0 until keys) {
+                drawRoundRect(
+                    color = keyColor,
+                    topLeft = Offset(indent + k * slot + gap, r * rowH + gap),
+                    size = Size(slot - gap * 2, rowH - gap * 2),
+                    cornerRadius = CornerRadius(4.dp.toPx()),
                 )
             }
         }
-        Text(
-            text = "－",
-            modifier = Modifier
-                .clickable { onValueChange((value - item.step).coerceAtLeast(min)) }
-                .padding(horizontal = 12.dp),
-        )
-        Text(text = if (item.unit != null) "$value ${item.unit}" else value.toString())
-        Text(
-            text = "＋",
-            modifier = Modifier
-                .clickable { onValueChange((value + item.step).coerceAtMost(max)) }
-                .padding(horizontal = 12.dp),
-        )
     }
+}
+
+private val PREVIEW_ROWS = listOf(10, 9, 9, 5)
+
+@Composable
+private fun CandidateTextPreview(textSp: Int) {
+    Text(
+        text = "清风 输入法 候选 示例",
+        modifier = Modifier.padding(top = 12.dp),
+        fontSize = textSp.sp,
+    )
 }
 
 @Composable
