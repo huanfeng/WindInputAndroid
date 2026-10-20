@@ -67,7 +67,21 @@ class PreeditPopup(private val anchor: View) {
     private val heightPx = dp(HEIGHT_DP)
     private var popup: PopupWindow? = null
 
+    /** 等条区挂上窗口后再弹的那一次（见 [show]）；[dismiss] 时作废 */
+    private var pendingShow: Runnable? = null
+
     fun show(text: String, mode: String, pagerText: String) {
+        // 冷启动时「准备中」是在 onCreateInputView 里弹的，这时条区还没挂到 IME 窗口上，
+        // 没有 window token，PopupWindow 直接抛 BadTokenException、整个进程崩掉
+        // （输入法进程被杀后第一次弹键盘就会撞上）。没挂上就排到挂上之后再弹。
+        if (anchor.windowToken == null) {
+            pendingShow?.let(anchor::removeCallbacks)
+            pendingShow = Runnable {
+                pendingShow = null
+                show(text, mode, pagerText)
+            }.also(anchor::post)
+            return
+        }
         preedit.text = text
         modeLabel.visibility = if (mode.isEmpty()) View.GONE else View.VISIBLE
         modeLabel.text = mode
@@ -99,6 +113,8 @@ class PreeditPopup(private val anchor: View) {
     }
 
     fun dismiss() {
+        pendingShow?.let(anchor::removeCallbacks)
+        pendingShow = null
         popup?.dismiss()
         popup = null
     }
