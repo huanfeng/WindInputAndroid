@@ -82,6 +82,12 @@ enum class KeyboardLayer { LETTERS, SYMBOLS, NUMBER }
  */
 object KeyboardDimens {
     var rowHeightDp: Int = 56
+
+    /** 条区编码行高度（dp）；横屏收矮，见 [BarView] */
+    var barPreeditDp: Float = 20f
+
+    /** 条区候选行高度（dp） */
+    var barMainRowDp: Float = 40f
 }
 
 object KeyboardLayouts {

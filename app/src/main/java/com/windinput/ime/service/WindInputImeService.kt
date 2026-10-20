@@ -313,6 +313,9 @@ class WindInputImeService :
         } else {
             userConfig.getInt("ui.android.row_height_landscape", 44)
         }
+        // 条区跟着收：横屏 60dp 的条区加四行键就占去七成屏高，正文只剩两三行
+        KeyboardDimens.barPreeditDp = if (portrait) 20f else 16f
+        KeyboardDimens.barMainRowDp = if (portrait) 40f else 34f
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {

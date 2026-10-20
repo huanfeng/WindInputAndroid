@@ -14,7 +14,7 @@ import android.widget.TextView
  *
  * ```
  * ┌──────────────────────────────┐
- * │ 五 aa                    1/3 │  编码行（PREEDIT_DP，只在候选态）
+ * │ 五 aa                    1/3 │  编码行（KeyboardDimens.barPreeditDp，只在候选态）
  * │ 式  戒  工  ...            ∨ │  候选行
  * ├──────────────────────────────┤
  * │ ⠿          🕶 无痕          ∨ │  或：工具栏，占满整个条区高度、图标居中
@@ -57,14 +57,12 @@ class BarView(
     enum class ToolbarAction { QUICK_PANEL, HIDE_IME }
 
     companion object {
-        /** 候选态顶上的编码行高度（dp） */
-        const val PREEDIT_DP = 20f
-
-        /** 候选行高度（dp） */
-        const val MAIN_ROW_DP = 40f
-
-        /** 条区总高：编码行 + 候选行；工具栏态整块归工具栏。恒定不随组合态变化 */
-        const val TOTAL_DP = PREEDIT_DP + MAIN_ROW_DP
+        /**
+         * 条区总高（dp）= 编码行 + 候选行；工具栏态整块归工具栏。恒定不随组合态变化。
+         * 两段高度在 [KeyboardDimens]：横屏可用高度只有竖屏的一半不到，条区跟着键高一起收
+         * （竖屏 20 + 40，横屏 16 + 34）。旋转会重建输入视图，取值天然跟上。
+         */
+        val TOTAL_DP: Float get() = KeyboardDimens.barPreeditDp + KeyboardDimens.barMainRowDp
 
         private const val SUGGESTION_TIMEOUT_MS = 30_000L
 
@@ -229,7 +227,7 @@ class BarView(
         candidateRow = LinearLayout(context).apply {
             orientation = VERTICAL
             setBackgroundColor(Palette.current.surface)
-            addView(preeditRow, LayoutParams(MATCH, dp(PREEDIT_DP)))
+            addView(preeditRow, LayoutParams(MATCH, dp(KeyboardDimens.barPreeditDp)))
             addView(candidateLine, LayoutParams(MATCH, 0, 1f))
         }
 
