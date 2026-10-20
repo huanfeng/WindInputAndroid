@@ -4,7 +4,8 @@
 #
 # weight: 0~10000 短语 tier 内排序权重，未设置默认 1000（中位）
 # position: 仅同 code 多条 tie-break（升序）
-# platform: ""/"all"=全平台；"windows"/"darwin"/"linux"=仅该平台
+# platform: ""/"all"=全平台；"windows"/"darwin"/"linux"=仅该平台（"macos" 同 "darwin"）。
+#   按运行平台取舍：同一个 code 要在各平台做不同的事，就每个平台各写一条。
 # 详见 docs/design/command-bar-design.md
 
 [[phrases]]
@@ -36,6 +37,21 @@ code = 'date'
 text = '${YC}年${MC}月${DC}日'
 weight = 800
 position = 5
+
+# 农历补两条，weight 低于全部公历形态故恒排其后。$LF 在非节日展开为空，
+# 于是同一条模板平常日子给「农历四月廿九」、端午当天给「农历五月初五端午节」。
+# 农历大全见 zznl。
+[[phrases]]
+code = 'date'
+text = '农历$LMD$LF'
+weight = 600
+position = 6
+
+[[phrases]]
+code = 'date'
+text = '$LY$LZ年$LMD$LF'
+weight = 600
+position = 7
 
 [[phrases]]
 code = 'time'
@@ -238,7 +254,7 @@ weight = 1010
 
 [[phrases]]
 code = 'zzsb'
-text = '$AA("上标", "¹²³⁴⁵⁶⁷⁸⁰⁺⁻⁼⁽⁾ⁿᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖʳˢᵗᵘᵛʷˣʸᶻ")'
+text = '$AA("上标", "¹²³⁴⁵⁶⁷⁸⁹⁰⁺⁻⁼⁽⁾ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖʳˢᵗᵘᵛʷˣʸᶻ")'
 weight = 1009
 
 [[phrases]]
@@ -275,6 +291,72 @@ code = 'zzrq'
 text = '${YC}年${MC}月${DC}日'
 weight = 800
 position = 5
+
+# 与 date 同两条（zzrq 是 date 的 zz 系列入口，两者内容必须一致）。
+[[phrases]]
+code = 'zzrq'
+text = '农历$LMD$LF'
+weight = 600
+position = 6
+
+[[phrases]]
+code = 'zzrq'
+text = '$LY$LZ年$LMD$LF'
+weight = 600
+position = 7
+
+# 农历专用组。取的是**当天**的农历，与快捷输入 `;2026.6.19` 的农历候选同一套换算。
+#
+# $LF（传统节日）在非节日展开为空，故带它的条目平常日子只是少一段、照常出候选；
+# 而 position 7 那条**只有** $LF，整条展开为空时会被丢弃——于是它只在春节、端午、
+# 中秋这些日子自己冒出来，平时不占位。这是「条件性条目」的推荐写法。
+[[phrases]]
+code = 'zznl'
+text = '农历$LMD$LF'
+weight = 1000
+position = 1
+
+[[phrases]]
+code = 'zznl'
+text = '$LMD'
+weight = 900
+position = 2
+
+[[phrases]]
+code = 'zznl'
+text = '$LY$LZ年$LMD$LF'
+weight = 900
+position = 3
+
+[[phrases]]
+code = 'zznl'
+text = '$LYN年$LMD'
+weight = 800
+position = 4
+
+[[phrases]]
+code = 'zznl'
+text = '$LY年'
+weight = 800
+position = 5
+
+[[phrases]]
+code = 'zznl'
+text = '$LZ年'
+weight = 800
+position = 6
+
+[[phrases]]
+code = 'zznl'
+text = '$LF'
+weight = 800
+position = 7
+
+[[phrases]]
+code = 'zznl'
+text = '$Y年$M月$D日 农历$LMD$LF'
+weight = 700
+position = 8
 
 [[phrases]]
 code = 'zzsj'
@@ -340,6 +422,14 @@ text = '$CC("打开文本编辑", proc.run("open", "-a", "TextEdit"))'
 weight = 2000
 platform = 'darwin'
 
+# Linux 各桌面自带的编辑器不同：按顺序试，第一个装了的即启动（GNOME / 旧 GNOME / KDE /
+# Xfce / Cinnamon / MATE / Deepin / LXQt / LXDE）。
+[[phrases]]
+code = 'cono'
+text = '$CC("打开文本编辑器", proc.any("gnome-text-editor", "gedit", "kate", "kwrite", "mousepad", "xed", "pluma", "deepin-editor", "featherpad", "leafpad"))'
+weight = 2000
+platform = 'linux'
+
 [[phrases]]
 code = 'coca'
 text = '$CC("打开计算器", proc.run("calc.exe"))'
@@ -353,6 +443,12 @@ weight = 2000
 platform = 'darwin'
 
 [[phrases]]
+code = 'coca'
+text = '$CC("打开计算器", proc.any("gnome-calculator", "kcalc", "deepin-calculator", "mate-calc", "galculator", "qalculate-gtk", "xcalc"))'
+weight = 2000
+platform = 'linux'
+
+[[phrases]]
 code = 'cohm'
 text = '$CC("打开用户主目录", open(env("USERPROFILE")))'
 weight = 2000
@@ -363,6 +459,12 @@ code = 'cohm'
 text = '$CC("打开用户主目录", open(env("HOME")))'
 weight = 2000
 platform = 'darwin'
+
+[[phrases]]
+code = 'cohm'
+text = '$CC("打开用户主目录", open(env("HOME")))'
+weight = 2000
+platform = 'linux'
 
 [[phrases]]
 code = 'coll'
@@ -391,6 +493,14 @@ text = '$CC("[删行]", key.seq("Ctrl+A", "Ctrl+K"))'
 weight = 2000
 platform = 'darwin'
 
+# Linux 上的按键合成（key.tap / key.seq / key.hold / key.release）由 Fcitx5 addon 接住
+#   CMD_KEY_* 下行帧、经 forwardKey 交给当前应用（wind_linux/AGENTS.md「命令直通车按键合成」）。
+[[phrases]]
+code = 'codl'
+text = '$CC("[删行]", key.seq("Home", "Shift+End", "Backspace"))'
+weight = 2000
+platform = 'linux'
+
 [[phrases]]
 code = 'cocp'
 text = '$CC("复制时间", clip.copy(now()))'
@@ -399,6 +509,25 @@ weight = 2000
 [[phrases]]
 code = 'coad'
 text = '$CC("剪贴板加词:{clip()}", dict.add(clip()))'
+weight = 2000
+
+# 剪贴板反查：复制一个不认识的字 → 切回输入法 → 打 cofc → 候选即「字: 编码 拼音」，
+# 选中上屏这行文字。
+#
+# 用 `$CC` 而不是纯模板，是为了让**显示**与**上屏**分开：
+#   display = default(反查结果, 提示语)  → 查不到时显示提示，不让用户面对一片空白
+#   动作    = type(反查结果)             → 查不到时 type 到空串，选中什么也不上屏
+# 写成纯模板 `{dict.rev(clip())}` 的话，display 既是显示又是上屏文本，二者绑死：
+# 要么查不到时整条候选消失（用户分不清「没复制」还是「功能坏了」），
+# 要么把提示语本身当文本打进文档。
+#
+# 默认只查第 1 个字。要一次看多个字，自己改成 `$SS` 列若干元素、各查第 n 个：
+#   text = '$SS("反查", "{dict.rev(clip(),1)}", "{dict.rev(clip(),2)}", "{dict.rev(clip(),3)}")'
+# 元素个数即上限，查不到的那几条自动不出现。
+# 版式也可换，变量同候选注释段：`{dict.rev(clip(), 1, format="${char} ${chaizi}[${chaizi_code}]")}`
+[[phrases]]
+code = 'cofc'
+text = '$CC(default(dict.rev(clip()), "剪贴板反查（需先复制文字）"), type(dict.rev(clip())))'
 weight = 2000
 
 [[phrases]]
