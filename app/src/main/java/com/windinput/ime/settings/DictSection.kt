@@ -110,6 +110,7 @@ private fun DictContent(
     LaunchedEffect(schema.id, query, limit, reload) {
         // 防抖：每次查询都扫满整张个人词表，连敲几个字就叠出几次全表扫描（JNI 调用取消不了）。
         // 输入变了这个协程会被取消，delay 处直接短路
+        if (mode == DictMode.ADD) return@LaunchedEffect // 加词页用不到列表，不扫整张表
         if (query.isNotEmpty()) delay(SEARCH_DEBOUNCE_MS)
         val page = withContext(Dispatchers.IO) {
             CoreAccess.obtainCore(context)?.userWords(schema.id, query.trim(), 0u, limit)
@@ -147,8 +148,8 @@ private fun DictContent(
     if (mode == DictMode.OVERVIEW) {
         SectionTitle("当前方案：$schemaName")
         Card(modifier = Modifier.fillMaxWidth()) {
-            NavRow("我的词条", "共 $total 条 · 搜索、删除、清空", icon = SettingsIcons.words) { onOpen("我的词条") }
-            NavRow("添加词条", "手动加一个词和它的编码", icon = SettingsIcons.addWord) { onOpen("添加词条") }
+            NavRow("我的词条", "共 $total 条 · 搜索、删除、清空", icon = SettingsIcons.words) { onOpen(DICT_WORDS) }
+            NavRow("添加词条", "手动加一个词和它的编码", icon = SettingsIcons.addWord) { onOpen(DICT_ADD) }
         }
         return
     }

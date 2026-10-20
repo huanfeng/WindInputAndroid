@@ -59,9 +59,9 @@ key = [
 key = [
   { label = "符号", action = "symbol_page", width = 1.35 },
   { label = "123", action = "switch_symbols", width = 1.15 },
-  { text = ",", long_press = ",;:、" },
+  { text = ",", long_press = ",;:\\" },
   { label = "空格", action = "space", width = 2.95 },
-  { text = ".", long_press = ".?!…" },
+  { text = ".", long_press = ".?!^" },
   # 中英切换固定在回车左侧（主流输入法的位置约定，肌肉记忆在这）
   { label = "中英", action = "switch_lang", width = 1.15 },
   { label = "换行", action = "enter", width = 1.4 },

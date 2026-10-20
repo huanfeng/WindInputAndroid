@@ -151,6 +151,7 @@ class SettingsManifestTest {
                 assertTrue("${p.id} 有无名 section", name.isNotEmpty())
                 assertTrue("${p.id}/$name 没有专属图标", name in SettingsIcons.SECTION_ICON_NAMES)
                 assertTrue("${p.id}/$name 是空组", items.isNotEmpty())
+                assertTrue("${p.id}/$name 与代码画的二级页撞名，会被遮住", name !in RESERVED_SUBPAGES)
             }
         }
     }

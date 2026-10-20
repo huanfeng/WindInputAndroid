@@ -112,9 +112,9 @@ object KeyboardLayouts {
     private val lettersBottomRow: List<KeyDef> = listOf(
         KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.35f, isSpecial = true),
         KeyDef("123", KeyAction.SwitchSymbols, widthWeight = 1.15f, isSpecial = true),
-        KeyDef(",", KeyAction.Text(','), longPress = ",;:、"),
+        KeyDef(",", KeyAction.Text(','), longPress = ",;:\\"),
         KeyDef("空格", KeyAction.Space, widthWeight = 2.95f),
-        KeyDef(".", KeyAction.Text('.'), longPress = ".?!…"),
+        KeyDef(".", KeyAction.Text('.'), longPress = ".?!^"),
         KeyDef("中英", KeyAction.SwitchLang, widthWeight = 1.15f, isSpecial = true),
         KeyDef("换行", KeyAction.Enter, widthWeight = 1.4f, isSpecial = true),
     )

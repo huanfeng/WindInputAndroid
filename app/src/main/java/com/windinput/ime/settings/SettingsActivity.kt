@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -196,12 +197,53 @@ private data class Route(val page: String? = null, val sub: String? = null) {
     fun up(): Route = if (sub != null) copy(sub = null) else Route()
 }
 
-/** 词库页的两个二级页（不来自清单，代码画） */
-private const val DICT_WORDS = "我的词条"
-private const val DICT_ADD = "添加词条"
+/** 词库页的两个二级页（不来自清单，代码画）；名字即路由，DictSection 的入口用同一份 */
+internal const val DICT_WORDS = "我的词条"
+internal const val DICT_ADD = "添加词条"
 
 /** 方案页里代码画的二级页 */
-private const val SUB_LAYOUTS = "双拼布局"
+internal const val SUB_LAYOUTS = "双拼布局"
+
+/** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
+internal val RESERVED_SUBPAGES = setOf(DICT_WORDS, DICT_ADD, SUB_LAYOUTS)
+
+/**
+ * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
+ *
+ * **只在后台线程碰核心**：第一次切到某方案时核心要现编词库（白霜拼音模拟器上近 5 秒），
+ * 这期间主线程若去取方案列表，可能等在核心的锁上——切完方案马上进出别的页、回首页看摘要，
+ * 都会走到这里。[switching] 也放在这一层：页面重进后照样知道「正在切」，不会再排一次切换。
+ */
+private class SchemaState(private val core: ImeSession, private val scope: kotlinx.coroutines.CoroutineScope) {
+    var schemas by mutableStateOf<List<SchemaEntry>>(emptyList())
+    var layouts by mutableStateOf<List<LayoutEntry>>(emptyList())
+    var switching by mutableStateOf<String?>(null)
+
+    suspend fun refresh() {
+        val (s, l) = withContext(Dispatchers.IO) { core.schemas() to core.shuangpinLayouts() }
+        schemas = s
+        layouts = l
+    }
+
+    /**
+     * 切方案 / 换双拼布局，做完回读真值（切换可能被引擎拒绝，本地不先行打勾）。
+     * 在设置页顶层的作用域里跑：发起切换的那一页离开了，切换照样做完、状态照样复位。
+     */
+    fun switchTo(label: String, cmd: EngineCmd) {
+        if (switching != null) return
+        switching = label
+        scope.launch {
+            try {
+                withContext(Dispatchers.IO) { core.runCommand(cmd) }
+                refresh()
+            } finally {
+                switching = null
+            }
+        }
+    }
+
+    val activeName: String? get() = schemas.firstOrNull { it.active }?.let { it.name.ifEmpty { it.id } }
+}
 
 @Composable
 private fun SettingsApp(
@@ -231,6 +273,10 @@ private fun SettingsApp(
         session = s
         values = v
     }
+
+    val appScope = rememberCoroutineScope()
+    val schemaState = remember(session) { session?.let { SchemaState(it, appScope) } }
+    LaunchedEffect(schemaState) { schemaState?.refresh() }
 
     // 预测性返回：侧滑过程中当前页跟手右移（progress 0→1），松手才真正退一层；
     // 中途放弃（CancellationException）就弹回原位
@@ -272,9 +318,9 @@ private fun SettingsApp(
         ) {
             val page = manifest.pages.firstOrNull { it.id == r.page }
             when {
-                page == null -> HomeScreen(setup, manifest, values, session, versionName, actions) { go(Route(it)) }
-                r.sub == null -> PageScreen(manifest, page, values, session, versionName) { go(r.copy(sub = it)) }
-                else -> SubScreen(manifest, page, r.sub, values, session)
+                page == null -> HomeScreen(setup, manifest, values, schemaState, versionName, actions) { go(Route(it)) }
+                r.sub == null -> PageScreen(manifest, page, values, session, schemaState, versionName) { go(r.copy(sub = it)) }
+                else -> SubScreen(manifest, page, r.sub, values, session, schemaState)
             }
         }
     }
@@ -320,6 +366,8 @@ private fun Screen(
                     .nestedScroll(scrollBehavior.nestedScrollConnection)
                     .padding(top = padding.calculateTopPadding())
                     .verticalScroll(rememberScrollState())
+                    // 「添加词条」等有输入框的页：软键盘弹起时内容让出来，按钮不被挡
+                    .imePadding()
                     .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -343,7 +391,7 @@ private fun HomeScreen(
     setup: ImeSetup,
     manifest: SettingsManifestData,
     values: SettingsValues,
-    session: ImeSession?,
+    schemaState: SchemaState?,
     versionName: String,
     actions: SettingsActions,
     onOpen: (String) -> Unit,
@@ -386,7 +434,7 @@ private fun HomeScreen(
             for (p in pages) {
                 NavRow(
                     title = p.title,
-                    summary = pageSummary(manifest, p, values, session, versionName),
+                    summary = pageSummary(manifest, p, values, schemaState, versionName),
                     icon = SettingsIcons.page(p.icon),
                 ) { onOpen(p.id) }
             }
@@ -402,12 +450,13 @@ private fun pageSummary(
     manifest: SettingsManifestData,
     page: SettingPage,
     values: SettingsValues,
-    session: ImeSession?,
+    schemaState: SchemaState?,
     versionName: String,
 ): String {
     @Suppress("UNUSED_EXPRESSION") values.version // 值变了摘要跟着变
     return when (page.id) {
-        "schema" -> session?.schemas()?.firstOrNull { it.active }?.name?.let { "当前：$it" }
+        "schema" -> schemaState?.switching?.let { "正在切换到「$it」…" }
+            ?: schemaState?.activeName?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
         "dict" -> "我的词条 · 添加词条"
         "about" -> "版本 $versionName"
@@ -426,11 +475,12 @@ private fun PageScreen(
     page: SettingPage,
     values: SettingsValues,
     session: ImeSession?,
+    schemaState: SchemaState?,
     versionName: String,
     onOpenSub: (String) -> Unit,
 ) {
     when (page.id) {
-        "schema" -> SchemaSection(session, onOpenSub)
+        "schema" -> SchemaSection(schemaState, onOpenSub)
         "stats" -> StatsSection()
         "dict" -> DictOverview(session, onOpen = onOpenSub)
         "about" -> AboutSection(versionName)
@@ -477,9 +527,10 @@ private fun SubScreen(
     sub: String,
     values: SettingsValues,
     session: ImeSession?,
+    schemaState: SchemaState?,
 ) {
     when {
-        page.id == "schema" && sub == SUB_LAYOUTS -> ShuangpinLayouts(session)
+        page.id == "schema" && sub == SUB_LAYOUTS -> ShuangpinLayouts(schemaState)
         page.id == "dict" && sub == DICT_WORDS -> DictWords(session)
         page.id == "dict" && sub == DICT_ADD -> DictAdd(session)
         else -> {
@@ -537,52 +588,29 @@ private fun ItemRow(item: SettingItem, values: SettingsValues) {
  * 以及删掉某个方案后设置页还列着一个选不动的死项。
  */
 @Composable
-private fun SchemaSection(session: ImeSession?, onOpenSub: (String) -> Unit) {
-    val core = session ?: return
-    val scope = rememberCoroutineScope()
-    var schemas by remember { mutableStateOf<List<SchemaEntry>>(core.schemas()) }
-    var layouts by remember { mutableStateOf<List<LayoutEntry>>(core.shuangpinLayouts()) }
-    var switching by remember { mutableStateOf<String?>(null) }
-    if (schemas.isEmpty()) return
+private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
+    val st = state ?: return
+    if (st.schemas.isEmpty()) return
 
-    /**
-     * 切方案放后台：第一次切到某方案时核心现编词库，白霜拼音在模拟器上要近 5 秒，
-     * 放主线程就是整页卡死（真机上会 ANR）。做完回读真值。
-     */
-    fun switchTo(label: String, cmd: EngineCmd) {
-        if (switching != null) return
-        switching = label
-        scope.launch {
-            val (s, l) = withContext(Dispatchers.IO) {
-                core.runCommand(cmd)
-                core.schemas() to core.shuangpinLayouts()
-            }
-            // 真值一律回读，不本地翻转：切换可能被引擎拒绝（方案损坏、
-            // 词库缺失），本地先行打勾会造出一个和引擎不一致的选中态。
-            schemas = s
-            layouts = l
-            switching = null
-        }
-    }
-
-    SmallTitle(switching?.let { "正在切换到「$it」…（首次使用要准备词库，稍候）" } ?: "输入方案")
+    SmallTitle(st.switching?.let { "正在切换到「$it」…（首次使用要准备词库，稍候）" } ?: "输入方案")
     Card(modifier = Modifier.fillMaxWidth()) {
-        for (s in schemas) {
+        for (s in st.schemas) {
+            val label = s.name.ifEmpty { s.id }
             ChoiceRow(
-                title = s.name.ifEmpty { s.id },
+                title = label,
                 selected = s.active,
-                onClick = { switchTo(s.name.ifEmpty { s.id }, EngineCmd.SelectSchema(s.index)) },
+                onClick = { st.switchTo(label, EngineCmd.SelectSchema(s.index)) },
             )
         }
     }
 
     // 双拼布局是二级页：十几个布局摊在方案页上只会把下面的设置挤出屏幕。
     // 只在**当前用的是双拼**时给入口——别的方案用不上它
-    if (layouts.isNotEmpty() && schemas.any { it.id == SHUANGPIN_SCHEMA_ID && it.active }) {
+    if (st.layouts.isNotEmpty() && st.schemas.any { it.id == SHUANGPIN_SCHEMA_ID && it.active }) {
         Card(modifier = Modifier.fillMaxWidth()) {
             NavRow(
                 title = SUB_LAYOUTS,
-                summary = layouts.firstOrNull { it.active }?.let { "当前：${it.name.ifEmpty { it.id }}" },
+                summary = st.layouts.firstOrNull { it.active }?.let { "当前：${it.name.ifEmpty { it.id }}" },
                 icon = SettingsIcons.section(SUB_LAYOUTS),
             ) { onOpenSub(SUB_LAYOUTS) }
         }
@@ -590,28 +618,16 @@ private fun SchemaSection(session: ImeSession?, onOpenSub: (String) -> Unit) {
 }
 
 @Composable
-private fun ShuangpinLayouts(session: ImeSession?) {
-    val core = session ?: return
-    val scope = rememberCoroutineScope()
-    var layouts by remember { mutableStateOf<List<LayoutEntry>>(core.shuangpinLayouts()) }
-    var busy by remember { mutableStateOf(false) }
+private fun ShuangpinLayouts(state: SchemaState?) {
+    val st = state ?: return
+    st.switching?.let { SmallTitle("正在切换到「$it」…") }
     Card(modifier = Modifier.fillMaxWidth()) {
-        for (l in layouts) {
+        for (l in st.layouts) {
+            val label = l.name.ifEmpty { l.id }
             ChoiceRow(
-                title = l.name.ifEmpty { l.id },
+                title = label,
                 selected = l.active,
-                onClick = {
-                    if (!busy) {
-                        busy = true
-                        scope.launch {
-                            layouts = withContext(Dispatchers.IO) {
-                                core.runCommand(EngineCmd.SetShuangpinLayout(l.id))
-                                core.shuangpinLayouts()
-                            }
-                            busy = false
-                        }
-                    }
-                },
+                onClick = { st.switchTo(label, EngineCmd.SetShuangpinLayout(l.id)) },
             )
         }
     }

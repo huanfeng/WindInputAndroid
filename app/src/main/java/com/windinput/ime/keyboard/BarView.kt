@@ -87,8 +87,10 @@ class BarView(
     private val density = resources.displayMetrics.density
 
     // ── 编码行 ───────────────────────────────────────────────────
+    // 编码行高度写死 20dp，字号按 dp 而非 sp：系统字体放大到 1.3 倍以上时 sp 字号会被行高裁掉
     private val modeLabel = TextView(context).apply {
-        textSize = 11f
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 11f)
+        includeFontPadding = false
         gravity = Gravity.CENTER
         setTextColor(Palette.current.onAccent)
         background = android.graphics.drawable.GradientDrawable().apply {
@@ -98,7 +100,8 @@ class BarView(
         setPadding(dp(4), 0, dp(4), 0)
     }
     private val preeditText = TextView(context).apply {
-        textSize = 14f
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 14f)
+        includeFontPadding = false
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.START // 长编码保留末尾（正在打的那几码）
         gravity = Gravity.CENTER_VERTICAL
@@ -106,7 +109,8 @@ class BarView(
         setPadding(dp(6), 0, dp(6), 0)
     }
     private val pagerText = TextView(context).apply {
-        textSize = 11f
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 11f)
+        includeFontPadding = false
         gravity = Gravity.CENTER_VERTICAL
         setTextColor(Palette.current.hint)
         setPadding(dp(6), 0, dp(12), 0)
@@ -138,6 +142,14 @@ class BarView(
 
     private var state = State.TOOLBAR
     private var hasCandidates = false
+
+    /**
+     * 条区该停在候选态吗：有候选，或者有编码（生僻码、打错码零候选时编码行也要让人看到）。
+     * 所有「回候选态还是回工具栏」的判断都用它，别再单看 [hasCandidates]。
+     * 准备词库时例外：提示写在工具栏中间，候选态会把它藏住。
+     */
+    private val wantsCandidateRow: Boolean
+        get() = !preparing && (hasCandidates || currentPreedit.isNotEmpty())
 
     /** 候选是否已在下方面板铺开（见 [setExpanded]） */
     private var expanded = false
@@ -299,7 +311,7 @@ class BarView(
             return
         }
         // 有编码没候选（生僻码、打错码）也停在候选态：编码行要让用户看到自己打了什么
-        if (hasCandidates || preedit.isNotEmpty()) {
+        if (wantsCandidateRow) {
             applyState(State.CANDIDATES)
         } else if (state == State.CANDIDATES) {
             applyState(State.TOOLBAR)
@@ -325,7 +337,7 @@ class BarView(
         applyState(
             when {
                 expanded -> State.TOOLBAR
-                hasCandidates -> State.CANDIDATES
+                wantsCandidateRow -> State.CANDIDATES
                 else -> State.TOOLBAR
             },
         )
@@ -340,17 +352,15 @@ class BarView(
     fun setPreparing(preparing: Boolean) {
         this.preparing = preparing
         refreshCenterNote()
-    }
-
-    /** 键盘收起 / 面板切换：撤掉「准备中」提示（编码行随候选态一起走，不用单独收） */
-    fun hidePreedit() {
-        preparing = false
-        refreshCenterNote()
+        // 准备中的提示在工具栏上：联想候选还挂着时也得让出来，否则提示画在被藏住的工具栏里
+        if (!expanded && state != State.CLIP_SUGGESTION) {
+            applyState(if (wantsCandidateRow) State.CANDIDATES else State.TOOLBAR)
+        }
     }
 
     /** 复制新内容后的建议条（候选优先级更高，仅空闲时展示） */
     fun showClipSuggestion(text: String) {
-        if (hasCandidates) return
+        if (wantsCandidateRow) return
         suggestionText.text = text
         suggestionText.setOnClickListener {
             hideClipSuggestion()
@@ -364,7 +374,7 @@ class BarView(
     private fun hideClipSuggestion() {
         removeCallbacks(dismissSuggestion)
         if (state == State.CLIP_SUGGESTION) {
-            applyState(if (hasCandidates) State.CANDIDATES else State.TOOLBAR)
+            applyState(if (wantsCandidateRow) State.CANDIDATES else State.TOOLBAR)
         }
     }
 

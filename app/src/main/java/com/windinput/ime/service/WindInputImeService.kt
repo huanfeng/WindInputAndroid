@@ -404,8 +404,7 @@ class WindInputImeService :
     override fun onFinishInputView(finishingInput: Boolean) {
         candidateMenu?.dismiss()
         abandonComposition()
-        // 编码浮层是独立窗口，不随 IME 窗口隐藏，必须显式收
-        barView?.hidePreedit()
+        // 「词库准备中」不在这里撤：它画在条区里随窗口一起收；撤了再弹键盘时词库还没好，提示却没了
         selecting = false
         super.onFinishInputView(finishingInput)
     }
