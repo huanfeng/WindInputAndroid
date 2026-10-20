@@ -642,6 +642,43 @@ impl WindCore {
             .user_words_clear(&schema_id)
             .map_err(|reason| ConfigError::Rejected { reason })
     }
+
+    /// 导出该方案的词库数据（个人词 / 临时词 / 词频 / 候选调整）为 .wdict 文本，与电脑版
+    /// 「词库 → 导出」同一格式，电脑版能直接导入。宿主负责写到用户选的文件。
+    pub fn dict_export(&self, schema_id: String) -> Result<String, ConfigError> {
+        self.core
+            .dict_export(&schema_id)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 导入词库文本：.wdict（电脑版 / 本机导出）或 Rime / TSV 词表；`replace` = 先清空再导入。
+    /// 文件的引擎类型与方案不一致（五笔词库导入拼音）、只读模式 → Rejected(原因)。
+    pub fn dict_import(
+        &self,
+        schema_id: String,
+        content: String,
+        replace: bool,
+    ) -> Result<DictImportInfo, ConfigError> {
+        let r = self
+            .core
+            .dict_import(&schema_id, &content, replace)
+            .map_err(|reason| ConfigError::Rejected { reason })?;
+        Ok(DictImportInfo {
+            sections: r
+                .sections
+                .into_iter()
+                .map(|s| DictImportSectionInfo {
+                    key: s.key,
+                    added: s.added,
+                    updated: s.updated,
+                    unchanged: s.unchanged,
+                    imported: s.imported,
+                    skipped: s.skipped,
+                    rejected: s.rejected,
+                })
+                .collect(),
+        })
+    }
 }
 
 /// 配置字段（注册表一行）。`ty` ∈ bool / int / float / str / enum / str_list / map / struct_list。
@@ -762,6 +799,24 @@ pub struct UserWordInfo {
 pub struct UserWordPageInfo {
     pub items: Vec<UserWordInfo>,
     pub total: u64,
+}
+
+/// 词库导入结果的一段。用户词段（`userWords`）看 added / updated / unchanged，其余段看 imported；
+/// skipped 是未导入的总数，rejected 是其中被拼音准入判为不合法的。
+#[derive(Debug, uniffi::Record)]
+pub struct DictImportSectionInfo {
+    pub key: String,
+    pub added: u64,
+    pub updated: u64,
+    pub unchanged: u64,
+    pub imported: u64,
+    pub skipped: u64,
+    pub rejected: u64,
+}
+
+#[derive(Debug, uniffi::Record)]
+pub struct DictImportInfo {
+    pub sections: Vec<DictImportSectionInfo>,
 }
 
 /// 候选提示的一段：段名（`None` = 无标题）、是否与首行同行、原始行（不截断，宿主自己折行）。

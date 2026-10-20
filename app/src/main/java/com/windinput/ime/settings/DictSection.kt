@@ -3,6 +3,8 @@ package com.windinput.ime.settings
 import android.content.Context
 import android.os.SystemClock
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -151,6 +153,7 @@ private fun DictContent(
             NavRow("我的词条", "共 $total 条 · 搜索、删除、清空", icon = SettingsIcons.words) { onOpen(DICT_WORDS) }
             NavRow("添加词条", "手动加一个词和它的编码", icon = SettingsIcons.addWord) { onOpen(DICT_ADD) }
         }
+        BackupCard(schema, context, scope) { reload++ }
         return
     }
 
@@ -251,6 +254,81 @@ private fun DictContent(
                 write("已清空") { it.userWordsClear(schema.id) }
             }
         }
+    }
+}
+
+/**
+ * 备份：导出 / 导入当前方案的词库数据（个人词、临时词、词频、候选调整）。
+ *
+ * 文件经系统的文件选择器存取（SAF），不要存储权限，存到网盘、发到电脑都由系统那边接手。
+ * 导入只做合并：手机上没有电脑版那样的预览对话框，「覆盖」一点错就是丢数据，不给这个口。
+ */
+@Composable
+private fun BackupCard(schema: SchemaEntry, context: Context, scope: CoroutineScope, onImported: () -> Unit) {
+    var busy by remember { mutableStateOf(false) }
+
+    fun run(op: suspend () -> String) {
+        busy = true
+        scope.launch {
+            val message = try {
+                withContext(Dispatchers.IO) { op() }
+            } catch (e: ConfigException) {
+                (e as? ConfigException.Rejected)?.reason ?: e.toString()
+            } catch (e: Exception) {
+                // 文件读写失败、核心 panic（UniFFI 的 InternalException）都落这里，不让设置页崩
+                "操作失败：${e.message ?: e}"
+            }
+            busy = false
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/x-yaml")) { uri ->
+        if (uri != null) run {
+            val core = CoreAccess.obtainCore(context) ?: return@run "输入法核心未就绪"
+            val content = core.dictExport(schema.id)
+            context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(content.toByteArray()) }
+                ?: return@run "无法写入所选位置"
+            "已导出"
+        }
+    }
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) run {
+            val size = context.contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+            if (size > DictBackup.MAX_IMPORT_BYTES) return@run "文件太大（超过 32MB），不像是词库备份"
+            val content = context.contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }
+                ?: return@run "无法读取所选文件"
+            val core = CoreAccess.obtainCore(context) ?: return@run "输入法核心未就绪"
+            val report = core.dictImport(schema.id, content, false)
+            withContext(Dispatchers.Main) { onImported() }
+            DictBackup.describe(
+                report.sections.map {
+                    // 只有个人词段分「新增 / 更新 / 未变」，其余段（词频、候选调整…）只给导入条数
+                    val words = it.key == "userWords"
+                    DictBackup.Section(
+                        it.key,
+                        added = (if (words) it.added else it.imported).toLong(),
+                        updated = if (words) it.updated.toLong() else 0,
+                        unchanged = if (words) it.unchanged.toLong() else 0,
+                        skipped = it.skipped.toLong(),
+                    )
+                },
+            )
+        }
+    }
+
+    SectionTitle("备份")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow(
+            "导出词库",
+            if (busy) "正在处理…" else "存成文件，电脑版「词库 → 导入」也认",
+            icon = SettingsIcons.backup,
+        ) { if (!busy) exporter.launch(DictBackup.fileName(schema.id)) }
+        NavRow(
+            "导入词库",
+            if (busy) "正在处理…" else "合并电脑版或本机导出的词库文件，也认 Rime / 文本词表",
+            icon = SettingsIcons.import,
+        ) { if (!busy) importer.launch(arrayOf("*/*")) }
     }
 }
 

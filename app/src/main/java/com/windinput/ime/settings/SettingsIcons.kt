@@ -3,6 +3,7 @@ package com.windinput.ime.settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Backup
 import top.yukonga.miuix.kmp.icon.extended.ConvertFile
 import top.yukonga.miuix.kmp.icon.extended.Copy
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -11,6 +12,7 @@ import top.yukonga.miuix.kmp.icon.extended.Favorites
 import top.yukonga.miuix.kmp.icon.extended.Filter
 import top.yukonga.miuix.kmp.icon.extended.GridView
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
+import top.yukonga.miuix.kmp.icon.extended.Import
 import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.icon.extended.Link
@@ -90,6 +92,8 @@ object SettingsIcons {
     val words: ImageVector get() = MiuixIcons.Notes
     val addWord: ImageVector get() = MiuixIcons.Add
     val clear: ImageVector get() = MiuixIcons.Delete
+    val backup: ImageVector get() = MiuixIcons.Backup
+    val import: ImageVector get() = MiuixIcons.Import
     val licenses: ImageVector get() = MiuixIcons.Share
     val fallback: ImageVector get() = MiuixIcons.Settings
 

@@ -1127,3 +1127,66 @@ fn schema_dict_toggle_roundtrips() {
         Err(ConfigError::Rejected { .. })
     ));
 }
+
+/// 词库备份往返：加词 → 导出（.wdict，头部带引擎类型）→ 清空 → 导入 → 列表与按键都回来。
+/// 文件格式与电脑版同一份（主仓 dict_transfer_api），这里只验绑定层这一段接通。
+#[test]
+fn dict_export_clear_import_round_trip() {
+    let Some((core, rec, _env)) = setup_exclusive("dict_transfer") else {
+        return;
+    };
+    let schema = core
+        .schemas()
+        .into_iter()
+        .find(|s| s.active)
+        .expect("应有当前方案")
+        .id;
+    let (code, text) = ("xxyy", "清风备份");
+    core.user_word_add(schema.clone(), code.into(), text.into())
+        .expect("加词应成功");
+
+    let file = core.dict_export(schema.clone()).expect("导出应成功");
+    assert!(file.contains("engine_type"), "文件头应带引擎类型，便于导入时校验");
+    assert!(file.contains(text), "导出文件里应有刚加的词");
+
+    core.user_words_clear(schema.clone()).expect("清空应成功");
+    assert!(
+        core.user_words(schema.clone(), code.into(), 0, 20).items.is_empty(),
+        "前提：清空后列表为空"
+    );
+
+    let report = core
+        .dict_import(schema.clone(), file, false)
+        .expect("导入应成功");
+    let words = report
+        .sections
+        .iter()
+        .find(|s| s.key == "userWords")
+        .expect("结果里应有个人词段");
+    assert!(words.added >= 1, "个人词应至少新增 1 条，实得 {words:?}");
+
+    let page = core.user_words(schema.clone(), code.into(), 0, 20);
+    assert!(
+        page.items.iter().any(|w| w.text == text),
+        "导入后列表里应有，实得 {:?}",
+        page.items
+    );
+    for vk in [0x58u32, 0x58, 0x59, 0x59] {
+        core.key_down(vk, 0);
+    }
+    settle();
+    let typed: Vec<String> = rec
+        .candidates
+        .lock()
+        .unwrap()
+        .last()
+        .map(|(_, items)| items.clone())
+        .unwrap_or_default();
+    assert!(
+        typed.iter().any(|t| t == text),
+        "导入后打 {code} 应立即出词，实得 {typed:?}"
+    );
+    core.key_down(0x1B, 0);
+    core.user_word_remove(schema, code.into(), text.into())
+        .expect("清理应成功");
+}

@@ -739,6 +739,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_config_snapshot(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_dict_export(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_dict_import(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_emoji_modules(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_gained(
@@ -833,6 +837,10 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_config_set(`ptr`: Long,`key`: RustBuffer.ByValue,`value`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_config_snapshot(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_dict_export(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_dict_import(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`replace`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_emoji_modules(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1030,6 +1038,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_config_snapshot() != 24732) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_dict_export() != 49890) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_dict_import() != 18678) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_emoji_modules() != 39855) {
@@ -2073,6 +2087,18 @@ public interface WindCoreInterface {
     fun `configSnapshot`(): kotlin.String
     
     /**
+     * 导出该方案的词库数据（个人词 / 临时词 / 词频 / 候选调整）为 .wdict 文本，与电脑版
+     * 「词库 → 导出」同一格式，电脑版能直接导入。宿主负责写到用户选的文件。
+     */
+    fun `dictExport`(`schemaId`: kotlin.String): kotlin.String
+    
+    /**
+     * 导入词库文本：.wdict（电脑版 / 本机导出）或 Rime / TSV 词表；`replace` = 先清空再导入。
+     * 文件的引擎类型与方案不一致（五笔词库导入拼音）、只读模式 → Rejected(原因)。
+     */
+    fun `dictImport`(`schemaId`: kotlin.String, `content`: kotlin.String, `replace`: kotlin.Boolean): DictImportInfo
+    
+    /**
      * emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
      */
     fun `emojiModules`(): List<EmojiModuleInfo>
@@ -2445,6 +2471,46 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     UniffiLib.uniffi_wind_android_fn_method_windcore_config_snapshot(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 导出该方案的词库数据（个人词 / 临时词 / 词频 / 候选调整）为 .wdict 文本，与电脑版
+     * 「词库 → 导出」同一格式，电脑版能直接导入。宿主负责写到用户选的文件。
+     */
+    @Throws(ConfigException::class)override fun `dictExport`(`schemaId`: kotlin.String): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_dict_export(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 导入词库文本：.wdict（电脑版 / 本机导出）或 Rime / TSV 词表；`replace` = 先清空再导入。
+     * 文件的引擎类型与方案不一致（五笔词库导入拼音）、只读模式 → Rejected(原因)。
+     */
+    @Throws(ConfigException::class)override fun `dictImport`(`schemaId`: kotlin.String, `content`: kotlin.String, `replace`: kotlin.Boolean): DictImportInfo {
+            return FfiConverterTypeDictImportInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_dict_import(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterString.lower(`content`),
+        FfiConverterBoolean.lower(`replace`),_status)
 }
     }
     )
@@ -3172,6 +3238,106 @@ public object FfiConverterTypeDailyTotalInfo: FfiConverterRustBuffer<DailyTotalI
             FfiConverterUInt.write(value.`total`, buf)
             FfiConverterUInt.write(value.`chinese`, buf)
             FfiConverterUInt.write(value.`english`, buf)
+    }
+}
+
+
+
+data class DictImportInfo (
+    var `sections`: List<DictImportSectionInfo>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDictImportInfo: FfiConverterRustBuffer<DictImportInfo> {
+    override fun read(buf: ByteBuffer): DictImportInfo {
+        return DictImportInfo(
+            FfiConverterSequenceTypeDictImportSectionInfo.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DictImportInfo) = (
+            FfiConverterSequenceTypeDictImportSectionInfo.allocationSize(value.`sections`)
+    )
+
+    override fun write(value: DictImportInfo, buf: ByteBuffer) {
+            FfiConverterSequenceTypeDictImportSectionInfo.write(value.`sections`, buf)
+    }
+}
+
+
+
+/**
+ * 词库导入结果的一段。用户词段（`userWords`）看 added / updated / unchanged，其余段看 imported；
+ * skipped 是未导入的总数，rejected 是其中被拼音准入判为不合法的。
+ */
+data class DictImportSectionInfo (
+    var `key`: kotlin.String
+    , 
+    var `added`: kotlin.ULong
+    , 
+    var `updated`: kotlin.ULong
+    , 
+    var `unchanged`: kotlin.ULong
+    , 
+    var `imported`: kotlin.ULong
+    , 
+    var `skipped`: kotlin.ULong
+    , 
+    var `rejected`: kotlin.ULong
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeDictImportSectionInfo: FfiConverterRustBuffer<DictImportSectionInfo> {
+    override fun read(buf: ByteBuffer): DictImportSectionInfo {
+        return DictImportSectionInfo(
+            FfiConverterString.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: DictImportSectionInfo) = (
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterULong.allocationSize(value.`added`) +
+            FfiConverterULong.allocationSize(value.`updated`) +
+            FfiConverterULong.allocationSize(value.`unchanged`) +
+            FfiConverterULong.allocationSize(value.`imported`) +
+            FfiConverterULong.allocationSize(value.`skipped`) +
+            FfiConverterULong.allocationSize(value.`rejected`)
+    )
+
+    override fun write(value: DictImportSectionInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterULong.write(value.`added`, buf)
+            FfiConverterULong.write(value.`updated`, buf)
+            FfiConverterULong.write(value.`unchanged`, buf)
+            FfiConverterULong.write(value.`imported`, buf)
+            FfiConverterULong.write(value.`skipped`, buf)
+            FfiConverterULong.write(value.`rejected`, buf)
     }
 }
 
@@ -4394,6 +4560,34 @@ public object FfiConverterSequenceTypeDailyTotalInfo: FfiConverterRustBuffer<Lis
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeDailyTotalInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeDictImportSectionInfo: FfiConverterRustBuffer<List<DictImportSectionInfo>> {
+    override fun read(buf: ByteBuffer): List<DictImportSectionInfo> {
+        val len = buf.getInt()
+        return List<DictImportSectionInfo>(len) {
+            FfiConverterTypeDictImportSectionInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<DictImportSectionInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeDictImportSectionInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<DictImportSectionInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeDictImportSectionInfo.write(it, buf)
         }
     }
 }

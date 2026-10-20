@@ -178,7 +178,12 @@
   wind-coordinator `user_words_api`（webdata 委托它，Android 闭包不含 webdata），wind-mobile 开
   `user_words / user_word_add / user_word_remove / user_words_clear`；手机端管当前方案的个人词：
   搜索、分页、点选删除、加词、清空（两次确认）。绑定层用例：加词 → 搜到 → 真按键打得出 → 删掉。
-  **没做**：备份恢复 / 从电脑版导入、暂停学习（主仓需加开关）、自定义短语。
+  **没做**：自定义短语。（暂停学习已做，见下方「隐私模式」。）
+- 词库备份（2026-10-20）：主仓 165c1fb1 把桌面 `dict.export` / `dict.import` 的本体下沉到
+  wind-coordinator `dict_transfer_api`，wind-mobile 开 `dict_export / dict_import`。词库页「备份」卡：
+  导出 / 导入走系统文件选择器（SAF，不要存储权限），格式即电脑版 `.wdict.yaml`（头带引擎类型，
+  五笔文件导入拼音会被拒），也认 Rime / TSV 词表；导入只合并、不给覆盖（手机上没有预览对话框）。
+  绑定层用例：加词 → 导出 → 清空 → 导入 → 立即打得出。
 - 简繁转换 / Emoji：APK 带上主仓的 opencc 与 emoji 数据（原样，rime-emoji 为 LGPL 须逐字分发），
   输入页加「简繁转换」「Emoji/OpenCC」两卡；清单支持电脑版的 `exclusive_with`（简入繁出 ↔ 繁入简出
   二选一）与 `enabled_when`（依赖开关关着时不显示）。emu [35]：开简入繁出后 trwu → 我們。
