@@ -603,6 +603,11 @@ class WindInputImeService :
                     is EditOp.SetComposition -> {
                         if (op.text.isEmpty()) {
                             ic.finishComposingText()
+                        } else if (isCompositionPlaceholder(op.text)) {
+                            // 占位组合（联想态挂的空格等）是桌面 TSF 给候选窗定位光标用的，手机上
+                            // 没有这回事。写进来就是输入框里一个带下划线的空格（真机反馈）；
+                            // 已有的内联编码也一并清掉，不能 finish——那会把编码当正文上屏
+                            if (inlinePreedit) ic.setComposingText("", 1)
                         } else if (inlinePreedit) {
                             // 编码默认只显示在自绘编码栏：五笔码嵌在正文里是噪声，且与
                             // 编码栏重复。想要宿主内联的用户开 ui.android.inline_preedit。
@@ -624,6 +629,13 @@ class WindInputImeService :
             ic.endBatchEdit()
         }
     }
+
+    /**
+     * 核心的占位组合：只由空格 / ZWSP / U+2800 组成（核心按应用兼容规则在三者里挑，见主仓
+     * `composition_placeholder`）。移动端原则上不往输入框里放任何占位符。
+     */
+    private fun isCompositionPlaceholder(text: String): Boolean =
+        text.all { it == ' ' || it == '\u200B' || it == '\u2800' || it == '\u3000' }
 
     /** 相对移动光标：取当前选区绝对位置再 setSelection，比连发方向键可靠 */
     private fun moveCursor(ic: android.view.inputmethod.InputConnection, delta: Int) {

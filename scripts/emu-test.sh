@@ -1003,6 +1003,22 @@ sleep 2
 tap_key a; tap_key a; tap_key SPACE
 check "切回五笔 aa 出「式」" "式" "$(get_pad_text)"
 
+echo; echo "${Y}[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符${N}"
+# 核心在联想态挂一个占位组合（空格等，桌面 TSF 给候选窗定位用）；手机上写进来就是输入框里
+# 一个带下划线的空格（真机反馈）。键盘侧把纯占位的组合文本挡掉。开关是键盘自己的配置文件。
+KB_CFG=files/user/config.toml
+printf '[ui.android]\ninline_preedit = true\n' | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"
+restart_pad
+wait_chinese >/dev/null
+reset_pad
+tap_key a; tap_key a
+check "内联编码写进输入框" "aa" "$(get_pad_text)"
+tap_key SPACE
+check "上屏后不留占位空格" "式" "$(get_pad_text)"
+printf '' | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $KB_CFG'"
+restart_pad
+wait_chinese >/dev/null
+
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then
