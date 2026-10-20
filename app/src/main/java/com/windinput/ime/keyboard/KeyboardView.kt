@@ -159,6 +159,18 @@ class KeyboardView(context: Context) : View(context) {
             invalidate()
         }
 
+    /**
+     * 九宫格数字键盘左列的符号（数字框和电话框不同，由 Service 按输入框类型给）。
+     * 画在布局左列的占位空白里，可上下滚动，点选原样上屏（见 [sideRect]）。
+     */
+    var sideSymbols: List<String> = emptyList()
+        set(value) {
+            if (field == value) return
+            field = value
+            sideScroll = 0f
+            invalidate()
+        }
+
     /** 空格上的灰色小字：当前方案名。空串 = 不画 */
     var spaceLabel = ""
         set(value) {
@@ -168,6 +180,9 @@ class KeyboardView(context: Context) : View(context) {
         }
 
     private var layer = KeyboardLayer.LETTERS
+
+    /** 数字键盘「←」回到哪一层：从 123 层进来回 123 层，数字框直接调起的回字母层 */
+    private var numberReturnLayer = KeyboardLayer.LETTERS
     private var rows = layoutProvider(layer)
     private var shifted = false
 
@@ -215,6 +230,19 @@ class KeyboardView(context: Context) : View(context) {
     private data class KeyBounds(val key: KeyDef, val rect: RectF, val row: Int)
 
     private val keyBounds = mutableListOf<KeyBounds>()
+
+    /**
+     * 左列符号的区域：布局从第 1 行起、每行打头的等宽占位空白连成的一列（数字键盘的左列）。
+     * 没有这样的列或没给 [sideSymbols] 时为 null，视图就是普通键盘。
+     */
+    private var sideRect: RectF? = null
+    private var sideScroll = 0f
+    private val sideItemHeightPx get() = rowHeightPx * 0.75f
+    private var sideTouch = false
+    private var sideDragging = false
+    private var sideLastY = 0f
+    private var sidePressed = -1
+    private val touchSlopPx = android.view.ViewConfiguration.get(context).scaledTouchSlop
     private var pressedKey: KeyDef? = null
     private var pressedRect: RectF? = null
 
@@ -354,7 +382,7 @@ class KeyboardView(context: Context) : View(context) {
                         key,
                         RectF(
                             x + keyGapPx, top + keyGapPx,
-                            x + keyWidth - keyGapPx, top + rowHeightPx - keyGapPx,
+                            x + keyWidth - keyGapPx, top + rowHeightPx * key.rowSpan - keyGapPx,
                         ),
                         rowIndex,
                     )
@@ -362,24 +390,105 @@ class KeyboardView(context: Context) : View(context) {
                 x += keyWidth
             }
         }
+        sideRect = computeSideRect(width)
+    }
+
+    private fun computeSideRect(width: Int): RectF? {
+        val first = rows.firstOrNull()?.firstOrNull() ?: return null
+        if (first.action != KeyAction.Spacer) return null
+        val count = rows.takeWhile { row ->
+            row.firstOrNull()?.let { it.action == KeyAction.Spacer && it.widthWeight == first.widthWeight } == true
+        }.size
+        val unit = width / rows[0].sumOf { it.widthWeight.toDouble() }.toFloat()
+        return RectF(keyGapPx, keyGapPx, unit * first.widthWeight - keyGapPx, rowHeightPx * count - keyGapPx)
+    }
+
+    private val maxSideScroll: Float
+        get() {
+            val rect = sideRect ?: return 0f
+            return (sideSymbols.size * sideItemHeightPx - rect.height()).coerceAtLeast(0f)
+        }
+
+    private fun sideIndexAt(y: Float): Int {
+        val rect = sideRect ?: return -1
+        val i = ((y - rect.top + sideScroll) / sideItemHeightPx).toInt()
+        return if (i in sideSymbols.indices) i else -1
+    }
+
+    /** 左列符号：一整条功能键底色，里面一格一个符号，超出部分上下滚动 */
+    private fun drawSide(canvas: Canvas) {
+        val rect = sideRect ?: return
+        if (sideSymbols.isEmpty()) return
+        keyPaint.color = keySpecialColor
+        canvas.drawRoundRect(rect, keyRadiusPx, keyRadiusPx, keyPaint)
+        canvas.save()
+        canvas.clipRect(rect)
+        textPaint.textSize = 18 * density
+        textPaint.color = textColor
+        sideSymbols.forEachIndexed { i, sym ->
+            val top = rect.top + i * sideItemHeightPx - sideScroll
+            if (top + sideItemHeightPx < rect.top || top > rect.bottom) return@forEachIndexed
+            val cell = RectF(rect.left, top, rect.right, top + sideItemHeightPx)
+            if (i == sidePressed) {
+                keyPaint.color = keyPressedColor
+                canvas.drawRect(cell, keyPaint)
+            }
+            drawCentered(canvas, sym, cell, textPaint)
+        }
+        canvas.restore()
+    }
+
+    /** 左列的触摸：竖向拖动是滚动，没拖动就抬手是点选 */
+    private fun handleSideTouch(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_MOVE -> {
+                if (!sideDragging && kotlin.math.abs(event.y - downY) > touchSlopPx) {
+                    sideDragging = true
+                    sidePressed = -1
+                }
+                if (sideDragging) {
+                    sideScroll = (sideScroll - (event.y - sideLastY)).coerceIn(0f, maxSideScroll)
+                    sideLastY = event.y
+                    invalidate()
+                }
+            }
+            MotionEvent.ACTION_UP -> {
+                val index = sidePressed
+                sideTouch = false
+                sidePressed = -1
+                invalidate()
+                if (!sideDragging && index >= 0) {
+                    listener?.onKeyAction(KeyAction.Commit(sideSymbols[index]), shifted = false)
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> {
+                sideTouch = false
+                sidePressed = -1
+                invalidate()
+            }
+        }
     }
 
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(bgColor)
+        drawSide(canvas)
         if (highlightKey != null) highlightFrames++
         for ((key, rect) in keyBounds) {
             keyPaint.color = when {
                 key === highlightKey -> keyPressedColor
+                key.isAccent -> palette.accent
                 key.action == KeyAction.Shift && (shifted || shiftLocked) -> keyPressedColor
                 key.isSpecial -> keySpecialColor
                 else -> keyColor
             }
             canvas.drawRoundRect(rect, keyRadiusPx, keyRadiusPx, keyPaint)
+            textPaint.color = if (key.isAccent) palette.onAccent else textColor
             if (key.action == KeyAction.SwitchLang) {
                 drawLangKey(canvas, rect)
                 continue
             }
-            if (key.action == KeyAction.Space && spaceLabel.isNotEmpty()) {
+            // 数字键盘的空格只是一个小功能键，写「空格」；方案名留给字母层和 123 层的长空格
+            if (key.action == KeyAction.Space && spaceLabel.isNotEmpty() && layer != KeyboardLayer.NUMBER) {
                 drawCentered(canvas, spaceLabel, rect, smallPaint)
                 continue
             }
@@ -472,8 +581,23 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (sideTouch) {
+            handleSideTouch(event)
+            return true
+        }
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                val side = sideRect
+                if (side != null && sideSymbols.isNotEmpty() && side.contains(event.x, event.y)) {
+                    sideTouch = true
+                    sideDragging = false
+                    downY = event.y
+                    sideLastY = event.y
+                    sidePressed = sideIndexAt(event.y)
+                    if (hapticEnabled) performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    invalidate()
+                    return true
+                }
                 downX = event.x
                 downY = event.y
                 swipeConsumed = false
@@ -657,8 +781,12 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun findKey(x: Float, y: Float): KeyDef? = findBounds(x, y)?.key
 
-    /** 切换布局层（EditorInfo 场景感知/符号键共用入口） */
-    fun setLayer(newLayer: KeyboardLayer) {
+    /**
+     * 切换布局层（EditorInfo 场景感知 / 符号键共用入口）。
+     * [returnTo]：进数字键盘时记下「←」回哪一层。
+     */
+    fun setLayer(newLayer: KeyboardLayer, returnTo: KeyboardLayer = KeyboardLayer.LETTERS) {
+        if (newLayer == KeyboardLayer.NUMBER) numberReturnLayer = returnTo
         if (layer == newLayer) return
         layer = newLayer
         shifted = false
@@ -700,10 +828,11 @@ class KeyboardView(context: Context) : View(context) {
                     when (layer) {
                         KeyboardLayer.LETTERS -> KeyboardLayer.SYMBOLS
                         KeyboardLayer.SYMBOLS -> KeyboardLayer.LETTERS
-                        KeyboardLayer.NUMBER -> KeyboardLayer.LETTERS
+                        KeyboardLayer.NUMBER -> numberReturnLayer
                     },
                 )
             }
+            KeyAction.NumberPad -> setLayer(KeyboardLayer.NUMBER, returnTo = layer)
             else -> {
                 // 逗号句号合一键：英文模式点按改出句点
                 val action = key.textFor(englishMode)

@@ -20,7 +20,7 @@ import com.windinput.ime.core.EditOp
 import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.FakeSession
 import com.windinput.ime.core.ImeSession
-import com.windinput.ime.core.RecentEmojiStore
+import com.windinput.ime.core.RecentStore
 import com.windinput.ime.core.RustCoreLoader
 import com.windinput.ime.core.RustSession
 import com.windinput.ime.core.SchemaEntry
@@ -39,6 +39,8 @@ import com.windinput.ime.keyboard.LayoutRepository
 import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.panels.ClipboardWindow
 import com.windinput.ime.panels.EmojiWindow
+import com.windinput.ime.panels.SymbolPages
+import com.windinput.ime.panels.SymbolWindow
 import com.windinput.ime.panels.ExpandedCandidatesWindow
 import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
@@ -63,6 +65,7 @@ class WindInputImeService :
     TextEditingWindow.Listener,
     ClipboardWindow.Listener,
     EmojiWindow.Listener,
+    SymbolWindow.Listener,
     QuickPanelWindow.Listener,
     ExpandedCandidatesWindow.Listener {
 
@@ -86,7 +89,9 @@ class WindInputImeService :
     private lateinit var layoutRepository: LayoutRepository
     private lateinit var userConfig: UserConfig
     private lateinit var clipboardStore: ClipboardStore
-    private lateinit var recentEmojiStore: RecentEmojiStore
+    private lateinit var recentEmojiStore: RecentStore
+    private lateinit var recentSymbolStore: RecentStore
+    private lateinit var dataDirs: com.windinput.ime.core.DataDirs
 
     private var barView: BarView? = null
     private var windowManager: InputWindowManager? = null
@@ -94,6 +99,7 @@ class WindInputImeService :
     private var textEditingWindow: TextEditingWindow? = null
     private var clipboardWindow: ClipboardWindow? = null
     private var emojiWindow: EmojiWindow? = null
+    private var symbolWindow: SymbolWindow? = null
     private var expandedCandidatesWindow: ExpandedCandidatesWindow? = null
     private var quickPanelWindow: QuickPanelWindow? = null
 
@@ -121,6 +127,7 @@ class WindInputImeService :
     override fun onCreate() {
         super.onCreate()
         val dirs = (application as WindInputApp).dataDirs
+        dataDirs = dirs
         layoutRepository = LayoutRepository(dirs)
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
         // 核心**异步构造**：它要加载三层配置、开 redb、把词库 yaml 编译成 wdat，
@@ -149,7 +156,8 @@ class WindInputImeService :
         clipboardStore.onNewClip = { text ->
             if (!directInput && clipSuggestionEnabled) barView?.showClipSuggestion(text)
         }
-        recentEmojiStore = RecentEmojiStore(this)
+        recentEmojiStore = RecentStore(this, "recent_emoji")
+        recentSymbolStore = RecentStore(this, "recent_symbol")
     }
 
     override fun onDestroy() {
@@ -187,6 +195,7 @@ class WindInputImeService :
         textEditingWindow = TextEditingWindow(listener = this)
         clipboardWindow = ClipboardWindow(clipboardStore, listener = this)
         emojiWindow = EmojiWindow(recentEmojiStore, listener = this)
+        symbolWindow = SymbolWindow({ SymbolPages.load(dataDirs) }, recentSymbolStore, listener = this)
         expandedCandidatesWindow = ExpandedCandidatesWindow(listener = this)
         quickPanelWindow = QuickPanelWindow(listener = this)
 
@@ -233,6 +242,13 @@ class WindInputImeService :
          * 补上后改为问引擎「当前方案的分隔键是哪个」，见 IMPLEMENTATION_PLAN.md。
          */
         val SPLIT_SCHEMAS = setOf("pinyin")
+
+        /**
+         * 九宫格数字键盘左列的符号（可上下滚动）。数字框放算式和常见分隔符；
+         * 电话框放拨号会用到的 `* # +` 和分隔用的 `- ( )`，`,` `;` 是拨号里的暂停 / 等待。
+         */
+        val NUMBER_SIDE_SYMBOLS = listOf("+", "-", "*", "/", "%", "=", ",", ":", "@", "#", "(", ")")
+        val PHONE_SIDE_SYMBOLS = listOf("*", "#", "+", "-", "(", ")", ",", ";")
 
         /**
          * 每次按键预取的候选条数。
@@ -400,8 +416,10 @@ class WindInputImeService :
         val numericScene = clazz == InputType.TYPE_CLASS_NUMBER ||
             clazz == InputType.TYPE_CLASS_PHONE ||
             clazz == InputType.TYPE_CLASS_DATETIME
-        keyboardWindow?.keyboardView
-            ?.setLayer(if (numericScene) KeyboardLayer.NUMBER else KeyboardLayer.LETTERS)
+        keyboardWindow?.keyboardView?.let { kv ->
+            kv.setLayer(if (numericScene) KeyboardLayer.NUMBER else KeyboardLayer.LETTERS)
+            kv.sideSymbols = if (clazz == InputType.TYPE_CLASS_PHONE) PHONE_SIDE_SYMBOLS else NUMBER_SIDE_SYMBOLS
+        }
     }
 
     /**
@@ -548,6 +566,14 @@ class WindInputImeService :
         }
         if (action == KeyAction.Emoji) {
             emojiWindow?.let { windowManager?.show(it) }
+            return
+        }
+        if (action == KeyAction.SymbolPage) {
+            symbolWindow?.let { windowManager?.show(it) }
+            return
+        }
+        if (action is KeyAction.Commit) {
+            commitDirect(action.text)
             return
         }
         if (!directInput && session.keyPressed(action, shifted)) return
@@ -912,7 +938,40 @@ class WindInputImeService :
     // ── 表情面板 ─────────────────────────────────────────────────
 
     override fun onEmojiSelected(emoji: String) {
-        currentInputConnection?.commitText(emoji, 1)
+        commitDirect(emoji)
+    }
+
+    // ── 分类符号页 ───────────────────────────────────────────────
+
+    override fun onSymbolSelected(symbol: String) {
+        commitDirect(symbol)
+    }
+
+    override fun onSymbolBackspace() {
+        sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
+    }
+
+    /** 回到进来前的那一层：键盘窗口的层没动过，123 层或数字键盘原样还在 */
+    override fun onSymbolBack() {
+        windowManager?.showKeyboard()
+    }
+
+    /**
+     * 不经引擎、原样上屏（数字键盘、符号页、表情）。
+     *
+     * 有编码时先把首选上屏，再接这个字符——与在编码后打一个标点的效果一样（引擎打标点也是
+     * 先顶首选）。没有候选的编码（五笔打了空码）上屏原文。不先处理的话，编码还挂在引擎里，
+     * 字符却已插到了它前面。选词是同步回调，上屏顺序有保证。
+     */
+    private fun commitDirect(text: String) {
+        if (composing && !directInput) {
+            if (loadedCandidates.isNotEmpty()) {
+                session.candidateSelected(0)
+            } else {
+                session.keyPressed(KeyAction.Enter, false)
+            }
+        }
+        currentInputConnection?.commitText(text, 1)
     }
 
     override fun onEmojiBackspace() {

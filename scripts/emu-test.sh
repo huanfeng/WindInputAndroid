@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 模拟器端到端输入测试（Linux/macOS 版，Windows 见 emu-test.ps1）：
 # 环境准备 → 点击键盘按键 → 断言输入框内容
-# 用例 [15][16]（组合态同步）为 bash 版新增，emu-test.ps1 尚无。
+# 用例 [15][16]（组合态同步）、[23]–[26]（123 层 / 九宫格 / 符号页）为 bash 版新增，emu-test.ps1 尚无。
 #
 # ── 三个必踩的坑（都已在脚本里处理，改动前先读）────────────────────────
 # 1. 模拟器带硬件键盘，InputMethodService.onEvaluateInputViewShown() 默认返回
@@ -156,6 +156,54 @@ tap_key() {
     die "未知键位: $name"
 }
 
+# ── 非字母层：按「行号 + 行权重 + 下标」点（权重与布局 TOML 同步） ─────────
+# 123 层（assets/data/layouts/symbols.toml）
+SYM_W=(
+    "1 1 1 1 1 1 1 1 1 1"
+    "1 1 1 1 1 1 1 1 1 1"
+    # 符号 · 。 ， 、 ？ ！ 半角句点 · ⌫
+    "1.5 1 1 1 1 1 1 1.5"
+    # ← · 表情 · 1234 · 空格 · 换行
+    "1.5 1 1.5 4 2"
+)
+# 九宫格数字键盘（number.toml）：左列 · 三列数字 · 右列，四行同权重
+NUM_W="1 1.4 1.4 1.4 1"
+
+tap_cell() {   # 行号(0 起) 权重串 下标
+    local cx cy
+    cx="$(awk -v ws="$2" -v idx="$3" -v W="$GEO_W" 'BEGIN{
+        n = split(ws, a, " "); total = 0
+        for (i = 1; i <= n; i++) total += a[i]
+        unit = W / total; x = 0
+        for (i = 1; i <= idx; i++) x += a[i] * unit
+        printf "%d", int(x + a[idx+1] * unit / 2)
+    }')"
+    cy="$(awk -v kb="$GEO_KBBOTTOM" -v r="$1" -v rp="$GEO_ROWPX" 'BEGIN{ printf "%d", int(kb - (4 - r - 0.5) * rp) }')"
+    adb_q shell input tap "$cx" "$cy"
+    sleep 0.4
+}
+
+# 按文字点一个可见节点（符号页的格子和分类 tab、测试台按钮都是带 text 的 View）
+# 轮询：Activity 刚重启、面板刚弹出时 dump 可能还拿不到节点
+tap_text() {
+    local node try
+    for ((try = 0; try < 6; try++)); do
+        # `|| -n "$node"`：dump 末尾没有换行，最后一个节点（测试台的按钮恰好是它）
+        # 会被 read 丢掉——不加这句，按钮永远「找不到」
+        while IFS= read -r node || [[ -n "$node" ]]; do
+            [[ "$node" == *" text=\"$1\""* ]] || continue
+            if [[ "$node" =~ bounds=\"\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]\" ]]; then
+                adb_q shell input tap $(( (BASH_REMATCH[1] + BASH_REMATCH[3]) / 2 )) \
+                                      $(( (BASH_REMATCH[2] + BASH_REMATCH[4]) / 2 ))
+                sleep 0.5
+                return 0
+            fi
+        done < <(dump_xml | sed 's/<node/\n<node/g')
+        sleep 0.7
+    done
+    die "找不到文字为「$1」的节点"
+}
+
 # 点候选条第 n 项（0 起，按等宽粗估；候选窄时够用）
 tap_candidate() {
     adb_q shell input tap $(( 60 + $1 * 120 )) "$GEO_BARY"
@@ -266,6 +314,15 @@ reset_pad() {
     adb_q shell 'for i in $(seq 1 40); do input keyevent KEYCODE_DEL; done'
     sleep 0.3
     [[ -z "$(get_pad_text)" ]] || die "reset_pad 未清空输入框，后续断言不可信"
+}
+
+# 重启测试台回到第 1 场景。`am start -S` 会 force-stop **整个包**，输入法也在其中
+# ——系统随即切回 Gboard（坑 2），所以重启后必须重新 enable / set。
+restart_pad() {
+    adb_q shell am start -S -n "$PKG/.settings.TestPadActivity"
+    adb_q shell ime enable "$IME"
+    adb_q shell ime set "$IME"
+    sleep 2
 }
 
 FAILED=0
@@ -632,6 +689,72 @@ tap_key LANG; sleep 3
 reset_pad
 tap_key a; tap_key a; tap_key SPACE
 check_match "切回中文出汉字" "$CN" "$(get_pad_text)"
+
+echo; echo "${Y}[23] 123 层：中文模式下的半角句点与中文句号${N}"
+# 第 3 行「。」走引擎（中文模式出全角），最后一格半角句点原样上屏（打小数用）；← 回字母层
+reset_pad
+tap_key SYM
+tap_cell 0 "${SYM_W[0]}" 0; tap_cell 2 "${SYM_W[2]}" 6; tap_cell 0 "${SYM_W[0]}" 1; tap_cell 2 "${SYM_W[2]}" 1
+check "1 . 2 。" "1.2。" "$(get_pad_text)"
+tap_cell 3 "${SYM_W[3]}" 0
+tap_key a; tap_key a; tap_key SPACE
+check_match "← 回到字母层继续打中文" '^1\.2。[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
+
+echo; echo "${Y}[24] 九宫格数字键盘${N}"
+# 123 层「1234」进九宫格，算式不用切层：数字、句点在格子里，* 在左列第 3 项
+reset_pad
+tap_key SYM; tap_cell 3 "${SYM_W[3]}" 2
+tap_cell 0 "$NUM_W" 1; tap_cell 0 "$NUM_W" 2; tap_cell 3 "$NUM_W" 3; tap_cell 1 "$NUM_W" 2
+side_x="$(awk -v W="$GEO_W" 'BEGIN{ printf "%d", W / 6.2 / 2 }')"
+side_y="$(awk -v top="$GEO_KBTOP" -v rp="$GEO_ROWPX" 'BEGIN{ printf "%d", top + 0.75 * rp * 2.5 }')"
+adb_q shell input tap "$side_x" "$side_y"; sleep 0.4
+tap_cell 0 "$NUM_W" 3
+check "12.5*3" "12.5*3" "$(get_pad_text)"
+# ← 回进来的那一层（123 层），再 ← 回字母层
+tap_cell 3 "$NUM_W" 0; tap_cell 3 "${SYM_W[3]}" 0
+# 数字框直接调起九宫格：第 3 场景（测试台场景按钮循环），按九宫格坐标打 5 0
+restart_pad
+tap_text "切换场景"; tap_text "切换场景"
+get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1
+tap_cell 1 "$NUM_W" 2; tap_cell 3 "$NUM_W" 2
+check "数字框直接是九宫格" "50" "$(get_pad_text)"
+# 场景复位（重启 Activity 回到第 1 场景），后续用例照常
+restart_pad
+
+echo; echo "${Y}[25] 分类符号页：选符号上屏、停在本页、退格、返回${N}"
+# 符号页在 IME 窗口里，uiautomator 只 dump 应用窗口，格子和 tab 看不到，只能按坐标点。
+# 先清掉「最近」（debug 包可 run-as），进页面就固定落在第一个分类「中」：
+# 第 1 行是 ， 。 、 ？ ！ …（assets/data/symbol_pages.toml），每行 10 格。
+adb_q shell run-as "$PKG" rm -f shared_prefs/recent_symbol.xml
+restart_pad      # SharedPreferences 有进程内缓存，删文件后要重启进程才读得到
+# 进程刚重启，核心异步加载；没就绪时字母直接上屏，下面「有编码」的前提就不成立
+[[ -n "$(wait_chinese)" ]] || die "重启后中文引擎未就绪"
+reset_pad
+sym_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 20 )) $(( GEO_KBTOP + GEO_ROWPX * (2 * $1 + 1) / 2 )); sleep 0.4; }
+# 有编码时点符号：先上屏首选再接符号（与打标点的效果一致）
+tap_key a; tap_key a
+tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0; sleep 0.6
+sym_cell 0 0; sym_cell 0 1
+check_match "首选 + ，。（点完停在本页）" '^[\x{4e00}-\x{9fa5}]，。$' "$(get_pad_text)"
+sym_bs_x=$(( GEO_W * 925 / 1000 )); sym_back_x=$(( GEO_W * 75 / 1000 ))
+sym_bottom_y=$(( GEO_KBBOTTOM - GEO_ROWPX / 2 ))
+adb_q shell input tap "$sym_bs_x" "$sym_bottom_y"; sleep 0.4
+check_match "符号页退格" '^[\x{4e00}-\x{9fa5}]，$' "$(get_pad_text)"
+# ← 回到 123 层（不是字母层）：点第 1 行第 1 格应出 1
+adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
+tap_cell 0 "${SYM_W[0]}" 0
+check_match "← 回到 123 层" '^[\x{4e00}-\x{9fa5}]，1$' "$(get_pad_text)"
+tap_cell 3 "${SYM_W[3]}" 0
+
+echo; echo "${Y}[26] 最近使用置首、重启后保留${N}"
+restart_pad
+reset_pad
+tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0; sleep 0.6
+# 有最近使用时默认进「最近」，第一格是最后点的那个（[25] 里最后点的是「。」）
+sym_cell 0 0
+check "最近第一格是上次点的「。」" "。" "$(get_pad_text)"
+adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
+tap_cell 3 "${SYM_W[3]}" 0
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"

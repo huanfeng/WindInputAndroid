@@ -10,7 +10,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.windinput.ime.core.RecentEmojiStore
+import com.windinput.ime.core.RecentStore
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.Palette
 
@@ -19,7 +19,7 @@ import com.windinput.ime.keyboard.Palette
  * 数据为精简集（EmojiData）；肤色变体长按/可渲染过滤为后续能力。
  */
 class EmojiWindow(
-    private val recentStore: RecentEmojiStore,
+    private val recentStore: RecentStore,
     private val listener: Listener,
 ) : InputWindow() {
 

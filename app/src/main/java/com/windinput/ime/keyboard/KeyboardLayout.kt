@@ -24,8 +24,20 @@ sealed interface KeyAction {
      */
     data object SwitchLang : KeyAction
 
-    /** 打开表情面板（符号层底栏） */
+    /** 打开表情面板（123 层底栏） */
     data object Emoji : KeyAction
+
+    /**
+     * 原样上屏，**不经引擎**。用于九宫格数字键盘和 123 层的半角句点：那里要的就是
+     * 键面上那个字符，中文模式下也不能被引擎转成「。」，有编码时数字也不能变成选词。
+     */
+    data class Commit(val text: String) : KeyAction
+
+    /** 打开分类符号页（123 层、数字键盘的「符号」键） */
+    data object SymbolPage : KeyAction
+
+    /** 切到九宫格数字键盘（123 层的「1234」键） */
+    data object NumberPad : KeyAction
 
     /**
      * 占位空白：不绘制、不响应。用于第 2 行两侧各缩进半个键（大众布局）。
@@ -49,6 +61,10 @@ data class KeyDef(
     val enText: Char? = null,
     /** 英文模式下的上滑字符；null = 同 [swipeUp] */
     val enSwipeUp: Char? = null,
+    /** 纵向占几行（数字键盘的「换行」占两行）；下面那一行同一位置要放等宽的占位空白 */
+    val rowSpan: Int = 1,
+    /** 强调色键面（123 层、数字键盘左下角的返回键，两家都用强调色） */
+    val isAccent: Boolean = false,
 ) {
     /** 按当前模式取点按输出的字符；非字符键为 null */
     fun textFor(english: Boolean): Char? =
@@ -103,18 +119,6 @@ object KeyboardLayouts {
         KeyDef("换行", KeyAction.Enter, widthWeight = 2f, isSpecial = true),
     )
 
-    /** 符号层底栏（Stage 2 重做 123 层前沿用旧形态；表情入口在这里） */
-    private fun bottomRow(switchLabel: String): List<KeyDef> = listOf(
-        KeyDef(switchLabel, KeyAction.SwitchSymbols, widthWeight = 1.3f, isSpecial = true),
-        KeyDef("☺", KeyAction.Emoji, isSpecial = true),
-        KeyDef(",", KeyAction.Text(','), longPress = "\\!?:;"),
-        KeyDef("空格", KeyAction.Space, widthWeight = 3.4f),
-        KeyDef(".", KeyAction.Text('.'), longPress = "^~`_%"),
-        // 中英切换固定在回车左侧——主流输入法的位置约定，肌肉记忆在这
-        KeyDef("中/英", KeyAction.SwitchLang, isSpecial = true),
-        KeyDef("⏎", KeyAction.Enter, widthWeight = 1.3f, isSpecial = true),
-    )
-
     /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
     val qwerty: List<List<KeyDef>> = listOf(
         charKeys("qwertyuiop", "1234567890"),
@@ -127,43 +131,57 @@ object KeyboardLayouts {
         lettersBottomRow,
     )
 
-    /** 符号/数字层（占位集合，正式键位随布局 TOML 化调整） */
+    /**
+     * 123 层，按两家的形态（docs/android-ime-features.md §14.2）。标点一律写 ASCII，
+     * 中文模式下显示「：（）…“」等中文形态。第 3 行最后一个是**半角句点**（原样上屏，
+     * 打小数用）；英文模式下它改出分号，免得一行里两个句点。
+     */
     val symbols: List<List<KeyDef>> = listOf(
         charKeys("1234567890"),
-        charKeys("@#%&*-+=()"),
         buildList {
-            add(KeyDef("~", KeyAction.Text('~'), widthWeight = 1.5f))
-            addAll(charKeys("!?:;/'\""))
+            addAll(charKeys("-/:~()"))
+            add(KeyDef("^", KeyAction.Text('^'), enText = '_'))
+            addAll(charKeys("@\"'"))
+        },
+        buildList {
+            add(KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.5f, isSpecial = true))
+            add(KeyDef(".", KeyAction.Text('.')))
+            add(KeyDef(",", KeyAction.Text(',')))
+            add(KeyDef("\\", KeyAction.Text('\\'), enText = '\''))
+            addAll(charKeys("?!"))
+            add(KeyDef(".", KeyAction.Commit("."), enText = ';'))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
-        bottomRow("ABC"),
+        listOf(
+            KeyDef("←", KeyAction.SwitchSymbols, widthWeight = 1.5f, isSpecial = true, isAccent = true),
+            KeyDef("☺", KeyAction.Emoji, isSpecial = true),
+            KeyDef("1234", KeyAction.NumberPad, widthWeight = 1.5f, isSpecial = true),
+            KeyDef("空格", KeyAction.Space, widthWeight = 4f),
+            KeyDef("换行", KeyAction.Enter, widthWeight = 2f, isSpecial = true),
+        ),
     )
 
-    /** 数字/电话/日期框的计算器式键盘 */
+    private fun digit(c: Char) = KeyDef(c.toString(), KeyAction.Commit(c.toString()), widthWeight = 1.4f)
+    private val sideSpacer = KeyDef("", KeyAction.Spacer)
+
+    /**
+     * 九宫格数字键盘（§14.4）。左列前三行是**占位空白**：那里由视图画可滚动的符号列
+     * （见 KeyboardView.sideSymbols）；「换行」占两行，第 4 行同一位置是等宽占位。
+     * 数字和句点都原样上屏，不经引擎。
+     */
     val number: List<List<KeyDef>> = listOf(
+        listOf(sideSpacer, digit('1'), digit('2'), digit('3'),
+            KeyDef("⌫", KeyAction.Backspace, isSpecial = true)),
+        listOf(sideSpacer, digit('4'), digit('5'), digit('6'),
+            KeyDef("空格", KeyAction.Space, isSpecial = true)),
+        listOf(sideSpacer, digit('7'), digit('8'), digit('9'),
+            KeyDef("换行", KeyAction.Enter, isSpecial = true, rowSpan = 2)),
         listOf(
-            KeyDef("1", KeyAction.Text('1')),
-            KeyDef("2", KeyAction.Text('2')),
-            KeyDef("3", KeyAction.Text('3')),
-            KeyDef("⌫", KeyAction.Backspace, isSpecial = true),
-        ),
-        listOf(
-            KeyDef("4", KeyAction.Text('4')),
-            KeyDef("5", KeyAction.Text('5')),
-            KeyDef("6", KeyAction.Text('6')),
-            KeyDef("-", KeyAction.Text('-')),
-        ),
-        listOf(
-            KeyDef("7", KeyAction.Text('7')),
-            KeyDef("8", KeyAction.Text('8')),
-            KeyDef("9", KeyAction.Text('9')),
-            KeyDef(".", KeyAction.Text('.')),
-        ),
-        listOf(
-            KeyDef("+", KeyAction.Text('+')),
-            KeyDef("0", KeyAction.Text('0')),
-            KeyDef(",", KeyAction.Text(',')),
-            KeyDef("⏎", KeyAction.Enter, isSpecial = true),
+            KeyDef("←", KeyAction.SwitchSymbols, isSpecial = true, isAccent = true),
+            KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.4f, isSpecial = true),
+            digit('0'),
+            KeyDef(".", KeyAction.Commit("."), widthWeight = 1.4f),
+            sideSpacer,
         ),
     )
 

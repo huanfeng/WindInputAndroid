@@ -96,6 +96,8 @@ object LayoutParser {
             }
 
             val width = number(entry, "width") ?: 1f
+            val rowSpan = number(entry, "row_span")?.toInt() ?: 1
+            val accent = entry.getBoolean("accent") ?: false
             val longPress = entry.getString("long_press") ?: ""
             val swipeUp = entry.getString("swipe_up")?.firstOrNull()
 
@@ -103,6 +105,20 @@ object LayoutParser {
             if (chars != null) {
                 val swipes = entry.getString("swipe") ?: ""
                 chars.forEachIndexed { ci, c -> add(charKey(c, swipes.getOrNull(ci), width)) }
+                continue
+            }
+
+            val commit = entry.getString("commit")
+            if (commit != null) {
+                add(
+                    KeyDef(
+                        entry.getString("label") ?: commit,
+                        KeyAction.Commit(commit),
+                        width,
+                        enText = entry.getString("en_text")?.firstOrNull(),
+                        rowSpan = rowSpan,
+                    ),
+                )
                 continue
             }
 
@@ -131,11 +147,13 @@ object LayoutParser {
                 "switch_symbols" -> KeyAction.SwitchSymbols
                 "switch_lang" -> KeyAction.SwitchLang
                 "emoji" -> KeyAction.Emoji
+                "symbol_page" -> KeyAction.SymbolPage
+                "number_pad" -> KeyAction.NumberPad
                 else -> throw IllegalArgumentException("未知 action: $name")
             }
             val label = entry.getString("label")
                 ?: throw IllegalArgumentException("功能键缺少 label")
-            add(KeyDef(label, action, width, isSpecial = true))
+            add(KeyDef(label, action, width, isSpecial = true, rowSpan = rowSpan, isAccent = accent))
         }
     }
 }

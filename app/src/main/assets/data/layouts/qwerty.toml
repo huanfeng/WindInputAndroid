@@ -9,11 +9,14 @@
 #     key  = [ {..} ] 显式键位数组，字段：
 #       spacer     占位空白的宽度权重（不绘制，触点归最近的键），如 { spacer = 0.5 }
 #       label      显示文本（text/chars 键可省略，缺省用字符本身）
-#       text       字符键的输出字符
+#       text       字符键的输出字符（经引擎：中文模式下标点转中文形态、有编码时数字选词）
+#       commit     原样上屏的文本，不经引擎（数字键盘、123 层的半角句点）
 #       chars      简写：连续字符批量展开
 #       action     功能键：shift | backspace | enter | space | switch_symbols | switch_lang
 #                  switch_lang 键面同时写「中」「英」，当前模式高亮；长按开快捷面板
-#                  emoji 打开表情面板
+#                  emoji 打开表情面板；symbol_page 分类符号页；number_pad 九宫格数字键盘
+#       accent     true = 强调色键面（123 层、数字键盘的返回键）
+#       row_span   纵向占几行（缺省 1）；下一行同一位置放等宽 spacer
 #       width      相对宽度权重，缺省 1.0
 #       swipe_up   上滑输出的副字符
 #       long_press 长按气泡字符集（每字符一项，横移选择）
