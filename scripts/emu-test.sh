@@ -946,6 +946,17 @@ menu_cell 1 0          # 恢复默认（第 2 行第 1 格）
 tap_key SPACE
 check "恢复默认后首选回到「式」" "式" "$(get_pad_text)"
 
+echo; echo "${Y}[37] 逗号、句号各占一键；五笔 emoj 出表情${N}"
+# 默认布局（豆包式底栏）：中文模式下逗号键出「，」、句号键出「。」，不用上滑
+reset_pad
+tap_key COMMA; tap_key PERIOD
+check "逗号键与句号键" "，。" "$(get_pad_text)"
+# 五笔 Emoji 库默认加载：emoj 首选是 😂（库里按权重排的第一个）。曾因 APK 没带这个库而什么都不出
+reset_pad
+tap_key e; tap_key m; tap_key o; tap_key j; tap_key SPACE
+# uiautomator 把 BMP 以外的字符写成 XML 数字实体：😂（U+1F602）读回来是 &#128514;
+check "emoj 上屏表情" "&#128514;" "$(get_pad_text)"
+
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then
