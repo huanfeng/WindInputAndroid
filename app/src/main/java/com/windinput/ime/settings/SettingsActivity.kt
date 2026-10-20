@@ -61,6 +61,30 @@ import java.io.File
  */
 class SettingsActivity : ComponentActivity() {
 
+    /**
+     * 输入法启用 / 当前状态。回到本页时重查：去系统设置启用后按返回是 onResume，
+     * 而「切换输入法」弹的是系统对话框，本页不 pause、只失焦——两处都要查。
+     */
+    private val imeSetup = mutableStateOf(ImeSetup.ENABLE)
+
+    private fun refreshImeSetup() {
+        val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+        val enabled = imm?.enabledInputMethodList.orEmpty().any { it.packageName == packageName }
+        val current = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+            ?.startsWith("$packageName/") == true
+        imeSetup.value = ImeSetup.of(enabled, current)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refreshImeSetup()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) refreshImeSetup()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val dirs = (application as WindInputApp).dataDirs
@@ -73,6 +97,7 @@ class SettingsActivity : ComponentActivity() {
         setContent {
             MiuixTheme {
                 SettingsApp(
+                    setup = imeSetup.value,
                     manifest = manifest,
                     userConfig = userConfig,
                     versionName = versionName,
@@ -99,8 +124,29 @@ private class SettingsActions(
     val openTestPad: () -> Unit,
 )
 
+/** 首页状态卡处在哪一步（docs/mobile-ux-reference.md §6.3） */
+enum class ImeSetup {
+    /** 第 1 步：去系统设置里启用 */
+    ENABLE,
+
+    /** 第 2 步：已启用，还没切成当前输入法 */
+    SWITCH,
+
+    /** 已在使用 */
+    READY;
+
+    companion object {
+        fun of(enabled: Boolean, current: Boolean): ImeSetup = when {
+            current -> READY // 能是当前输入法就一定已启用（个别系统的启用列表查询会漏）
+            enabled -> SWITCH
+            else -> ENABLE
+        }
+    }
+}
+
 @Composable
 private fun SettingsApp(
+    setup: ImeSetup,
     manifest: SettingsManifestData,
     userConfig: UserConfig,
     versionName: String,
@@ -150,7 +196,7 @@ private fun SettingsApp(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (page == null) {
-                HomeScreen(manifest, values, session, versionName, actions) { pageId = it }
+                HomeScreen(setup, manifest, values, session, versionName, actions) { pageId = it }
             } else {
                 PageScreen(manifest, page, values, session, versionName)
             }
@@ -168,6 +214,7 @@ private val SEGMENT_TITLES = listOf(
 
 @Composable
 private fun HomeScreen(
+    setup: ImeSetup,
     manifest: SettingsManifestData,
     values: SettingsValues,
     session: ImeSession?,
@@ -175,11 +222,23 @@ private fun HomeScreen(
     actions: SettingsActions,
     onOpen: (String) -> Unit,
 ) {
+    // 状态卡：没装好时只给「下一步该做什么」，装好了给「试一试」——新用户不用猜自己卡在哪
     Card(modifier = Modifier.fillMaxWidth()) {
         Column {
-            NavRow("启用输入法", "在系统设置中启用「清风输入法」", actions.enableIme)
-            NavRow("切换输入法", "弹出系统的输入法选择框，选「清风输入法」即设为当前输入法", actions.switchIme)
-            NavRow("输入测试台", "普通 / 搜索 / 数字 / 密码 / 句子五种场景的输入框，用于试打", actions.openTestPad)
+            when (setup) {
+                ImeSetup.ENABLE -> {
+                    NavRow("第 1 步：启用清风输入法", "去系统设置的输入法列表里打开「清风输入法」", actions.enableIme)
+                    NavRow("第 2 步：切换为当前输入法", "启用后回到这里再点", null)
+                }
+                ImeSetup.SWITCH -> {
+                    NavRow("✓ 已启用", null, null)
+                    NavRow("第 2 步：切换为当前输入法", "弹出系统的输入法选择框，选「清风输入法」", actions.switchIme)
+                }
+                ImeSetup.READY -> {
+                    NavRow("试一试", "普通 / 搜索 / 数字 / 密码 / 句子五种场景的输入框", actions.openTestPad)
+                    NavRow("切换输入法", "弹出系统的输入法选择框", actions.switchIme)
+                }
+            }
         }
     }
     for ((segment, title) in SEGMENT_TITLES) {
