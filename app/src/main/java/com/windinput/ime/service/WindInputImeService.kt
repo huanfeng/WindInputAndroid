@@ -188,6 +188,10 @@ class WindInputImeService :
     }
 
     override fun onCreateInputView(): View {
+        // 旋转 / 配色变化重建输入视图时不经 onFinishInputView：挂在旧条区上的卡片要在这里收，
+        // 否则按旧宽度和坐标留在新视图上（首次卡片点外面不收，会一直挂着）
+        candidateMenu?.dismiss()
+        schemaPicker?.dismiss()
         applyKeyboardDimens()
         // 深浅色：uiMode 变化会让系统重跑本方法，下面所有视图都按新调色板构造
         Palette.apply(this, userConfig.getString("ui.android.theme", "system"))
@@ -325,6 +329,7 @@ class WindInputImeService :
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
+        hasInlineComposition = false // 换了输入框，宿主那边没有我们挂的组合区
         // 先定学习开关再给焦点：焦点一到，引擎就可能开始记东西
         fieldSuspendsLearning = suspendsLearning(attribute?.inputType ?: 0, attribute?.imeOptions ?: 0)
         applyLearningSuspended()
@@ -344,6 +349,7 @@ class WindInputImeService :
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
             longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)
             spaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_space_cursor", true)
+            spaceLongPressEnabled = userConfig.getString("ui.android.space_long_press", "switch_ime") != "none"
             backspaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
             swipeSymbolsEnabled = userConfig.getBoolean("ui.android.gesture_swipe_symbols", true)
             showSwipeHints = userConfig.getBoolean("ui.android.show_swipe_hints", true)
@@ -445,7 +451,22 @@ class WindInputImeService :
      */
     private fun abandonComposition() {
         session.reset()
-        if (inlinePreedit) currentInputConnection?.finishComposingText()
+        currentInputConnection?.let(::clearInlineComposition)
+    }
+
+    /**
+     * 宿主组合区里是否挂着我们写进去的内联编码（只在开了 ui.android.inline_preedit 时会有）。
+     *
+     * 清组合区要分两种：有内联编码时用 `setComposingText("")` 把那串码**删掉**；没有时什么都
+     * 不做。`finishComposingText` 不能用来「清」——它只去掉下划线，码会原样留成正文（开着内联编码
+     * 打 a 再退格，正文里剩一个 a）；`setComposingText("")` 也不能无条件调——没有组合区时它
+     * 作用在选区上，会把用户选中的文字删掉。
+     */
+    private var hasInlineComposition = false
+
+    private fun clearInlineComposition(ic: android.view.inputmethod.InputConnection) {
+        if (hasInlineComposition) ic.setComposingText("", 1)
+        hasInlineComposition = false
     }
 
     /**
@@ -606,19 +627,22 @@ class WindInputImeService :
         try {
             for (op in ops) {
                 when (op) {
-                    is EditOp.Commit -> ic.commitText(op.text, 1)
+                    is EditOp.Commit -> {
+                        // commitText 会顶掉组合区里的内联编码
+                        ic.commitText(op.text, 1)
+                        hasInlineComposition = false
+                    }
                     is EditOp.SetComposition -> {
-                        if (op.text.isEmpty()) {
-                            ic.finishComposingText()
-                        } else if (isCompositionPlaceholder(op.text)) {
-                            // 占位组合（联想态挂的空格等）是桌面 TSF 给候选窗定位光标用的，手机上
-                            // 没有这回事。写进来就是输入框里一个带下划线的空格（真机反馈）；
-                            // 已有的内联编码也一并清掉，不能 finish——那会把编码当正文上屏
-                            if (inlinePreedit) ic.setComposingText("", 1)
+                        if (op.text.isEmpty() || isCompositionPlaceholder(op.text)) {
+                            // 空 = 核心要清组合区（退格清空、ESC…）；占位组合（联想态挂的空格等）
+                            // 是桌面 TSF 给候选窗定位光标用的，手机上没有这回事，写进来就是输入框
+                            // 里一个带下划线的空格（真机反馈）。两种都只清掉我们的内联编码
+                            clearInlineComposition(ic)
                         } else if (inlinePreedit) {
                             // 编码默认只显示在自绘编码栏：五笔码嵌在正文里是噪声，且与
                             // 编码栏重复。想要宿主内联的用户开 ui.android.inline_preedit。
                             ic.setComposingText(op.text, op.caret.coerceAtLeast(1))
+                            hasInlineComposition = true
                         }
                     }
                     // 按**码点**删除：核心按字符计数，deleteSurroundingText 的单位是
@@ -642,7 +666,7 @@ class WindInputImeService :
      * `composition_placeholder`）。移动端原则上不往输入框里放任何占位符。
      */
     private fun isCompositionPlaceholder(text: String): Boolean =
-        text.all { it == ' ' || it == '\u200B' || it == '\u2800' || it == '\u3000' }
+        text.all { it == ' ' || it == '\u200B' || it == '\u2800' }
 
     /** 相对移动光标：取当前选区绝对位置再 setSelection，比连发方向键可靠 */
     private fun moveCursor(ic: android.view.inputmethod.InputConnection, delta: Int) {
@@ -880,6 +904,16 @@ class WindInputImeService :
      * 切方案走 [DeferredSession] 的后台线程（首次切到拼音要现编词库），不卡主线程。
      */
     override fun onKeyLongPress(action: KeyAction) {
+        if (action == KeyAction.Space) {
+            // 长按空格：切输入法（Gboard 的习惯）或语音（豆包、搜狗的习惯），见设置「长按空格」。
+            // 有编码时先丢掉——不然弹出系统选择框回来，编码还悬在条区上
+            abandonComposition()
+            when (userConfig.getString("ui.android.space_long_press", "switch_ime")) {
+                "voice" -> if (voiceInputAvailable()) onVoiceInput() else onSwitchInputMethod()
+                "switch_ime" -> onSwitchInputMethod()
+            }
+            return
+        }
         if (action != KeyAction.SwitchLang) return
         if (!showSchemaPicker("切换方案")) {
             quickPanelWindow?.let { windowManager?.show(it) } // 核心没起来：退回快捷面板
@@ -896,6 +930,11 @@ class WindInputImeService :
      */
     private fun maybeShowFirstRunPicker() {
         if (onboardingPrefs.getBoolean(KEY_FIRST_PICK_SHOWN, false)) return
+        // 升级上来的老用户早就用着了（切过中英 / 方案就会记下上次中文方案）：不算首次
+        if (statePrefs.contains(KEY_LAST_CHINESE)) {
+            onboardingPrefs.edit().putBoolean(KEY_FIRST_PICK_SHOWN, true).apply()
+            return
+        }
         val info = currentInputEditorInfo ?: return
         val cls = info.inputType and android.text.InputType.TYPE_MASK_CLASS
         if (cls != android.text.InputType.TYPE_CLASS_TEXT || suspendsLearning(info.inputType, 0)) return
@@ -903,6 +942,8 @@ class WindInputImeService :
         // 条区要先量好才能定位卡片
         bar.post {
             if (onboardingPrefs.getBoolean(KEY_FIRST_PICK_SHOWN, false)) return@post
+            // 排进来到执行之间键盘可能已经收起：此时弹出用户看不到，标记却记上了
+            if (!isInputViewShown || currentInputEditorInfo == null) return@post
             if (showSchemaPicker("选一个输入方案（以后长按中英键随时换）", dismissOnOutside = false)) {
                 onboardingPrefs.edit().putBoolean(KEY_FIRST_PICK_SHOWN, true).apply()
             }
@@ -938,7 +979,8 @@ class WindInputImeService :
                     schemas.firstOrNull { it.active && it.id != ENGLISH_SCHEMA_ID }
                         ?.let { statePrefs.edit().putString(KEY_LAST_CHINESE, it.id).apply() }
                 }
-                abandonComposition()
+                // 与单击中英键一致：有编码先上屏字母原文再切，打了半截的码不吞掉
+                if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
                 session.runCommand(EngineCmd.SelectSchema(target.index))
             }
         }

@@ -85,7 +85,8 @@ class BarView(
     private val density = resources.displayMetrics.density
 
     // ── 编码行 ───────────────────────────────────────────────────
-    // 编码行高度写死 20dp，字号按 dp 而非 sp：系统字体放大到 1.3 倍以上时 sp 字号会被行高裁掉
+    // 编码行高度固定（竖屏 20dp、横屏 16dp，见 KeyboardDimens），字号按 dp 而非 sp：
+    // 系统字体放大到 1.3 倍以上时 sp 字号会被行高裁掉
     private val modeLabel = TextView(context).apply {
         setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 11f)
         includeFontPadding = false
@@ -116,9 +117,11 @@ class BarView(
     private val preeditRow = LinearLayout(context).apply {
         orientation = HORIZONTAL
         gravity = Gravity.CENTER_VERTICAL
-        setPadding(dp(10), dp(2), 0, 0)
+        // 横屏编码行只有 16dp：去掉顶部内边距、短称收矮，否则短称被裁、拼音的 g/j/p/q/y 下伸被裁
+        val compact = KeyboardDimens.barPreeditDp < 20f
+        setPadding(dp(10), if (compact) 0 else dp(2), 0, 0)
         setBackgroundColor(Palette.current.surface)
-        addView(modeLabel, LayoutParams(LayoutParams.WRAP_CONTENT, dp(15)))
+        addView(modeLabel, LayoutParams(LayoutParams.WRAP_CONTENT, dp(if (compact) 13 else 15)))
         addView(preeditText, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         addView(pagerText, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
     }

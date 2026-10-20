@@ -434,6 +434,11 @@ mark_onboarded() {
         | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p shared_prefs && cat > $ONBOARD_XML'"
 }
 mark_onboarded
+# [40] 中途断掉会留下 inline_preedit = true，之后所有读输入框的断言都带上内联编码
+if adb_ shell run-as "$PKG" cat files/user/config.toml 2>/dev/null | grep -q '^inline_preedit = true'; then
+    echo "${Y}残留 inline_preedit，清掉${N}"
+    adb_q shell "run-as $PKG sed -i '/^inline_preedit = true/d' files/user/config.toml"
+fi
 restart_pad
 SCHEMA_BEFORE="$(get_active_schema)"
 
@@ -1002,7 +1007,7 @@ reset_pad
 read -r lx ly <<< "$(key_center LANG)"
 adb_q shell input swipe "$lx" "$ly" "$lx" "$ly" 900; sleep 0.8
 menu_cell 0 1          # 全拼
-sleep 3
+sleep 6                # 模拟器上首次编译拼音词库近 5 秒，期间按键直接上屏字母
 tap_key n; tap_key i; tap_key SPACE
 check "切到全拼后 ni 出「你」" "你" "$(get_pad_text)"
 reset_pad
@@ -1016,7 +1021,11 @@ echo; echo "${Y}[40] 开着「编码也显示在输入框里」：上屏后输�
 # 核心在联想态挂一个占位组合（空格等，桌面 TSF 给候选窗定位用）；手机上写进来就是输入框里
 # 一个带下划线的空格（真机反馈）。键盘侧把纯占位的组合文本挡掉。开关是键盘自己的配置文件。
 KB_CFG=files/user/config.toml
-printf '[ui.android]\ninline_preedit = true\n' | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"
+kb_orig="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -v 'No such file')"
+write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"; }
+write_kb_cfg "$(strip_section "$kb_orig" ui.android)
+[ui.android]
+inline_preedit = true"
 restart_pad
 wait_chinese >/dev/null
 reset_pad
@@ -1024,13 +1033,18 @@ tap_key a; tap_key a
 check "内联编码写进输入框" "aa" "$(get_pad_text)"
 tap_key SPACE
 check "上屏后不留占位空格" "式" "$(get_pad_text)"
-printf '' | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $KB_CFG'"
+# 内联编码打一码再退格：码要被删掉，不能留成正文（finishComposingText 只去下划线）
+reset_pad
+tap_key a; tap_key BS
+check "内联编码退格清空后不留残码" "" "$(get_pad_text)"
+write_kb_cfg "$kb_orig"
 restart_pad
 wait_chinese >/dev/null
 
 echo; echo "${Y}[41] 首次使用：第一次弹键盘先出方案卡片，选完不再出${N}"
 # 点卡片里的「全拼」再打 ni：卡片在就出「你」；卡片没出来的话那一下落在字母键上，对不上
-adb_q shell run-as "$PKG" rm -f "$ONBOARD_XML"
+# 当成全新用户：连 ime_state（记着上次中文方案）一起删——记过它的会被当成升级上来的老用户、不弹卡片
+adb_q shell run-as "$PKG" rm -f "$ONBOARD_XML" shared_prefs/ime_state.xml
 restart_pad            # am start -S：进程重起，SharedPreferences 的进程内缓存一并丢掉
 sleep 2
 # 点输入框把键盘叫出来。卡片可能已随测试台的 stateVisible 弹出——首次卡片不因点应用区域

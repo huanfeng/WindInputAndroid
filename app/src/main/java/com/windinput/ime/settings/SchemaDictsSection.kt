@@ -14,6 +14,8 @@ import androidx.compose.ui.platform.LocalContext
 import android.widget.Toast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import uniffi.wind_android.ConfigException
@@ -44,7 +46,8 @@ internal fun SchemaDictsSection(title: String, schemaIds: List<String>) {
         for (d in dicts) {
             ToggleLine(d.label.ifEmpty { d.id }, d.description.ifEmpty { null }, d.enabled) { on ->
                 scope.launch {
-                    val error = withContext(Dispatchers.IO) {
+                    val error = dictWriteLock.withLock {
+                        withContext(Dispatchers.IO) {
                         val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
                         try {
                             for (id in schemaIds) {
@@ -56,6 +59,7 @@ internal fun SchemaDictsSection(title: String, schemaIds: List<String>) {
                         } catch (e: Exception) {
                             "操作失败：${e.message ?: e}"
                         }
+                        }
                     }
                     if (error != null) Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
                     reload++
@@ -64,3 +68,10 @@ internal fun SchemaDictsSection(title: String, schemaIds: List<String>) {
         }
     }
 }
+
+/**
+ * 附加词库的写入串行：核心每次是「读整份 dictionaries → 改一项 → 整份写回覆盖」，
+ * 连点两个开关时两个写入并行，后写的会把先写的落盘结果盖掉（内存里已翻、重启后对不上）。
+ */
+private val dictWriteLock = Mutex()
+

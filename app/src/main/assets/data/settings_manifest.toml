@@ -879,6 +879,21 @@ default = true
 [[item]]
 page = "keys"
 section = "手势"
+key = "ui.android.space_long_press"
+source = "android"
+type = "select"
+title = "长按空格"
+summary = "语音输入要求系统里装了带语音的输入法，没有时退回切换输入法"
+default = "switch_ime"
+options = [
+  { value = "none", label = "不做什么" },
+  { value = "switch_ime", label = "切换输入法" },
+  { value = "voice", label = "语音输入" },
+]
+
+[[item]]
+page = "keys"
+section = "手势"
 key = "ui.android.gesture_backspace_select"
 source = "android"
 type = "toggle"

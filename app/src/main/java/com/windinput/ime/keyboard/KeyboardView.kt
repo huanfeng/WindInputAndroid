@@ -77,6 +77,9 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 空格横滑移光标 / 退格左滑扩选 / 上滑副字符 三个手势的开关（设置项 ui.android.gesture_*） */
     var spaceSwipeEnabled = true
+
+    /** 长按空格有没有动作（设置项 ui.android.space_long_press ≠ none）；做什么由 Service 决定 */
+    var spaceLongPressEnabled = true
     var backspaceSwipeEnabled = true
     var swipeSymbolsEnabled = true
 
@@ -340,7 +343,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun hasLongPressAction(action: KeyAction): Boolean =
-        action == KeyAction.SwitchLang
+        action == KeyAction.SwitchLang || (action == KeyAction.Space && spaceLongPressEnabled)
 
     /**
      * 长按气泡的字符集。字母键固定是「小写 / 大写」两个形态（豆包的做法）：上滑字符已经有
