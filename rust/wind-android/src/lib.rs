@@ -492,6 +492,66 @@ impl WindCore {
             .stats_clear()
             .map_err(|reason| ConfigError::Rejected { reason })
     }
+
+    // ── 设置页：词库（用户词）─────────────────────────────────────────
+    //
+    // 与电脑版设置页「词库」同一份实现（主仓 wind-coordinator 的用户词模块）：拼音码的
+    // ü 归一、音节边界求解、数据方案折叠（拼音族共用一个库）都在核心里，这里只做形状转换。
+
+    /// 某方案的用户词一页。`query` 为空列全部（按编码序），否则编码前缀命中在前、
+    /// 词条内容 / 编码中段包含在后。
+    pub fn user_words(
+        &self,
+        schema_id: String,
+        query: String,
+        offset: u32,
+        limit: u32,
+    ) -> UserWordPageInfo {
+        let page = self.core.user_words(&schema_id, &query, offset, limit);
+        UserWordPageInfo {
+            items: page
+                .items
+                .into_iter()
+                .map(|w| UserWordInfo {
+                    code: w.code,
+                    text: w.text,
+                    weight: w.weight,
+                })
+                .collect(),
+            total: page.total,
+        }
+    }
+
+    /// 手动加词。拼音码可带空格声明音节切分（`ni hao`）。
+    pub fn user_word_add(
+        &self,
+        schema_id: String,
+        code: String,
+        text: String,
+    ) -> Result<(), ConfigError> {
+        self.core
+            .user_word_add(&schema_id, &code, &text)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 删一条用户词；`code` 直接传列表里显示的码（带音节空格也行）。
+    pub fn user_word_remove(
+        &self,
+        schema_id: String,
+        code: String,
+        text: String,
+    ) -> Result<(), ConfigError> {
+        self.core
+            .user_word_remove(&schema_id, &code, &text)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 清空某方案的全部用户词，返回删掉的条数。
+    pub fn user_words_clear(&self, schema_id: String) -> Result<u64, ConfigError> {
+        self.core
+            .user_words_clear(&schema_id)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
 }
 
 /// 配置字段（注册表一行）。`ty` ∈ bool / int / float / str / enum / str_list / map / struct_list。
@@ -597,4 +657,19 @@ pub struct DailyTotalInfo {
     pub total: u32,
     pub chinese: u32,
     pub english: u32,
+}
+
+/// 一条用户词。`code` 是显示码：拼音带音节空格（`ni hao`），码表原样。
+#[derive(Debug, uniffi::Record)]
+pub struct UserWordInfo {
+    pub code: String,
+    pub text: String,
+    pub weight: i32,
+}
+
+/// 用户词的一页与命中总数。
+#[derive(Debug, uniffi::Record)]
+pub struct UserWordPageInfo {
+    pub items: Vec<UserWordInfo>,
+    pub total: u64,
 }

@@ -162,7 +162,7 @@
 
 ### S5 词库页（视主仓接口情况，可能后置）
 
-**Status**: In Progress — S1、S2 完成，S3、S4 首版完成（2026-10-20）
+**Status**: In Progress — S1、S2 完成，S3、S4、S5 首版完成（2026-10-20）
 - S1：主仓 46102baa（统计报表挪进 wind-store 两端共用、wind-mobile 开 stats_*、config_set 校验键名、
   LayoutEnum 选项）；绑定层投影配置读写与统计，用例 3 条。
 - S2：清单改为 `[[page]]` + `[[item]]`（page / section / source / advanced），从 APK assets 直接读
@@ -173,7 +173,14 @@
   **没放进来的**：简繁转换、Emoji——APK 里没带 opencc / emoji 数据，开了也没效果，带上数据后再加；
   临时拼音 / 临时英文——触发键是实体键盘语义，手机上怎么触发另议。
 - S4 首版：概览数字、近 30 天柱状图、清空（两次确认）、启用统计开关。
-- 待做：词库页（主仓 wind-mobile 尚无个人词接口）；外观改走核心主题（`ui.theme.*`）；键盘高度改滑块预览。
+- 数值项改滑块（松手才写入）；键盘行高按真实尺寸画四行键预览，候选字号写一行示例。
+- S5 词库页首版：主仓 fd0de88d 把用户词的列表 / 加 / 删 / 清空从 wind-webdata 下沉到
+  wind-coordinator `user_words_api`（webdata 委托它，Android 闭包不含 webdata），wind-mobile 开
+  `user_words / user_word_add / user_word_remove / user_words_clear`；手机端管当前方案的个人词：
+  搜索、分页、点选删除、加词、清空（两次确认）。绑定层用例：加词 → 搜到 → 真按键打得出 → 删掉。
+  **没做**：备份恢复 / 从电脑版导入、暂停学习（主仓需加开关）、自定义短语。
+- 待做：外观改走核心主题——核心的调色板是候选窗语义色（text / accent …），没有键面、功能键这些
+  键盘域颜色；要先在主题格式里定键盘域节点（architecture §3.4），APK 也还没带 themes 数据。
 
 ## Stage 5: 真机走查 → v0.3.0
 **Goal**: 小米真机按「微信聊天 / 浏览器搜索 / 登录框 / 备忘录长文」四个场景逐项走查

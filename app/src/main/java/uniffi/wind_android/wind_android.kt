@@ -753,6 +753,14 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_stats_summary(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_user_word_add(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_user_word_remove(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_user_words(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_user_words_clear(
+    ): Int
     external fun uniffi_wind_android_checksum_constructor_windcore_new(
     ): Int
     external fun ffi_wind_android_uniffi_contract_version(
@@ -824,6 +832,14 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_stats_summary(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_user_word_add(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_user_word_remove(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`code`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_user_words(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`query`: RustBuffer.ByValue,`offset`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_user_words_clear(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
     external fun uniffi_wind_android_fn_func_init_logging(`filter`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun ffi_wind_android_rustbuffer_alloc(`size`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -1003,6 +1019,18 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_stats_summary() != 63898) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_user_word_add() != 15919) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_user_word_remove() != 21149) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_user_words() != 53270) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_user_words_clear() != 13532) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 19999) {
@@ -2032,6 +2060,27 @@ public interface WindCoreInterface {
      */
     fun `statsSummary`(): StatsSummaryInfo?
     
+    /**
+     * 手动加词。拼音码可带空格声明音节切分（`ni hao`）。
+     */
+    fun `userWordAdd`(`schemaId`: kotlin.String, `code`: kotlin.String, `text`: kotlin.String)
+    
+    /**
+     * 删一条用户词；`code` 直接传列表里显示的码（带音节空格也行）。
+     */
+    fun `userWordRemove`(`schemaId`: kotlin.String, `code`: kotlin.String, `text`: kotlin.String)
+    
+    /**
+     * 某方案的用户词一页。`query` 为空列全部（按编码序），否则编码前缀命中在前、
+     * 词条内容 / 编码中段包含在后。
+     */
+    fun `userWords`(`schemaId`: kotlin.String, `query`: kotlin.String, `offset`: kotlin.UInt, `limit`: kotlin.UInt): UserWordPageInfo
+    
+    /**
+     * 清空某方案的全部用户词，返回删掉的条数。
+     */
+    fun `userWordsClear`(`schemaId`: kotlin.String): kotlin.ULong
+    
     companion object
 }
 
@@ -2414,6 +2463,83 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     UniffiLib.uniffi_wind_android_fn_method_windcore_stats_summary(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 手动加词。拼音码可带空格声明音节切分（`ni hao`）。
+     */
+    @Throws(ConfigException::class)override fun `userWordAdd`(`schemaId`: kotlin.String, `code`: kotlin.String, `text`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_user_word_add(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterString.lower(`code`),
+        FfiConverterString.lower(`text`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 删一条用户词；`code` 直接传列表里显示的码（带音节空格也行）。
+     */
+    @Throws(ConfigException::class)override fun `userWordRemove`(`schemaId`: kotlin.String, `code`: kotlin.String, `text`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_user_word_remove(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterString.lower(`code`),
+        FfiConverterString.lower(`text`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 某方案的用户词一页。`query` 为空列全部（按编码序），否则编码前缀命中在前、
+     * 词条内容 / 编码中段包含在后。
+     */override fun `userWords`(`schemaId`: kotlin.String, `query`: kotlin.String, `offset`: kotlin.UInt, `limit`: kotlin.UInt): UserWordPageInfo {
+            return FfiConverterTypeUserWordPageInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_user_words(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterString.lower(`query`),
+        FfiConverterUInt.lower(`offset`),
+        FfiConverterUInt.lower(`limit`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 清空某方案的全部用户词，返回删掉的条数。
+     */
+    @Throws(ConfigException::class)override fun `userWordsClear`(`schemaId`: kotlin.String): kotlin.ULong {
+            return FfiConverterULong.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_user_words_clear(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),_status)
 }
     }
     )
@@ -3133,6 +3259,93 @@ public object FfiConverterTypeStatsSummaryInfo: FfiConverterRustBuffer<StatsSumm
 
 
 
+/**
+ * 一条用户词。`code` 是显示码：拼音带音节空格（`ni hao`），码表原样。
+ */
+data class UserWordInfo (
+    var `code`: kotlin.String
+    , 
+    var `text`: kotlin.String
+    , 
+    var `weight`: kotlin.Int
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUserWordInfo: FfiConverterRustBuffer<UserWordInfo> {
+    override fun read(buf: ByteBuffer): UserWordInfo {
+        return UserWordInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterInt.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: UserWordInfo) = (
+            FfiConverterString.allocationSize(value.`code`) +
+            FfiConverterString.allocationSize(value.`text`) +
+            FfiConverterInt.allocationSize(value.`weight`)
+    )
+
+    override fun write(value: UserWordInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`code`, buf)
+            FfiConverterString.write(value.`text`, buf)
+            FfiConverterInt.write(value.`weight`, buf)
+    }
+}
+
+
+
+/**
+ * 用户词的一页与命中总数。
+ */
+data class UserWordPageInfo (
+    var `items`: List<UserWordInfo>
+    , 
+    var `total`: kotlin.ULong
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeUserWordPageInfo: FfiConverterRustBuffer<UserWordPageInfo> {
+    override fun read(buf: ByteBuffer): UserWordPageInfo {
+        return UserWordPageInfo(
+            FfiConverterSequenceTypeUserWordInfo.read(buf),
+            FfiConverterULong.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: UserWordPageInfo) = (
+            FfiConverterSequenceTypeUserWordInfo.allocationSize(value.`items`) +
+            FfiConverterULong.allocationSize(value.`total`)
+    )
+
+    override fun write(value: UserWordPageInfo, buf: ByteBuffer) {
+            FfiConverterSequenceTypeUserWordInfo.write(value.`items`, buf)
+            FfiConverterULong.write(value.`total`, buf)
+    }
+}
+
+
+
 
 
 /**
@@ -3732,6 +3945,34 @@ public object FfiConverterSequenceTypeSchemaInfo: FfiConverterRustBuffer<List<Sc
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeSchemaInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeUserWordInfo: FfiConverterRustBuffer<List<UserWordInfo>> {
+    override fun read(buf: ByteBuffer): List<UserWordInfo> {
+        val len = buf.getInt()
+        return List<UserWordInfo>(len) {
+            FfiConverterTypeUserWordInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<UserWordInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeUserWordInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<UserWordInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeUserWordInfo.write(it, buf)
         }
     }
 }

@@ -795,13 +795,24 @@ fn english_schema_prefix_completion() {
         .map(|(_, items)| items.clone())
         .unwrap_or_default();
     eprintln!("beau 候选：{items:?}");
-    assert_eq!(items.first().map(String::as_str), Some("beau"), "首候选应为原文");
+    assert_eq!(
+        items.first().map(String::as_str),
+        Some("beau"),
+        "首候选应为原文"
+    );
     assert!(
-        items.iter().any(|w| w.to_ascii_lowercase().starts_with("beau") && w.len() > 4),
+        items
+            .iter()
+            .any(|w| w.to_ascii_lowercase().starts_with("beau") && w.len() > 4),
         "应有以 beau 开头的补全，实得 {items:?}",
     );
     let r = core.key_down(VK_SPACE, 0);
-    let text: String = r.ops.iter().filter(|o| o.kind == 0).map(|o| o.text.clone()).collect();
+    let text: String = r
+        .ops
+        .iter()
+        .filter(|o| o.kind == 0)
+        .map(|o| o.text.clone())
+        .collect();
     eprintln!("空格上屏：{text:?}");
     assert!(text.starts_with("beau"), "空格应上屏原文，实得 {text:?}");
 }
@@ -822,7 +833,15 @@ fn english_schema_shifted_letter_composes() {
     settle();
     rec.candidates.lock().unwrap().clear();
     let first = core.key_down(0x48, 0x0001); // Shift+H
-    eprintln!("Shift+H：consumed={} ops={:?}", first.consumed, first.ops.iter().map(|o| (o.kind, o.text.clone())).collect::<Vec<_>>());
+    eprintln!(
+        "Shift+H：consumed={} ops={:?}",
+        first.consumed,
+        first
+            .ops
+            .iter()
+            .map(|o| (o.kind, o.text.clone()))
+            .collect::<Vec<_>>()
+    );
     for vk in [0x45u32, 0x4C, 0x4C] {
         core.key_down(vk, 0); // e l l
     }
@@ -837,9 +856,20 @@ fn english_schema_shifted_letter_composes() {
         .cloned()
         .unwrap_or_default();
     eprintln!("Hell 编码={:?} 候选={:?}", last.0, last.1);
-    assert!(first.consumed && first.ops.iter().all(|o| o.kind != 0), "Shift+H 应进组合而不是直接上屏");
-    assert_eq!(last.1.first().map(String::as_str), Some("Hell"), "首候选应为原文（保留大小写）");
-    assert!(last.1.iter().any(|w| w.starts_with("Hello")), "应补全出 Hello，实得 {:?}", last.1);
+    assert!(
+        first.consumed && first.ops.iter().all(|o| o.kind != 0),
+        "Shift+H 应进组合而不是直接上屏"
+    );
+    assert_eq!(
+        last.1.first().map(String::as_str),
+        Some("Hell"),
+        "首候选应为原文（保留大小写）"
+    );
+    assert!(
+        last.1.iter().any(|w| w.starts_with("Hello")),
+        "应补全出 Hello，实得 {:?}",
+        last.1
+    );
 }
 
 /// 设置页写引擎项：`config_set` 写进核心的用户层，快照里读得回来；
@@ -905,4 +935,57 @@ fn stats_summary_counts_commits() {
     );
     let today = core.stats_daily("2000-01-01".into(), "2000-01-03".into());
     assert_eq!(today.len(), 3, "区间内每天一条，缺的补零");
+}
+
+/// 词库页：手动加的词立刻能打出来、列表里搜得到、删掉后两边都消失。
+///
+/// 「加了词却打不出」是词库页最要命的失败——列表看着有，用户以为功能坏了。
+/// 所以不只断言列表，还要真按键看候选。
+#[test]
+fn user_word_add_list_type_remove() {
+    let Some((core, rec, _env)) = setup_exclusive("user_words") else {
+        return;
+    };
+    let schema = core
+        .schemas()
+        .into_iter()
+        .find(|s| s.active)
+        .expect("应有当前方案")
+        .id;
+    let (code, text) = ("xxyy", "清风测词");
+    core.user_word_add(schema.clone(), code.into(), text.into())
+        .expect("加词应成功");
+
+    let page = core.user_words(schema.clone(), code.into(), 0, 20);
+    assert!(
+        page.items.iter().any(|w| w.text == text && w.code == code),
+        "按编码搜应搜到刚加的词，实得 {:?}",
+        page.items
+    );
+
+    for vk in [0x58u32, 0x58, 0x59, 0x59] {
+        core.key_down(vk, 0);
+    }
+    settle();
+    let typed: Vec<String> = rec
+        .candidates
+        .lock()
+        .unwrap()
+        .last()
+        .map(|(_, items)| items.clone())
+        .unwrap_or_default();
+    assert!(
+        typed.iter().any(|t| t == text),
+        "打 {code} 应出刚加的词，实得 {typed:?}"
+    );
+    core.key_down(0x1B, 0); // Esc 清掉编码
+
+    core.user_word_remove(schema.clone(), code.into(), text.into())
+        .expect("删词应成功");
+    let page = core.user_words(schema, code.into(), 0, 20);
+    assert!(
+        !page.items.iter().any(|w| w.text == text),
+        "删掉后列表里不应还有，实得 {:?}",
+        page.items
+    );
 }

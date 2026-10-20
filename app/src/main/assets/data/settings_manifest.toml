@@ -1,7 +1,7 @@
 # 安卓设置清单：驱动设置页生成（结构与取舍见 docs/mobile-ux-reference.md §6）。
 #
 # [[page]]   一级页面（首页的一行）
-#   id       页面标识；schema / stats / about 另有代码画的专属区块
+#   id       页面标识；schema / stats / dict / about 另有代码画的专属区块
 #   title    标题
 #   segment  首页分段：shared（与电脑版相同）/ android（手机键盘）/ tail（收尾）
 #
@@ -42,6 +42,11 @@ segment = "shared"
 [[page]]
 id = "stats"
 title = "统计"
+segment = "shared"
+
+[[page]]
+id = "dict"
+title = "词库"
 segment = "shared"
 
 # ── 手机键盘（安卓专属）──────────────────────────────────────

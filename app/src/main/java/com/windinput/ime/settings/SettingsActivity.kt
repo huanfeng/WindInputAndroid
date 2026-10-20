@@ -57,7 +57,7 @@ import java.io.File
  * docs/mobile-ux-reference.md §6——首页三段（与电脑版相同 / 手机键盘 / 收尾），
  * 每段一行一个页面并带一行摘要；点进去是按卡片分组的设置项，工程参数收在「进阶」里。
  *
- * 方案列表、统计概览、关于是代码画的专属区块，其余全部来自清单。
+ * 方案列表、统计概览、词库、关于是代码画的专属区块，其余全部来自清单。
  */
 class SettingsActivity : ComponentActivity() {
 
@@ -211,6 +211,7 @@ private fun pageSummary(
     return when (page.id) {
         "schema" -> session?.schemas()?.firstOrNull { it.active }?.name?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
+        "dict" -> "个人词：查看 · 搜索 · 加词 · 删除"
         "about" -> "版本 $versionName"
         else -> sectionList(manifest, page.id)
     }
@@ -232,6 +233,7 @@ private fun PageScreen(
     when (page.id) {
         "schema" -> SchemaSection(session)
         "stats" -> StatsSection()
+        "dict" -> DictSection(session)
         "about" -> AboutSection(versionName)
     }
     val sections = manifest.sectionsOf(page.id)
