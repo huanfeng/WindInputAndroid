@@ -106,6 +106,8 @@ data class CandidatePage(
     val offset: Int,
     val total: Int,
     val selected: Int,
+    /** 与 [items] 一一对应的注释灰字；没开「候选显示编码提示」时为空 */
+    val comments: List<String> = emptyList(),
 )
 
 /**
@@ -185,12 +187,20 @@ interface ImeSession {
         CandidatePage(emptyList(), offset, 0, 0)
 
     /**
-     * 候选长按菜单（对应电脑版的候选右键菜单，菜单项与文案由核心按候选类型给出）。
-     * [index] 是全量里的绝对下标。无候选 / 越界 → 空。
+     * [candidateWindow] 是否连同注释灰字一起取（设置项 ui.android.candidate_comment）。
+     * 注释要逐条求值（反查、注释库），关着时不付这份钱。
      */
+    var candidateComments: Boolean
+        get() = false
+        set(_) {}
+
     /** 第 [index]（绝对下标）个候选的提示段（编码 / 读音 / 释义…），与电脑版悬停气泡同源；没有就空 */
     fun candidateTooltip(index: Int): List<TooltipSection> = emptyList()
 
+    /**
+     * 候选长按菜单（对应电脑版的候选右键菜单，菜单项与文案由核心按候选类型给出）。
+     * [index] 是全量里的绝对下标。无候选 / 越界 → 空。
+     */
     fun candidateMenu(index: Int): List<CandidateMenuEntry> = emptyList()
 
     /**

@@ -759,6 +759,16 @@ max = 24
 unit = "sp"
 preview = "candidate_text"
 
+[[item]]
+page = "ui"
+section = "候选字体"
+key = "ui.android.candidate_comment"
+source = "android"
+type = "toggle"
+title = "候选显示编码提示"
+summary = "候选后面的小字：五笔显示剩余编码，拼音候选显示五笔码（与电脑版候选右侧灰字相同）"
+default = true
+
 # ═══ 统计（概览由代码画）═══════════════════════════════════════
 
 [[item]]

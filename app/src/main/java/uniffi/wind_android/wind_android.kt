@@ -731,6 +731,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidates(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_candidates_with_comments(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_config_defaults(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_config_registry(
@@ -829,6 +831,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_candidate_tooltip(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_candidates(`ptr`: Long,`offset`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_candidates_with_comments(`ptr`: Long,`offset`: Int,`limit`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_config_defaults(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1026,6 +1030,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_candidates() != 43261) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_candidates_with_comments() != 25152) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_config_defaults() != 33008) {
@@ -2067,6 +2074,11 @@ public interface WindCoreInterface {
     fun `candidates`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow
     
     /**
+     * 同 [`Self::candidates`]，另带每条候选的注释灰字（与电脑版候选窗同一份模板）。
+     */
+    fun `candidatesWithComments`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow
+    
+    /**
      * 出厂默认配置的全量快照（TOML 文本）。「恢复默认」与「和默认不同」的标注用它。
      */
     fun `configDefaults`(): kotlin.String
@@ -2401,6 +2413,24 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_method_windcore_candidates(
+        it,
+        
+        FfiConverterUInt.lower(`offset`),
+        FfiConverterUInt.lower(`limit`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 同 [`Self::candidates`]，另带每条候选的注释灰字（与电脑版候选窗同一份模板）。
+     */override fun `candidatesWithComments`(`offset`: kotlin.UInt, `limit`: kotlin.UInt): CandidateWindow {
+            return FfiConverterTypeCandidateWindow.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_candidates_with_comments(
         it,
         
         FfiConverterUInt.lower(`offset`),
@@ -3100,6 +3130,12 @@ data class CandidateWindow (
      * 当前高亮候选的**绝对**下标（空格上屏的目标）
      */
     var `selected`: kotlin.UInt
+    , 
+    /**
+     * 与 items 一一对应的注释灰字（码表剩余编码、拼音候选反查码…）；
+     * 只有 [`WindCore::candidates_with_comments`] 填，否则为空
+     */
+    var `comments`: List<kotlin.String>
     
 ){
     
@@ -3120,6 +3156,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
+            FfiConverterSequenceString.read(buf),
         )
     }
 
@@ -3127,7 +3164,8 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterSequenceString.allocationSize(value.`items`) +
             FfiConverterUInt.allocationSize(value.`offset`) +
             FfiConverterUInt.allocationSize(value.`total`) +
-            FfiConverterUInt.allocationSize(value.`selected`)
+            FfiConverterUInt.allocationSize(value.`selected`) +
+            FfiConverterSequenceString.allocationSize(value.`comments`)
     )
 
     override fun write(value: CandidateWindow, buf: ByteBuffer) {
@@ -3135,6 +3173,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.write(value.`offset`, buf)
             FfiConverterUInt.write(value.`total`, buf)
             FfiConverterUInt.write(value.`selected`, buf)
+            FfiConverterSequenceString.write(value.`comments`, buf)
     }
 }
 

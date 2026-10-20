@@ -209,9 +209,15 @@ class RustSession(
     override fun candidateMenuRun(index: Int, action: String): Boolean =
         index >= 0 && core.candidateMenuRun(index.toUInt(), action)
 
+    override var candidateComments: Boolean = false
+
     override fun candidateWindow(offset: Int, limit: Int): CandidatePage {
         val t0 = SystemClock.elapsedRealtimeNanos()
-        val w = core.candidates(offset.toUInt(), limit.toUInt())
+        val w = if (candidateComments) {
+            core.candidatesWithComments(offset.toUInt(), limit.toUInt())
+        } else {
+            core.candidates(offset.toUInt(), limit.toUInt())
+        }
         val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
         // 与 keyDown 同一条标尺：它同样在主线程上同步阻塞，超一帧就得改预取策略
         if (costUs > FRAME_BUDGET_US) {
@@ -222,6 +228,7 @@ class RustSession(
             offset = w.offset.toInt(),
             total = w.total.toInt(),
             selected = w.selected.toInt(),
+            comments = w.comments,
         )
     }
 

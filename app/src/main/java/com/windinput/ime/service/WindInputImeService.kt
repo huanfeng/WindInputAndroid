@@ -313,6 +313,9 @@ class WindInputImeService :
     /** 已从核心取到的候选（绝对下标即列表下标，选词直接用它） */
     private var loadedCandidates: List<String> = emptyList()
 
+    /** 与 [loadedCandidates] 对应的注释灰字（开了「候选显示编码提示」才有） */
+    private var loadedComments: List<String> = emptyList()
+
     /** 核心侧候选全量总数：`loadedCandidates.size < candidateTotal` 即还有得取 */
     private var candidateTotal = 0
 
@@ -348,6 +351,7 @@ class WindInputImeService :
         if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current) {
             setInputView(onCreateInputView())
         }
+        session.candidateComments = userConfig.getBoolean("ui.android.candidate_comment", true)
         KeyHaptics.init(this)
         KeyHaptics.enabled = userConfig.getBoolean("ui.android.haptic", true)
         KeyHaptics.strength = userConfig.getInt("ui.android.haptic_strength", KeyHaptics.DEFAULT_STRENGTH)
@@ -587,6 +591,7 @@ class WindInputImeService :
                     session.candidateWindow(0, CANDIDATE_PREFETCH)
                 }
                 loadedCandidates = page.items
+                loadedComments = page.comments
                 candidateTotal = page.total
                 composing = event.composing
                 keyboardWindow?.keyboardView?.composing = composing
@@ -595,6 +600,7 @@ class WindInputImeService :
 
                 barView?.setCandidateFrame(
                     items = loadedCandidates,
+                    comments = loadedComments,
                     preedit = event.preedit,
                     modeLabel = event.modeLabel,
                     page = event.page,
@@ -899,8 +905,9 @@ class WindInputImeService :
         val page = session.candidateWindow(loadedCandidates.size, CANDIDATE_CHUNK)
         if (page.items.isEmpty()) return
         loadedCandidates = loadedCandidates + page.items
+        loadedComments = loadedComments + page.comments
         candidateTotal = page.total
-        barView?.appendCandidates(page.items)
+        barView?.appendCandidates(page.items, page.comments)
         expandedCandidatesWindow?.appendCandidates(page.items)
     }
 

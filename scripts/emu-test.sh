@@ -439,6 +439,23 @@ if adb_ shell run-as "$PKG" cat files/user/config.toml 2>/dev/null | grep -q '^i
     echo "${Y}残留 inline_preedit，清掉${N}"
     adb_q shell "run-as $PKG sed -i '/^inline_preedit = true/d' files/user/config.toml"
 fi
+# 候选字后的编码灰字（ui.android.candidate_comment，默认开）让每个候选变宽，tap_candidate
+# 按固定步长点就会错位：整套用例关着它跑，跑完写回原配置。带 `# emu-test` 标记，
+# 中途断掉留下的这一行下次开跑时先剥掉，SUITE_KB_ORIG 拿到的就是用户自己的配置
+KB_CFG=files/user/config.toml
+COMMENT_OFF='candidate_comment = false # emu-test'
+write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"; }
+SUITE_KB_ORIG="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -v 'No such file' | grep -vxF "$COMMENT_OFF")"
+with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段就补一段
+    if printf '%s\n' "$1" | grep -qx '\[ui.android\]'; then
+        printf '%s\n' "$1" | awk -v line="$COMMENT_OFF" '{ print } $0 == "[ui.android]" { print line }'
+    else
+        printf '%s\n\n[ui.android]\n%s\n' "$1" "$COMMENT_OFF"
+    fi
+}
+write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
+restore_suite_kb() { write_kb_cfg "$SUITE_KB_ORIG"; }
+trap 'restore_suite_kb; exit 1' TERM INT
 restart_pad
 SCHEMA_BEFORE="$(get_active_schema)"
 
@@ -911,7 +928,7 @@ echo; echo "${Y}[35] 简入繁出：开启后「我们」上屏为「我們」${
 # 跑完把原文件写回去，不污染后续用例与下次运行；中途退出（die / Ctrl-C）也由 trap 写回。
 cfg_orig="$(read_core_cfg)"
 restore_cfg() { write_core_cfg "$cfg_orig"; }
-trap 'restore_cfg; exit 1' TERM INT
+trap 'restore_cfg; restore_suite_kb; exit 1' TERM INT
 write_core_cfg "$(strip_section "$cfg_orig" input.s2t)
 [input.s2t]
 enabled = true"
@@ -921,7 +938,7 @@ reset_pad
 for w in t r w u SPACE; do tap_key "$w"; done
 check "简入繁出上屏繁体" "我們" "$(get_pad_text)"
 restore_cfg
-trap 'exit 1' TERM
+trap 'restore_suite_kb; exit 1' TERM INT
 restart_pad
 wait_chinese >/dev/null
 
@@ -1037,11 +1054,10 @@ check "切回五笔 aa 出「式」" "式" "$(get_pad_text)"
 echo; echo "${Y}[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符${N}"
 # 核心在联想态挂一个占位组合（空格等，桌面 TSF 给候选窗定位用）；手机上写进来就是输入框里
 # 一个带下划线的空格（真机反馈）。键盘侧把纯占位的组合文本挡掉。开关是键盘自己的配置文件。
-KB_CFG=files/user/config.toml
 kb_orig="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -v 'No such file')"
-write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"; }
 write_kb_cfg "$(strip_section "$kb_orig" ui.android)
 [ui.android]
+$COMMENT_OFF
 inline_preedit = true"
 restart_pad
 wait_chinese >/dev/null
@@ -1094,6 +1110,7 @@ else
     check "活跃方案未被用例改动" "$SCHEMA_BEFORE" "$schema_after"
 fi
 
+restore_suite_kb
 echo; echo "${C}================================${N}"
 if (( FAILED == 0 )); then echo "${G}全部通过${N}"; exit 0; fi
 echo "${R}${FAILED} 项失败${N}"

@@ -70,12 +70,20 @@ class CandidateBarView(context: Context) : View(context) {
         textSize = 19 * density
     }
 
+    /** 注释灰字（码表剩余编码、拼音候选反查码）：候选字号的 0.6 倍，紧跟在字后 */
+    private val commentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Palette.current.hint
+        textSize = 19 * density * COMMENT_SCALE
+    }
+    private val commentGap = 3 * density
+
     /** 候选字号（sp，设置项 ui.android.candidate_text_sp）；改后全部重量 */
     var textSizeSp = 19f
         set(value) {
             if (field == value) return
             field = value
             textPaint.textSize = value * density
+            commentPaint.textSize = value * density * COMMENT_SCALE
             itemBounds.clear()
             contentWidth = 0f
             measureFrom(0)
@@ -84,6 +92,9 @@ class CandidateBarView(context: Context) : View(context) {
     private val helperPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     private var candidates: List<String> = emptyList()
+
+    /** 与 [candidates] 一一对应的注释；可以比它短（没开注释时为空） */
+    private var comments: List<String> = emptyList()
 
     /** 每个候选的命中区域（内容坐标系，未减滚动量） */
     private val itemBounds = mutableListOf<RectF>()
@@ -115,8 +126,9 @@ class CandidateBarView(context: Context) : View(context) {
     private var loadingMore = false
 
     /** 新一轮候选（替换全部） */
-    fun setCandidates(items: List<String>) {
+    fun setCandidates(items: List<String>, itemComments: List<String> = emptyList()) {
         candidates = items
+        comments = itemComments
         pressedIndex = -1
         loadingMore = false
         // 新一轮候选从头看起：保留上一轮的滚动位置会让用户以为候选没更新
@@ -129,10 +141,12 @@ class CandidateBarView(context: Context) : View(context) {
     }
 
     /** 续取到货：**只量新来的这一段**，已有的量过就不再动 */
-    fun appendCandidates(more: List<String>) {
+    fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
         loadingMore = false
         if (more.isEmpty()) return
         val from = candidates.size
+        // 注释与候选按下标对齐：前面那段若没带注释（中途开了开关），先用空串补齐
+        if (moreComments.isNotEmpty()) comments = comments + List(from - comments.size) { "" } + moreComments
         candidates = candidates + more
         measureFrom(from)
         invalidate()
@@ -142,7 +156,9 @@ class CandidateBarView(context: Context) : View(context) {
     private fun measureFrom(from: Int) {
         var x = if (from == 0) 0f else contentWidth
         for (i in from until candidates.size) {
-            val w = textPaint.measureText(candidates[i]) + itemPaddingH * 2
+            val comment = comments.getOrNull(i).orEmpty()
+            val commentW = if (comment.isEmpty()) 0f else commentGap + commentPaint.measureText(comment)
+            val w = textPaint.measureText(candidates[i]) + commentW + itemPaddingH * 2
             itemBounds += RectF(x, 0f, x + w, barHeightPx.toFloat())
             x += w
         }
@@ -197,6 +213,12 @@ class CandidateBarView(context: Context) : View(context) {
             }
             val y = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2
             canvas.drawText(item, rect.left + itemPaddingH, y, textPaint)
+            val comment = comments.getOrNull(i).orEmpty()
+            if (comment.isNotEmpty()) {
+                // 与候选字同一条基线：小字落在字脚，读起来是「字 + 下标式编码」
+                val x = rect.left + itemPaddingH + textPaint.measureText(item) + commentGap
+                canvas.drawText(comment, x, y, commentPaint)
+            }
         }
         canvas.restore()
     }
@@ -285,5 +307,10 @@ class CandidateBarView(context: Context) : View(context) {
     private fun findIndex(viewX: Float): Int {
         val contentX = viewX + scrollX
         return itemBounds.indexOfFirst { contentX >= it.left && contentX < it.right }
+    }
+
+    private companion object {
+        /** 注释灰字相对候选字号的比例 */
+        const val COMMENT_SCALE = 0.6f
     }
 }

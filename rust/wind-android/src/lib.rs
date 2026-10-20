@@ -256,6 +256,9 @@ pub struct CandidateWindow {
     pub total: u32,
     /// 当前高亮候选的**绝对**下标（空格上屏的目标）
     pub selected: u32,
+    /// 与 items 一一对应的注释灰字（码表剩余编码、拼音候选反查码…）；
+    /// 只有 [`WindCore::candidates_with_comments`] 填，否则为空
+    pub comments: Vec<String>,
 }
 
 impl From<CoreCandidateWindow> for CandidateWindow {
@@ -265,6 +268,7 @@ impl From<CoreCandidateWindow> for CandidateWindow {
             offset: w.offset as u32,
             total: w.total as u32,
             selected: w.selected as u32,
+            comments: w.comments,
         }
     }
 }
@@ -417,6 +421,13 @@ impl WindCore {
     /// 起手拉够铺满一两屏即可，用户滚到尾部再续取。
     pub fn candidates(&self, offset: u32, limit: u32) -> CandidateWindow {
         self.core.candidates(offset as usize, limit as usize).into()
+    }
+
+    /// 同 [`Self::candidates`]，另带每条候选的注释灰字（与电脑版候选窗同一份模板）。
+    pub fn candidates_with_comments(&self, offset: u32, limit: u32) -> CandidateWindow {
+        self.core
+            .candidates_with_comments(offset as usize, limit as usize)
+            .into()
     }
 
     /// 按**绝对下标**选词，返回编辑指令流（与 [`Self::key_down`] 同一种形状）。

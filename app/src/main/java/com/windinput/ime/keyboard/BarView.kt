@@ -294,8 +294,9 @@ class BarView(
         modeLabel: String,
         page: Int,
         totalPages: Int,
+        comments: List<String> = emptyList(),
     ) {
-        candidateBar.setCandidates(items)
+        candidateBar.setCandidates(items, comments)
         hasCandidates = items.isNotEmpty()
 
         currentPreedit = preedit
@@ -320,9 +321,9 @@ class BarView(
     }
 
     /** 续取到货：只把新的一段交给候选栏（不重量已有项，见 CandidateBarView 的说明） */
-    fun appendCandidates(more: List<String>) {
+    fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
         if (more.isEmpty()) return
-        candidateBar.appendCandidates(more)
+        candidateBar.appendCandidates(more, moreComments)
         hasCandidates = true
     }
 

@@ -129,6 +129,7 @@ class DeferredSession(
             mainHandler.post {
                 session.listener = listener
                 session.setLearningSuspended(learningSuspended)
+                session.candidateComments = candidateComments
                 delegate = session
                 Log.i(TAG, "核心就绪，耗时 ${cost}ms")
                 onReady(session)
@@ -158,6 +159,13 @@ class DeferredSession(
 
     override fun candidateSelected(index: Int): Boolean =
         if (busy) false else delegate?.candidateSelected(index) ?: false
+
+    /** 未就绪时先记下，核心就绪后补设（同 [learningSuspended]） */
+    override var candidateComments: Boolean = false
+        set(value) {
+            field = value
+            delegate?.candidateComments = value
+        }
 
     override fun candidateWindow(offset: Int, limit: Int): CandidatePage =
         (if (busy) null else delegate?.candidateWindow(offset, limit))
