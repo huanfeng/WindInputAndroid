@@ -236,6 +236,25 @@ dump_xml() {
     adb_ shell cat /sdcard/wt.xml
 }
 
+# 输入法窗口里的节点（键、候选、面板格子都报了无障碍节点）：dump 默认只导前台应用窗口，
+# 输入法窗口要 --windows。按文字 / 描述找，比按几何算坐标稳——布局一改坐标就点偏
+ime_xml() {
+    timeout 90 "$ADB" -s "$SERIAL" shell uiautomator dump --windows /sdcard/a11y.xml >/dev/null 2>&1
+    adb_ shell cat /sdcard/a11y.xml
+}
+ime_bounds() {   # 文字或描述为 $1 的节点 → "左 上 右 下"
+    local node
+    node="$(ime_xml | grep -oE '(text|content-desc)="'"$1"'"[^>]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1)"
+    [[ "$node" =~ bounds=\"\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]\" ]] || return 1
+    echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} ${BASH_REMATCH[4]}"
+}
+tap_ime() {
+    local l t r b
+    read -r l t r b <<< "$(ime_bounds "$1")" || true
+    [[ -n "$b" ]] || { echo "  ${D}找不到输入法里的「$1」${N}"; return 1; }
+    adb_q shell input tap $(( (l + r) / 2 )) $(( (t + b) / 2 ))
+    sleep 0.8
+}
 # 读输入框内容；输入框为空时 dump 会把 hint 填进 text，需剔除
 get_pad_text() {
     local node text hint
@@ -462,7 +481,8 @@ SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF "$COMMENT_OFF")"
 with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段就补一段
     # 用户自己写过的 candidate_comment 先去掉：留着就是重复键（TOML 错误、取值看解析器心情）
     local body
-    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*candidate_comment[[:space:]]*=')"
+    # one_hand 同理剥掉：[43] 中途断掉留下单手模式的话，后面按全宽几何点键的用例全会点偏
+    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand)[[:space:]]*=')"
     # 段头允许带空白与行尾注释（`[ui.android]  # 键盘`）；认不出就会再补一段，TOML 里是重复段
     if printf '%s\n' "$body" | grep -qE '^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$'; then
         printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" \
@@ -728,14 +748,11 @@ before="$(get_pad_text)"
 # ⚠ 上屏后条区被**联想候选**（标点）占着，工具栏不可见；这时点条区点到的是联想项
 # （实测把「，」上了屏）。先点一下输入框：光标动 → 组合/联想作废 → 工具栏回来。
 adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 0.8
-# 工具栏只剩入口和收起，文本编辑在快捷面板里：入口 → 面板网格第 2 行第 2 格
-# （第 1 行：中文标点 · 全角 · 无痕 · 表情；第 2 行：剪贴板 · 文本编辑 …）。
-# 网格行位置（键盘顶下 158dp）取自 QuickPanelWindow 实测：方案分段行 + 第 1 行开关格。
-# ⚠ 格子顺序一变（多出「简入繁出」格 s2tShown、新增开关）文本编辑就挪位，这里要跟着改。
+# 工具栏只剩入口和收起，文本编辑在快捷面板里：入口 → 按文字点「文本编辑」格（格子顺序、
+# 行高随开关数与键盘高度变，按坐标点曾在多出一格后点进了表情面板，整轮级联失败）。
 adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
 sleep 1
-adb_q shell input tap $(( GEO_W * 3 / 8 )) "$(awk -v t="$GEO_KBTOP" -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", t + 158 * d }')"
-sleep 1
+tap_ime 文本编辑
 cell_h=$(( GEO_ROWPX * 4 / 3 ))
 edit_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 8 )) $(( GEO_KBTOP + cell_h * (2 * $1 + 1) / 2 )); sleep 0.5; }
 edit_cell 1 1      # 选择
@@ -1143,6 +1160,23 @@ for name in 上档 删除 空格 中英切换 符号 123; do
 done
 check "字母键有无障碍节点（Q）" "yes" "$(grep -qxF Q <<< "$nodes" && echo yes || echo no)"
 check "候选栏的候选有无障碍节点（式）" "yes" "$(grep -qE '^式(，编码 .*)?$' <<< "$nodes" && echo yes || echo no)"
+reset_pad
+
+echo; echo "${Y}[43] 单手模式：快捷面板开、收窄后照常打字、换边、退出${N}"
+# 单手时键盘几何变了，tap_key 的全宽坐标不能用——全程按无障碍节点（文字 / 描述）点
+reset_pad
+q_full="$(ime_bounds Q | cut -d' ' -f1)"
+tap_ime 快捷功能; tap_ime 单手; tap_ime 返回
+q_right="$(ime_bounds Q | cut -d' ' -f1)"
+check "开单手（右手）：键盘靠右，Q 右移" "yes" "$( (( ${q_right:-0} > ${q_full:-0} + 100 )) && echo yes || echo no)"
+tap_ime A; tap_ime A; tap_ime 空格
+check "单手下照常打字" "式" "$(get_pad_text)"
+tap_ime 换边
+q_left="$(ime_bounds Q | cut -d' ' -f1)"
+check "换边：键盘靠左，Q 回到最左" "yes" "$( (( ${q_left:-999} <= ${q_full:-0} + 10 )) && echo yes || echo no)"
+tap_ime '退出&#10;单手'
+q_back="$(ime_bounds Q | cut -d' ' -f1)"
+check "退出单手：恢复满宽" "${q_full:-?}" "${q_back:-}"
 reset_pad
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
