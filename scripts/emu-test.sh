@@ -1332,6 +1332,30 @@ tap_key t; tap_key m; tap_key t; tap_key s; tap_key SPACE
 check_match "恢复默认后 tmts 不再出时间戳" '^[^0-9]*$' "$(get_pad_text)"
 reset_pad
 
+section "[47] 横屏：键盘铺满整宽（挖孔在侧边）、输入框不被挤出屏外、照常打字"
+set_rotation() {   # 0 竖屏 / 1 横屏
+    adb_q shell settings put system accelerometer_rotation 0
+    adb_q shell settings put system user_rotation "$1"
+    sleep 2.5
+}
+set_rotation 1
+reset_pad
+# 输入法窗口的 frame 应横跨整个屏宽：默认不进挖孔区时左缘是挖孔宽度（模拟器 128px）
+ime_frame="$(adb_ shell dumpsys window windows \
+    | awk '/Window\{.* InputMethod\}:/ { on = 1 } on && /Frames:/ { print; exit }' \
+    | grep -o ' frame=\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]')"
+read -r fl ft fr fb <<< "$(grep -oE '[0-9]+' <<< "$ime_frame" | tr '\n' ' ')"
+screen_w="$(adb_ shell wm size | grep -oE '[0-9]+x[0-9]+' | tail -1 | awk -Fx '{ print ($1 > $2) ? $1 : $2 }')"
+check "输入法窗口左缘贴屏边" "0" "${fl:-?}"
+check "输入法窗口右缘贴屏边" "$screen_w" "${fr:-?}"
+# 输入框整个落在键盘上方（「试一试」横屏时页签让位）
+edit_b="$(dump_xml | sed 's/<node/\n<node/g' | grep 'windinput-testpad' | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | grep -oE '[0-9]+' | sed -n 4p)"
+check "输入框在键盘上方可见" "yes" "$([[ -n "$edit_b" && -n "$ft" && "$edit_b" -le "$ft" ]] && echo yes || echo "no(框底 ${edit_b:-?} 键盘顶 ${ft:-?})")"
+adb_q shell input keyevent KEYCODE_A KEYCODE_A KEYCODE_SPACE
+check_match "横屏打字出汉字" "$CN" "$(wait_pad_match "$CN")"
+set_rotation 0
+reset_pad
+
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then
