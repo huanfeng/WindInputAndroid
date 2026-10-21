@@ -46,7 +46,10 @@ class KeyboardView(context: Context) : View(context) {
         /** 退格滑动抬手：删除当前选区 */
         fun onBackspaceSwipeDelete()
 
-        /** 功能键长按（中英键 → 方案卡片，空格 → 按设置切输入法 / 语音） */
+        /** 退格上滑过阈值后抬手：清空（有编码清编码，否则清空整个输入框） */
+        fun onBackspaceClearAll()
+
+        /** 功能键长按（空格 → 按设置切输入法 / 语音；中英键弹不出菜单时退到这里） */
         fun onKeyLongPress(action: KeyAction)
 
         /**
@@ -797,6 +800,26 @@ class KeyboardView(context: Context) : View(context) {
             }
         }
 
+        // 退格上滑：清空。与字母键上滑同一套一体式气泡（上半「清空」、下半退格），
+        // 过阈值变强调色、抬手才执行，滑回来可反悔；一旦进了上滑就不再算左滑扩选
+        if (key.action == KeyAction.Backspace && backspaceSwipeEnabled && !backspaceSwipeActive) {
+            if (!swipeShown && dy > swipeActivatePx && dy > kotlin.math.abs(dx)) {
+                val rect = pressedRect ?: return
+                swipeShown = true
+                cancelTimers()
+                popupManager.showSwipeBubble(rect, "⌫", "清空")
+            }
+            if (swipeShown) {
+                val armed = dy > swipeThresholdPx
+                if (armed != swipeArmed) {
+                    swipeArmed = armed
+                    popupManager.setSwipeArmed(armed)
+                    if (armed) KeyHaptics.tap(this)
+                }
+                return
+            }
+        }
+
         // 退格左滑：扩选删除（实时选中光标前 N 字符）
         if (key.action == KeyAction.Backspace && backspaceSwipeEnabled) {
             val dxLeft = downX - x
@@ -851,6 +874,8 @@ class KeyboardView(context: Context) : View(context) {
         }
         val key = pressedKey
         val swipeChar = if (swipeArmed) key?.swipeFor(englishMode) else null
+        val clearAll = swipeArmed && key?.action == KeyAction.Backspace
+        val swipeAbandoned = swipeShown && !swipeArmed && key?.action == KeyAction.Backspace
         val popupChoice = popupManager.popupSelectedIndex()
             ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
         val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
@@ -859,6 +884,8 @@ class KeyboardView(context: Context) : View(context) {
         cancelPress()
         when {
             swipeChar != null -> listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
+            clearAll -> listener?.onBackspaceClearAll()
+            swipeAbandoned -> Unit // 上滑出了气泡又退回来：反悔，不删
             wasSpaceSwipe -> Unit
             wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
             // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）

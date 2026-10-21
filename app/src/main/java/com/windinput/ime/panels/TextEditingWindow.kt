@@ -30,7 +30,7 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
 
     enum class EditAction {
         UP, DOWN, LEFT, RIGHT, HOME, END,
-        TOGGLE_SELECT, SELECT_ALL, CUT, COPY, PASTE, BACKSPACE,
+        TOGGLE_SELECT, SELECT_ALL, CUT, COPY, PASTE, BACKSPACE, UNDO, REDO,
     }
 
     private var selectButton: TextView? = null
@@ -45,11 +45,12 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
     override fun onCreateView(context: Context): View {
         val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
-        // 4×3 网格：文本按钮，功能标注见各 label
+        // 4×3 网格 + 底行撤销 / 重做（各占半行）：文本按钮，功能标注见各 label
         val rows = listOf(
             listOf("全选" to EditAction.SELECT_ALL, "↑" to EditAction.UP, "剪切" to EditAction.CUT, "行首" to EditAction.HOME),
             listOf("←" to EditAction.LEFT, "选择" to EditAction.TOGGLE_SELECT, "→" to EditAction.RIGHT, "行尾" to EditAction.END),
             listOf("复制" to EditAction.COPY, "↓" to EditAction.DOWN, "粘贴" to EditAction.PASTE, "⌫" to EditAction.BACKSPACE),
+            listOf("撤销" to EditAction.UNDO, "重做" to EditAction.REDO),
         )
         for (row in rows) {
             val rowView = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }

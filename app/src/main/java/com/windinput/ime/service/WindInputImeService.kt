@@ -293,6 +293,9 @@ class WindInputImeService :
 
         const val TAG = "WindIme"
 
+        /** 退格上滑清空时向前 / 向后各取多少字：够一般输入框，超长文档清不干净好过一次读几 MB */
+        const val CLEAR_ALL_MAX = 100_000
+
         /** 切方案超过这么久还没完才提示「词库准备中」 */
         const val SWITCH_HINT_DELAY_MS = 300L
 
@@ -1333,6 +1336,39 @@ class WindInputImeService :
 
     // ── 工具栏 ───────────────────────────────────────────────────
 
+    /**
+     * 退格上滑抬手：有编码 → 清空编码；否则清空整个输入框。走宿主的文本删除，
+     * 误清了可以在编辑面板「撤销」找回（文本框自带的撤销栈）
+     */
+    override fun onBackspaceClearAll() {
+        if (composing) {
+            abandonComposition()
+            return
+        }
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        if (!ic.getSelectedText(0).isNullOrEmpty()) ic.commitText("", 1)
+        val before = ic.getTextBeforeCursor(CLEAR_ALL_MAX, 0)?.length ?: 0
+        val after = ic.getTextAfterCursor(CLEAR_ALL_MAX, 0)?.length ?: 0
+        if (before + after > 0) ic.deleteSurroundingText(before, after)
+        ic.endBatchEdit()
+    }
+
+    /**
+     * 撤销 / 重做：发 Ctrl+Z / Ctrl+Shift+Z。这是 Android 文本框的标准快捷键
+     * （TextView 自带撤销栈，浏览器网页输入框也认），不用输入法自己记历史。
+     * 有编码时先放弃编码：撤销的对象是已经写进输入框的字
+     */
+    private fun sendUndoRedo(redo: Boolean) {
+        if (composing) abandonComposition()
+        val ic = currentInputConnection ?: return
+        var meta = KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
+        if (redo) meta = meta or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
+        val now = SystemClock.uptimeMillis()
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, meta))
+        ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, meta))
+    }
+
     override fun onToolbarAction(action: BarView.ToolbarAction) {
         val wm = windowManager ?: return
         when (action) {
@@ -1562,6 +1598,8 @@ class WindInputImeService :
             TextEditingWindow.EditAction.BACKSPACE -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             else -> moveCaret(ic, action)
         }
+            TextEditingWindow.EditAction.UNDO -> sendUndoRedo(redo = false)
+            TextEditingWindow.EditAction.REDO -> sendUndoRedo(redo = true)
     }
 
     /** 当前选区的绝对偏移 (start, end)；宿主不支持 ExtractedText 时为 null */

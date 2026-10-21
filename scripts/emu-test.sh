@@ -797,7 +797,7 @@ check "点编辑框后空格不上屏旧码的字" " " "$(get_pad_text)"
 
 section "[17] 编辑面板：选择 + 方向键 + 剪切"
 # 选择模式此前靠带 Shift 的方向键事件，多数编辑器不理会 → 「选择无效」。现在用 setSelection。
-# 面板网格 4 列 × 3 行铺满键盘四行区域；顶栏（返回）与条区等高。
+# 面板网格 4 列 × 3 行 + 底行撤销 / 重做，铺满键盘四行区域（一格一键行高）；顶栏（返回）与条区等高。
 reset_pad
 tap_key a; tap_key a; tap_key SPACE
 tap_key a; tap_key a; tap_key SPACE
@@ -811,7 +811,7 @@ tap_edit; sleep 0.8
 adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
 sleep 1
 tap_ime 文本编辑
-cell_h=$(( GEO_ROWPX * 4 / 3 ))
+cell_h=$GEO_ROWPX
 edit_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 8 )) $(( GEO_KBTOP + cell_h * (2 * $1 + 1) / 2 )); sleep 0.5; }
 edit_cell 1 1      # 选择
 edit_cell 1 0      # ←
@@ -1369,6 +1369,27 @@ restore_suite_kb
 echo; echo "${C}最慢的用例：${N}"
 printf '%s\n' "${SECTION_TIMES[@]}" | sort -rn | head -10 | awk -F'\t' '{ printf "  %4ds  %s\n", $1, $2 }'
 echo "  合计 ${SECONDS}s"
+section "[48] 退格上滑清空输入框，编辑面板撤销找回、重做再清"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+tap_key a; tap_key a; tap_key SPACE
+tap_edit; sleep 0.8   # 收起联想，免得条区挡着工具栏
+before="$(get_pad_text)"
+read -r bs_x bs_y <<< "$(key_center BS)"
+adb_q shell input swipe "$bs_x" "$bs_y" "$bs_x" $(( bs_y - GEO_ROWPX * 2 )) 300
+sleep 0.6
+check "退格上滑清空输入框" "" "$(get_pad_text)"
+adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
+sleep 1
+tap_ime 文本编辑
+tap_ime 撤销
+check "撤销找回清空前的字" "$before" "$(get_pad_text)"
+tap_ime 重做
+check "重做再次清空" "" "$(get_pad_text)"
+adb_q shell input tap "$GEO_PANELBACKX" "$GEO_PANELHEADERY"   # 返回键盘
+sleep 1
+reset_pad
+
 echo; echo "${C}================================${N}"
 if (( FAILED == 0 )); then echo "${G}全部通过${N}"; exit 0; fi
 echo "${R}${FAILED} 项失败${N}"

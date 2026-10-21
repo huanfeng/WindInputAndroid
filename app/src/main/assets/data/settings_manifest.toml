@@ -955,8 +955,8 @@ section = "手势"
 key = "ui.android.gesture_backspace_select"
 source = "android"
 type = "toggle"
-title = "退格左滑批量删除"
-summary = "有编码时清空编码，没有编码时选中并删除光标前的文字"
+title = "退格滑动删除"
+summary = "左滑选中光标前的文字后删除，上滑清空整个输入框；有编码时都只清空编码。误删可在「文本编辑」里撤销"
 default = true
 
 [[item]]
