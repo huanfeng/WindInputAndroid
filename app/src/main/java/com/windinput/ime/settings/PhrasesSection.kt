@@ -46,6 +46,7 @@ internal fun PhrasesSection() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var phrases by remember { mutableStateOf<List<PhraseInfo>?>(null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
     var reload by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
     var newCode by remember { mutableStateOf("") }
@@ -53,19 +54,24 @@ internal fun PhrasesSection() {
     var selected by remember { mutableStateOf<PhraseInfo?>(null) }
 
     LaunchedEffect(reload) {
-        phrases = withContext(Dispatchers.IO) {
-            runCatching { CoreAccess.obtainCore(context)?.phrases() }.getOrNull()
+        val result = withContext(Dispatchers.IO) {
+            runCatching { CoreAccess.obtainCore(context)?.phrases() }
+        }
+        phrases = result.getOrNull()
+        loadError = when {
+            result.isFailure -> "读取失败：${result.exceptionOrNull()?.message}"
+            phrases == null -> "输入法核心未就绪"
+            else -> null
         }
     }
 
-    /** 写操作放后台；失败报核心给的原因（只读模式等），成功后重读列表 */
-    fun write(done: String?, onSuccess: () -> Unit = {}, op: (WindCore) -> Unit) {
+    /** 写操作放后台；失败报核心给的原因（只读模式等），成功后重读列表。[op] 返回非空即作为失败原因 */
+    fun write(done: String?, onSuccess: () -> Unit = {}, op: (WindCore) -> String?) {
         scope.launch {
             val error = withContext(Dispatchers.IO) {
                 val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
                 try {
                     op(core)
-                    null
                 } catch (e: ConfigException) {
                     (e as? ConfigException.Rejected)?.reason ?: e.toString()
                 } catch (e: Exception) {
@@ -81,7 +87,8 @@ internal fun PhrasesSection() {
 
     val all = phrases
     if (all == null) {
-        SectionTitle("正在读取…")
+        // 核心拿不到就一直是 null：给出原因，别让人以为还在加载
+        SectionTitle(loadError ?: "正在读取…")
         return
     }
 
@@ -107,7 +114,7 @@ internal fun PhrasesSection() {
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {
                     val (code, text) = newCode.trim() to newText.trim()
-                    write("已添加「$text」", onSuccess = { newCode = ""; newText = "" }) { it.phraseAdd(code, text) }
+                    write("已添加「$text」", onSuccess = { newCode = ""; newText = "" }) { it.phraseAdd(code, text); null }
                 },
             )
         }
@@ -136,8 +143,8 @@ internal fun PhrasesSection() {
                 phrase = p,
                 selected = selected == p,
                 onClick = { selected = if (selected == p) null else p },
-                onToggle = { on -> write(null) { it.phraseSetEnabled(p.code, p.text, on) } },
-                onDelete = { write("已删除「${p.text}」") { it.phraseRemove(p.code, p.text) } },
+                onToggle = { on -> write(null) { it.phraseSetEnabled(p.code, p.text, on); null } },
+                onDelete = { write("已删除「${p.text}」") { it.phraseRemove(p.code, p.text); null } },
             )
         }
     }
@@ -146,7 +153,8 @@ internal fun PhrasesSection() {
     // 恢复默认放在列表前：系统短语七十多条、每条两三行，放在末尾要翻到底才找得到
     Card(modifier = Modifier.fillMaxWidth()) {
         NavRow("系统短语恢复默认", "开关回到出厂设定（出厂关闭的仍关闭），自己加的不动") {
-            write("已恢复默认") { it.phrasesRestoreDefaults() }
+            // 核心同步系统短语失败时只记日志、返回 0（成功时是系统短语条数，不会是 0）
+            write("已恢复默认") { if (it.phrasesRestoreDefaults() == 0uL) "恢复失败，系统短语没有改动" else null }
         }
     }
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -156,7 +164,7 @@ internal fun PhrasesSection() {
                 phrase = p,
                 selected = false,
                 onClick = null,
-                onToggle = { on -> write(null) { it.phraseSetEnabled(p.code, p.text, on) } },
+                onToggle = { on -> write(null) { it.phraseSetEnabled(p.code, p.text, on); null } },
                 onDelete = null,
             )
         }

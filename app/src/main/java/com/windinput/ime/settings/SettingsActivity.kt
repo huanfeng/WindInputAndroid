@@ -328,15 +328,17 @@ private fun SettingsApp(
         val target = route.up()
         try {
             events.collect { transitionState.seekTo(it.progress, target) }
-            // 先在这里把过渡放完、再改路由（官方示例的顺序）：反过来的话路由一变，过渡按新的
-            // 一对起止重算一次，已经拖开的页从另一侧再滑回来一截
-            transitionState.animateTo(target, tween(220, easing = LinearOutSlowInEasing))
-            go(target)
         } catch (e: CancellationException) {
-            // 本协程已取消，回弹动画另起一个
+            // 手势放弃：本协程已取消，回弹动画另起一个
             appScope.launch { transitionState.animateTo(route, tween(200, easing = LinearOutSlowInEasing)) }
             throw e
         }
+        // 先在这里把过渡放完、再改路由（官方示例的顺序）：反过来的话路由一变，过渡按新的
+        // 一对起止重算一次，已经拖开的页从另一侧再滑回来一截。
+        // 放在 try 外：收尾这 220ms 里点了露出来的上一级页面，新路由的动画会打断这里——
+        // 那是用户换了去处，不是放弃手势，不能回弹到旧页（会盖掉新路由）
+        transitionState.animateTo(target, tween(220, easing = LinearOutSlowInEasing))
+        go(target)
     }
     val transition = rememberTransition(transitionState, label = "settings-route")
 
