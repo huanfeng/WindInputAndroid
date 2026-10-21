@@ -15,21 +15,39 @@ class UserConfig(private val file: File) {
 
     private companion object {
         const val TAG = "UserConfig"
+
+        /**
+         * 解析结果按文件路径缓存，进程内共享（输入法服务与设置页各有一个实例，同一进程）。
+         *
+         * 此前每取一个值都要读盘 + 整份解析：弹一次键盘 onStartInputView 取二十来项，就在主线程
+         * 上解析二十来遍；设置页键盘侧的每一项、每次重组也各解析一遍。
+         *
+         * 失效：本进程写入（[put]）直接换上新表；进程外改了文件（测试脚本 run-as 直接写）按
+         * 修改时间 + 大小发现。
+         */
+        private val cache = HashMap<String, Snapshot>()
     }
 
+    private class Snapshot(val modified: Long, val length: Long, val values: Map<String, Any>)
+
     /** 点分键 → 值（String/Boolean/Long/Double），读取失败返回空表 */
-    fun readAll(): Map<String, Any> {
+    fun readAll(): Map<String, Any> = synchronized(cache) {
         if (!file.isFile) return emptyMap()
-        return try {
-            val result = Toml.parse(file.readText())
-            if (result.hasErrors()) {
-                Log.w(TAG, "config.toml has errors: ${result.errors()}")
-            }
-            result.dottedKeySet().associateWith { key -> result.get(key)!! }
-        } catch (e: Exception) {
-            Log.w(TAG, "read config.toml failed", e)
-            emptyMap()
+        val modified = file.lastModified()
+        val length = file.length()
+        cache[file.path]?.takeIf { it.modified == modified && it.length == length }?.let { return it.values }
+        parse().also { cache[file.path] = Snapshot(modified, length, it) }
+    }
+
+    private fun parse(): Map<String, Any> = try {
+        val result = Toml.parse(file.readText())
+        if (result.hasErrors()) {
+            Log.w(TAG, "config.toml has errors: ${result.errors()}")
         }
+        result.dottedKeySet().associateWith { key -> result.get(key)!! }
+    } catch (e: Exception) {
+        Log.w(TAG, "read config.toml failed", e)
+        emptyMap()
     }
 
     fun getBoolean(key: String, default: Boolean): Boolean =
@@ -45,10 +63,14 @@ class UserConfig(private val file: File) {
      * 写回一个键值（读全量 → 改内存 → 重新序列化整文件）。
      * 值仅支持标量（Boolean/Long/Double/String）。
      */
-    fun put(key: String, value: Any) {
+    fun put(key: String, value: Any) = synchronized(cache) {
         val all = readAll().toMutableMap()
-        all[key] = value
+        // 与 TOML 解析出的类型对齐（整数解析出来是 Long）：缓存里放的就是下次读到的样子
+        all[key] = if (value is Int) value.toLong() else value
         write(all)
+        // 直接换上刚写的表：修改时间精度可能只到秒，同一秒内同长度的两次写（30 → 31）
+        // 只凭时间 + 大小分不出来
+        cache[file.path] = Snapshot(file.lastModified(), file.length(), all)
     }
 
     private fun write(values: Map<String, Any>) {
