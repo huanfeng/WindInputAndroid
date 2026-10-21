@@ -394,7 +394,15 @@ class KeyboardView(context: Context) : View(context) {
             }
         }
         sideRect = computeSideRect(width)
+        // 键位变了（换层、改尺寸）：旧的虚拟节点作废，让无障碍服务重取
+        if (a11yAttached) a11y.invalidateRoot()
     }
+
+    /**
+     * 无障碍代理已挂上。属性按声明顺序初始化，[rebuildBounds] 可能在 [a11y] 建好之前被调用
+     * （构造期换层），那时它还是 null——用这个标记挡住（JVM 默认 false）。
+     */
+    private var a11yAttached = false
 
     private fun computeSideRect(width: Int): RectF? {
         val first = rows.firstOrNull()?.firstOrNull() ?: return null
@@ -851,6 +859,70 @@ class KeyboardView(context: Context) : View(context) {
             rebuildBounds(width)
         }
         invalidate()
+    }
+
+    // ── 无障碍 ──────────────────────────────────────────────────────
+    // 键是 Canvas 画的，系统看不见：每个键报成一个虚拟节点（读屏念键名、双击即按），
+    // uiautomator 也因此能按文字找到键。按下走 [handleKey]，与手指点按同一条路。
+
+    private val a11y = object : androidx.customview.widget.ExploreByTouchHelper(this) {
+        override fun getVirtualViewAt(x: Float, y: Float): Int =
+            keyBounds.indexOfFirst { it.rect.contains(x, y) }.takeIf { it >= 0 } ?: INVALID_ID
+
+        override fun getVisibleVirtualViews(ids: MutableList<Int>) {
+            keyBounds.indices.forEach(ids::add)
+        }
+
+        override fun onPopulateNodeForVirtualView(id: Int, node: androidx.core.view.accessibility.AccessibilityNodeInfoCompat) {
+            val kb = keyBounds.getOrNull(id)
+            if (kb == null) {
+                // 键位刚重排、旧 id 失效：给个空壳，ExploreByTouchHelper 要求边界非空
+                node.contentDescription = ""
+                node.setBoundsInParent(android.graphics.Rect(0, 0, 1, 1))
+                return
+            }
+            node.className = android.widget.Button::class.java.name
+            node.contentDescription = a11yLabel(kb.key)
+            node.text = a11yLabel(kb.key)
+            val r = android.graphics.Rect()
+            kb.rect.roundOut(r)
+            node.setBoundsInParent(r)
+            node.addAction(androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_CLICK)
+        }
+
+        override fun onPerformActionForVirtualView(id: Int, action: Int, arguments: android.os.Bundle?): Boolean {
+            if (action != androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_CLICK) return false
+            val key = keyBounds.getOrNull(id)?.key ?: return false
+            handleKey(key)
+            invalidate()
+            invalidateVirtualView(id)
+            return true
+        }
+    }
+
+    init {
+        androidx.core.view.ViewCompat.setAccessibilityDelegate(this, a11y)
+        a11yAttached = true
+    }
+
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        a11y.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
+    /** 读屏念的键名：功能键说它做什么，字符键念键面上的那个字 */
+    private fun a11yLabel(key: KeyDef): String = when (key.action) {
+        KeyAction.Shift -> when {
+            splitMode -> "分词"
+            shiftLocked -> "大写锁定"
+            shifted -> "上档，已开"
+            else -> "上档"
+        }
+        KeyAction.Backspace -> "删除"
+        KeyAction.Space -> "空格"
+        KeyAction.SwitchLang -> "中英切换"
+        KeyAction.Emoji -> "表情"
+        KeyAction.SymbolPage -> "符号"
+        KeyAction.NumberPad -> "数字键盘"
+        else -> displayLabel(key)
     }
 
     private fun handleKey(key: KeyDef) {

@@ -1116,6 +1116,25 @@ tap_key a; tap_key a; tap_key SPACE
 check "第二次弹键盘不再出卡片" "式" "$(get_pad_text)"
 mark_onboarded
 
+echo; echo "${Y}[42] 无障碍：键与候选是读屏看得见、可按的虚拟节点${N}"
+# 键盘与候选栏都是 Canvas 自绘，靠 ExploreByTouchHelper 报虚拟节点。uiautomator 默认只导出
+# 前台应用窗口，输入法窗口要 --windows 才在里面。节点没报出来时读屏用户整个键盘是空的
+ime_nodes() {   # 输入法窗口里所有虚拟按钮的 content-desc，一行一个
+    adb_q shell uiautomator dump --windows /sdcard/a11y.xml
+    adb_ shell cat /sdcard/a11y.xml \
+        | grep -oE 'class="android.widget.Button" package="'"$PKG"'" content-desc="[^"]*"' \
+        | sed -E 's/.*content-desc="([^"]*)"/\1/'
+}
+reset_pad
+tap_key a
+nodes="$(ime_nodes)"
+for name in 上档 删除 空格 中英切换 符号 123; do
+    check "功能键「$name」有无障碍节点" "yes" "$(grep -qxF "$name" <<< "$nodes" && echo yes || echo no)"
+done
+check "字母键有无障碍节点（Q）" "yes" "$(grep -qxF Q <<< "$nodes" && echo yes || echo no)"
+check "候选栏的候选有无障碍节点（式）" "yes" "$(grep -qE '^式(，编码 .*)?$' <<< "$nodes" && echo yes || echo no)"
+reset_pad
+
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then

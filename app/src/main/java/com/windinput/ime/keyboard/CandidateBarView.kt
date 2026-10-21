@@ -138,6 +138,7 @@ class CandidateBarView(context: Context) : View(context) {
         contentWidth = 0f
         measureFrom(0)
         invalidate()
+        a11yChanged()
     }
 
     /**
@@ -154,6 +155,7 @@ class CandidateBarView(context: Context) : View(context) {
         measureFrom(0)
         scrollX = scrollX.coerceIn(0f, maxScroll())
         invalidate()
+        a11yChanged()
     }
 
     /** 续取到货：**只量新来的这一段**，已有的量过就不再动 */
@@ -166,6 +168,7 @@ class CandidateBarView(context: Context) : View(context) {
         candidates = candidates + more
         measureFrom(from)
         invalidate()
+        a11yChanged()
     }
 
     /** 从第 [from] 项起量文字宽度并累加命中区域（内容坐标系） */
@@ -179,6 +182,68 @@ class CandidateBarView(context: Context) : View(context) {
             x += w
         }
         contentWidth = x
+    }
+
+    // ── 无障碍 ──────────────────────────────────────────────────────
+    // 候选是画出来的：视口里看得见的每个候选报成一个虚拟节点（读屏念「词，编码 x」），
+    // 单击即选词、长按出提示卡，与手指操作同一条路。uiautomator 也因此读得到候选栏。
+
+    private val a11y = object : androidx.customview.widget.ExploreByTouchHelper(this) {
+        override fun getVirtualViewAt(x: Float, y: Float): Int =
+            findIndex(x).takeIf { it >= 0 } ?: INVALID_ID
+
+        override fun getVisibleVirtualViews(ids: MutableList<Int>) {
+            itemBounds.forEachIndexed { i, r ->
+                if (r.right > scrollX && r.left < scrollX + width) ids += i
+            }
+        }
+
+        override fun onPopulateNodeForVirtualView(id: Int, node: androidx.core.view.accessibility.AccessibilityNodeInfoCompat) {
+            val rect = itemBounds.getOrNull(id)
+            val text = candidates.getOrNull(id)
+            if (rect == null || text == null) {
+                node.contentDescription = ""
+                node.setBoundsInParent(android.graphics.Rect(0, 0, 1, 1))
+                return
+            }
+            val comment = comments.getOrNull(id).orEmpty()
+            node.className = android.widget.Button::class.java.name
+            node.text = text
+            node.contentDescription = if (comment.isEmpty()) text else "$text，编码 $comment"
+            // 内容坐标 → 视图坐标，并夹进视口（部分露出的候选只报看得见的那段）
+            val left = (rect.left - scrollX).coerceAtLeast(0f)
+            val right = (rect.right - scrollX).coerceAtMost(width.toFloat())
+            node.setBoundsInParent(android.graphics.Rect(left.toInt(), 0, right.toInt().coerceAtLeast(left.toInt() + 1), height))
+            node.addAction(androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_CLICK)
+            node.addAction(androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_LONG_CLICK)
+        }
+
+        override fun onPerformActionForVirtualView(id: Int, action: Int, arguments: android.os.Bundle?): Boolean {
+            if (id !in candidates.indices) return false
+            return when (action) {
+                androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_CLICK -> {
+                    listener?.onCandidateSelected(id)
+                    true
+                }
+                androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_LONG_CLICK -> {
+                    listener?.onCandidateLongPressed(id)
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    init {
+        androidx.core.view.ViewCompat.setAccessibilityDelegate(this, a11y)
+    }
+
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        a11y.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
+    /** 内容或滚动位置变了：虚拟节点重取（候选换一轮、续取、滑动后看得见的那几个都变了） */
+    private fun a11yChanged() {
+        a11y.invalidateRoot()
     }
 
     /** 视口右缘距内容尾部不足一屏时续取：留一屏的余量，滑到尽头前就到货 */
@@ -276,6 +341,8 @@ class CandidateBarView(context: Context) : View(context) {
                 }
             }
             MotionEvent.ACTION_UP -> {
+                // 拖动过：视口里看得见的候选换了一批，虚拟节点重取（无障碍没开时是空操作）
+                if (dragging) a11yChanged()
                 removeCallbacks(longPress)
                 val index = if (longPressFired) -1 else pressedIndex
                 pressedIndex = -1

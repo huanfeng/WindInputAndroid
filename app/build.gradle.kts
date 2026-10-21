@@ -106,6 +106,8 @@ tasks.withType<Test>().configureEach {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
+    // ExploreByTouchHelper：自绘键盘 / 候选栏的无障碍虚拟节点（TalkBack、uiautomator 都靠它看见键）
+    implementation(libs.androidx.customview)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.foundation)
