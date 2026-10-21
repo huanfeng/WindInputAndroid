@@ -23,8 +23,8 @@ android {
         applicationId = "com.windinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 41
-        versionName = "0.3.0-dev.38"
+        versionCode = 42
+        versionName = "0.3.0-dev.39"
         // 仪器测试（androidTest）：自绘控件的无障碍动作等要在真实 Android 运行时里验
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -61,7 +61,11 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8：dex 由约 25MB 缩到约 4MB，类少了冷启动也少加载；JNA / UniFFI 的反射入口在 proguard-rules.pro
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // 正式包只给真机：x86_64 核心 .so 有 21MB，只有模拟器用（模拟器测试走 debug 包）
+            ndk { abiFilters += "arm64-v8a" }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
