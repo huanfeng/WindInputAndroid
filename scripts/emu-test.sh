@@ -161,12 +161,12 @@ tap_key() {
 SYM_W=(
     "1 1 1 1 1 1 1 1 1 1"
     "1 1 1 1 1 1 1 1 1 1"
-    # 符号 · 。 ， 、 ？ ！ 半角句点 · ⌫
+    # 1234 · 。 ， 、 ？ ！ 半角句点 · ⌫
     "1.5 1 1 1 1 1 1 1.5"
-    # 1234 · 返回 · 表情 · 空格 · 换行（与字母层底行同宽对齐）
+    # 符号 · 返回 · 表情 · 空格 · 换行（与字母层底行同宽对齐；左下「符号」三层同位）
     "1.35 1.15 1 5.1 1.4"
 )
-# 九宫格数字键盘（number.toml）：左列 · 三列数字 · 右列，四行同权重
+# 九宫格数字键盘（number.toml）：左列 · 三列数字 · 右列，四行同权重；底行 符号 · 返回 · 0 · 句点
 NUM_W="1 1.4 1.4 1.4 1"
 
 tap_cell() {   # 行号(0 起) 权重串 下标
@@ -306,6 +306,13 @@ get_edit_bounds() {
     die "找不到测试输入框（重试 12 次仍无）"
 }
 
+# 点输入框。试一试的输入框在底部、随键盘弹出 / 收起上下移动（聊天框的样子），
+# 之前记下的坐标随时会过期——每次都现找再点
+tap_edit() {
+    get_edit_bounds
+    adb_q shell input tap "$EDIT_CX" "$EDIT_CY"
+}
+
 # 点掉 ANR 对话框的「关闭」按钮。传入已 dump 好的 xml，避免多跑一次 dump。
 dismiss_anr() {
     local node
@@ -327,7 +334,7 @@ reset_pad() {
     sleep 2
     # 清空：全选 + 删除（比重启 Activity 快，且不会掉 IME）
     get_edit_bounds
-    adb_q shell input tap "$EDIT_CX" "$EDIT_CY"
+    tap_edit
     sleep 0.8
     adb_q shell input keyevent KEYCODE_MOVE_END
     # 次数要够长：命令短语用例会上屏 36 字符的 UUID，删不干净会污染下一个用例
@@ -660,6 +667,10 @@ check "英文空格上屏原文 + 自动空格" "hi " "$(get_pad_text)"
 tap_key PERIOD
 # 句号键：英文模式出半角句点；自动补的空格挪到句点后面
 check "英文句点吃掉自动空格" "hi. " "$(get_pad_text)"
+# 物理键盘与软键共用宿主侧处理：英文空格上屏后同样自动补空格（首字母是否大写不论）
+adb_q shell input keyevent KEYCODE_H KEYCODE_I KEYCODE_SPACE
+sleep 0.8
+check_match "物理键盘：英文空格上屏也自动补空格" '^hi\. [Hh]i $' "$(get_pad_text)"
 
 tap_key LANG
 sleep 3
@@ -727,7 +738,7 @@ reset_pad
 tap_key a; tap_key a
 adb_q shell input keyevent KEYCODE_BACK      # 收键盘（不失焦，不走 onFinishInput）
 sleep 1
-adb_q shell input tap "$EDIT_CX" "$EDIT_CY"   # 点回输入框，键盘重新弹出
+tap_edit   # 点回输入框，键盘重新弹出
 sleep 1.5
 tap_key SPACE
 check "收键盘后空格不上屏旧码的字" " " "$(get_pad_text)"
@@ -736,7 +747,7 @@ echo; echo "${Y}[16] 点编辑框移动光标后组合态不残留${N}"
 # 键盘不收、直接点编辑框（用户挪光标的最常见方式）：同样要作废组合。
 reset_pad
 tap_key a; tap_key a
-adb_q shell input tap "$EDIT_CX" "$EDIT_CY"   # onViewClicked / onUpdateEditorToolType
+tap_edit   # onViewClicked / onUpdateEditorToolType
 sleep 1
 tap_key SPACE
 check "点编辑框后空格不上屏旧码的字" " " "$(get_pad_text)"
@@ -751,7 +762,7 @@ tap_key a; tap_key a; tap_key SPACE
 before="$(get_pad_text)"
 # ⚠ 上屏后条区被**联想候选**（标点）占着，工具栏不可见；这时点条区点到的是联想项
 # （实测把「，」上了屏）。先点一下输入框：光标动 → 组合/联想作废 → 工具栏回来。
-adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 0.8
+tap_edit; sleep 0.8
 # 工具栏只剩入口和收起，文本编辑在快捷面板里：入口 → 按文字点「文本编辑」格（格子顺序、
 # 行高随开关数与键盘高度变，按坐标点曾在多出一格后点进了表情面板，整轮级联失败）。
 adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
@@ -832,21 +843,21 @@ tap_key a; tap_key a; tap_key SPACE
 check_match "← 回到字母层继续打中文" '^1\.2。[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
 
 echo; echo "${Y}[24] 九宫格数字键盘${N}"
-# 123 层「1234」进九宫格，算式不用切层：数字、句点在格子里，* 在左列第 3 项
+# 123 层「1234」（第 3 行左端）进九宫格，算式不用切层：数字、句点在格子里，* 在左列第 3 项
 reset_pad
-tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0
+tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0
 tap_cell 0 "$NUM_W" 1; tap_cell 0 "$NUM_W" 2; tap_cell 3 "$NUM_W" 3; tap_cell 1 "$NUM_W" 2
 side_x="$(awk -v W="$GEO_W" 'BEGIN{ printf "%d", W / 6.2 / 2 }')"
 side_y="$(awk -v top="$GEO_KBTOP" -v rp="$GEO_ROWPX" 'BEGIN{ printf "%d", top + 0.75 * rp * 2.5 }')"
 adb_q shell input tap "$side_x" "$side_y"; sleep 0.4
 tap_cell 0 "$NUM_W" 3
 check "12.5*3" "12.5*3" "$(get_pad_text)"
-# ← 回进来的那一层（123 层），再 ← 回字母层
-tap_cell 3 "$NUM_W" 0; tap_cell 3 "${SYM_W[3]}" 1
-# 数字框直接调起九宫格：第 3 场景（测试台场景按钮循环），按九宫格坐标打 5 0
+# 「返回」（底行第 2 格）回进来的那一层（123 层），再「返回」回字母层
+tap_cell 3 "$NUM_W" 1; tap_cell 3 "${SYM_W[3]}" 1
+# 数字框直接调起九宫格：测试台「数字」场景，按九宫格坐标打 5 0
 restart_pad
-tap_text "切换场景"; tap_text "切换场景"
-get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1
+tap_text "数字"
+tap_edit; sleep 1
 tap_cell 1 "$NUM_W" 2; tap_cell 3 "$NUM_W" 2
 check "数字框直接是九宫格" "50" "$(get_pad_text)"
 # 场景复位（重启 Activity 回到第 1 场景），后续用例照常
@@ -854,8 +865,8 @@ restart_pad
 
 echo; echo "${Y}[25] 分类符号页：选符号上屏、停在本页、退格、返回${N}"
 # 符号页在 IME 窗口里，uiautomator 只 dump 应用窗口，格子和 tab 看不到，只能按坐标点。
-# 先清掉「最近」（debug 包可 run-as），进页面就固定落在第一个分类「中」：
-# 第 1 行是 ， 。 、 ？ ！ …（assets/data/symbol_pages.toml），每行 10 格。
+# 先清掉最近用过的（debug 包可 run-as），进页面落在「常用」、内容只有出厂那一组：
+# 第 1 行是 ， 。 ？ ！ 、 …（SymbolWindow.COMMON_DEFAULTS），每行 10 格。
 adb_q shell run-as "$PKG" rm -f shared_prefs/recent_symbol.xml
 restart_pad      # SharedPreferences 有进程内缓存，删文件后要重启进程才读得到
 # 进程刚重启，核心异步加载；没就绪时字母直接上屏，下面「有编码」的前提就不成立
@@ -864,7 +875,7 @@ reset_pad
 sym_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 20 )) $(( GEO_KBTOP + GEO_ROWPX * (2 * $1 + 1) / 2 )); sleep 0.4; }
 # 有编码时点符号：先上屏首选再接符号（与打标点的效果一致）
 tap_key a; tap_key a
-tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0; sleep 0.6
+tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
 sym_cell 0 0; sym_cell 0 1
 check_match "首选 + ，。（点完停在本页）" '^[\x{4e00}-\x{9fa5}]，。$' "$(get_pad_text)"
 sym_bs_x=$(( GEO_W * 925 / 1000 )); sym_back_x=$(( GEO_W * 75 / 1000 ))
@@ -877,13 +888,13 @@ tap_cell 0 "${SYM_W[0]}" 0
 check_match "← 回到 123 层" '^[\x{4e00}-\x{9fa5}]，1$' "$(get_pad_text)"
 tap_cell 3 "${SYM_W[3]}" 1
 
-echo; echo "${Y}[26] 最近使用置首、重启后保留${N}"
+echo; echo "${Y}[26] 常用里最近用过的置首、重启后保留${N}"
 restart_pad
 reset_pad
-tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0; sleep 0.6
-# 有最近使用时默认进「最近」，第一格是最后点的那个（[25] 里最后点的是「。」）
+tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
+# 进「常用」，第一格是最后点的那个（[25] 里最后点的是「。」）
 sym_cell 0 0
-check "最近第一格是上次点的「。」" "。" "$(get_pad_text)"
+check "常用第一格是上次点的「。」" "。" "$(get_pad_text)"
 adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
 tap_cell 3 "${SYM_W[3]}" 1
 
@@ -895,41 +906,31 @@ tap_key b; tap_key e; tap_key a; tap_key u
 adb_q shell input tap $(( GEO_W / 2 )) "$GEO_BARY"; sleep 0.6
 check_match "点补全词上屏" '^[Bb]eau[a-z]+ $' "$(get_pad_text)"
 
-echo; echo "${Y}[28] 英文句首自动大写、双击空格出句号${N}"
-# 句子框（第 5 场景，CAP_SENTENCES）：句首的 h 自动大写，打完 hi 双击空格得「. 」，下一句又自动大写
+echo; echo "${Y}[28] 英文句首自动大写${N}"
+# 句子框（第 5 场景，CAP_SENTENCES）：句首的 h 自动大写；句点后下一句又自动大写
 restart_pad
-tap_text "切换场景"; tap_text "切换场景"; tap_text "切换场景"; tap_text "切换场景"
-get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.5
+tap_text "句子"
+tap_edit; sleep 1.5
 [[ -n "$(wait_english)" ]] || die "重启后英文方案未就绪"
-tap_key h; tap_key i
-read -r sp_x sp_y <<< "$(key_center SPACE)"
-# 两下空格要在 600ms 内：放进同一个 adb shell 里连发
-adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
+tap_key h; tap_key i; tap_key SPACE; tap_key PERIOD
 # 自动大写的 H 进的是英文组合（补全不断），空格上屏后才读得到
 tap_key h; tap_key SPACE
-check "句首大写 + 双空格句号 + 下一句又大写" "Hi. H " "$(get_pad_text)"
+check "句首大写 + 句点后下一句又大写" "Hi. H " "$(get_pad_text)"
+read -r sp_x sp_y <<< "$(key_center SPACE)"
 restart_pad
 
-echo; echo "${Y}[29] 密码框不自动大写、不出句号${N}"
+echo; echo "${Y}[29] 密码框不自动大写、不补全${N}"
 restart_pad
-tap_text "切换场景"; tap_text "切换场景"; tap_text "切换场景"
-get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.5
+tap_text "密码"
+tap_edit; sleep 1.5
 tap_key h; tap_key i
 adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
-check "密码框原样直输（不大写、不补全、不出句号）" "hi  " "$(get_pad_text)"
+check "密码框原样直输（不大写、不补全）" "hi  " "$(get_pad_text)"
 restart_pad
 [[ -n "$(wait_english)" ]] || die "重启后英文方案未就绪"
 # 收尾回中文（方案选择持久化，留在英文会污染下次运行）
 reset_pad; tap_key LANG; sleep 4
 [[ -n "$(wait_chinese)" ]] || die "收尾切回中文失败"
-
-echo; echo "${Y}[30] 中文模式双击空格出「。」${N}"
-# 数字后面也要成立（汉字后面的情形见 [32]）：从 123 层打一个数字再回字母层，
-# 光标前是「1」，双击空格应换成「。」
-reset_pad
-tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 1
-adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
-check "数字后双空格换成句号" "1。" "$(get_pad_text)"
 
 echo; echo "${Y}[31] 上屏后联想：学会「我们 → 一直」后点联想首位${N}"
 # 下一词学习（主仓 learn_next_word）：相邻上屏两次「我们」「一直」，第三次上屏「我们」联想首位应是「一直」
@@ -939,16 +940,12 @@ sleep 0.5
 tap_candidate 0
 check_match "联想首位整词上屏" '我们一直我们一直我们一直$' "$(get_pad_text)"
 
-echo; echo "${Y}[32] 联想态按空格出空格，双击出「。」${N}"
+echo; echo "${Y}[32] 联想态按空格出空格${N}"
 # 两家在联想态按空格都是收起联想、出空格，不选联想词
 reset_pad
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 tap_key SPACE
 check_match "联想态空格出空格" '^[\x{4e00}-\x{9fa5}] $' "$(get_pad_text)"
-reset_pad
-tap_key a; tap_key a; tap_key SPACE; sleep 0.4
-adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
-check_match "汉字后双击空格出「。」" '^[\x{4e00}-\x{9fa5}]。$' "$(get_pad_text)"
 
 echo; echo "${Y}[33] 联想态按退格先收联想、不删正文${N}"
 reset_pad
@@ -963,7 +960,7 @@ echo; echo "${Y}[34] 收起键盘后联想不残留${N}"
 reset_pad
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 adb_q shell input keyevent KEYCODE_BACK; sleep 1
-get_edit_bounds; adb_q shell input tap "$EDIT_CX" "$EDIT_CY"; sleep 1.2
+tap_edit; sleep 1.2
 tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 1
 check_match "收起后数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 
@@ -1127,7 +1124,7 @@ restart_pad            # am start -S：进程重起，SharedPreferences 的进�
 sleep 2
 # 点输入框把键盘叫出来。卡片可能已随测试台的 stateVisible 弹出——首次卡片不因点应用区域
 # 而收（真机上用户第一次几乎一定会再点一下文本框），所以这一下点不掉它
-adb_q shell input tap "$EDIT_CX" "$EDIT_CY"
+tap_edit
 sleep 3
 menu_cell 0 1          # 全拼
 sleep 3
@@ -1205,7 +1202,28 @@ check "只用物理键盘：打字中键盘面板仍收着" "no" "$([[ "$bar_xml
 adb_q shell input keyevent KEYCODE_SPACE
 sleep 0.8
 check "只用物理键盘：空格上屏" "式" "$(get_pad_text)"
+# 空闲时屏幕上没有输入法，返回键要一下就交给应用（不能先被隐形的输入法窗口吃掉）
+adb_q shell input keyevent KEYCODE_BACK
+sleep 1
+check "只用物理键盘：空闲时返回键一下退出页面" "no" \
+    "$(adb_ shell dumpsys window | grep -m1 mCurrentFocus | grep -q TestPadActivity && echo yes || echo no)"
 adb_q shell settings put secure show_ime_with_hard_keyboard "${SHOW_IME_WITH_HARD_KB:-1}"
+reset_pad
+
+echo; echo "${Y}[45] 软键盘数字不选候选、工具栏常驻按钮${N}"
+# 有编码时上滑 q 出 1：是要数字 1，不是选第 1 个候选——先上屏首选再接 1
+reset_pad
+tap_key a; tap_key a
+read -r qx qy <<< "$(key_center q)"
+adb_q shell input swipe "$qx" "$qy" "$qx" $(( qy - GEO_ROWPX * 3 / 2 )) 250
+sleep 0.8
+check_match "上滑数字：首选 + 数字" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
+# 工具栏出厂常驻剪贴板、文本编辑；点文本编辑直接进编辑面板（面板标题「编辑」）
+reset_pad
+check "工具栏常驻「剪贴板」" "yes" "$(ime_bounds 剪贴板 >/dev/null && echo yes || echo no)"
+tap_ime 文本编辑
+check "工具栏「文本编辑」直达编辑面板" "yes" "$(ime_xml | grep -q 'text="编辑"' && echo yes || echo no)"
+tap_ime 返回
 reset_pad
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
