@@ -47,7 +47,7 @@ class SettingsManifestTest {
     @Test
     fun sectionsKeepFirstAppearanceOrder() {
         assertEquals(
-            listOf("码表", "拼音", "模糊音", "混输", "英文"),
+            listOf("码表", "拼音", "模糊音", "双拼", "混输", "英文"),
             bundled.sectionsOf("schema").map { it.first },
         )
     }

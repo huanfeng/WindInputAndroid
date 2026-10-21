@@ -1,18 +1,62 @@
 package com.windinput.ime.settings
 
-import android.app.Activity
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.text.InputType
+import android.util.TypedValue
 import android.view.Gravity
-import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import android.widget.Button
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
+import top.yukonga.miuix.kmp.basic.TabRowWithContour
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Send
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.ThemeController
 
 /**
- * 输入测试台：**手动试打 + 自动化测试共用**。
+ * 输入测试台：**手动试打 + 自动化测试共用**。做成聊天界面的样子：底部输入栏、发出去的
+ * 内容进上面的对话气泡——输入法最常见的使用场景就是聊天框，在这里试最接近真实手感。
  *
  * # 为什么只有一个输入框
  *
@@ -21,88 +65,180 @@ import android.widget.TextView
  * `requestFocus()` 指定的那个；脚本点击目标框后 `InputConnection` 的重建还有延迟。
  * 于是「操作后再打字」类用例读到的是空框，看起来像功能坏了——实际字母进了另一个框。
  *
- * 现在改成**单框 + 场景切换按钮**：框只有一个，焦点无处可跑；
- * 场景（`inputType` / `imeOptions`）由按钮循环切换。两种用途都满足：
- * - 自动化：`content-desc` 恒定、焦点确定
- * - 手动：点按钮就能试密码框强制英文、数字框切符号层、回车键变「搜索」这些分支
+ * 现在是**单框 + 顶部场景分段**：框只有一个，焦点无处可跑；场景（`inputType` / `imeOptions`）
+ * 由分段切换。输入框仍是原生 [EditText]：场景要精确控制 `inputType` 的 variation
+ * （可见密码、句首大写），脚本也按它的 `content-desc` 定位、读文本。
  */
-class TestPadActivity : Activity() {
+class TestPadActivity : ComponentActivity() {
 
-    /** 场景：名称 → (inputType, imeOptions)。顺序即按钮循环顺序。 */
+    private data class Scene(val tab: String, val hint: String, val inputType: Int, val imeOptions: Int)
+
+    /** 顺序即分段顺序。脚本按分段文字点（scripts/emu-test.sh 的 tap_text） */
     private val scenes = listOf(
-        Scene("普通文本（多行，回车换行）", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED),
-        Scene("搜索框（回车应显示「搜索」）", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH),
-        Scene("数字框（应切数字层）", InputType.TYPE_CLASS_NUMBER, EditorInfo.IME_ACTION_UNSPECIFIED),
+        Scene("普通", "多行文本，回车换行", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED),
+        Scene("搜索", "回车键应显示「搜索」", InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH),
+        Scene("数字", "应直接调起九宫格数字键盘", InputType.TYPE_CLASS_NUMBER, EditorInfo.IME_ACTION_UNSPECIFIED),
         // 用「可见密码」：同样走直输分支，但字不变成圆点，脚本读得出来
-        Scene("密码框（可见密码，应强制英文直输）", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, EditorInfo.IME_ACTION_DONE),
+        Scene("密码", "可见密码：应强制英文直输、不学习", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD, EditorInfo.IME_ACTION_DONE),
         // 聊天类应用的输入框大多带 CAP_SENTENCES：英文句首自动大写只在这种框里生效
-        Scene("句子框（英文句首应自动大写）", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED),
+        Scene("句子", "英文句首应自动大写", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED),
     )
-
-    private data class Scene(val label: String, val inputType: Int, val imeOptions: Int)
-
-    private var sceneIndex = 0
-    private lateinit var field: EditText
-    private lateinit var label: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        val density = resources.displayMetrics.density
-        fun dp(v: Int) = (v * density).toInt()
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(24), dp(16), dp(16))
+        val theme = ThemeController(ColorSchemeMode.System)
+        setContent {
+            MiuixTheme(controller = theme) { TestPad() }
         }
-
-        label = TextView(this).apply {
-            textSize = 12f
-            setTextColor(0xFF969696.toInt())
-        }
-        root.addView(label, wrap())
-
-        field = EditText(this).apply {
-            // 脚本按 content-desc 定位（代码设的 id 在 uiautomator dump 里不可见）
-            contentDescription = TEST_PAD_DESC
-            hint = "测试输入框"
-            gravity = Gravity.TOP or Gravity.START
-            requestFocus()
-        }
-        root.addView(field, wrap())
-
-        root.addView(
-            Button(this).apply {
-                text = "切换场景"
-                setOnClickListener {
-                    sceneIndex = (sceneIndex + 1) % scenes.size
-                    applyScene()
-                }
-            },
-            wrap(),
-        )
-
-        setContentView(root)
-        applyScene()
     }
 
-    /** 换场景要重启输入连接，否则 IME 拿到的还是旧的 EditorInfo */
-    private fun applyScene() {
+    @Composable
+    private fun TestPad() {
+        var sceneIndex by rememberSaveable { mutableIntStateOf(0) }
+        val messages = remember { mutableStateListOf<String>() }
+        val listState = rememberLazyListState()
+        LaunchedEffect(messages.size) {
+            if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
+        }
+        val colors = MiuixTheme.colorScheme
         val scene = scenes[sceneIndex]
-        label.text = scene.label
-        field.inputType = scene.inputType
-        field.imeOptions = scene.imeOptions
-        field.requestFocus()
-        val imm = getSystemService(android.view.inputmethod.InputMethodManager::class.java)
-        imm?.restartInput(field)
+
+        Scaffold(
+            topBar = {
+                SmallTopAppBar(
+                    title = "试一试",
+                    navigationIcon = {
+                        IconButton(onClick = { finish() }, modifier = Modifier.padding(start = 12.dp)) {
+                            Icon(MiuixIcons.Back, contentDescription = "返回")
+                        }
+                    },
+                )
+            },
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding())
+                    .imePadding()
+                    .navigationBarsPadding(),
+            ) {
+                TabRowWithContour(
+                    tabs = scenes.map { it.tab },
+                    selectedTabIndex = sceneIndex,
+                    onTabSelected = { sceneIndex = it },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                Text(
+                    text = scene.hint,
+                    fontSize = 13.sp,
+                    color = colors.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.Bottom),
+                ) {
+                    if (messages.isEmpty()) {
+                        item {
+                            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "在下面试打，点发送就像发一条消息",
+                                    fontSize = 13.sp,
+                                    color = colors.onSurfaceVariantSummary,
+                                )
+                            }
+                        }
+                    }
+                    items(messages) { Bubble(it) }
+                }
+                InputBar(scene) { text -> if (text.isNotBlank()) messages += text }
+            }
+        }
     }
 
-    private fun wrap() = ViewGroup.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT,
-        ViewGroup.LayoutParams.WRAP_CONTENT,
-    )
+    @Composable
+    private fun Bubble(text: String) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), horizontalArrangement = Arrangement.End) {
+            Text(
+                text = text,
+                color = MiuixTheme.colorScheme.onPrimary,
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .background(MiuixTheme.colorScheme.primary, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+            )
+        }
+    }
+
+    /** 底部输入栏：原生输入框 + 发送。发送 = 把框里的话放进对话、清空框 */
+    @Composable
+    private fun InputBar(scene: Scene, onSend: (String) -> Unit) {
+        val colors = MiuixTheme.colorScheme
+        val fieldBg = colors.secondaryContainer.toArgb()
+        val textColor = colors.onSurface.toArgb()
+        val hintColor = colors.onSurfaceVariantSummary.toArgb()
+        var field by remember { mutableStateOf<EditText?>(null) }
+        fun send() {
+            val f = field ?: return
+            onSend(f.text.toString())
+            f.text.clear()
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+        ) {
+            AndroidView(
+                modifier = Modifier.weight(1f),
+                factory = { ctx ->
+                    EditText(ctx).apply {
+                        // 脚本按 content-desc 定位（代码设的 id 在 uiautomator dump 里不可见）
+                        contentDescription = TEST_PAD_DESC
+                        hint = "测试输入框"
+                        gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                        minHeight = (44 * resources.displayMetrics.density).toInt()
+                        maxLines = 5
+                        val pad = (14 * resources.displayMetrics.density).toInt()
+                        setPadding(pad, pad / 2, pad, pad / 2)
+                        // 搜索 / 完成键当发送
+                        setOnEditorActionListener { _, actionId, _ ->
+                            if (actionId == EditorInfo.IME_ACTION_SEARCH || actionId == EditorInfo.IME_ACTION_DONE) {
+                                send()
+                                true
+                            } else {
+                                false
+                            }
+                        }
+                        field = this
+                    }
+                },
+                update = { f ->
+                    f.background = GradientDrawable().apply {
+                        cornerRadius = 22 * f.resources.displayMetrics.density
+                        setColor(fieldBg)
+                    }
+                    f.setTextColor(textColor)
+                    f.setHintTextColor(hintColor)
+                    // 换场景要重启输入连接，否则输入法拿到的还是旧的 EditorInfo
+                    if (f.inputType != scene.inputType || f.imeOptions != scene.imeOptions) {
+                        f.inputType = scene.inputType
+                        f.imeOptions = scene.imeOptions
+                        f.requestFocus()
+                        getSystemService(InputMethodManager::class.java)?.restartInput(f)
+                    }
+                },
+            )
+            IconButton(onClick = { send() }, modifier = Modifier.padding(start = 4.dp)) {
+                Icon(MiuixIcons.Send, contentDescription = "发送", tint = colors.primary)
+            }
+        }
+        LaunchedEffect(Unit) { field?.requestFocus() }
+    }
 
     companion object {
-        /** 与 scripts/emu-test.ps1 约定的定位锚点 */
+        /** 与 scripts/emu-test.sh 约定的定位锚点 */
         const val TEST_PAD_DESC = "windinput-testpad"
     }
 }

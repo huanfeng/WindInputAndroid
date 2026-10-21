@@ -8,6 +8,7 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
@@ -204,10 +205,13 @@ internal const val DICT_WORDS = "我的词条"
 internal const val DICT_ADD = "添加词条"
 
 /** 方案页里代码画的二级页 */
-internal const val SUB_LAYOUTS = "双拼布局"
+internal const val SUB_ENABLED_SCHEMAS = "启用的方案"
+
+/** 方案设置里的「双拼」组：清单项之外，代码在组页顶上画布局列表 */
+private const val SECTION_SHUANGPIN = "双拼"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
-internal val RESERVED_SUBPAGES = setOf(DICT_WORDS, DICT_ADD, SUB_LAYOUTS)
+internal val RESERVED_SUBPAGES = setOf(DICT_WORDS, DICT_ADD, SUB_ENABLED_SCHEMAS)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -333,8 +337,11 @@ private fun SettingsApp(
                     slideOutHorizontally(tween(300)) { -it / 4 })
                     .apply { targetContentZIndex = 1f }
             } else {
-                (slideInHorizontally(tween(300)) { -it / 4 } togetherWith
-                    slideOutHorizontally(tween(300)) { it })
+                // 返回用**线性**曲线：侧滑时进度经 seekTo 直接映射到动画时间，带缓动的话页面跟不上
+                // 手指（手指拖到一半，页面才挪开一成），松手时剩下的一大截猛地甩出去——
+                // 真机上看就是「回退时会再弹一下」
+                (slideInHorizontally(tween(300, easing = LinearEasing)) { -it / 4 } togetherWith
+                    slideOutHorizontally(tween(300, easing = LinearEasing)) { it })
                     .apply { targetContentZIndex = -1f }
             }
         },
@@ -547,19 +554,41 @@ private fun PageScreen(
                 for ((name, items) in sections) {
                     NavRow(
                         title = name,
-                        summary = items.take(3).joinToString(" · ") { it.title },
+                        summary = sectionSummary(name, items, values, schemaState),
                         icon = SettingsIcons.section(name),
                     ) { onOpenSub(name) }
                 }
             }
         }
-        // 启用哪些方案设一次就不大动：放在常用的「方案设置」之后，别把它挤出首屏
-        if (page.id == "schema") schemaState?.let { EnabledSchemasSection(it) }
     } else {
         for ((name, items) in sections) SettingsCard(name, items, values)
         // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
         if (page.id == "ui") TooltipSectionsSection()
     }
+}
+
+/**
+ * 二级入口的摘要。组里打头是与组同名的总开关（如「模糊音」）时写**现在的状态**：关着写
+ * 「未开启」，开着列出打开了的子项——只列子项标题（「zh ↔ z · ch ↔ c」）读起来像这几项已经开了。
+ */
+private fun sectionSummary(
+    name: String,
+    items: List<SettingItem>,
+    values: SettingsValues,
+    schemaState: SchemaState?,
+): String {
+    val master = items.firstOrNull()?.takeIf { it.type == "toggle" && it.title == name }
+    if (master != null) {
+        if (!values.bool(master)) return "未开启"
+        val on = items.drop(1).filter { it.type == "toggle" && values.bool(it) }
+        if (on.isEmpty()) return "已开启"
+        val head = on.take(3).joinToString(" · ") { it.title }
+        return if (on.size > 3) "$head 等 ${on.size} 项" else head
+    }
+    if (name == SECTION_SHUANGPIN) {
+        schemaState?.layouts?.firstOrNull { it.active }?.let { return "布局：${it.name.ifEmpty { it.id }}" }
+    }
+    return items.take(3).joinToString(" · ") { it.title }
 }
 
 private fun visibleSections(
@@ -583,13 +612,14 @@ private fun SubScreen(
     schemaState: SchemaState?,
 ) {
     when {
-        page.id == "schema" && sub == SUB_LAYOUTS -> ShuangpinLayouts(schemaState)
+        page.id == "schema" && sub == SUB_ENABLED_SCHEMAS -> schemaState?.let { EnabledSchemasSection(it) }
         page.id == "dict" && sub == DICT_WORDS -> DictWords(session)
         page.id == "dict" && sub == DICT_ADD -> DictAdd(session)
         else -> {
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
-            if (items.isNotEmpty()) SettingsCard("", items, values)
+            if (page.id == "schema" && sub == SECTION_SHUANGPIN) ShuangpinLayouts(schemaState)
+            if (items.isNotEmpty()) SettingsCard(if (sub == SECTION_SHUANGPIN) "选项" else "", items, values)
             // 方案的附加词库挂在对应的二级页底下：拼音细胞词库在「拼音」，五笔附加库在「码表」
             if (page.id == "schema" && sub == "拼音") SchemaDictsSection("细胞词库", listOf("pinyin", "shuangpin"))
             if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
@@ -660,18 +690,12 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
                 onClick = { st.switchTo(label, EngineCmd.SelectSchema(s.index)) },
             )
         }
-    }
-
-    // 双拼布局是二级页：十几个布局摊在方案页上只会把下面的设置挤出屏幕。
-    // 只在**当前用的是双拼**时给入口——别的方案用不上它
-    if (st.layouts.isNotEmpty() && st.schemas.any { it.id == SHUANGPIN_SCHEMA_ID && it.active }) {
-        Card(modifier = Modifier.fillMaxWidth()) {
-            NavRow(
-                title = SUB_LAYOUTS,
-                summary = st.layouts.firstOrNull { it.active }?.let { "当前：${it.name.ifEmpty { it.id }}" },
-                icon = SettingsIcons.section(SUB_LAYOUTS),
-            ) { onOpenSub(SUB_LAYOUTS) }
-        }
+        // 启用哪些方案设一次就不大动：收进二级页，入口挂在方案列表末尾
+        NavRow(
+            title = SUB_ENABLED_SCHEMAS,
+            summary = "已启用 ${st.schemas.size} 个方案",
+            icon = SettingsIcons.section(SUB_ENABLED_SCHEMAS),
+        ) { onOpenSub(SUB_ENABLED_SCHEMAS) }
     }
 }
 
@@ -693,8 +717,7 @@ private fun EnabledSchemasSection(st: SchemaState) {
             runCatching { CoreAccess.obtainCore(context)?.installedSchemas() }.getOrNull().orEmpty()
         }
     }
-    if (installed.size < 2) return
-    SmallTitle("启用的方案")
+    if (installed.isEmpty()) return
     Card(modifier = Modifier.fillMaxWidth()) {
         for (s in installed) {
             ToggleLine(
@@ -727,6 +750,8 @@ private fun EnabledSchemasSection(st: SchemaState) {
 @Composable
 private fun ShuangpinLayouts(state: SchemaState?) {
     val st = state ?: return
+    if (st.layouts.isEmpty()) return
+    SmallTitle("布局")
     Card(modifier = Modifier.fillMaxWidth()) {
         for (l in st.layouts) {
             val label = l.name.ifEmpty { l.id }
@@ -743,9 +768,6 @@ private fun ShuangpinLayouts(state: SchemaState?) {
 /** Emoji 候选总开关（附加模块卡片跟着它显示）与它所在的二级页 */
 private const val EMOJI_ENABLED_KEY = "input.emoji.enabled"
 private const val EMOJI_SECTION = "Emoji/OpenCC"
-
-/** 双拼方案 id（与 assets/data/schemas/shuangpin.schema.toml 一致） */
-private const val SHUANGPIN_SCHEMA_ID = "shuangpin"
 
 // ── 关于 ─────────────────────────────────────────────────────────
 

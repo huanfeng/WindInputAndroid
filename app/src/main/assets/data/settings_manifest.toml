@@ -234,14 +234,6 @@ title = "启用简拼"
 [[item]]
 page = "schema"
 section = "拼音"
-key = "schema.pinyin.shuangpin.allow_full_pinyin"
-source = "engine"
-type = "toggle"
-title = "双拼时允许全拼输入"
-
-[[item]]
-page = "schema"
-section = "拼音"
 key = "schema.pinyin.single_char"
 source = "engine"
 type = "toggle"
@@ -400,6 +392,14 @@ title = "eng ↔ ong"
 
 [[item]]
 page = "schema"
+section = "双拼"
+key = "schema.pinyin.shuangpin.allow_full_pinyin"
+source = "engine"
+type = "toggle"
+title = "双拼时允许全拼输入"
+
+[[item]]
+page = "schema"
 section = "混输"
 key = "schema.mix.enable_english"
 source = "engine"
@@ -453,16 +453,6 @@ source = "android"
 type = "toggle"
 title = "句首自动大写"
 summary = "在句首、输入框开头自动切大写（输入框要求大写时才生效，密码 / 网址 / 邮箱框不生效）"
-default = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "ui.android.double_space_period"
-source = "android"
-type = "toggle"
-title = "双击空格输入句号"
-summary = "快速点两下空格：英文输入「. 」，中文输入「。」"
 default = true
 
 [[item]]
@@ -860,8 +850,8 @@ section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"
 type = "toggle"
-title = "编码也显示在输入框里"
-summary = "打字时把编码同时写进输入框（默认只在候选栏上方显示）"
+title = "编码写在输入框里"
+summary = "开启后编码直接写进输入框（带下划线），候选栏上方不再单独显示编码行，键盘也矮一截"
 default = false
 
 [[item]]
@@ -951,8 +941,8 @@ key = "ui.android.space_long_press"
 source = "android"
 type = "select"
 title = "长按空格"
-summary = "语音输入要求系统里装了带语音的输入法，没有时退回切换输入法"
-default = "switch_ime"
+summary = "切换输入法也在中英键的长按里。语音输入要求系统里装了带语音的输入法，没有时退回切换输入法"
+default = "none"
 options = [
   { value = "none", label = "不做什么" },
   { value = "switch_ime", label = "切换输入法" },

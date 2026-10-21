@@ -46,7 +46,7 @@ object SettingsIcons {
 
     /** 有专属图标的二级入口名（与 [bySection] 同步） */
     val SECTION_ICON_NAMES = setOf(
-        "码表", "拼音", "模糊音", "双拼布局", "混输", "英文",
+        "码表", "拼音", "模糊音", "双拼", "混输", "英文",
         "默认状态", "字符与标点", "标点配对", "联想输入", "简繁转换", "Emoji/OpenCC",
     )
 
@@ -72,7 +72,7 @@ object SettingsIcons {
             "码表" to MiuixIcons.ListView,
             "拼音" to MiuixIcons.Messages,
             "模糊音" to MiuixIcons.Filter,
-            "双拼布局" to MiuixIcons.HorizontalSplit,
+            "双拼" to MiuixIcons.HorizontalSplit,
             "混输" to MiuixIcons.Merge,
             "英文" to MiuixIcons.Translate,
             "默认状态" to MiuixIcons.Refresh,
