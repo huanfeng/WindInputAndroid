@@ -458,19 +458,14 @@ class WindInputImeService :
     }
 
     /**
-     * 条区两段高度（编码行, 候选/工具栏行）。横屏跟着收：60dp 的条区加四行键就占去七成屏高。
+     * 条区两段高度（编码行, 候选/工具栏行）。横竖屏同高：候选字号不随横屏变小，此前横屏收到
+     * 14 + 32dp，候选与编码挤得发扁（真机反馈「太矮」）；横屏省高度靠键行高（单独可调）。
      * 编码写在输入框里（ui.android.inline_preedit）时**不要编码行**：编码只出现在一处，
      * 两处都写是重复（真机反馈），条区也因此矮一截。
      */
     private fun barDims(): Pair<Float, Float> {
-        val portrait =
-            resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
-        val preedit = when {
-            userConfig.getBoolean("ui.android.inline_preedit", false) -> 0f
-            portrait -> 16f
-            else -> 14f
-        }
-        return preedit to (if (portrait) 38f else 32f)
+        val preedit = if (userConfig.getBoolean("ui.android.inline_preedit", false)) 0f else 16f
+        return preedit to 38f
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
