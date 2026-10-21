@@ -1262,7 +1262,8 @@ section "[46] 快捷短语：打开出厂关闭的时间戳 tmts，打出来，�
 # 滑动找某段文字所在行的纵坐标（列表长，只往下翻；要从顶上找就先 scroll_top）；按字面匹配（文字里有 $）
 row_y_of() {
     local try node
-    for ((try = 0; try < 10; try++)); do
+    # 系统短语七十多条、带预览每条两三行：翻到 tmts 要十几下
+    for ((try = 0; try < 25; try++)); do
         node="$(dump_xml | sed 's/<node/\n<node/g' | grep -F " text=\"$1\"" | head -1)"
         if [[ "$node" =~ bounds=\"\[[0-9]+,([0-9]+)\]\[[0-9]+,([0-9]+)\]\" ]]; then
             echo $(( (BASH_REMATCH[1] + BASH_REMATCH[2]) / 2 )); return 0
@@ -1278,14 +1279,17 @@ scroll_top() {
     done
     sleep 0.6
 }
-# 切到设置的快捷短语页：还停在这一页就直接用，不在（被系统回收、回到了首页）就从首页点进去
+# 打开设置的快捷短语页：NEW_TASK | CLEAR_TASK 新开一个设置（总从首页起；前面的用例可能把设置
+# 留在别的页上，如 [38] 停在「我的词条」——那里点不到「词库」），不杀进程，输入法与核心照旧
 open_phrases_page() {
-    adb_q shell am start -n "$PKG/.settings.SettingsActivity"
-    sleep 1.5
-    if ! dump_xml | grep -q ' text="添加短语"'; then
-        tap_text "词库"
-        tap_text "快捷短语"
-    fi
+    adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SettingsActivity"
+    sleep 2
+    tap_text "词库"
+    # 词库总览先显示「正在启动…」、方案读到后才铺卡片：布局还在动时点，会点到挪过来的别的行
+    [[ "$(has_text 添加词条)" == yes ]] || die "词库页没出来"
+    sleep 0.8
+    tap_text "快捷短语"
+    [[ "$(has_text 添加短语)" == yes ]] || die "没进到快捷短语页"
 }
 # 从设置回测试台：设置在前台时普通的 am start 拉不回测试台（两者可能同在一个任务栈里），
 # 用 NEW_TASK | CLEAR_TASK 新开一个——不杀进程，输入法与核心照旧
@@ -1295,6 +1299,7 @@ back_to_pad() {
 }
 phrases_restore_defaults() {
     open_phrases_page
+    scroll_top   # 「恢复默认」在系统短语列表之前
     local y
     y="$(row_y_of '系统短语恢复默认')" || die "找不到「系统短语恢复默认」"
     adb_q shell input tap $(( GEO_W / 2 )) "$y"; sleep 1.5
