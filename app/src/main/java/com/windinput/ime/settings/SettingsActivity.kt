@@ -1,7 +1,6 @@
 package com.windinput.ime.settings
 
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -133,10 +132,9 @@ class SettingsActivity : ComponentActivity() {
         val versionName = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
         }.getOrNull().orEmpty()
-        // 莫奈取色要 Android 12（S）的系统调色板；更早的系统用 miuix 默认配色，深浅色照样跟系统
-        val theme = ThemeController(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) ColorSchemeMode.MonetSystem else ColorSchemeMode.System,
-        )
+        // miuix 推荐的默认配色，深浅色跟系统。不用莫奈取色（MonetSystem）：系统壁纸取出来的
+        // 主色在不少机型上与 miuix 组件不协调（维护者要求用 miuix 默认风格）
+        val theme = ThemeController(ColorSchemeMode.System)
 
         setContent {
             MiuixTheme(controller = theme) {
@@ -223,6 +221,12 @@ private class SchemaState(private val core: ImeSession, private val scope: kotli
     var layouts by mutableStateOf<List<LayoutEntry>>(emptyList())
     var switching by mutableStateOf<String?>(null)
 
+    /**
+     * 切换已超过 [SLOW_SWITCH_MS] 还没完（首次要编词库）：此时才在那一行写「正在准备词库…」。
+     * 快的切换（几十毫秒）一闪而过的提示只会让页面跳一下（真机反馈「界面一抖一抖的」）。
+     */
+    var slowSwitching by mutableStateOf<String?>(null)
+
     suspend fun refresh() {
         val (s, l) = withContext(Dispatchers.IO) { core.schemas() to core.shuangpinLayouts() }
         schemas = s
@@ -236,17 +240,27 @@ private class SchemaState(private val core: ImeSession, private val scope: kotli
     fun switchTo(label: String, cmd: EngineCmd) {
         if (switching != null) return
         switching = label
+        val slow = scope.launch {
+            kotlinx.coroutines.delay(SLOW_SWITCH_MS)
+            if (switching == label) slowSwitching = label
+        }
         scope.launch {
             try {
                 withContext(Dispatchers.IO) { core.runCommand(cmd) }
                 refresh()
             } finally {
+                slow.cancel()
                 switching = null
+                slowSwitching = null
             }
         }
     }
 
     val activeName: String? get() = schemas.firstOrNull { it.active }?.let { it.name.ifEmpty { it.id } }
+
+    private companion object {
+        const val SLOW_SWITCH_MS = 300L
+    }
 }
 
 @Composable
@@ -297,6 +311,9 @@ private fun SettingsApp(
         val target = route.up()
         try {
             events.collect { transitionState.seekTo(it.progress, target) }
+            // 先在这里把过渡放完、再改路由（官方示例的顺序）：反过来的话路由一变，过渡按新的
+            // 一对起止重算一次，已经拖开的页从另一侧再滑回来一截（真机反馈「回退时会再弹一下」）
+            transitionState.animateTo(target)
             go(target)
         } catch (e: CancellationException) {
             // 本协程已取消，回弹动画另起一个
@@ -481,7 +498,7 @@ private fun pageSummary(
 ): String {
     @Suppress("UNUSED_EXPRESSION") values.version // 值变了摘要跟着变
     return when (page.id) {
-        "schema" -> schemaState?.switching?.let { "正在切换到「$it」…" }
+        "schema" -> schemaState?.slowSwitching?.let { "正在切换到「$it」…" }
             ?: schemaState?.activeName?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
         "dict" -> "我的词条 · 添加词条"
@@ -536,6 +553,8 @@ private fun PageScreen(
                 }
             }
         }
+        // 启用哪些方案设一次就不大动：放在常用的「方案设置」之后，别把它挤出首屏
+        if (page.id == "schema") schemaState?.let { EnabledSchemasSection(it) }
     } else {
         for ((name, items) in sections) SettingsCard(name, items, values)
         // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
@@ -629,13 +648,15 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
     val st = state ?: return
     if (st.schemas.isEmpty()) return
 
-    SmallTitle(st.switching?.let { "正在切换到「$it」…（首次使用要准备词库，稍候）" } ?: "输入方案")
+    // 标题固定：切换中的提示只写在那一行里，且慢了才写（见 SchemaState.slowSwitching）
+    SmallTitle("输入方案")
     Card(modifier = Modifier.fillMaxWidth()) {
         for (s in st.schemas) {
             val label = s.name.ifEmpty { s.id }
             ChoiceRow(
                 title = label,
                 selected = s.active,
+                summary = if (st.slowSwitching == label) "正在准备词库，首次使用要稍候…" else null,
                 onClick = { st.switchTo(label, EngineCmd.SelectSchema(s.index)) },
             )
         }
@@ -654,16 +675,65 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
     }
 }
 
+/**
+ * 启用的方案：装了的方案里哪些出现在「输入方案」列表、快捷面板与中英键卡片里。
+ *
+ * 移动端默认装了的全部可用；这里关掉的写进用户层（核心每次重载都按它重算，此前重载会读回
+ * 出厂的「五笔 + 五笔拼音」，拼音、双拼就从列表里没了）。英文是中英键切换的目标，关不掉；
+ * 最后一个中文方案也关不掉——原因由核心给，Toast 报出来。
+ */
+@Composable
+private fun EnabledSchemasSection(st: SchemaState) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var installed by remember { mutableStateOf<List<uniffi.wind_android.InstalledSchemaInfo>>(emptyList()) }
+    var reload by remember { mutableIntStateOf(0) }
+    LaunchedEffect(reload) {
+        installed = withContext(Dispatchers.IO) {
+            runCatching { CoreAccess.obtainCore(context)?.installedSchemas() }.getOrNull().orEmpty()
+        }
+    }
+    if (installed.size < 2) return
+    SmallTitle("启用的方案")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        for (s in installed) {
+            ToggleLine(
+                title = s.name.ifEmpty { s.id },
+                summary = if (s.locked) "中英键切换要用，不能关" else null,
+                checked = s.enabled,
+            ) { on ->
+                scope.launch {
+                    val error = withContext(Dispatchers.IO) {
+                        val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
+                        try {
+                            core.setSchemaEnabled(s.id, on)
+                            core.runCommand(uniffi.wind_android.EngineCommand.ReloadConfig)
+                            null
+                        } catch (e: uniffi.wind_android.ConfigException) {
+                            (e as? uniffi.wind_android.ConfigException.Rejected)?.reason ?: e.toString()
+                        } catch (e: Exception) {
+                            "操作失败：${e.message ?: e}"
+                        }
+                    }
+                    if (error != null) android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_SHORT).show()
+                    reload++
+                    st.refresh()
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ShuangpinLayouts(state: SchemaState?) {
     val st = state ?: return
-    st.switching?.let { SmallTitle("正在切换到「$it」…") }
     Card(modifier = Modifier.fillMaxWidth()) {
         for (l in st.layouts) {
             val label = l.name.ifEmpty { l.id }
             ChoiceRow(
                 title = label,
                 selected = l.active,
+                summary = if (st.slowSwitching == label) "正在切换…" else null,
                 onClick = { st.switchTo(label, EngineCmd.SetShuangpinLayout(l.id)) },
             )
         }
@@ -742,9 +812,10 @@ internal fun NavRow(
 
 /** 单选的一行：选中项右侧打勾（方案、双拼布局） */
 @Composable
-private fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
+private fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit, summary: String? = null) {
     RadioButtonPreference(
         title = title,
+        summary = summary,
         selected = selected,
         onClick = onClick,
         radioButtonLocation = RadioButtonLocation.End,

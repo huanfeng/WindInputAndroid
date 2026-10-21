@@ -569,6 +569,28 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 全部已装方案（含没启用的）及启用状态（设置页「启用的方案」）。
+    pub fn installed_schemas(&self) -> Vec<InstalledSchemaInfo> {
+        self.core
+            .installed_schemas()
+            .into_iter()
+            .map(|s| InstalledSchemaInfo {
+                id: s.id,
+                name: s.name,
+                enabled: s.enabled,
+                locked: s.locked,
+            })
+            .collect()
+    }
+
+    /// 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
+    /// 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+    pub fn set_schema_enabled(&self, id: String, on: bool) -> Result<(), ConfigError> {
+        self.core
+            .set_schema_enabled(&id, on)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     /// 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。
     pub fn tooltip_sections(&self) -> Vec<TooltipSectionStateInfo> {
         self.core
@@ -868,6 +890,15 @@ pub struct CandidateMenuItemInfo {
     pub label: String,
     pub action: String,
     pub enabled: bool,
+}
+
+/// 一个已装方案：`locked` = 关不掉（英文是中英键切换的目标）。
+#[derive(Debug, uniffi::Record)]
+pub struct InstalledSchemaInfo {
+    pub id: String,
+    pub name: String,
+    pub enabled: bool,
+    pub locked: bool,
 }
 
 /// 候选提示的一段：`label` 是段名原文（开关时回传），`title` 是给人看的名字。

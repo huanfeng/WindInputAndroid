@@ -1253,3 +1253,40 @@ fn tooltip_section_toggle_reaches_candidate_tooltip() {
         "不存在的段名要报错，不能静默成功"
     );
 }
+
+/// 启用的方案：重载配置后拼音 / 双拼还在（真机：快捷面板一操作它们就没了——重载读回出厂
+/// `available = ["wubi86", "wubi86_pinyin"]`）；关掉双拼并重载后它不在可选里，英文关不掉。
+#[test]
+fn enabled_schemas_survive_reload_and_can_be_toggled() {
+    let Some((core, _rec, _env)) = setup_exclusive("enabled_schemas") else {
+        return;
+    };
+    let ids = |core: &Arc<WindCore>| core.schemas().into_iter().map(|s| s.id).collect::<Vec<_>>();
+    let installed = core.installed_schemas();
+    if !installed.iter().any(|s| s.id == "shuangpin") || !installed.iter().any(|s| s.id == "pinyin") {
+        eprintln!("跳过：未装拼音 / 双拼");
+        return;
+    }
+    reload_config(&core);
+    let after_reload = ids(&core);
+    assert!(
+        after_reload.contains(&"pinyin".to_string()) && after_reload.contains(&"shuangpin".to_string()),
+        "重载后拼音、双拼应仍可选，实得 {after_reload:?}"
+    );
+
+    core.set_schema_enabled("shuangpin".into(), false).expect("关双拼应成功");
+    reload_config(&core);
+    assert!(!ids(&core).contains(&"shuangpin".to_string()), "关掉后不该在可选里");
+    assert!(
+        core.installed_schemas().iter().any(|s| s.id == "shuangpin" && !s.enabled),
+        "已装列表里仍有它，标为未启用"
+    );
+    assert!(
+        core.set_schema_enabled("english".into(), false).is_err(),
+        "英文是中英键切换的目标，不能关"
+    );
+
+    core.set_schema_enabled("shuangpin".into(), true).expect("再开应成功");
+    reload_config(&core);
+    assert!(ids(&core).contains(&"shuangpin".to_string()), "重新启用后回到可选里");
+}

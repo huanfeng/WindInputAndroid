@@ -751,6 +751,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_lost(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_installed_schemas(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_key_down(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_run_command(
@@ -766,6 +768,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_schema_enabled(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled(
     ): Int
@@ -856,6 +860,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_focus_lost(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_installed_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,`modifiers`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -871,6 +877,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_schema_enabled(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(`ptr`: Long,`label`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1070,6 +1078,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_focus_lost() != 32859) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_installed_schemas() != 44493) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 7962) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1092,6 +1103,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled() != 12394) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_enabled() != 53133) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled() != 59430) {
@@ -2142,6 +2156,11 @@ public interface WindCoreInterface {
     fun `focusLost`()
     
     /**
+     * 全部已装方案（含没启用的）及启用状态（设置页「启用的方案」）。
+     */
+    fun `installedSchemas`(): List<InstalledSchemaInfo>
+    
+    /**
      * 按下键（vk = wind-keys VK 码，`modifiers` 为位掩码）。
      *
      * 抬起事件骨架期不喂（协调器按键链以 down 为主）。吃键判定在核心内部完成，
@@ -2192,6 +2211,12 @@ public interface WindCoreInterface {
      * 开 / 关一个附加词库：落盘到方案覆盖并即时生效（已加载的引擎热切换或重建）。
      */
     fun `setSchemaDictEnabled`(`schemaId`: kotlin.String, `dictId`: kotlin.String, `on`: kotlin.Boolean)
+    
+    /**
+     * 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    fun `setSchemaEnabled`(`id`: kotlin.String, `on`: kotlin.Boolean)
     
     /**
      * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
@@ -2622,6 +2647,22 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 全部已装方案（含没启用的）及启用状态（设置页「启用的方案」）。
+     */override fun `installedSchemas`(): List<InstalledSchemaInfo> {
+            return FfiConverterSequenceTypeInstalledSchemaInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_installed_schemas(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 按下键（vk = wind-keys VK 码，`modifiers` 为位掩码）。
      *
      * 抬起事件骨架期不喂（协调器按键链以 down 为主）。吃键判定在核心内部完成，
@@ -2763,6 +2804,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterString.lower(`schemaId`),
         FfiConverterString.lower(`dictId`),
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    @Throws(ConfigException::class)override fun `setSchemaEnabled`(`id`: kotlin.String, `on`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_schema_enabled(
+        it,
+        
+        FfiConverterString.lower(`id`),
         FfiConverterBoolean.lower(`on`),_status)
 }
     }
@@ -3634,6 +3694,57 @@ public object FfiConverterTypeInputStatus: FfiConverterRustBuffer<InputStatus> {
             FfiConverterBoolean.write(value.`chinesePunct`, buf)
             FfiConverterBoolean.write(value.`s2tEnabled`, buf)
             FfiConverterBoolean.write(value.`s2tShown`, buf)
+    }
+}
+
+
+
+/**
+ * 一个已装方案：`locked` = 关不掉（英文是中英键切换的目标）。
+ */
+data class InstalledSchemaInfo (
+    var `id`: kotlin.String
+    , 
+    var `name`: kotlin.String
+    , 
+    var `enabled`: kotlin.Boolean
+    , 
+    var `locked`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeInstalledSchemaInfo: FfiConverterRustBuffer<InstalledSchemaInfo> {
+    override fun read(buf: ByteBuffer): InstalledSchemaInfo {
+        return InstalledSchemaInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: InstalledSchemaInfo) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterBoolean.allocationSize(value.`enabled`) +
+            FfiConverterBoolean.allocationSize(value.`locked`)
+    )
+
+    override fun write(value: InstalledSchemaInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterBoolean.write(value.`enabled`, buf)
+            FfiConverterBoolean.write(value.`locked`, buf)
     }
 }
 
@@ -4797,6 +4908,34 @@ public object FfiConverterSequenceTypeEmojiModuleInfo: FfiConverterRustBuffer<Li
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeEmojiModuleInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeInstalledSchemaInfo: FfiConverterRustBuffer<List<InstalledSchemaInfo>> {
+    override fun read(buf: ByteBuffer): List<InstalledSchemaInfo> {
+        val len = buf.getInt()
+        return List<InstalledSchemaInfo>(len) {
+            FfiConverterTypeInstalledSchemaInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<InstalledSchemaInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeInstalledSchemaInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<InstalledSchemaInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeInstalledSchemaInfo.write(it, buf)
         }
     }
 }
