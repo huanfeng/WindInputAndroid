@@ -414,6 +414,16 @@ options = [
 
 [[item]]
 page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.hint_tone"
+source = "engine"
+type = "toggle"
+title = "提示带声调"
+summary = "提示里的正确拼音带声调，如「苹(píng)果」"
+enabled_when = "schema.pinyin.fuzzy.hint"
+
+[[item]]
+page = "schema"
 section = "双拼"
 key = "schema.pinyin.shuangpin.allow_full_pinyin"
 source = "engine"
