@@ -268,6 +268,18 @@ get_pad_text() {
     get_pad_text_dump
 }
 
+# 等输入框内容匹配 pattern（最多约 3s），返回最后读到的文本。一次按键宿主可能分两次改
+# 输入框（上屏 + 自动空格），机器忙时只 sleep 固定时长会读到中间态
+wait_pad_match() {   # pattern
+    local i t
+    for ((i = 0; i < 10; i++)); do
+        t="$(get_pad_text)"
+        printf '%s' "$t" | grep -qP "$1" && break
+        sleep 0.3
+    done
+    printf '%s' "$t"
+}
+
 get_pad_text_dump() {
     local node text hint
     while IFS= read -r node; do
@@ -701,8 +713,7 @@ tap_key PERIOD
 check "英文句点吃掉自动空格" "hi. " "$(get_pad_text)"
 # 物理键盘与软键共用宿主侧处理：英文空格上屏后同样自动补空格（首字母是否大写不论）
 adb_q shell input keyevent KEYCODE_H KEYCODE_I KEYCODE_SPACE
-sleep 0.8
-check_match "物理键盘：英文空格上屏也自动补空格" '^hi\. [Hh]i $' "$(get_pad_text)"
+check_match "物理键盘：英文空格上屏也自动补空格" '^hi\. [Hh]i $' "$(wait_pad_match '^hi\. [Hh]i $')"
 
 tap_key LANG
 sleep 3
