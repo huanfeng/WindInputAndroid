@@ -196,6 +196,14 @@ class TestPadActivity : ComponentActivity() {
                         // 脚本按 content-desc 定位（代码设的 id 在 uiautomator dump 里不可见）
                         contentDescription = TEST_PAD_DESC
                         hint = "测试输入框"
+                        // 内容一变就写一行日志：测试脚本读日志拿输入框内容（几十毫秒），不必每次
+                        // 抓整个界面（uiautomator dump，一次 0.2–3 秒，全量一百多次）
+                        logText("")
+                        addTextChangedListener(object : android.text.TextWatcher {
+                            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+                            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+                            override fun afterTextChanged(s: android.text.Editable?) = logText(s?.toString().orEmpty())
+                        })
                         gravity = Gravity.CENTER_VERTICAL or Gravity.START
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                         minHeight = (44 * resources.displayMetrics.density).toInt()
@@ -240,5 +248,12 @@ class TestPadActivity : ComponentActivity() {
     companion object {
         /** 与 scripts/emu-test.sh 约定的定位锚点 */
         const val TEST_PAD_DESC = "windinput-testpad"
+
+        /** 与 scripts/emu-test.sh 的 get_pad_text 约定：`text=` 后接内容，反斜杠与换行转义 */
+        private const val LOG_TAG = "WindTestPad"
+
+        private fun logText(text: String) {
+            android.util.Log.i(LOG_TAG, "text=" + text.replace("\\", "\\\\").replace("\n", "\\n"))
+        }
     }
 }

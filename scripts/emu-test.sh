@@ -256,7 +256,19 @@ tap_ime() {
     sleep 0.8
 }
 # 读输入框内容；输入框为空时 dump 会把 hint 填进 text，需剔除
+# 先读测试台写的日志（TestPadActivity：内容一变就记一行 `text=…`，反斜杠与换行已转义），
+# 几十毫秒；日志里没有（刚 logcat -c 过）才退回抓界面——一次 dump 0.2–3 秒，全量一百多次
 get_pad_text() {
+    local line
+    line="$(adb_ shell logcat -d -v raw -s WindTestPad:I | grep '^text=' | tail -1)"
+    if [[ -n "$line" ]]; then
+        printf '%b' "${line#text=}"
+        return 0
+    fi
+    get_pad_text_dump
+}
+
+get_pad_text_dump() {
     local node text hint
     while IFS= read -r node; do
         [[ "$node" == *'content-desc="windinput-testpad"'* ]] || continue
@@ -331,18 +343,23 @@ dismiss_anr() {
 
 reset_pad() {
     adb_q shell am start -n "$PKG/.settings.TestPadActivity"
-    sleep 2
-    # 清空：全选 + 删除（比重启 Activity 快，且不会掉 IME）
-    get_edit_bounds
+    # 不必干等：tap_edit 找输入框本身就轮询重试（此前固定 sleep 2，全量五十多次就是两分钟）
+    sleep 0.3
     tap_edit
     sleep 0.8
+    clear_pad
+}
+
+# 清空输入框：光标挪到末尾 + 连删（比重启 Activity 快，且不会掉 IME）。换场景不会清空，
+# 换完要接着用的也调它
+clear_pad() {
     adb_q shell input keyevent KEYCODE_MOVE_END
     # 次数要够长：命令短语用例会上屏 36 字符的 UUID，删不干净会污染下一个用例
     #（表现为下一条断言"实得"里带着上一条的残字，极易误判成新 bug）。
-    # 一次 shell 里连发 40 下，逐次 exec 要多花 ~20s。
-    adb_q shell 'for i in $(seq 1 40); do input keyevent KEYCODE_DEL; done'
+    # 一条 input 命令带 40 个键码（0.1 秒）；逐个 input 每下都要起一次进程（40 下约 0.8 秒）
+    adb_q shell "input keyevent $(printf 'KEYCODE_DEL %.0s' $(seq 1 40))"
     sleep 0.3
-    [[ -z "$(get_pad_text)" ]] || die "reset_pad 未清空输入框，后续断言不可信"
+    [[ -z "$(get_pad_text)" ]] || die "clear_pad 未清空输入框，后续断言不可信"
 }
 
 # 重启测试台回到第 1 场景。`am start -S` 会 force-stop **整个包**，输入法也在其中
@@ -356,6 +373,21 @@ restart_pad() {
 
 FAILED=0
 G=$'\e[32m'; R=$'\e[31m'; Y=$'\e[33m'; C=$'\e[36m'; D=$'\e[90m'; N=$'\e[0m'
+
+# 用例标题 + 计时：每进一个新用例，记下上一个用了多少秒；收尾时按耗时排出最慢的几个
+# （全量一轮二十多分钟，先用数据找出慢在哪，再谈提速）
+SECTION_NAME=""; SECTION_T0=$SECONDS; SECTION_TIMES=()
+section_end() {
+    [[ -n "$SECTION_NAME" ]] || return 0
+    local dt=$(( SECONDS - SECTION_T0 ))
+    echo "  ${D}（${dt}s）${N}"
+    SECTION_TIMES+=("$dt	$SECTION_NAME")
+}
+section() {
+    section_end
+    SECTION_NAME="$1"; SECTION_T0=$SECONDS
+    echo; echo "${Y}$1${N}"
+}
 
 check() {   # case expected actual
     if [[ "$3" == "$2" ]]; then
@@ -518,7 +550,7 @@ SCHEMA_BEFORE="$(get_active_schema)"
 # **方案选择是持久化的**（引擎会把 schema.active 写进用户配置）。上一次运行若在
 # 英文用例中途失败，英文方案就留在那儿了，下次启动仍是英文——于是所有中文用例
 # 连同系统短语一起失败，看起来像功能坏了。测试必须自己把前置条件建起来。
-echo; echo "${Y}[0] 前置：确保中文方案${N}"
+section "[0] 前置：确保中文方案"
 # 打一次中文探针；出汉字返回该字，否则返回空。
 probe_chinese() {
     reset_pad
@@ -563,41 +595,41 @@ wait_english() {
     done
 }
 
-echo; echo "${Y}[1] 五笔组合上屏：aa + 空格${N}"
+section "[1] 五笔组合上屏：aa + 空格"
 reset_pad
 tap_key a; tap_key a; tap_key SPACE
 check_match "上屏汉字" "$CN" "$(get_pad_text)"
 
-echo; echo "${Y}[2] 连续两轮组合（候选每轮都要出）${N}"
+section "[2] 连续两轮组合（候选每轮都要出）"
 reset_pad
 tap_key a; tap_key a; tap_key SPACE
 tap_key a; tap_key a; tap_key SPACE
 check_match "两轮各上屏一字" '^[\x{4e00}-\x{9fa5}]{2}$' "$(get_pad_text)"
 
-echo; echo "${Y}[3] 空缓冲功能键${N}"
+section "[3] 空缓冲功能键"
 reset_pad
 tap_key SPACE
 check "空缓冲空格出空格" " " "$(get_pad_text)"
 tap_key BS
 check "退格删除" "" "$(get_pad_text)"
 
-echo; echo "${Y}[4] 中文标点${N}"
+section "[4] 中文标点"
 reset_pad
 tap_key COMMA
 check "中文模式逗号是全角" "，" "$(get_pad_text)"
 
-echo; echo "${Y}[5] 候选点选${N}"
+section "[5] 候选点选"
 reset_pad
 tap_key a; tap_key a
 tap_candidate 1
 check_match "点选第二个候选" "$CN" "$(get_pad_text)"
 
-echo; echo "${Y}[6] 组合中退格删码${N}"
+section "[6] 组合中退格删码"
 reset_pad
 tap_key a; tap_key a; tap_key BS; tap_key SPACE
 check_match "删一码后上屏" "$CN" "$(get_pad_text)"
 
-echo; echo "${Y}[7] 系统短语（命令直通车）${N}"
+section "[7] 系统短语（命令直通车）"
 reset_pad
 # uuid 是出厂命令短语（display = {uuid()} 求值结果）。探针不用 date：
 # date 的五笔码表候选太多，短语被挤到第二页。
@@ -606,7 +638,7 @@ tap_candidate 0
 # 首选未必是短语，只断言「打得出东西」+ 不崩；短语是否在首位属排序策略
 check_match "短语码可上屏" '.+' "$(get_pad_text)"
 
-echo; echo "${Y}[8] 条区总高恒定（编码栏出现不顶高键盘）${N}"
+section "[8] 条区总高恒定（编码栏出现不顶高键盘）"
 # ⚠ 编码栏本身**无法用 uiautomator 断言**：IME 窗口不进 dump（实测 dump 只有宿主
 # Activity 的 9 个节点）。改测它必须守住的那条约束——组合态出现编码栏时，IME 窗口
 # 总高不能变，否则每次起手打字键盘都会跳一下。高度取自 dumpsys 的 ime inset。
@@ -621,7 +653,7 @@ else
 fi
 tap_key BS; tap_key BS
 
-echo; echo "${Y}[9] 快捷面板往返${N}"
+section "[9] 快捷面板往返"
 # 同样绕开 dump：验证「打开面板 → 键盘让位 → 返回 → 键盘恢复」这条往返。
 #
 # ⚠ 不要用「敲原 'a' 键位应无反应」来验证面板已顶上：那个坐标落在面板的方案选择
@@ -645,7 +677,7 @@ if (( panel_h <= 0 )); then
     echo "  ${R}FAIL${N}  面板期间取不到 IME 窗口高度"; FAILED=$((FAILED + 1))
 fi
 
-echo; echo "${Y}[10] 首键延迟（词库预热）${N}"
+section "[10] 首键延迟（词库预热）"
 # 惰性构建的反查/合并索引若没被后台预热，会同步阻塞用户首键（实测 2.8s）。
 # 阈值取 100ms 而非一帧：16ms 级抖动是 GC/调度噪声，卡顿量级才是要守的。
 slow="$(adb_ shell logcat -d -s RustSession:W \
@@ -656,7 +688,7 @@ else
     echo "  ${G}PASS${N}  无 100ms 级主线程阻塞"
 fi
 
-echo; echo "${Y}[11] 中英切换键${N}"
+section "[11] 中英切换键"
 # 底栏中英键切到**英文方案**（带补全）：空格上屏所打原文并自动补空格，再点回中文恢复出汉字。
 reset_pad
 tap_key LANG
@@ -684,7 +716,7 @@ if ! printf '%s' "$back_to_cn" | grep -qP "$CN"; then
     reset_pad; tap_key LANG; sleep 4
 fi
 
-echo; echo "${Y}[12] 快速点击的按下反馈${N}"
+section "[12] 快速点击的按下反馈"
 # 「点得快就没有按下效果」的回归。`input tap` 的 down/up 间隔近乎为零，是最坏情况：
 # 两次 invalidate 落在同一帧内被合并，若不做保底，按下态一帧都不会被绘制。
 # KeyboardView 在高亮结束时自检绘制帧数，未绘制即打 W 日志。
@@ -700,7 +732,7 @@ else
 fi
 reset_pad
 
-echo; echo "${Y}[13] 候选栏滚动后可选中第 10 个以后的候选${N}"
+section "[13] 候选栏滚动后可选中第 10 个以后的候选"
 # 此前点选靠**合成页内数字键 1-9**，第 10 个及以后永远点不到，候选栏做了滚动也是空转
 # （一帧只有 6~9 条）。现在候选按窗口拉取、按绝对下标选词。
 #
@@ -731,7 +763,7 @@ elif [[ -n "$far" ]]; then
         "$G" "$N" "'$far'" "$(IFS=/; echo "${near[*]}")"
 fi
 
-echo; echo "${Y}[15] 收起键盘后组合态不残留${N}"
+section "[15] 收起键盘后组合态不残留"
 # 打到一半按返回收键盘，再点回输入框——之前那串码必须已经作废：接着按空格应上屏
 # 一个空格，而不是把旧码拼出来的字。onFinishInputView 就是为这个加的。
 reset_pad
@@ -743,7 +775,7 @@ sleep 1.5
 tap_key SPACE
 check "收键盘后空格不上屏旧码的字" " " "$(get_pad_text)"
 
-echo; echo "${Y}[16] 点编辑框移动光标后组合态不残留${N}"
+section "[16] 点编辑框移动光标后组合态不残留"
 # 键盘不收、直接点编辑框（用户挪光标的最常见方式）：同样要作废组合。
 reset_pad
 tap_key a; tap_key a
@@ -752,7 +784,7 @@ sleep 1
 tap_key SPACE
 check "点编辑框后空格不上屏旧码的字" " " "$(get_pad_text)"
 
-echo; echo "${Y}[17] 编辑面板：选择 + 方向键 + 剪切${N}"
+section "[17] 编辑面板：选择 + 方向键 + 剪切"
 # 选择模式此前靠带 Shift 的方向键事件，多数编辑器不理会 → 「选择无效」。现在用 setSelection。
 # 面板网格 4 列 × 3 行铺满键盘四行区域；顶栏（返回）与条区等高。
 reset_pad
@@ -784,7 +816,7 @@ else
     echo "  ${R}FAIL${N}  前置三字未上屏：'$before'"; FAILED=$((FAILED + 1))
 fi
 
-echo; echo "${Y}[18] 有编码时滑退格清编码，不动正文${N}"
+section "[18] 有编码时滑退格清编码，不动正文"
 # 此前有编码时左滑退格删的是输入框里的字（意图相反）。现在等价于清空编码。
 reset_pad
 tap_key a; tap_key a; tap_key SPACE          # 先上屏一个字当"正文"
@@ -795,13 +827,13 @@ sleep 0.6
 tap_key SPACE                                # 编码已清 → 空格出空格
 check_match "正文保留一字且编码已清" '^[\x{4e00}-\x{9fa5}] $' "$(get_pad_text)"
 
-echo; echo "${Y}[19] 有编码时回车上屏编码原文${N}"
+section "[19] 有编码时回车上屏编码原文"
 # 大众布局：有编码时回车键写「确定」，按下上屏字母原文（键面文字 uiautomator 看不到，验行为）
 reset_pad
 tap_key a; tap_key a; tap_key ENTER
 check "回车上屏编码原文" "aa" "$(get_pad_text)"
 
-echo; echo "${Y}[20] 第 2 行缩进的半键空白归最近的键${N}"
+section "[20] 第 2 行缩进的半键空白归最近的键"
 # 第 2 行两侧各缩进半个键（布局 spacer），落在空白里的触点归同一行最近的键（a / l），不能点空
 reset_pad
 row2_y="$(awk -v kb="$GEO_KBBOTTOM" -v rp="$GEO_ROWPX" 'BEGIN{ printf "%d", kb - 2.5 * rp }')"
@@ -810,7 +842,7 @@ adb_q shell input tap 8 "$row2_y"; sleep 0.4
 tap_key SPACE
 check_match "左侧空白两次 = aa 出字" "$CN" "$(get_pad_text)"
 
-echo; echo "${Y}[21] 长按字母出大写${N}"
+section "[21] 长按字母出大写"
 # 字母长按气泡是「小写 / 大写」，大写在右；按住不抬手右移一格再松开即选中大写。
 # 用 motionevent 而不是 swipe：swipe 一按下就开始移动，气泡还没弹出手指已经划走了。
 reset_pad
@@ -821,7 +853,7 @@ adb_q shell input motionevent MOVE $(( ex + shift_px )) "$ey"; sleep 0.2
 adb_q shell input motionevent UP $(( ex + shift_px )) "$ey"; sleep 0.6
 check "长按 e 右移选中 E" "E" "$(get_pad_text)"
 
-echo; echo "${Y}[22] 有编码时切中英先上屏字母原文${N}"
+section "[22] 有编码时切中英先上屏字母原文"
 reset_pad
 tap_key a; tap_key a; tap_key LANG
 sleep 3
@@ -832,7 +864,7 @@ reset_pad
 tap_key a; tap_key a; tap_key SPACE
 check_match "切回中文出汉字" "$CN" "$(get_pad_text)"
 
-echo; echo "${Y}[23] 123 层：中文模式下的半角句点与中文句号${N}"
+section "[23] 123 层：中文模式下的半角句点与中文句号"
 # 第 3 行「。」走引擎（中文模式出全角），最后一格半角句点原样上屏（打小数用）；← 回字母层
 reset_pad
 tap_key SYM
@@ -842,7 +874,7 @@ tap_cell 3 "${SYM_W[3]}" 1
 tap_key a; tap_key a; tap_key SPACE
 check_match "← 回到字母层继续打中文" '^1\.2。[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
 
-echo; echo "${Y}[24] 九宫格数字键盘${N}"
+section "[24] 九宫格数字键盘"
 # 123 层「1234」（第 3 行左端）进九宫格，算式不用切层：数字、句点在格子里，* 在左列第 3 项
 reset_pad
 tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0
@@ -860,10 +892,10 @@ tap_text "数字"
 tap_edit; sleep 1
 tap_cell 1 "$NUM_W" 2; tap_cell 3 "$NUM_W" 2
 check "数字框直接是九宫格" "50" "$(get_pad_text)"
-# 场景复位（重启 Activity 回到第 1 场景），后续用例照常
-restart_pad
+# 场景复位：点回「普通」（场景是分段，不必重启进程——重启会连输入法一起杀掉、核心冷启动）
+tap_text "普通"
 
-echo; echo "${Y}[25] 分类符号页：选符号上屏、停在本页、退格、返回${N}"
+section "[25] 分类符号页：选符号上屏、停在本页、退格、返回"
 # 符号页在 IME 窗口里，uiautomator 只 dump 应用窗口，格子和 tab 看不到，只能按坐标点。
 # 先清掉最近用过的（debug 包可 run-as），进页面落在「常用」、内容只有出厂那一组：
 # 第 1 行是 ， 。 ？ ！ 、 …（SymbolWindow.COMMON_DEFAULTS），每行 10 格。
@@ -888,7 +920,7 @@ tap_cell 0 "${SYM_W[0]}" 0
 check_match "← 回到 123 层" '^[\x{4e00}-\x{9fa5}]，1$' "$(get_pad_text)"
 tap_cell 3 "${SYM_W[3]}" 1
 
-echo; echo "${Y}[26] 常用里最近用过的置首、重启后保留${N}"
+section "[26] 常用里最近用过的置首、重启后保留"
 restart_pad
 reset_pad
 tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
@@ -898,7 +930,7 @@ check "常用第一格是上次点的「。」" "。" "$(get_pad_text)"
 adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
 tap_cell 3 "${SYM_W[3]}" 1
 
-echo; echo "${Y}[27] 英文补全：点候选上屏补全词并自动加空格${N}"
+section "[27] 英文补全：点候选上屏补全词并自动加空格"
 reset_pad
 tap_key LANG; sleep 4
 tap_key b; tap_key e; tap_key a; tap_key u
@@ -906,33 +938,31 @@ tap_key b; tap_key e; tap_key a; tap_key u
 adb_q shell input tap $(( GEO_W / 2 )) "$GEO_BARY"; sleep 0.6
 check_match "点补全词上屏" '^[Bb]eau[a-z]+ $' "$(get_pad_text)"
 
-echo; echo "${Y}[28] 英文句首自动大写${N}"
-# 句子框（第 5 场景，CAP_SENTENCES）：句首的 h 自动大写；句点后下一句又自动大写
-restart_pad
+section "[28] 英文句首自动大写"
+# 句子框（CAP_SENTENCES）：句首的 h 自动大写；句点后下一句又自动大写。[27] 收尾仍在英文方案
 tap_text "句子"
 tap_edit; sleep 1.5
-[[ -n "$(wait_english)" ]] || die "重启后英文方案未就绪"
+[[ -n "$(wait_english)" ]] || die "英文方案未就绪"
 tap_key h; tap_key i; tap_key SPACE; tap_key PERIOD
 # 自动大写的 H 进的是英文组合（补全不断），空格上屏后才读得到
 tap_key h; tap_key SPACE
 check "句首大写 + 句点后下一句又大写" "Hi. H " "$(get_pad_text)"
 read -r sp_x sp_y <<< "$(key_center SPACE)"
-restart_pad
 
-echo; echo "${Y}[29] 密码框不自动大写、不补全${N}"
-restart_pad
+section "[29] 密码框不自动大写、不补全"
 tap_text "密码"
 tap_edit; sleep 1.5
+clear_pad
 tap_key h; tap_key i
 adb_q shell "input tap $sp_x $sp_y; input tap $sp_x $sp_y"; sleep 0.5
 check "密码框原样直输（不大写、不补全）" "hi  " "$(get_pad_text)"
-restart_pad
-[[ -n "$(wait_english)" ]] || die "重启后英文方案未就绪"
+tap_text "普通"
+[[ -n "$(wait_english)" ]] || die "英文方案未就绪"
 # 收尾回中文（方案选择持久化，留在英文会污染下次运行）
 reset_pad; tap_key LANG; sleep 4
 [[ -n "$(wait_chinese)" ]] || die "收尾切回中文失败"
 
-echo; echo "${Y}[31] 上屏后联想：学会「我们 → 一直」后点联想首位${N}"
+section "[31] 上屏后联想：学会「我们 → 一直」后点联想首位"
 # 下一词学习（主仓 learn_next_word）：相邻上屏两次「我们」「一直」，第三次上屏「我们」联想首位应是「一直」
 reset_pad
 for w in t r w u SPACE g g f h SPACE t r w u SPACE g g f h SPACE t r w u SPACE; do tap_key "$w"; done
@@ -940,14 +970,14 @@ sleep 0.5
 tap_candidate 0
 check_match "联想首位整词上屏" '我们一直我们一直我们一直$' "$(get_pad_text)"
 
-echo; echo "${Y}[32] 联想态按空格出空格${N}"
+section "[32] 联想态按空格出空格"
 # 两家在联想态按空格都是收起联想、出空格，不选联想词
 reset_pad
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 tap_key SPACE
 check_match "联想态空格出空格" '^[\x{4e00}-\x{9fa5}] $' "$(get_pad_text)"
 
-echo; echo "${Y}[33] 联想态按退格先收联想、不删正文${N}"
+section "[33] 联想态按退格先收联想、不删正文"
 reset_pad
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 tap_key BS
@@ -955,7 +985,7 @@ check_match "第一下退格只收联想" '^[\x{4e00}-\x{9fa5}]$' "$(get_pad_tex
 tap_key BS
 check "第二下退格才删字" "" "$(get_pad_text)"
 
-echo; echo "${Y}[34] 收起键盘后联想不残留${N}"
+section "[34] 收起键盘后联想不残留"
 # 联想还在的话，数字键会选联想词；收起再弹出后数字应原样上屏
 reset_pad
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
@@ -964,7 +994,7 @@ tap_edit; sleep 1.2
 tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 1
 check_match "收起后数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 
-echo; echo "${Y}[35] 简入繁出：开启后「我们」上屏为「我們」${N}"
+section "[35] 简入繁出：开启后「我们」上屏为「我們」"
 # 要 APK 带上 opencc 数据才有效——没带时开关照样能开，上屏却还是简体，且不报错。
 # 直接写核心用户层再重启进程（等价于设置页写入 + 重载，但不依赖设置页的坐标）；
 # 跑完把原文件写回去，不污染后续用例与下次运行；中途退出（die / Ctrl-C）也由 trap 写回。
@@ -984,7 +1014,7 @@ trap 'restore_suite_kb; exit 1' TERM INT
 restart_pad
 wait_chinese >/dev/null
 
-echo; echo "${Y}[36] 候选长按：提示卡 →「更多操作」→ 置顶第三个候选，再恢复默认${N}"
+section "[36] 候选长按：提示卡 →「更多操作」→ 置顶第三个候选，再恢复默认"
 # 菜单是 IME 窗口里的浮层，uiautomator 看不到，按版式算坐标（CandidateMenuPopup）：
 # 卡片在条区下方 4dp、左右各让 8dp，内边距 10dp，标题一行之后是 4 列格子，
 # 第 1 行中心约在键盘顶下 62dp，行距 46dp（实测）。
@@ -1026,7 +1056,7 @@ menu_cell 1 0          # 恢复默认（第 2 行第 1 格）
 tap_key SPACE
 check "恢复默认后首选回到「式」" "式" "$(get_pad_text)"
 
-echo; echo "${Y}[37] 逗号、句号各占一键；五笔 emoj 出表情${N}"
+section "[37] 逗号、句号各占一键；五笔 emoj 出表情"
 # 默认布局（豆包式底栏）：中文模式下逗号键出「，」、句号键出「。」，不用上滑
 reset_pad
 tap_key COMMA; tap_key PERIOD
@@ -1035,9 +1065,9 @@ check "逗号键与句号键" "，。" "$(get_pad_text)"
 reset_pad
 tap_key e; tap_key m; tap_key o; tap_key j; tap_key SPACE
 # uiautomator 把 BMP 以外的字符写成 XML 数字实体：😂（U+1F602）读回来是 &#128514;
-check "emoj 上屏表情" "&#128514;" "$(get_pad_text)"
+check "emoj 上屏表情" "😂" "$(get_pad_text)"
 
-echo; echo "${Y}[38] 设置页层级：首页 → 方案 → 码表 → 返回；词库 → 我的词条${N}"
+section "[38] 设置页层级：首页 → 方案 → 码表 → 返回；词库 → 我的词条"
 # 设置页分了两层（方案 / 输入按组进二级页，词库拆成入口），返回走预测性返回的回调。
 # 这里只验「点得进、退得回、每层该有的东西在」，不验视觉。
 has_text() {   # 当前界面有没有这段文字（等界面稳定，最多约 4 秒）
@@ -1076,7 +1106,7 @@ adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 restart_pad
 
-echo; echo "${Y}[39] 长按中英键弹方案卡片：切到全拼打 ni，再切回五笔${N}"
+section "[39] 长按中英键弹方案卡片：切到全拼打 ni，再切回五笔"
 # 卡片与候选长按菜单同一组件，格子坐标同 menu_cell；方案顺序按核心给的列表：
 # 清风英文 · 全拼 · 双拼 · 五笔 · 五笔拼音（第 1 行 4 格）
 reset_pad
@@ -1093,7 +1123,7 @@ sleep 2
 tap_key a; tap_key a; tap_key SPACE
 check "切回五笔 aa 出「式」" "式" "$(get_pad_text)"
 
-echo; echo "${Y}[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符${N}"
+section "[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符"
 # 核心在联想态挂一个占位组合（空格等，桌面 TSF 给候选窗定位用）；手机上写进来就是输入框里
 # 一个带下划线的空格（真机反馈）。键盘侧把纯占位的组合文本挡掉。开关是键盘自己的配置文件。
 kb_orig="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -v 'No such file')"
@@ -1116,7 +1146,7 @@ write_kb_cfg "$kb_orig"
 restart_pad
 wait_chinese >/dev/null
 
-echo; echo "${Y}[41] 首次使用：第一次弹键盘先出方案卡片，选完不再出${N}"
+section "[41] 首次使用：第一次弹键盘先出方案卡片，选完不再出"
 # 点卡片里的「全拼」再打 ni：卡片在就出「你」；卡片没出来的话那一下落在字母键上，对不上
 # 当成全新用户：连 ime_state（记着上次中文方案）一起删——记过它的会被当成升级上来的老用户、不弹卡片
 adb_q shell run-as "$PKG" rm -f "$ONBOARD_XML" shared_prefs/ime_state.xml
@@ -1144,7 +1174,7 @@ tap_key a; tap_key a; tap_key SPACE
 check "第二次弹键盘不再出卡片" "式" "$(get_pad_text)"
 mark_onboarded
 
-echo; echo "${Y}[42] 无障碍：键与候选是读屏看得见、可按的虚拟节点${N}"
+section "[42] 无障碍：键与候选是读屏看得见、可按的虚拟节点"
 # 键盘与候选栏都是 Canvas 自绘，靠 ExploreByTouchHelper 报虚拟节点。uiautomator 默认只导出
 # 前台应用窗口，输入法窗口要 --windows 才在里面。节点没报出来时读屏用户整个键盘是空的
 ime_nodes() {   # 输入法窗口里所有虚拟按钮的 content-desc，一行一个
@@ -1163,7 +1193,7 @@ check "字母键有无障碍节点（Q）" "yes" "$(grep -qxF Q <<< "$nodes" && 
 check "候选栏的候选有无障碍节点（式）" "yes" "$(grep -qE '^式(，编码 .*)?$' <<< "$nodes" && echo yes || echo no)"
 reset_pad
 
-echo; echo "${Y}[43] 单手模式：快捷面板开、收窄后照常打字、换边、退出${N}"
+section "[43] 单手模式：快捷面板开、收窄后照常打字、换边、退出"
 # 单手时键盘几何变了，tap_key 的全宽坐标不能用——全程按无障碍节点（文字 / 描述）点
 reset_pad
 q_full="$(ime_bounds Q | cut -d' ' -f1)"
@@ -1180,7 +1210,7 @@ q_back="$(ime_bounds Q | cut -d' ' -f1)"
 check "退出单手：恢复满宽" "${q_full:-?}" "${q_back:-}"
 reset_pad
 
-echo; echo "${Y}[44] 物理键盘：按键进引擎、快捷键放行、只露条区${N}"
+section "[44] 物理键盘：按键进引擎、快捷键放行、只露条区"
 # adb 的 keyevent 走的就是物理键盘那条路（InputMethodService.onKeyDown），不经软键盘
 reset_pad
 adb_q shell input keyevent KEYCODE_A KEYCODE_A KEYCODE_SPACE
@@ -1210,7 +1240,7 @@ check "只用物理键盘：空闲时返回键一下退出页面" "no" \
 adb_q shell settings put secure show_ime_with_hard_keyboard "${SHOW_IME_WITH_HARD_KB:-1}"
 reset_pad
 
-echo; echo "${Y}[45] 软键盘数字不选候选、工具栏常驻按钮${N}"
+section "[45] 软键盘数字不选候选、工具栏常驻按钮"
 # 有编码时上滑 q 出 1：是要数字 1，不是选第 1 个候选——先上屏首选再接 1
 reset_pad
 tap_key a; tap_key a
@@ -1226,7 +1256,7 @@ check "工具栏「文本编辑」直达编辑面板" "yes" "$(ime_xml | grep -q
 tap_ime 返回
 reset_pad
 
-echo; echo "${Y}[14] 跑完不改变活跃方案${N}"
+section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then
     echo "  ${D}SKIP  首次运行，无基线可比${N}"
@@ -1234,7 +1264,11 @@ else
     check "活跃方案未被用例改动" "$SCHEMA_BEFORE" "$schema_after"
 fi
 
+section_end
 restore_suite_kb
+echo; echo "${C}最慢的用例：${N}"
+printf '%s\n' "${SECTION_TIMES[@]}" | sort -rn | head -10 | awk -F'\t' '{ printf "  %4ds  %s\n", $1, $2 }'
+echo "  合计 ${SECONDS}s"
 echo; echo "${C}================================${N}"
 if (( FAILED == 0 )); then echo "${G}全部通过${N}"; exit 0; fi
 echo "${R}${FAILED} 项失败${N}"
