@@ -703,6 +703,7 @@ impl WindCore {
                 text: p.text,
                 enabled: p.enabled,
                 is_system: p.is_system,
+                preview: p.preview,
             })
             .collect()
     }
@@ -900,6 +901,8 @@ pub struct PhraseInfo {
     pub text: String,
     pub enabled: bool,
     pub is_system: bool,
+    /// 候选上显示的样子（日期按此刻展开、组展开成前几项）；求值落空为空串
+    pub preview: String,
 }
 
 /// 用户词的一页与命中总数。

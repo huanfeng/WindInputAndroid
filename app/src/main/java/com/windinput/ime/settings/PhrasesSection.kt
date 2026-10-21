@@ -18,7 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -177,13 +179,25 @@ private fun PhraseRow(
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // 先给打出来的样子（「2026年10月21日」「好的 · 收到 · …」），模板原文（`$Y年$M月$D日`）
+        // 只在两者不同时小字附在下面——只有原文的话，普通用户看不懂这条是干什么的
+        val preview = phrase.preview.ifEmpty { phrase.text }
         Column(modifier = Modifier.weight(1f)) {
             Text(text = phrase.code)
             Text(
-                text = phrase.text,
+                text = preview,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 maxLines = 2,
             )
+            if (preview != phrase.text) {
+                Text(
+                    text = phrase.text,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.6f),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         if (selected && onDelete != null) {
             Text(

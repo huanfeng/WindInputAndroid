@@ -4020,6 +4020,11 @@ data class PhraseInfo (
     var `enabled`: kotlin.Boolean
     , 
     var `isSystem`: kotlin.Boolean
+    , 
+    /**
+     * 候选上显示的样子（日期按此刻展开、组展开成前几项）；求值落空为空串
+     */
+    var `preview`: kotlin.String
     
 ){
     
@@ -4040,6 +4045,7 @@ public object FfiConverterTypePhraseInfo: FfiConverterRustBuffer<PhraseInfo> {
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterString.read(buf),
         )
     }
 
@@ -4047,7 +4053,8 @@ public object FfiConverterTypePhraseInfo: FfiConverterRustBuffer<PhraseInfo> {
             FfiConverterString.allocationSize(value.`code`) +
             FfiConverterString.allocationSize(value.`text`) +
             FfiConverterBoolean.allocationSize(value.`enabled`) +
-            FfiConverterBoolean.allocationSize(value.`isSystem`)
+            FfiConverterBoolean.allocationSize(value.`isSystem`) +
+            FfiConverterString.allocationSize(value.`preview`)
     )
 
     override fun write(value: PhraseInfo, buf: ByteBuffer) {
@@ -4055,6 +4062,7 @@ public object FfiConverterTypePhraseInfo: FfiConverterRustBuffer<PhraseInfo> {
             FfiConverterString.write(value.`text`, buf)
             FfiConverterBoolean.write(value.`enabled`, buf)
             FfiConverterBoolean.write(value.`isSystem`, buf)
+            FfiConverterString.write(value.`preview`, buf)
     }
 }
 
