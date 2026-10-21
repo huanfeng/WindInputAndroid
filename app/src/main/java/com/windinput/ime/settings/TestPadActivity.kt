@@ -14,6 +14,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -116,25 +117,30 @@ class TestPadActivity : ComponentActivity() {
                 )
             },
         ) { padding ->
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = padding.calculateTopPadding())
                     .imePadding()
                     .navigationBarsPadding(),
             ) {
-                TabRowWithContour(
-                    tabs = scenes.map { it.tab },
-                    selectedTabIndex = sceneIndex,
-                    onTabSelected = { sceneIndex = it },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                Text(
-                    text = scene.hint,
-                    fontSize = 13.sp,
-                    color = colors.onSurfaceVariantSummary,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
-                )
+            // 横屏弹出键盘后只剩一百多 dp：场景页签与说明让位，否则输入框被挤出屏外、看不见在打什么
+            val roomy = maxHeight >= 200.dp
+            Column(modifier = Modifier.fillMaxSize()) {
+                if (roomy) {
+                    TabRowWithContour(
+                        tabs = scenes.map { it.tab },
+                        selectedTabIndex = sceneIndex,
+                        onTabSelected = { sceneIndex = it },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    Text(
+                        text = scene.hint,
+                        fontSize = 13.sp,
+                        color = colors.onSurfaceVariantSummary,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -154,6 +160,7 @@ class TestPadActivity : ComponentActivity() {
                     items(messages) { Bubble(it) }
                 }
                 InputBar(scene) { text -> if (text.isNotBlank()) messages += text }
+            }
             }
         }
     }
