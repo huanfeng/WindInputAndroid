@@ -143,6 +143,12 @@ internal fun PhrasesSection() {
     }
 
     SectionTitle("系统短语 · ${system.size} 条")
+    // 恢复默认放在列表前：系统短语七十多条、每条两三行，放在末尾要翻到底才找得到
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow("系统短语恢复默认", "开关回到出厂设定（出厂关闭的仍关闭），自己加的不动") {
+            write("已恢复默认") { it.phrasesRestoreDefaults() }
+        }
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         if (system.isEmpty()) NavRow("没有找到", null, null)
         for (p in system) {
@@ -153,9 +159,6 @@ internal fun PhrasesSection() {
                 onToggle = { on -> write(null) { it.phraseSetEnabled(p.code, p.text, on) } },
                 onDelete = null,
             )
-        }
-        NavRow("系统短语恢复默认", "开关回到出厂设定（出厂关闭的仍关闭），自己加的不动") {
-            write("已恢复默认") { it.phrasesRestoreDefaults() }
         }
     }
 }
