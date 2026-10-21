@@ -17,13 +17,13 @@
 
 | 功能 | 优先级 | 落点 | 参考与说明 |
 |---|---|---|---|
-| 长按气泡（多字符网格，横移选择） | P0 | K | fcitx5: `PopupKeyboardUi.kt`，长按弹网格、不抬指横移、抬手上屏 |
-| 按键预览气泡（点按放大显示） | P0 | K | fcitx5: `PopupEntryUi.kt`；已有设置项占位 `ui.android.key_preview` |
+| 长按气泡（多字符网格，横移选择） | P0 | K | fcitx5: `PopupKeyboardUi.kt`，长按弹网格、不抬指横移、抬手上屏；✅ `KeyPopupManager` |
+| 按键预览气泡（点按放大显示） | P0 | K | fcitx5: `PopupEntryUi.kt`；已有设置项占位 `ui.android.key_preview`；✅ 设置项 `ui.android.key_preview` |
 | 空格滑动移光标 | **P0** | K | 用户点名。fcitx5: 横向滑动按 10dp 阈值折算 N 次左右方向键，可带震动；Gboard 同款交互 |
-| 退格滑动批量删除 | P1 | K | fcitx5: 左滑扩选、抬手整段删；Gboard: 从退格左滑选多词 |
-| 字母键上滑出副字符（数字/符号） | P1 | K | fcitx5: `KeyDef.Behavior.Swipe`，方向可配，阈值 36dp |
+| 退格滑动批量删除 | P1 | K | fcitx5: 左滑扩选、抬手整段删；Gboard: 从退格左滑选多词；✅ `ui.android.gesture_backspace_select` |
+| 字母键上滑出副字符（数字/符号） | P1 | K | fcitx5: `KeyDef.Behavior.Swipe`，方向可配，阈值 36dp；✅ `ui.android.gesture_swipe_symbols` |
 | 长按重复（退格连删） | P0 | K | 已实现 ✅ |
-| Shift 双击/长按锁定大写 | P1 | K | fcitx5: `Behavior.DoubleTap/LongPress` |
+| Shift 双击/长按锁定大写 | P1 | K | fcitx5: `Behavior.DoubleTap/LongPress`；✅ 双击锁定（`KeyboardView`） |
 | 空格长按行为可配置 | P2 | K | fcitx5: 无/轮换输入法/切中英/系统选择器 |
 | 多指分离触控 | P1 | K | 已实现 ✅（rollover：新手指落下即把上一键按单击收尾，同 AOSP LatinIME；上一指在气泡/滑动/连删手势中则不打断）。fcitx5: `isMotionEventSplittingEnabled` |
 | 滑行输入（glide typing） | P3 | K+R | FlorisBoard/Gboard 有；HeliBoard 依赖闭源库。工程量大，中文价值低于英文，远期评估 |
@@ -39,9 +39,9 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 | 26 键 qwerty | P0 | K | 已实现 ✅ |
 | 符号/数字层 | P0 | K | 已实现 ✅（后续按 fcitx5 符号面板扩充分类） |
 | **九宫格（T9）拼音** | **P1** | **K+R** | fcitx5-android 没有、商业输入法全有，中文用户刚需。引擎侧歧义展开在 Rust 做（词图天然支持），键盘侧新布局 + 分词候选交互 |
-| 数字键盘（计算器式，数字/电话框自动切） | P0 | K | fcitx5: `NumberKeyboard.kt`；我们已有符号层自动切换，需专门数字布局 |
+| 数字键盘（计算器式，数字/电话框自动切） | P0 | K | fcitx5: `NumberKeyboard.kt`；我们已有符号层自动切换，需专门数字布局；✅ 九宫格，emu [24] |
 | 自定义布局（用户 TOML） | P1 | K | 我们已有三级覆盖机制 ✅，fcitx5 反而没有（其 Planned Feature） |
-| 键盘高度/左右边距/底部边距（横竖屏独立） | P1 | K | fcitx5: `twinInt` 横竖屏成对配置，值得抄 |
+| 键盘高度/左右边距/底部边距（横竖屏独立） | P1 | K | fcitx5: `twinInt` 横竖屏成对配置，值得抄；✅ 行高横竖屏分开 + 侧边 / 底部边距 |
 | 单手模式（缩窄靠边） | P2 | K | fcitx5 没有；Gboard/搜狗/HeliBoard 有 |
 | 悬浮键盘 | P2 | K | Gboard 有完整实现；平板场景重要 |
 | 分体键盘（平板横屏） | P3 | K | Gboard/HeliBoard 有 |
@@ -52,12 +52,12 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 | 功能 | 优先级 | 落点 | 参考与说明 |
 |---|---|---|---|
 | 横向候选条 | P0 | K | 已有占位 ✅；fcitx5 有三种填充策略 |
-| **展开式候选面板**（全键盘区网格） | P0 | K | 中文输入法刚需（重码多）。fcitx5: Grid/Flexbox 两种布局 + Paging3 分页 + 展开按钮状态机 |
+| **展开式候选面板**（全键盘区网格） | P0 | K | 中文输入法刚需（重码多）。fcitx5: Grid/Flexbox 两种布局 + Paging3 分页 + 展开按钮状态机；✅ `ExpandedCandidatesWindow` |
 | 候选长按操作（删词/置顶/反查） | P1 | K+R | 桌面右键菜单语义的移动端映射（shadow pin/delete 是 Rust 现成能力）。✅ 2026-10-20 已做（反查除外），见 §14.11 |
-| 剪贴板建议条（复制后提示粘贴） | P1 | K | fcitx5: 30s 超时 + 敏感内容遮蔽；Gboard 同款 |
+| 剪贴板建议条（复制后提示粘贴） | P1 | K | fcitx5: 30s 超时 + 敏感内容遮蔽；Gboard 同款；✅ `ui.android.clip_suggestion`，30s 超时 |
 | 内联建议 Inline Suggestions（Autofill，Android 11+） | P2 | K | 系统 API：密码管理器等的填充建议展示在候选条，隐私上系统托管 |
 | 密码框数字行 | P2 | K | fcitx5: 检测密码框在工具栏位置放数字行 |
-| 工具栏/候选区状态机 | P1 | K | fcitx5: Empty/Toolbar/Clipboard/NumberRow/InlineSuggestion 五态切换，架构值得抄 |
+| 工具栏/候选区状态机 | P1 | K | fcitx5: Empty/Toolbar/Clipboard/NumberRow/InlineSuggestion 五态切换，架构值得抄；✅ `BarView` 三态（候选 / 剪贴板建议 / 工具栏） |
 
 ## 4. 功能面板（用户点名重点）
 
@@ -66,9 +66,9 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 | **剪贴板历史面板** | **P0** | K | 用户点名。fcitx5 全套：Room 持久化、瀑布流、置顶、编辑、滑动删除+撤销、一键清空(跳过置顶)、条数上限、敏感遮蔽；Gboard: 自动存 1 小时+置顶常用 |
 | **表情面板（多行网格 + 分类 Tab + 最近使用）** | **P0** | K | 用户点名。fcitx5: Emoji 9 分类/颜文字 6 分类/符号 7 分类共用一套 Picker 框架，分类 Tab + 分页 + 最近使用置首 + 肤色变体长按 + 不可渲染过滤 |
 | **文本编辑面板（光标移动/选择/剪切复制粘贴）** | **P0** | K | 用户点名"移动光标/特殊键盘"。fcitx5: 方向键、行首行尾、选择模式开关、全选/剪切/复制/粘贴/退格 |
-| 快捷短语面板 | P1 | K+R | 桌面 wind-phrase 是 Rust 现成能力，K 侧只做面板 |
+| 快捷短语面板 | P1 | K+R | 桌面 wind-phrase 是 Rust 现成能力，K 侧只做面板；✅ 设置页「词库 → 快捷短语」（2026-10-21）；键盘内面板未做 |
 | 状态区（模式开关集合：中英/简繁/表情/设置入口） | P1 | K+R | fcitx5: 引擎动态状态项 + 固定入口；对应桌面工具栏语义 |
-| Unicode/特殊符号面板（全角、数学、箭头等） | P1 | K | fcitx5 符号面板 7 分类；对应桌面快符模式的数据 |
+| Unicode/特殊符号面板（全角、数学、箭头等） | P1 | K | fcitx5 符号面板 7 分类；对应桌面快符模式的数据；✅ 分类符号页，emu [25] |
 | 计算器/日期等快捷输入 | P2 | R | 桌面 wind-quick-input 现成，候选条直接出结果 |
 
 **框架预留建议（本调研最重要的架构结论）**：引入 fcitx5 的 **InputWindow
@@ -92,8 +92,8 @@ Press / LongPress / Repeat / Swipe / DoubleTap + Popup，新手势的边际成�
 | 功能 | 优先级 | 落点 | 参考与说明 |
 |---|---|---|---|
 | EditorInfo 场景感知（密码/数字框） | P0 | K | 已实现基础版 ✅；扩展：email/URI 场景换底排键位 |
-| 回车键动作标签（发送/搜索/下一项） | P0 | K | imeOptions 驱动回车键显示，主流标配 |
-| 全面屏/导航栏适配（edge-to-edge） | P0 | K | fcitx5: 三档处理 + Android 15 强制 e2e 自动降级。**Android 15 (targetSdk 35) 强制 edge-to-edge，必须一开始就做对** |
+| 回车键动作标签（发送/搜索/下一项） | P0 | K | imeOptions 驱动回车键显示，主流标配；✅ 按 imeOptions |
+| 全面屏/导航栏适配（edge-to-edge） | P0 | K | fcitx5: 三档处理 + Android 15 强制 e2e 自动降级。**Android 15 (targetSdk 35) 强制 edge-to-edge，必须一开始就做对**；✅ `InputRootView.onApplyWindowInsets` |
 | 语音输入入口（转发系统 voice IME） | P1 | K | 已实现 ✅（快捷面板，系统里有 voice 子类型的输入法才出入口）；自研识别不做 |
 | 输入法切换（语言键轮换 + 长按选择器） | P1 | K | 系统选择器已接 ✅（快捷面板「切换输入法」）；自绘选择对话框待定 |
 | 物理键盘支持（隐藏软盘 + 浮动候选窗） | P2 | K+R | fcitx5: 跟随光标的浮动候选窗（onUpdateCursorAnchorInfo）；桌面键事件模型在 Rust 侧免费 |
