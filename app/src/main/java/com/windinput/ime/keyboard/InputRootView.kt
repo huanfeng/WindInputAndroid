@@ -83,6 +83,12 @@ class InputRootView(context: Context) : LinearLayout(context) {
             insets.systemWindowInsetBottom
         }
         lastInsetBottom = bottom
+        // 横屏时挖孔与三键导航栏在左右两侧：窗口铺到底（服务里开了 cutout ALWAYS），
+        // 键往里收，背景照样铺满——否则侧边露出一条底下的应用
+        if (Build.VERSION.SDK_INT >= 30) {
+            val side = insets.getInsets(WindowInsets.Type.displayCutout() or WindowInsets.Type.navigationBars())
+            if (paddingLeft != side.left || paddingRight != side.right) setPadding(side.left, 0, side.right, 0)
+        }
         if (bottom != savedInset(context, portrait)) saveInset(context, portrait, bottom)
         if (bottom != insetBottom) {
             android.util.Log.i("InputRootView", "导航避让首帧 $insetBottom（估值 $estimated）→ 实际 $bottom")

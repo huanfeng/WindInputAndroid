@@ -198,6 +198,15 @@ class WindInputImeService :
     }
 
     override fun onCreateInputView(): View {
+        // 输入法窗口默认不进挖孔区：横屏时挖孔在侧边，键盘左边空出一条露出底下的应用。
+        // 让窗口铺进去，键盘根视图再按挖孔把键往里收（InputRootView.onApplyWindowInsets）
+        if (android.os.Build.VERSION.SDK_INT >= 30) {
+            window.window?.let { w ->
+                w.attributes = w.attributes.apply {
+                    layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                }
+            }
+        }
         // 旋转 / 配色变化重建输入视图时不经 onFinishInputView：挂在旧条区上的卡片要在这里收，
         // 否则按旧宽度和坐标留在新视图上（首次卡片点外面不收，会一直挂着）
         candidateMenu?.dismiss()
