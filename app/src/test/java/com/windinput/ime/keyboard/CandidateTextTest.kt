@@ -3,6 +3,7 @@ package com.windinput.ime.keyboard
 import com.windinput.ime.core.TextSegment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -35,6 +36,16 @@ class CandidateTextTest {
         assertTrue(CandidateText.isHint(pingguo[1]))
         assertFalse(CandidateText.isHint(pingguo[0]))
         assertFalse(CandidateText.isHint(TextSegment("x", "comment")))
+    }
+
+    /** 提示色取强调色的文字形态，深浅两套都与正文色、注释灰（hint）分得开 */
+    @Test
+    fun hintColorIsAccentTextDistinctFromBodyAndComment() {
+        for (p in listOf(Palette.light, Palette.dark)) {
+            assertEquals(p.accentText, CandidateText.hintColor(p))
+            assertNotEquals(p.text, CandidateText.hintColor(p))
+            assertNotEquals(p.hint, CandidateText.hintColor(p))
+        }
     }
 
     @Test

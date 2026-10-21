@@ -17,6 +17,12 @@ object CandidateText {
     fun isHint(segment: TextSegment): Boolean = segment.role == TextSegment.ROLE_FUZZY_HINT
 
     /**
+     * 提示段的颜色：强调色的文字形态。不用 [Palette.hint]——那是注释灰，提示要与正文、注释
+     * 在色调上都分得开，一眼看出「这段是读音提示」。
+     */
+    fun hintColor(palette: Palette): Int = palette.accentText
+
+    /**
      * 正文宽度：逐段按画它的那支笔量（`measure(text, isHint)`），与 [CandidateBarView] 逐段绘制的
      * 落笔位置一致；没有分段按原文整段量。
      */

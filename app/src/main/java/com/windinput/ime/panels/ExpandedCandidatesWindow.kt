@@ -187,7 +187,8 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
                             val start = length
                             append(s.text)
                             if (CandidateText.isHint(s)) {
-                                setSpan(android.text.style.ForegroundColorSpan(Palette.current.hint), start, length, 0)
+                                val color = CandidateText.hintColor(Palette.current)
+                                setSpan(android.text.style.ForegroundColorSpan(color), start, length, 0)
                             }
                         }
                     }
