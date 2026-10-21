@@ -1256,6 +1256,66 @@ check "工具栏「文本编辑」直达编辑面板" "yes" "$(ime_xml | grep -q
 tap_ime 返回
 reset_pad
 
+section "[46] 快捷短语：打开出厂关闭的时间戳 tmts，打出来，再恢复默认"
+# 时间戳出厂关闭（主仓 system.phrases.toml 的 enabled = false），设置页「词库 → 快捷短语」能打开。
+# 设置页与输入法同一进程、共用一个核心：设置里改了短语，输入法立刻生效，不必重启测试台。
+# 滑动找某段文字所在行的纵坐标（列表长，只往下翻；要从顶上找就先 scroll_top）；按字面匹配（文字里有 $）
+row_y_of() {
+    local try node
+    for ((try = 0; try < 10; try++)); do
+        node="$(dump_xml | sed 's/<node/\n<node/g' | grep -F " text=\"$1\"" | head -1)"
+        if [[ "$node" =~ bounds=\"\[[0-9]+,([0-9]+)\]\[[0-9]+,([0-9]+)\]\" ]]; then
+            echo $(( (BASH_REMATCH[1] + BASH_REMATCH[2]) / 2 )); return 0
+        fi
+        adb_q shell input swipe $(( GEO_W / 2 )) 1800 $(( GEO_W / 2 )) 900 300; sleep 0.8
+    done
+    return 1
+}
+scroll_top() {
+    local i
+    for ((i = 0; i < 4; i++)); do
+        adb_q shell input swipe $(( GEO_W / 2 )) 600 $(( GEO_W / 2 )) 2000 150
+    done
+    sleep 0.6
+}
+# 切到设置的快捷短语页：还停在这一页就直接用，不在（被系统回收、回到了首页）就从首页点进去
+open_phrases_page() {
+    adb_q shell am start -n "$PKG/.settings.SettingsActivity"
+    sleep 1.5
+    if ! dump_xml | grep -q ' text="添加短语"'; then
+        tap_text "词库"
+        tap_text "快捷短语"
+    fi
+}
+# 从设置回测试台：设置在前台时普通的 am start 拉不回测试台（两者可能同在一个任务栈里），
+# 用 NEW_TASK | CLEAR_TASK 新开一个——不杀进程，输入法与核心照旧
+back_to_pad() {
+    adb_q shell am start -f 0x10008000 -n "$PKG/.settings.TestPadActivity"
+    sleep 1
+}
+phrases_restore_defaults() {
+    open_phrases_page
+    local y
+    y="$(row_y_of '系统短语恢复默认')" || die "找不到「系统短语恢复默认」"
+    adb_q shell input tap $(( GEO_W / 2 )) "$y"; sleep 1.5
+}
+# 先恢复默认：上一次运行若中途断掉，tmts 可能还开着，下面「点一下开关」就成了关掉它
+phrases_restore_defaults
+scroll_top
+ts_y="$(row_y_of '$ts')" || die "快捷短语页找不到 tmts"
+# 开关在行尾、与两行字（编码 / 内容）居中对齐：内容那行的中线往上挪一点
+adb_q shell input tap $(( GEO_W - 90 )) $(( ts_y - 20 )); sleep 1
+back_to_pad
+reset_pad
+tap_key t; tap_key m; tap_key t; tap_key s; tap_key SPACE
+check_match "打开后 tmts 上屏 10 位时间戳" '^[0-9]{10}$' "$(get_pad_text)"
+phrases_restore_defaults
+back_to_pad
+reset_pad
+tap_key t; tap_key m; tap_key t; tap_key s; tap_key SPACE
+check_match "恢复默认后 tmts 不再出时间戳" '^[^0-9]*$' "$(get_pad_text)"
+reset_pad
+
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then
