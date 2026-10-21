@@ -841,6 +841,21 @@ unit = "dp"
 
 [[item]]
 page = "keyboard"
+section = "边距"
+key = "ui.android.one_hand"
+source = "android"
+type = "select"
+title = "单手模式"
+summary = "键盘收窄靠向一侧，空出的一侧可换边或退出；快捷面板里也能开关"
+default = "off"
+options = [
+  { value = "off", label = "关闭" },
+  { value = "right", label = "右手" },
+  { value = "left", label = "左手" },
+]
+
+[[item]]
+page = "keyboard"
 section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"

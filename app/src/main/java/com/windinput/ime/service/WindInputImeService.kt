@@ -32,6 +32,7 @@ import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
 import com.windinput.ime.keyboard.CandidateMenuPopup
 import com.windinput.ime.keyboard.InputRootView
+import com.windinput.ime.keyboard.OneHandStrip
 import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardDimens
@@ -213,14 +214,25 @@ class WindInputImeService :
             ),
         )
 
+        // 面板区外面再包一层横排：单手模式时在一侧放「换边 / 退出」那一条（见 applyOneHand）。
+        // 条区不进这一层——候选在单手时照样满宽，能多看几个
         val panelContainer = FrameLayout(this)
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        row.addView(panelContainer, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         root.addView(
-            panelContainer,
+            row,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             ),
         )
+        oneHandRow = row
+        oneHandStrip = OneHandStrip(
+            this,
+            onSwitchSide = { setOneHand(OneHandStrip.otherSide(oneHandMode())) },
+            onExit = { setOneHand(OneHandStrip.OFF) },
+        )
+        applyOneHand()
 
         keyboardWindow = KeyboardWindow(listener = this, layoutProvider = layoutRepository::rows)
         textEditingWindow = TextEditingWindow(listener = this)
@@ -259,6 +271,10 @@ class WindInputImeService :
     }
 
     private companion object {
+        /** 单手模式：off / left / right；last 记着上次用的那一侧，快捷面板重新打开时回到它 */
+        const val KEY_ONE_HAND = "ui.android.one_hand"
+        const val KEY_ONE_HAND_LAST = "ui.android.one_hand_last"
+
         const val TAG = "WindIme"
 
         /** 切方案超过这么久还没完才提示「词库准备中」 */
@@ -355,6 +371,7 @@ class WindInputImeService :
             setInputView(onCreateInputView())
         }
         session.candidateComments = userConfig.getBoolean("ui.android.candidate_comment", true)
+        applyOneHand() // 设置页改了单手模式：弹键盘时按新配置摆
         KeyHaptics.init(this)
         KeyHaptics.enabled = userConfig.getBoolean("ui.android.haptic", true)
         KeyHaptics.strength = userConfig.getInt("ui.android.haptic_strength", KeyHaptics.DEFAULT_STRENGTH)
@@ -798,6 +815,37 @@ class WindInputImeService :
     private var schemaPicker: CandidateMenuPopup? = null
 
     private var inputRoot: InputRootView? = null
+
+    // ── 单手模式（设置项 ui.android.one_hand：off / left / right）──────────────
+
+    private var oneHandRow: LinearLayout? = null
+    private var oneHandStrip: OneHandStrip? = null
+
+    private fun oneHandMode(): String = userConfig.getString(KEY_ONE_HAND, OneHandStrip.OFF)
+
+    /** 按配置摆放让出的那一条：右手模式键盘靠右、条在左；左手相反；关着就不放 */
+    private fun applyOneHand() {
+        val row = oneHandRow ?: return
+        val strip = oneHandStrip ?: return
+        val mode = oneHandMode()
+        row.removeView(strip)
+        if (mode != OneHandStrip.LEFT && mode != OneHandStrip.RIGHT) return
+        val width = (resources.displayMetrics.widthPixels * OneHandStrip.WIDTH_FRACTION).toInt()
+        val lp = LinearLayout.LayoutParams(width, LinearLayout.LayoutParams.MATCH_PARENT)
+        if (mode == OneHandStrip.RIGHT) row.addView(strip, 0, lp) else row.addView(strip, lp)
+    }
+
+    private fun setOneHand(mode: String) {
+        userConfig.put(KEY_ONE_HAND, mode)
+        if (mode != OneHandStrip.OFF) userConfig.put(KEY_ONE_HAND_LAST, mode)
+        applyOneHand()
+        quickPanelWindow?.refresh()
+    }
+
+    override fun oneHand(): Boolean = oneHandMode() != OneHandStrip.OFF
+
+    override fun onToggleOneHand() =
+        setOneHand(OneHandStrip.toggled(oneHandMode(), userConfig.getString(KEY_ONE_HAND_LAST, "")))
 
     /** 键盘边距（设置页「键盘布局 → 边距」）；每次弹出键盘重读，改完不用重启 */
     private fun applyGaps() {

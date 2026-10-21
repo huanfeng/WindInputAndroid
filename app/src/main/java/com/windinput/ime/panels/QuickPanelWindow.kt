@@ -59,6 +59,12 @@ class QuickPanelWindow(
         fun incognitoForced(): Boolean
 
         fun onToggleIncognito()
+
+        /** 单手模式开着（键盘收窄靠向一侧） */
+        fun oneHand(): Boolean
+
+        /** 单手模式开关：打开到上次那一侧，再点关掉 */
+        fun onToggleOneHand()
     }
 
     enum class Target { EMOJI, CLIPBOARD, TEXT_EDIT }
@@ -68,6 +74,7 @@ class QuickPanelWindow(
         const val ENGLISH_SCHEMA_ID = "english"
         const val COLUMNS = 4
         const val TILE_HEIGHT_DP = 64
+        const val MIN_TILE_HEIGHT_DP = 40
     }
 
     private var schemaRow: LinearLayout? = null
@@ -173,8 +180,9 @@ class QuickPanelWindow(
         val grid = tileGrid ?: return
         grid.removeAllViews()
         val st = status
+        val tiles = mutableListOf<View>()
         fun add(icon: String, label: String, selected: Boolean? = null, onClick: () -> Unit) {
-            grid.addView(tile(context, icon, label, selected, onClick), cell(context))
+            tiles += tile(context, icon, label, selected, onClick)
         }
         add("，", "中文标点", selected = st?.chinesePunct ?: true) {
             listener.onQuickCommand(EngineCmd.TogglePunct)
@@ -203,12 +211,30 @@ class QuickPanelWindow(
         }
         add("🌐", "切换输入法") { listener.onSwitchInputMethod() }
         add("⚙", "设置") { listener.onOpenSettings() }
+        // 放最后：插在中间会把后面各格整体挪一位，老用户的肌肉记忆（与按位置点的测试）全乱
+        add("🤚", "单手", selected = listener.oneHand()) {
+            listener.onToggleOneHand() // 选中态由 Service 改完配置后经 refresh 重画
+        }
+        val heightPx = tileHeightPx(context, rows = (tiles.size + COLUMNS - 1) / COLUMNS)
+        for (t in tiles) grid.addView(t, cell(context, heightPx))
     }
 
-    private fun cell(context: Context) = GridLayout.LayoutParams().apply {
+    /**
+     * 格子高度：所有行在键盘区里一屏放下（此前固定 64dp，第三行被底边裁掉一大半，「切换输入法」
+     * 「设置」只露出图标顶，而滚动条是隐藏的，用户不知道还能滑）。上限是原来的 64dp，下限 40dp
+     * ——再矮图标与字就叠了，那时宁可滚动。
+     */
+    private fun tileHeightPx(context: Context, rows: Int): Int {
+        val density = context.resources.displayMetrics.density
+        val reserved = (8 + 8 + 38 + 10) * density // 上下内边距 + 方案行及其下间距
+        val perRow = (PanelScaffold.keyboardHeightPx(context) - reserved) / rows.coerceAtLeast(1) - 6 * density
+        return perRow.coerceIn(MIN_TILE_HEIGHT_DP * density, TILE_HEIGHT_DP * density).toInt()
+    }
+
+    private fun cell(context: Context, heightPx: Int) = GridLayout.LayoutParams().apply {
         val density = context.resources.displayMetrics.density
         width = 0
-        height = (TILE_HEIGHT_DP * density).toInt()
+        height = heightPx
         columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
         setMargins(0, 0, (6 * density).toInt(), (6 * density).toInt())
     }

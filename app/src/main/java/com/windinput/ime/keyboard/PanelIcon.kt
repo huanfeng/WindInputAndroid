@@ -51,8 +51,17 @@ class PanelIcon(context: Context) : View(context) {
     var glyph: Glyph = Glyph.GRID
         set(value) {
             field = value
+            // 画出来的图标对读屏是空白：按图标给一个说法（调用方另设过 contentDescription 的不覆盖）
+            if (contentDescription == null || contentDescription in A11Y_LABELS.values) {
+                contentDescription = A11Y_LABELS[value]
+            }
             invalidate()
         }
+
+    init {
+        // 默认图标走的是属性初值、不经 setter，这里补一次
+        contentDescription = A11Y_LABELS[glyph]
+    }
 
     var tint: Int = Palette.current.icon
         set(value) {
@@ -194,5 +203,20 @@ class PanelIcon(context: Context) : View(context) {
                 }
             }
         }
+    }
+
+    private companion object {
+        /** 读屏念的说法（也让 uiautomator 能按描述找到它们） */
+        val A11Y_LABELS = mapOf(
+            Glyph.BACK to "返回",
+            Glyph.GRID to "快捷功能",
+            Glyph.EMOJI to "表情",
+            Glyph.CLIPBOARD to "剪贴板",
+            Glyph.TEXT_EDIT to "文本编辑",
+            Glyph.SETTINGS to "设置",
+            Glyph.COLLAPSE to "收起键盘",
+            Glyph.EXPAND to "展开候选",
+            Glyph.CLOSE to "关闭",
+        )
     }
 }
