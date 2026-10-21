@@ -11,6 +11,8 @@ jna = "5.19.1"
 coroutines = "1.10.2"
 junit = "4.13.2"
 customview = "1.1.0"
+androidxTestRunner = "1.6.2"
+androidxTestJunit = "1.2.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -29,6 +31,8 @@ jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 kotlinx-coroutines = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "coroutines" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-customview = { group = "androidx.customview", name = "customview", version.ref = "customview" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

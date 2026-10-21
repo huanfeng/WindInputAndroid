@@ -25,6 +25,8 @@ android {
         targetSdk = 36
         versionCode = 29
         versionName = "0.3.0-dev.26"
+        // 仪器测试（androidTest）：自绘控件的无障碍动作等要在真实 Android 运行时里验
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     // ── 签名 ─────────────────────────────────────────────────────────
@@ -125,4 +127,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines)
 
     testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.ext.junit)
 }

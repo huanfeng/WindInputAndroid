@@ -58,14 +58,16 @@ pwsh scripts/build-rust.ps1     # Windows
 
 ## 测试
 
-分三层，**越靠上越该先跑**——模拟器一轮几分钟，Rust 层同一条按键序列几秒就有结论，
+分几层，**越靠上越该先跑**——模拟器一轮十几分钟，Rust 层同一条按键序列几秒就有结论，
 能在下面复现的问题不要拿到模拟器上试错。
 
 | 层 | 跑什么 | 命令 |
 | --- | --- | --- |
-| Rust 单测 | 按键流 / 方案切换 / 候选回调（`rust/wind-android/tests/key_flow.rs`） | `cd rust && cargo test -p wind-android` |
+| Rust 单测 | 按键流 / 方案切换 / 候选回调 / 词库备份（`rust/wind-android/tests/key_flow.rs`） | `cd rust && cargo test -p wind-android` |
+| Kotlin 单测 | 布局解析、设置清单、许可声明、备份文案等纯逻辑（JVM） | `./gradlew :app:testDebugUnitTest` |
 | 构建 | 交叉编译 + APK | `scripts/build-rust.sh && ./gradlew :app:assembleDebug` |
-| 端到端 | 模拟器上点键盘、断言输入框（20 个用例） | `scripts/emu-test.sh` |
+| 仪器测试 | 要真 Android 运行时的控件行为：自绘键盘 / 候选栏的无障碍动作（读屏双击走 ACTION_CLICK，adb 注入的触摸会绕过 TalkBack，只能在进程里验） | `./gradlew :app:connectedDebugAndroidTest`（需开着模拟器；跑完会卸掉应用，之后的 emu-test 会重装） |
+| 端到端 | 模拟器上点键盘、断言输入框（40 余个用例） | `scripts/emu-test.sh` |
 
 一键跑完整条：
 
