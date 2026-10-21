@@ -492,7 +492,11 @@ with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段�
     fi
 }
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
+# [44] 会临时关掉「使用实体键盘时显示虚拟键盘」，中途断掉也要恢复，否则后面的用例看不到键盘
+SHOW_IME_WITH_HARD_KB="$(adb_ shell settings get secure show_ime_with_hard_keyboard)"
 restore_suite_kb() {   # 原来没有这个文件就删掉，不写回一个空文件
+    [[ "$SHOW_IME_WITH_HARD_KB" =~ ^[01]$ ]] &&
+        adb_q shell settings put secure show_ime_with_hard_keyboard "$SHOW_IME_WITH_HARD_KB"
     if (( SUITE_KB_EXISTED )); then
         write_kb_cfg "$SUITE_KB_ORIG"
     else
@@ -1177,6 +1181,31 @@ check "换边：键盘靠左，Q 回到最左" "yes" "$( (( ${q_left:-999} <= ${
 tap_ime '退出&#10;单手'
 q_back="$(ime_bounds Q | cut -d' ' -f1)"
 check "退出单手：恢复满宽" "${q_full:-?}" "${q_back:-}"
+reset_pad
+
+echo; echo "${Y}[44] 物理键盘：按键进引擎、快捷键放行、只露条区${N}"
+# adb 的 keyevent 走的就是物理键盘那条路（InputMethodService.onKeyDown），不经软键盘
+reset_pad
+adb_q shell input keyevent KEYCODE_A KEYCODE_A KEYCODE_SPACE
+sleep 0.8
+check "物理键 aa + 空格" "式" "$(get_pad_text)"
+adb_q shell input keycombination KEYCODE_SHIFT_LEFT KEYCODE_B
+sleep 0.8
+check "Shift+字母：中文方案下直接上屏大写" "式B" "$(get_pad_text)"
+# 系统设置「使用实体键盘时显示虚拟键盘」关掉：只在打字中露条区，键盘面板不出
+adb_q shell settings put secure show_ime_with_hard_keyboard 0
+reset_pad
+check "只用物理键盘：空闲时不弹软键盘" "no" "$(ime_bounds Q >/dev/null && echo yes || echo no)"
+adb_q shell input keyevent KEYCODE_A KEYCODE_A
+sleep 0.8
+bar_xml="$(ime_xml)"
+# 候选的读屏描述是「式」或「式，编码 …」（开了编码提示时）
+check "只用物理键盘：打字中露出候选" "yes" "$(grep -qE 'content-desc="式(，|")' <<< "$bar_xml" && echo yes || echo no)"
+check "只用物理键盘：打字中键盘面板仍收着" "no" "$([[ "$bar_xml" == *'content-desc="Q"'* ]] && echo yes || echo no)"
+adb_q shell input keyevent KEYCODE_SPACE
+sleep 0.8
+check "只用物理键盘：空格上屏" "式" "$(get_pad_text)"
+adb_q shell settings put secure show_ime_with_hard_keyboard "${SHOW_IME_WITH_HARD_KB:-1}"
 reset_pad
 
 echo; echo "${Y}[14] 跑完不改变活跃方案${N}"

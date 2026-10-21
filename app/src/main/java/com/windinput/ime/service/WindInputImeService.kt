@@ -27,6 +27,7 @@ import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.core.suspendsLearning
+import com.windinput.ime.keyboard.HardwareKeys
 import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
@@ -227,6 +228,7 @@ class WindInputImeService :
             ),
         )
         oneHandRow = row
+        applyHardKeyboardOnly()
         oneHandStrip = OneHandStrip(
             this,
             onSwitchSide = { setOneHand(OneHandStrip.otherSide(oneHandMode())) },
@@ -340,6 +342,71 @@ class WindInputImeService :
 
     override fun onEvaluateFullscreenMode(): Boolean = false
 
+    // ── 物理键盘 ──────────────────────────────────────────────────
+
+    /**
+     * 接了物理键盘、且系统设置不要软键盘（「使用实体键盘时显示虚拟键盘」关着）。
+     * 这时只在打字中露出条区看候选，键盘面板收起——整块软键盘挡住半屏毫无用处。
+     */
+    private var hardKeyboardOnly = false
+
+    /** 被引擎吃掉的按下键码：对应的抬起也要吃掉，不能只把半个按键漏给应用 */
+    private val consumedHardKeys = mutableSetOf<Int>()
+
+    override fun onEvaluateInputViewShown(): Boolean {
+        refreshHardKeyboardOnly()
+        return !hardKeyboardOnly || composing
+    }
+
+    /** 基类的判断（物理键盘 + 系统设置）即真值；窗口没显示过时系统不会来问，故开始输入时也刷一次 */
+    private fun refreshHardKeyboardOnly() {
+        val wasHardOnly = hardKeyboardOnly
+        hardKeyboardOnly = !super.onEvaluateInputViewShown()
+        if (wasHardOnly != hardKeyboardOnly) applyHardKeyboardOnly()
+    }
+
+    /**
+     * 基类在「有物理键盘 + 设置不显示软键盘」时一律拒绝显示请求，输入法窗口根本不出来，
+     * 之后再要露条区也叫不出（`requestShowSelf` 会被应用侧当成重复请求取消）。
+     * 故这时照常接下显示请求，窗口一直「显示着」，内容由 [onEvaluateInputViewShown]
+     * 决定：空闲时输入视图隐藏（屏幕上什么都没有），打字中才露条区。
+     */
+    override fun onShowInputRequested(flags: Int, configChange: Boolean): Boolean {
+        refreshHardKeyboardOnly()
+        return hardKeyboardOnly || super.onShowInputRequested(flags, configChange)
+    }
+
+    /** 只露条区时收起面板区（键盘、单手条都在里面） */
+    private fun applyHardKeyboardOnly() {
+        oneHandRow?.visibility = if (hardKeyboardOnly) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * 物理键盘按键与软键走同一条路进引擎（[HardwareKeys] 映射成 [KeyAction]）。
+     * 引擎不接的键（英文直输、空闲时的退格/回车、快捷键）原样交回系统默认处理，
+     * 应用收到的就是普通按键。
+     */
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        if (!directInput && currentInputConnection != null) {
+            if (keyCode == KeyEvent.KEYCODE_ESCAPE && composing) {
+                session.reset()
+                consumedHardKeys += keyCode
+                return true
+            }
+            val mapped = HardwareKeys.map(keyCode, event.getUnicodeChar(event.metaState), event.metaState)
+            if (mapped != null && session.keyPressed(mapped.action, mapped.shifted)) {
+                consumedHardKeys += keyCode
+                return true
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (consumedHardKeys.remove(keyCode)) return true
+        return super.onKeyUp(keyCode, event)
+    }
+
     /** 横竖屏独立键高（twinInt 模式）：旋转会触发 onCreateInputView 重建，天然生效 */
     private fun applyKeyboardDimens() {
         val portrait =
@@ -360,6 +427,7 @@ class WindInputImeService :
         // 先定学习开关再给焦点：焦点一到，引擎就可能开始记东西
         fieldSuspendsLearning = suspendsLearning(attribute?.inputType ?: 0, attribute?.imeOptions ?: 0)
         applyLearningSuspended()
+        refreshHardKeyboardOnly()
         session.focusGained()
     }
 
@@ -613,7 +681,10 @@ class WindInputImeService :
                 loadedCandidates = page.items
                 loadedComments = page.comments
                 candidateTotal = page.total
+                val composingChanged = composing != event.composing
                 composing = event.composing
+                // 只露条区的模式下，开始/结束打字时跟着显示/收起输入法窗口
+                if (hardKeyboardOnly && composingChanged) updateInputViewShown()
                 keyboardWindow?.keyboardView?.composing = composing
                 // 打完一个词（编码清空）后再判一次句首大写：上屏回调可能早于这一帧
                 updateAutoCaps()

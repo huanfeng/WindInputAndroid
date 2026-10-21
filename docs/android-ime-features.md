@@ -195,14 +195,14 @@ fcitx5-android 是架构最像本项目的参照（Kotlin 壳 + 原生引擎推�
 
 | 缺口 | fcitx5 对应 | 说明 |
 |---|---|---|
-| 物理键盘：按键直连引擎、浮动候选窗 | `onKeyDown/onKeyUp` → `forwardKeyEvent`；`onUpdateCursorAnchorInfo` 定位浮窗 | 平板 + 蓝牙键盘场景。桌面键事件模型在 Rust 侧现成，K 侧要做的是 KeyEvent → VK 映射与浮窗 |
-| 键盘左右 / 底部边距（横竖屏成对） | `keyboardSidePadding` / `keyboardBottomPadding` 的 twinInt | 大屏单手够不着两侧时的标配 |
+| ✅ 物理键盘：按键直连引擎（2026-10-21；`HardwareKeys` 映射成软键同款 KeyAction，Ctrl/Alt/Meta 组合键放行；系统设置不显示软键盘时只在打字中露条区。浮动候选窗未做） | `onKeyDown/onKeyUp` → `forwardKeyEvent`；`onUpdateCursorAnchorInfo` 定位浮窗 | 平板 + 蓝牙键盘场景。桌面键事件模型在 Rust 侧现成，K 侧要做的是 KeyEvent → VK 映射与浮窗 |
+| ✅ 键盘左右 / 底部边距（`keyboard_side_gap` / `keyboard_bottom_gap`） | `keyboardSidePadding` / `keyboardBottomPadding` 的 twinInt | 大屏单手够不着两侧时的标配 |
 | Direct Boot | `directBootAware` + 设备加密存储 | 锁屏解锁前的密码框用不了本输入法，系统会临时换别的 |
-| 空格长按行为可配 | `spaceKeyLongPressBehavior` | 现为无动作 |
+| ✅ 空格长按行为可配（`space_long_press`） | `spaceKeyLongPressBehavior` | 现为无动作 |
 | 内联建议（Autofill） | `onCreateInlineSuggestionsRequest` | 密码管理器填充条 |
-| 候选长按（删词 / 置顶） | 无（fcitx5 走引擎菜单） | Rust 侧 shadow pin/delete 现成，K 侧缺手势 + 菜单 |
+| ✅ 候选长按（先 tooltip，再进菜单） | 无（fcitx5 走引擎菜单） | Rust 侧 shadow pin/delete 现成，K 侧缺手势 + 菜单 |
 | 状态栏输入法图标 | `showStatusIcon` | 小事，但主流都有 |
-| 备份 / 恢复 | `UserDataManager` | 桌面 wind-transfer 是现成通道 |
+| ✅ 备份 / 恢复（词库导出导入，SAF） | `UserDataManager` | 桌面 wind-transfer 是现成通道 |
 
 fcitx5 有而**刻意不做**的：主题编辑器（21 色槽）——制作走 PC 工具站；插件系统——本项目
 引擎单一；表情肤色变体、颜文字分类——二期按需。
