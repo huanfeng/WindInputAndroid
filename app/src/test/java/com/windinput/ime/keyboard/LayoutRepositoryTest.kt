@@ -28,6 +28,17 @@ class LayoutRepositoryTest {
     }
 
     @Test
+    fun fileRewrittenWithinTheSameMtimeIsReparsedWhenLengthDiffers() {
+        // 升级拷贝出厂数据时，预热线程可能读到拷贝中途的文件；写完 mtime 可能还是同一秒
+        writeRow("a")
+        val stamp = qwerty.lastModified()
+        assertEquals(KeyAction.Text('a'), repo.rows(KeyboardLayer.LETTERS)[0][0].action)
+        writeRow("xyz")
+        qwerty.setLastModified(stamp)
+        assertEquals(KeyAction.Text('x'), repo.rows(KeyboardLayer.LETTERS)[0][0].action)
+    }
+
+    @Test
     fun missingFileFallsBackToBuiltin() {
         assertEquals(KeyboardLayouts.rows(KeyboardLayer.NUMBER), repo.rows(KeyboardLayer.NUMBER))
     }

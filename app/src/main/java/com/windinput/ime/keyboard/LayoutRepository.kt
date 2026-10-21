@@ -27,8 +27,11 @@ class LayoutRepository(private val resolve: (String) -> File?) {
         KeyboardLayer.NUMBER to "number",
     )
 
-    /** 解析结果：文件 + 修改时间对得上才用（用户放了覆盖文件、升级重放出厂数据都会让它失效） */
-    private class Parsed(val path: String?, val modified: Long, val rows: List<List<KeyDef>>)
+    /**
+     * 解析结果：文件 + 修改时间 + 长度对得上才用（用户放了覆盖文件、升级重放出厂数据都会让它失效）。
+     * 带上长度：mtime 可能只精确到秒，升级后预热线程恰好读到拷贝中途的文件时，单靠 mtime 认不出来
+     */
+    private class Parsed(val path: String?, val modified: Long, val length: Long, val rows: List<List<KeyDef>>)
 
     private val cache = HashMap<KeyboardLayer, Parsed>()
 
@@ -41,8 +44,10 @@ class LayoutRepository(private val resolve: (String) -> File?) {
     fun rows(layer: KeyboardLayer): List<List<KeyDef>> {
         val file = resolve("layouts/${layerToId.getValue(layer)}.toml")
         val modified = file?.lastModified() ?: 0L
-        cache[layer]?.takeIf { it.path == file?.path && it.modified == modified }?.let { return it.rows }
-        return load(layer, file).also { cache[layer] = Parsed(file?.path, modified, it) }
+        val length = file?.length() ?: 0L
+        cache[layer]?.takeIf { it.path == file?.path && it.modified == modified && it.length == length }
+            ?.let { return it.rows }
+        return load(layer, file).also { cache[layer] = Parsed(file?.path, modified, length, it) }
     }
 
     /** 把三层都解析进缓存（服务启动时在后台线程调，首次弹键盘就不用在主线程解析） */

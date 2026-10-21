@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.util.Log
 import java.io.File
+import java.io.IOException
 
 /**
  * 出厂数据安装器：把 APK assets/data 整树拷到 filesDir/data。
@@ -61,8 +62,15 @@ class AssetsInstaller(private val context: Context, private val dirs: DataDirs) 
         if (children.isEmpty()) {
             // 叶子 = 文件
             target.parentFile?.mkdirs()
+            // 先写临时文件再改名：核心与键盘布局的预热线程可能正在读同一个文件，
+            // 直接覆盖写会让它们读到截断后的半个文件
+            val tmp = File(target.parentFile, ".${target.name}.tmp")
             assets.open(assetPath).use { input ->
-                target.outputStream().use { output -> input.copyTo(output) }
+                tmp.outputStream().use { output -> input.copyTo(output) }
+            }
+            if (!tmp.renameTo(target)) {
+                tmp.delete()
+                throw IOException("cannot replace ${target.path}")
             }
             return
         }
