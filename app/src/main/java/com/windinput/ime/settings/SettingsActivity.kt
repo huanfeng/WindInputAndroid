@@ -8,7 +8,9 @@ import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
@@ -308,20 +310,30 @@ private fun SettingsApp(
 
     // 页面切换走可拖动的过渡：平时 animateTo 正常播放；预测性返回时按手势进度 seekTo 上一层，
     // 侧滑过程中上一层就画在下面、跟手滑出来（系统返回预览的样子），松手才真正退一层，
-    // 中途放弃就弹回当前页
+    // 中途放弃就弹回当前页。
+    //
+    // # 曲线只加在「进度」这一层
+    //
+    // 过渡里的子动画一律线性、不要尺寸动画，缓动由 animateTo 的进度曲线给。不这样做的两个坑
+    // （都是真机录屏逐帧看出来的）：
+    // - 子动画自带缓动时，侧滑进度经 seekTo 映射到动画时间，手指拖到一半页面才挪开一成，
+    //   松手剩下一大截猛甩出去；
+    // - 不给进度曲线时，animateTo 按「过渡总时长」推进；页面内容中途变化（码表页下半截异步
+    //   加载出来）总时长被重算，进度随之重排，快到位的页面又往回跳一截再滑进来
+    //   （「点进下一级会再弹一下」）。进度单调了，位置就只会往前走。
     val transitionState = remember { SeekableTransitionState(route) }
-    LaunchedEffect(route) { transitionState.animateTo(route) }
+    LaunchedEffect(route) { transitionState.animateTo(route, tween(300, easing = FastOutSlowInEasing)) }
     PredictiveBackHandler(enabled = route.depth > 0) { events ->
         val target = route.up()
         try {
             events.collect { transitionState.seekTo(it.progress, target) }
             // 先在这里把过渡放完、再改路由（官方示例的顺序）：反过来的话路由一变，过渡按新的
-            // 一对起止重算一次，已经拖开的页从另一侧再滑回来一截（真机反馈「回退时会再弹一下」）
-            transitionState.animateTo(target)
+            // 一对起止重算一次，已经拖开的页从另一侧再滑回来一截
+            transitionState.animateTo(target, tween(220, easing = LinearOutSlowInEasing))
             go(target)
         } catch (e: CancellationException) {
             // 本协程已取消，回弹动画另起一个
-            appScope.launch { transitionState.animateTo(route) }
+            appScope.launch { transitionState.animateTo(route, tween(200, easing = LinearOutSlowInEasing)) }
             throw e
         }
     }
@@ -331,19 +343,16 @@ private fun SettingsApp(
         transitionSpec = {
             // 层叠式（HyperOS / 系统设置同款）：深的一层总压在上面、整页从右边进出，
             // 浅的一层在下面只带一点视差。侧滑返回时就是当前页被手指拖开、露出下面的上一级
+            val linear = tween<androidx.compose.ui.unit.IntOffset>(300, easing = LinearEasing)
             val forward = targetState.depth > initialState.depth
-            if (forward) {
-                (slideInHorizontally(tween(300)) { it } togetherWith
-                    slideOutHorizontally(tween(300)) { -it / 4 })
+            val slide = if (forward) {
+                (slideInHorizontally(linear) { it } togetherWith slideOutHorizontally(linear) { -it / 4 })
                     .apply { targetContentZIndex = 1f }
             } else {
-                // 返回用**线性**曲线：侧滑时进度经 seekTo 直接映射到动画时间，带缓动的话页面跟不上
-                // 手指（手指拖到一半，页面才挪开一成），松手时剩下的一大截猛地甩出去——
-                // 真机上看就是「回退时会再弹一下」
-                (slideInHorizontally(tween(300, easing = LinearEasing)) { -it / 4 } togetherWith
-                    slideOutHorizontally(tween(300, easing = LinearEasing)) { it })
+                (slideInHorizontally(linear) { -it / 4 } togetherWith slideOutHorizontally(linear) { it })
                     .apply { targetContentZIndex = -1f }
             }
+            slide using null // 整页同尺寸，不要尺寸动画（默认弹簧，时长不定，会改过渡总时长）
         },
     ) { r ->
         stateHolder.SaveableStateProvider(r.key) {

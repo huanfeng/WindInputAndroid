@@ -850,7 +850,7 @@ section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"
 type = "toggle"
-title = "编码写在输入框里"
+title = "嵌入编码（写在输入框里）"
 summary = "开启后编码直接写进输入框（带下划线），候选栏上方不再单独显示编码行，键盘也矮一截"
 default = false
 
