@@ -152,6 +152,7 @@ private fun DictContent(
         Card(modifier = Modifier.fillMaxWidth()) {
             NavRow("我的词条", "共 $total 条 · 搜索、删除、清空", icon = SettingsIcons.words) { onOpen(DICT_WORDS) }
             NavRow("添加词条", "手动加一个词和它的编码", icon = SettingsIcons.addWord) { onOpen(DICT_ADD) }
+            NavRow(DICT_STATS, "系统词库的条目、码长、重码与字集覆盖", icon = SettingsIcons.dictStats) { onOpen(DICT_STATS) }
         }
         // 短语不分方案（全局一份），单独一张卡，不放在「当前方案」名下
         Card(modifier = Modifier.fillMaxWidth()) {

@@ -1078,7 +1078,7 @@ tap_key e; tap_key m; tap_key o; tap_key j; tap_key SPACE
 # uiautomator 把 BMP 以外的字符写成 XML 数字实体：😂（U+1F602）读回来是 &#128514;
 check "emoj 上屏表情" "😂" "$(get_pad_text)"
 
-section "[38] 设置页层级：首页 → 方案 → 码表 → 返回；词库 → 我的词条"
+section "[38] 设置页层级：首页 → 方案 → 码表 → 返回；词库 → 我的词条、词库统计"
 # 设置页分了两层（方案 / 输入按组进二级页，词库拆成入口），返回走预测性返回的回调。
 # 这里只验「点得进、退得回、每层该有的东西在」，不验视觉。
 has_text() {   # 当前界面有没有这段文字（等界面稳定，最多约 4 秒）
@@ -1102,6 +1102,10 @@ check "返回两层回到首页" "yes" "$(has_text 开始使用)"
 tap_text "词库"
 tap_text "我的词条"
 check "我的词条页有清空入口" "yes" "$(has_text 清空个人词)"
+adb_q shell input keyevent BACK; sleep 1.5
+# 词库统计：整表扫一遍在 IO 线程，算完才铺卡片（has_text 轮询约 4 秒，五笔前面已编译过）
+tap_text "词库统计"
+check "词库统计出各词库分行" "yes" "$(has_text 各词库)"
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 # 下拉项：miuix 的下拉弹窗要 activity ≥ 1.12 提供的 NavigationEventDispatcher，

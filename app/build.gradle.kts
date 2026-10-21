@@ -131,6 +131,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines)
 
     testImplementation(libs.junit)
+    // android.jar 里的 org.json 在 JVM 单测中只是桩（方法全抛异常）；词库统计的格式化要真解析
+    testImplementation(libs.org.json)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }

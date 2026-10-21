@@ -745,6 +745,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_dict_import(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_dict_stats(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_emoji_modules(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_focus_gained(
@@ -863,6 +865,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_dict_export(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_dict_import(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`content`: RustBuffer.ByValue,`replace`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_dict_stats(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`topN`: Int,`refresh`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_emoji_modules(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1087,6 +1091,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_dict_import() != 18678) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_dict_stats() != 40504) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_emoji_modules() != 39855) {
@@ -2174,6 +2181,13 @@ public interface WindCoreInterface {
     fun `dictImport`(`schemaId`: kotlin.String, `content`: kotlin.String, `replace`: kotlin.Boolean): DictImportInfo
     
     /**
+     * 统计方案的系统词库（条目、码长、重码、字集覆盖），回包为 JSON 文本，形态同电脑版
+     * 「词库统计」（`dict.systemStats`）。O(全表)，K 侧须在后台线程调用。
+     * 未知方案等 → Rejected(原因)。
+     */
+    fun `dictStats`(`schemaId`: kotlin.String, `topN`: kotlin.UInt, `refresh`: kotlin.Boolean): kotlin.String
+    
+    /**
      * emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
      */
     fun `emojiModules`(): List<EmojiModuleInfo>
@@ -2651,6 +2665,28 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         FfiConverterString.lower(`schemaId`),
         FfiConverterString.lower(`content`),
         FfiConverterBoolean.lower(`replace`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 统计方案的系统词库（条目、码长、重码、字集覆盖），回包为 JSON 文本，形态同电脑版
+     * 「词库统计」（`dict.systemStats`）。O(全表)，K 侧须在后台线程调用。
+     * 未知方案等 → Rejected(原因)。
+     */
+    @Throws(ConfigException::class)override fun `dictStats`(`schemaId`: kotlin.String, `topN`: kotlin.UInt, `refresh`: kotlin.Boolean): kotlin.String {
+            return FfiConverterString.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_dict_stats(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterUInt.lower(`topN`),
+        FfiConverterBoolean.lower(`refresh`),_status)
 }
     }
     )

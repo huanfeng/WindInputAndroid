@@ -202,10 +202,11 @@ private data class Route(val page: String? = null, val sub: String? = null) {
     val key: String get() = "$page/$sub"
 }
 
-/** 词库页的两个二级页（不来自清单，代码画）；名字即路由，DictSection 的入口用同一份 */
+/** 词库页的二级页（不来自清单，代码画）；名字即路由，DictSection 的入口用同一份 */
 internal const val DICT_WORDS = "我的词条"
 internal const val DICT_ADD = "添加词条"
 internal const val DICT_PHRASES = "快捷短语"
+internal const val DICT_STATS = "词库统计"
 
 /** 方案页里代码画的二级页 */
 internal const val SUB_ENABLED_SCHEMAS = "启用的方案"
@@ -214,7 +215,7 @@ internal const val SUB_ENABLED_SCHEMAS = "启用的方案"
 private const val SECTION_SHUANGPIN = "双拼"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
-internal val RESERVED_SUBPAGES = setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, SUB_ENABLED_SCHEMAS)
+internal val RESERVED_SUBPAGES = setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -520,7 +521,7 @@ private fun pageSummary(
         "schema" -> schemaState?.slowSwitching?.let { "正在切换到「$it」…" }
             ?: schemaState?.activeName?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
-        "dict" -> "我的词条 · 添加词条 · 快捷短语"
+        "dict" -> "我的词条 · 添加词条 · 快捷短语 · 词库统计"
         "about" -> "版本 $versionName"
         else -> sectionList(manifest, page.id)
     }
@@ -628,6 +629,7 @@ private fun SubScreen(
         page.id == "dict" && sub == DICT_WORDS -> DictWords(session)
         page.id == "dict" && sub == DICT_ADD -> DictAdd(session)
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
+        page.id == "dict" && sub == DICT_STATS -> DictStatsSection(session)
         else -> {
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
