@@ -419,8 +419,7 @@ key = "schema.pinyin.fuzzy.hint_tone"
 source = "engine"
 type = "toggle"
 title = "提示带声调"
-summary = "提示里的正确拼音带声调，如「苹(píng)果」"
-enabled_when = "schema.pinyin.fuzzy.hint"
+summary = "作用于正文提示与注释变量 ${fuzzy_pinyin}，如「苹(píng)果」"
 
 [[item]]
 page = "schema"
