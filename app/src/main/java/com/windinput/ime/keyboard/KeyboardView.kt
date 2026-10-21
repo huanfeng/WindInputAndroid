@@ -618,9 +618,21 @@ class KeyboardView(context: Context) : View(context) {
         smallPaint.textSize = 12 * density
     }
 
+    /**
+     * 当前跟踪的手指。快打时常是「上一指未抬、下一指已落」（rollover）：只认第一指的话，
+     * 第二指整次按键都丢了。做法同 AOSP LatinIME——新手指落下时把上一指的按压按单击收尾，
+     * 改跟新手指；之后只看这根手指的事件，已收尾的那根抬起时不再处理。
+     */
+    private var activePointerId = MotionEvent.INVALID_POINTER_ID
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (sideTouch) {
-            handleSideTouch(event)
+            // 侧栏滚动只跟第一指，其余手指的落下/抬起忽略
+            if (event.actionMasked != MotionEvent.ACTION_POINTER_DOWN &&
+                event.actionMasked != MotionEvent.ACTION_POINTER_UP
+            ) {
+                handleSideTouch(event)
+            }
             return true
         }
         when (event.actionMasked) {
@@ -636,121 +648,153 @@ class KeyboardView(context: Context) : View(context) {
                     invalidate()
                     return true
                 }
-                downX = event.x
-                downY = event.y
-                swipeConsumed = false
-                repeatFired = false
-                longPressFired = false
-                spaceSwipeActive = false
-                backspaceSwipeActive = false
-                lastStepX = event.x
-                lastBackspaceCount = 0
-                val bounds = findBounds(event.x, event.y)
-                pressedKey = bounds?.key
-                pressedRect = bounds?.rect
-                val key = bounds?.key
-                // 高亮立刻改指新键（连击时上一键的延迟清除不会误伤：clearHighlight 已撤销）
-                handler.removeCallbacks(clearHighlight)
-                highlightKey = key
-                highlightFrames = 0
-                highlightAt = android.os.SystemClock.uptimeMillis()
-                if (key != null) {
-                    feedback(key)
-                    if (previewEnabled && !key.isSpecial && key.action is KeyAction.Text) {
-                        popupManager.showPreview(bounds.rect, displayLabel(key))
-                    }
-                    if (key.action == KeyAction.Backspace) {
-                        repeating = true
-                        handler.postDelayed(repeatRunnable, longPressDelayMs.toLong())
-                    }
-                    if (popupChars(key).isNotEmpty() || hasLongPressAction(key.action)) {
-                        handler.postDelayed(longPressRunnable, longPressDelayMs.toLong())
-                    }
-                }
-                invalidate()
+                startPress(event.getPointerId(0), event.x, event.y)
+            }
+            MotionEvent.ACTION_POINTER_DOWN -> {
+                // 上一指正处在手势里（气泡选字、空格移光标、退格扩选/连删、长按）时不打断它
+                if (pressedKey != null && gestureInProgress()) return true
+                val i = event.actionIndex
+                if (pressedKey != null) finishPress()
+                startPress(event.getPointerId(i), event.getX(i), event.getY(i))
             }
             MotionEvent.ACTION_MOVE -> {
-                val key = pressedKey ?: return true
-                if (swipeConsumed) return true
-                if (popupManager.isPopupShown) {
-                    popupManager.updatePopupSelection(event.x)
-                    return true
-                }
-                val dy = downY - event.y
-                val dx = event.x - downX
-
-                // 空格横向滑动：移动光标（步进制，进入后不再出空格）
-                if (key.action == KeyAction.Space && spaceSwipeEnabled) {
-                    if (!spaceSwipeActive && kotlin.math.abs(dx) > swipeActivatePx) {
-                        spaceSwipeActive = true
-                        cancelTimers()
-                        popupManager.dismissAll()
-                        lastStepX = event.x
-                    }
-                    if (spaceSwipeActive) {
-                        val steps = ((event.x - lastStepX) / cursorStepPx).toInt()
-                        if (steps != 0) {
-                            listener?.onCursorMove(steps)
-                            lastStepX += steps * cursorStepPx
-                        }
-                        return true
-                    }
-                }
-
-                // 退格左滑：扩选删除（实时选中光标前 N 字符）
-                if (key.action == KeyAction.Backspace && backspaceSwipeEnabled) {
-                    val dxLeft = downX - event.x
-                    if (!backspaceSwipeActive && dxLeft > swipeActivatePx) {
-                        backspaceSwipeActive = true
-                        cancelTimers()
-                    }
-                    if (backspaceSwipeActive) {
-                        val count = (dxLeft / cursorStepPx).toInt().coerceAtLeast(0)
-                        if (count != lastBackspaceCount) {
-                            listener?.onBackspaceSelect(count)
-                            lastBackspaceCount = count
-                        }
-                        return true
-                    }
-                }
-
-                // 上滑副字符：位移超阈值且以纵向为主
-                val swipeChar = key.swipeFor(englishMode)
-                if (swipeSymbolsEnabled && swipeChar != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
-                    swipeConsumed = true
-                    cancelTimers()
-                    popupManager.dismissAll()
-                    listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
-                    clearPressed()
-                    return true
-                }
-                // 滑出键位即取消（滑动输入为二期能力）
-                if (findKey(event.x, event.y) !== key && dy < swipeThresholdPx / 2) {
-                    cancelPress()
-                }
+                val i = event.findPointerIndex(activePointerId)
+                if (i >= 0) movePress(event.getX(i), event.getY(i))
+            }
+            MotionEvent.ACTION_POINTER_UP -> {
+                if (event.getPointerId(event.actionIndex) == activePointerId) finishPress()
             }
             MotionEvent.ACTION_UP -> {
-                val key = pressedKey
-                val popupChoice = popupManager.popupSelectedIndex()
-                    ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
-                val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
-                val wasSpaceSwipe = spaceSwipeActive
-                val wasBackspaceSwipe = backspaceSwipeActive
-                cancelPress()
-                when {
-                    swipeConsumed || wasSpaceSwipe -> Unit
-                    wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
-                    // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
-                    popupChoice != null && popupChoice.isUpperCase() ->
-                        listener?.onKeyAction(KeyAction.Text(popupChoice.lowercaseChar()), shifted = true)
-                    popupChoice != null ->
-                        listener?.onKeyAction(KeyAction.Text(popupChoice), shifted = false)
-                    key != null && !skipTap -> handleKey(key)
-                }
+                if (event.getPointerId(0) == activePointerId) finishPress()
+                activePointerId = MotionEvent.INVALID_POINTER_ID
             }
-            MotionEvent.ACTION_CANCEL -> cancelPress()
+            MotionEvent.ACTION_CANCEL -> {
+                cancelPress()
+                activePointerId = MotionEvent.INVALID_POINTER_ID
+            }
         }
         return true
+    }
+
+    private fun gestureInProgress(): Boolean =
+        popupManager.isPopupShown || spaceSwipeActive || backspaceSwipeActive || repeatFired || longPressFired
+
+    private fun startPress(pointerId: Int, x: Float, y: Float) {
+        activePointerId = pointerId
+        downX = x
+        downY = y
+        swipeConsumed = false
+        repeatFired = false
+        longPressFired = false
+        spaceSwipeActive = false
+        backspaceSwipeActive = false
+        lastStepX = x
+        lastBackspaceCount = 0
+        val bounds = findBounds(x, y)
+        pressedKey = bounds?.key
+        pressedRect = bounds?.rect
+        val key = bounds?.key
+        // 高亮立刻改指新键（连击时上一键的延迟清除不会误伤：clearHighlight 已撤销）
+        handler.removeCallbacks(clearHighlight)
+        highlightKey = key
+        highlightFrames = 0
+        highlightAt = android.os.SystemClock.uptimeMillis()
+        if (key != null) {
+            feedback(key)
+            if (previewEnabled && !key.isSpecial && key.action is KeyAction.Text) {
+                popupManager.showPreview(bounds.rect, displayLabel(key))
+            }
+            if (key.action == KeyAction.Backspace) {
+                repeating = true
+                handler.postDelayed(repeatRunnable, longPressDelayMs.toLong())
+            }
+            if (popupChars(key).isNotEmpty() || hasLongPressAction(key.action)) {
+                handler.postDelayed(longPressRunnable, longPressDelayMs.toLong())
+            }
+        }
+        invalidate()
+    }
+
+    private fun movePress(x: Float, y: Float) {
+        val key = pressedKey ?: return
+        if (swipeConsumed) return
+        if (popupManager.isPopupShown) {
+            popupManager.updatePopupSelection(x)
+            return
+        }
+        val dy = downY - y
+        val dx = x - downX
+
+        // 空格横向滑动：移动光标（步进制，进入后不再出空格）
+        if (key.action == KeyAction.Space && spaceSwipeEnabled) {
+            if (!spaceSwipeActive && kotlin.math.abs(dx) > swipeActivatePx) {
+                spaceSwipeActive = true
+                cancelTimers()
+                popupManager.dismissAll()
+                lastStepX = x
+            }
+            if (spaceSwipeActive) {
+                val steps = ((x - lastStepX) / cursorStepPx).toInt()
+                if (steps != 0) {
+                    listener?.onCursorMove(steps)
+                    lastStepX += steps * cursorStepPx
+                }
+                return
+            }
+        }
+
+        // 退格左滑：扩选删除（实时选中光标前 N 字符）
+        if (key.action == KeyAction.Backspace && backspaceSwipeEnabled) {
+            val dxLeft = downX - x
+            if (!backspaceSwipeActive && dxLeft > swipeActivatePx) {
+                backspaceSwipeActive = true
+                cancelTimers()
+            }
+            if (backspaceSwipeActive) {
+                val count = (dxLeft / cursorStepPx).toInt().coerceAtLeast(0)
+                if (count != lastBackspaceCount) {
+                    listener?.onBackspaceSelect(count)
+                    lastBackspaceCount = count
+                }
+                return
+            }
+        }
+
+        // 上滑副字符：位移超阈值且以纵向为主
+        val swipeChar = key.swipeFor(englishMode)
+        if (swipeSymbolsEnabled && swipeChar != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
+            swipeConsumed = true
+            cancelTimers()
+            popupManager.dismissAll()
+            listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
+            clearPressed()
+            return
+        }
+        // 滑出键位即取消（滑动输入为二期能力）
+        if (findKey(x, y) !== key && dy < swipeThresholdPx / 2) {
+            cancelPress()
+        }
+    }
+
+    /** 当前手指抬起（或被下一指顶替）：按本次按压的状态决定发什么 */
+    private fun finishPress() {
+        val key = pressedKey
+        val popupChoice = popupManager.popupSelectedIndex()
+            ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
+        val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
+        val wasSpaceSwipe = spaceSwipeActive
+        val wasBackspaceSwipe = backspaceSwipeActive
+        cancelPress()
+        when {
+            swipeConsumed || wasSpaceSwipe -> Unit
+            wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
+            // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
+            popupChoice != null && popupChoice.isUpperCase() ->
+                listener?.onKeyAction(KeyAction.Text(popupChoice.lowercaseChar()), shifted = true)
+            popupChoice != null ->
+                listener?.onKeyAction(KeyAction.Text(popupChoice), shifted = false)
+            key != null && !skipTap -> handleKey(key)
+        }
     }
 
     /** 按下反馈：震动 + 按键音，各自受开关控制 */

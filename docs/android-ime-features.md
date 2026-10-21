@@ -25,7 +25,7 @@
 | 长按重复（退格连删） | P0 | K | 已实现 ✅ |
 | Shift 双击/长按锁定大写 | P1 | K | fcitx5: `Behavior.DoubleTap/LongPress` |
 | 空格长按行为可配置 | P2 | K | fcitx5: 无/轮换输入法/切中英/系统选择器 |
-| 多指分离触控 | P1 | K | fcitx5: `isMotionEventSplittingEnabled`；快打场景必需 |
+| 多指分离触控 | P1 | K | 已实现 ✅（rollover：新手指落下即把上一键按单击收尾，同 AOSP LatinIME；上一指在气泡/滑动/连删手势中则不打断）。fcitx5: `isMotionEventSplittingEnabled` |
 | 滑行输入（glide typing） | P3 | K+R | FlorisBoard/Gboard 有；HeliBoard 依赖闭源库。工程量大，中文价值低于英文，远期评估 |
 
 **框架预留建议**：引入 fcitx5 的**声明式按键行为**模式——`KeyDef` 同时可挂
