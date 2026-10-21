@@ -229,7 +229,10 @@ get_ime_height() {
 }
 
 dump_xml() {
-    adb_q shell uiautomator dump /sdcard/wt.xml
+    # 限时：界面迟迟不空闲时 uiautomator dump 会一直挂着（实测一次挂了半小时，整轮测试跟着停）。
+    # 超时就当这次没取到，交给调用方的重试
+    timeout 90 "$ADB" -s "$SERIAL" shell uiautomator dump /sdcard/wt.xml >/dev/null 2>&1 \
+        || "$ADB" -s "$SERIAL" shell pkill -f uiautomator >/dev/null 2>&1
     adb_ shell cat /sdcard/wt.xml
 }
 
@@ -349,7 +352,14 @@ CN_PLUS='^[\x{4e00}-\x{9fa5}]+$'
 if (( ! SKIP_INSTALL )); then
     echo "${C}构建并安装...${N}"
     ( cd "$ROOT" && ./gradlew :app:assembleDebug ) >/dev/null || { echo "构建失败" >&2; exit 1; }
-    adb_q install -r "$ROOT/app/build/outputs/apk/debug/app-debug.apk"
+    # 装不上必须当场停：静默吞掉的话，后面的用例跑在设备上旧的包上，失败得莫名其妙
+    # （实测：模拟器存储满，debug 包装不上，release 包留着，run-as 全部报 not debuggable）
+    install_out="$("$ADB" -s "$SERIAL" install -r "$ROOT/app/build/outputs/apk/debug/app-debug.apk" 2>&1)"
+    if ! grep -q Success <<< "$install_out"; then
+        echo "${R}安装 debug 包失败：${N}" >&2
+        grep -iE 'Failure|Exception|space' <<< "$install_out" | head -3 >&2
+        exit 1
+    fi
 fi
 # 坑 1：模拟器有硬件键盘 → 不显示软键盘视图
 adb_q shell settings put secure show_ime_with_hard_keyboard 1
