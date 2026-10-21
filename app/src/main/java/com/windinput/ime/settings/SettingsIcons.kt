@@ -91,6 +91,7 @@ object SettingsIcons {
     val tryIt: ImageVector get() = MiuixIcons.Edit
     val words: ImageVector get() = MiuixIcons.Notes
     val addWord: ImageVector get() = MiuixIcons.Add
+    val phrases: ImageVector get() = MiuixIcons.Messages
     val clear: ImageVector get() = MiuixIcons.Delete
     val backup: ImageVector get() = MiuixIcons.Backup
     val import: ImageVector get() = MiuixIcons.Import

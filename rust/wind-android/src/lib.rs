@@ -693,6 +693,48 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 全部快捷短语（系统 + 用户，按编码升序）。
+    pub fn phrases(&self) -> Vec<PhraseInfo> {
+        self.core
+            .phrases()
+            .into_iter()
+            .map(|p| PhraseInfo {
+                code: p.code,
+                text: p.text,
+                enabled: p.enabled,
+                is_system: p.is_system,
+            })
+            .collect()
+    }
+
+    /// 开 / 关一条短语（出厂关着的系统短语在这里打开）。
+    pub fn phrase_set_enabled(&self, code: String, text: String, enabled: bool) -> Result<(), ConfigError> {
+        self.core
+            .phrase_set_enabled(&code, &text, enabled)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 加一条用户短语。
+    pub fn phrase_add(&self, code: String, text: String) -> Result<(), ConfigError> {
+        self.core
+            .phrase_add(&code, &text)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 删一条用户短语（系统短语删不掉，只能关）。
+    pub fn phrase_remove(&self, code: String, text: String) -> Result<(), ConfigError> {
+        self.core
+            .phrase_remove(&code, &text)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 系统短语开关恢复出厂值，返回改动条数。
+    pub fn phrases_restore_defaults(&self) -> Result<u64, ConfigError> {
+        self.core
+            .phrases_restore_defaults()
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     /// 清空某方案的全部用户词，返回删掉的条数。
     pub fn user_words_clear(&self, schema_id: String) -> Result<u64, ConfigError> {
         self.core
@@ -849,6 +891,15 @@ pub struct UserWordInfo {
     pub code: String,
     pub text: String,
     pub weight: i32,
+}
+
+/// 一条快捷短语：系统短语只能开关，用户短语可删。
+#[derive(Debug, uniffi::Record)]
+pub struct PhraseInfo {
+    pub code: String,
+    pub text: String,
+    pub enabled: bool,
+    pub is_system: bool,
 }
 
 /// 用户词的一页与命中总数。

@@ -755,6 +755,16 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_key_down(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_phrase_add(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_phrase_remove(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_phrase_set_enabled(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_phrases(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_phrases_restore_defaults(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_run_command(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schema_dicts(
@@ -864,6 +874,16 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,`modifiers`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_phrase_add(`ptr`: Long,`code`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_phrase_remove(`ptr`: Long,`code`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_phrase_set_enabled(`ptr`: Long,`code`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,`enabled`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_phrases(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_phrases_restore_defaults(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
     external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_schema_dicts(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1082,6 +1102,21 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 7962) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_phrase_add() != 54643) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_phrase_remove() != 59778) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_phrase_set_enabled() != 6147) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_phrases() != 60600) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_phrases_restore_defaults() != 26484) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_run_command() != 36173) {
@@ -2169,6 +2204,31 @@ public interface WindCoreInterface {
     fun `keyDown`(`vk`: kotlin.UInt, `modifiers`: kotlin.UInt): KeyResult
     
     /**
+     * 加一条用户短语。
+     */
+    fun `phraseAdd`(`code`: kotlin.String, `text`: kotlin.String)
+    
+    /**
+     * 删一条用户短语（系统短语删不掉，只能关）。
+     */
+    fun `phraseRemove`(`code`: kotlin.String, `text`: kotlin.String)
+    
+    /**
+     * 开 / 关一条短语（出厂关着的系统短语在这里打开）。
+     */
+    fun `phraseSetEnabled`(`code`: kotlin.String, `text`: kotlin.String, `enabled`: kotlin.Boolean)
+    
+    /**
+     * 全部快捷短语（系统 + 用户，按编码升序）。
+     */
+    fun `phrases`(): List<PhraseInfo>
+    
+    /**
+     * 系统短语开关恢复出厂值，返回改动条数。
+     */
+    fun `phrasesRestoreDefaults`(): kotlin.ULong
+    
+    /**
      * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
      * ——同一个变化也可能由按键或焦点事件引发，只留推送一条路，K 侧才不会有两份真值。
      */
@@ -2676,6 +2736,94 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterUInt.lower(`vk`),
         FfiConverterUInt.lower(`modifiers`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 加一条用户短语。
+     */
+    @Throws(ConfigException::class)override fun `phraseAdd`(`code`: kotlin.String, `text`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_phrase_add(
+        it,
+        
+        FfiConverterString.lower(`code`),
+        FfiConverterString.lower(`text`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 删一条用户短语（系统短语删不掉，只能关）。
+     */
+    @Throws(ConfigException::class)override fun `phraseRemove`(`code`: kotlin.String, `text`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_phrase_remove(
+        it,
+        
+        FfiConverterString.lower(`code`),
+        FfiConverterString.lower(`text`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 开 / 关一条短语（出厂关着的系统短语在这里打开）。
+     */
+    @Throws(ConfigException::class)override fun `phraseSetEnabled`(`code`: kotlin.String, `text`: kotlin.String, `enabled`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_phrase_set_enabled(
+        it,
+        
+        FfiConverterString.lower(`code`),
+        FfiConverterString.lower(`text`),
+        FfiConverterBoolean.lower(`enabled`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 全部快捷短语（系统 + 用户，按编码升序）。
+     */override fun `phrases`(): List<PhraseInfo> {
+            return FfiConverterSequenceTypePhraseInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_phrases(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 系统短语开关恢复出厂值，返回改动条数。
+     */
+    @Throws(ConfigException::class)override fun `phrasesRestoreDefaults`(): kotlin.ULong {
+            return FfiConverterULong.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_phrases_restore_defaults(
+        it,
+        _status)
 }
     }
     )
@@ -3862,6 +4010,57 @@ public object FfiConverterTypeLayoutInfo: FfiConverterRustBuffer<LayoutInfo> {
 
 
 /**
+ * 一条快捷短语：系统短语只能开关，用户短语可删。
+ */
+data class PhraseInfo (
+    var `code`: kotlin.String
+    , 
+    var `text`: kotlin.String
+    , 
+    var `enabled`: kotlin.Boolean
+    , 
+    var `isSystem`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePhraseInfo: FfiConverterRustBuffer<PhraseInfo> {
+    override fun read(buf: ByteBuffer): PhraseInfo {
+        return PhraseInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: PhraseInfo) = (
+            FfiConverterString.allocationSize(value.`code`) +
+            FfiConverterString.allocationSize(value.`text`) +
+            FfiConverterBoolean.allocationSize(value.`enabled`) +
+            FfiConverterBoolean.allocationSize(value.`isSystem`)
+    )
+
+    override fun write(value: PhraseInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`code`, buf)
+            FfiConverterString.write(value.`text`, buf)
+            FfiConverterBoolean.write(value.`enabled`, buf)
+            FfiConverterBoolean.write(value.`isSystem`, buf)
+    }
+}
+
+
+
+/**
  * 方案的一个附加词库。`id` 原样回传给 [`WindCore::set_schema_dict_enabled`]。
  */
 data class SchemaDictItem (
@@ -4964,6 +5163,34 @@ public object FfiConverterSequenceTypeLayoutInfo: FfiConverterRustBuffer<List<La
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeLayoutInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypePhraseInfo: FfiConverterRustBuffer<List<PhraseInfo>> {
+    override fun read(buf: ByteBuffer): List<PhraseInfo> {
+        val len = buf.getInt()
+        return List<PhraseInfo>(len) {
+            FfiConverterTypePhraseInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<PhraseInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypePhraseInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<PhraseInfo>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypePhraseInfo.write(it, buf)
         }
     }
 }

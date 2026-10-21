@@ -153,6 +153,10 @@ private fun DictContent(
             NavRow("我的词条", "共 $total 条 · 搜索、删除、清空", icon = SettingsIcons.words) { onOpen(DICT_WORDS) }
             NavRow("添加词条", "手动加一个词和它的编码", icon = SettingsIcons.addWord) { onOpen(DICT_ADD) }
         }
+        // 短语不分方案（全局一份），单独一张卡，不放在「当前方案」名下
+        Card(modifier = Modifier.fillMaxWidth()) {
+            NavRow(DICT_PHRASES, "打编码出固定文字：地址、常用回复、日期时间…", icon = SettingsIcons.phrases) { onOpen(DICT_PHRASES) }
+        }
         BackupCard(schema, context, scope) { reload++ }
         return
     }
