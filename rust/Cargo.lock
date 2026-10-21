@@ -1500,6 +1500,7 @@ dependencies = [
 name = "wind-mobile"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "toml 0.8.23",
  "tracing",
  "wind-bridge",
@@ -1508,6 +1509,7 @@ dependencies = [
  "wind-host",
  "wind-ipc",
  "wind-keys",
+ "wind-phrase",
  "wind-store",
  "wind-ui-types",
 ]
