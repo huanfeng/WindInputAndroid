@@ -27,7 +27,7 @@ use std::sync::Arc;
 use wind_mobile::{
     CandidateFrame, CandidateWindow as CoreCandidateWindow, EditOp as CoreEditOp,
     InputStatus as CoreStatus, KeyOutcome, LayoutEntry, MobileCommand, MobileCore, MobileEventSink,
-    SchemaEntry,
+    SchemaEntry, TextSegment as CoreTextSegment,
 };
 
 uniffi::setup_scaffolding!();
@@ -259,8 +259,27 @@ pub struct CandidateWindow {
     /// 与 items 一一对应的注释灰字（码表剩余编码、拼音候选反查码…）；
     /// 只有 [`WindCore::candidates_with_comments`] 填，否则为空
     pub comments: Vec<String>,
+    /// 与 items 一一对应的显示用分段正文；某条为空 = 按 items 那条纯文字画。
+    /// 目前只有模糊音提示：items「苹果」→「苹」「(ping)」「果」，提示段 role = `fuzzy_hint`
+    pub text_segments: Vec<Vec<TextSegment>>,
     /// 本次拉取触发了核心扩容重建：前面已取到的候选可能变了，宿主须整份重取已显示的范围
     pub rebuilt: bool,
+}
+
+/// 分段正文的一段：`role` 为角色名（如 `fuzzy_hint`），`None` = 正文。字号与正文相同，按角色取色。
+#[derive(Debug, uniffi::Record)]
+pub struct TextSegment {
+    pub text: String,
+    pub role: Option<String>,
+}
+
+impl From<CoreTextSegment> for TextSegment {
+    fn from(s: CoreTextSegment) -> Self {
+        Self {
+            text: s.text,
+            role: s.role,
+        }
+    }
 }
 
 impl From<CoreCandidateWindow> for CandidateWindow {
@@ -271,6 +290,11 @@ impl From<CoreCandidateWindow> for CandidateWindow {
             total: w.total as u32,
             selected: w.selected as u32,
             comments: w.comments,
+            text_segments: w
+                .text_segments
+                .into_iter()
+                .map(|segs| segs.into_iter().map(TextSegment::from).collect())
+                .collect(),
             rebuilt: w.rebuilt,
         }
     }

@@ -392,6 +392,28 @@ title = "eng ↔ ong"
 
 [[item]]
 page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.hint"
+source = "engine"
+type = "toggle"
+title = "显示正确拼音"
+summary = "模糊命中的候选里内嵌正确拼音，如「苹(ping)果」"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+key = "schema.pinyin.fuzzy.hint_scope"
+source = "engine"
+type = "select"
+title = "提示范围"
+enabled_when = "schema.pinyin.fuzzy.hint"
+options = [
+  { value = "first", label = "首个模糊候选" },
+  { value = "all", label = "全部模糊候选" },
+]
+
+[[item]]
+page = "schema"
 section = "双拼"
 key = "schema.pinyin.shuangpin.allow_full_pinyin"
 source = "engine"

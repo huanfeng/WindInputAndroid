@@ -3406,6 +3406,12 @@ data class CandidateWindow (
     var `comments`: List<kotlin.String>
     , 
     /**
+     * 与 items 一一对应的显示用分段正文；某条为空 = 按 items 那条纯文字画。
+     * 目前只有模糊音提示：items「苹果」→「苹」「(ping)」「果」，提示段 role = `fuzzy_hint`
+     */
+    var `textSegments`: List<List<TextSegment>>
+    , 
+    /**
      * 本次拉取触发了核心扩容重建：前面已取到的候选可能变了，宿主须整份重取已显示的范围
      */
     var `rebuilt`: kotlin.Boolean
@@ -3430,6 +3436,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceSequenceTypeTextSegment.read(buf),
             FfiConverterBoolean.read(buf),
         )
     }
@@ -3440,6 +3447,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.allocationSize(value.`total`) +
             FfiConverterUInt.allocationSize(value.`selected`) +
             FfiConverterSequenceString.allocationSize(value.`comments`) +
+            FfiConverterSequenceSequenceTypeTextSegment.allocationSize(value.`textSegments`) +
             FfiConverterBoolean.allocationSize(value.`rebuilt`)
     )
 
@@ -3449,6 +3457,7 @@ public object FfiConverterTypeCandidateWindow: FfiConverterRustBuffer<CandidateW
             FfiConverterUInt.write(value.`total`, buf)
             FfiConverterUInt.write(value.`selected`, buf)
             FfiConverterSequenceString.write(value.`comments`, buf)
+            FfiConverterSequenceSequenceTypeTextSegment.write(value.`textSegments`, buf)
             FfiConverterBoolean.write(value.`rebuilt`, buf)
     }
 }
@@ -4290,6 +4299,47 @@ public object FfiConverterTypeStatsSummaryInfo: FfiConverterRustBuffer<StatsSumm
             FfiConverterUInt.write(value.`todaySpeed`, buf)
             FfiConverterUInt.write(value.`overallSpeed`, buf)
             FfiConverterUInt.write(value.`maxSpeed`, buf)
+    }
+}
+
+
+
+/**
+ * 分段正文的一段：`role` 为角色名（如 `fuzzy_hint`），`None` = 正文。字号与正文相同，按角色取色。
+ */
+data class TextSegment (
+    var `text`: kotlin.String
+    , 
+    var `role`: kotlin.String?
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeTextSegment: FfiConverterRustBuffer<TextSegment> {
+    override fun read(buf: ByteBuffer): TextSegment {
+        return TextSegment(
+            FfiConverterString.read(buf),
+            FfiConverterOptionalString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: TextSegment) = (
+            FfiConverterString.allocationSize(value.`text`) +
+            FfiConverterOptionalString.allocationSize(value.`role`)
+    )
+
+    override fun write(value: TextSegment, buf: ByteBuffer) {
+            FfiConverterString.write(value.`text`, buf)
+            FfiConverterOptionalString.write(value.`role`, buf)
     }
 }
 
@@ -5265,6 +5315,34 @@ public object FfiConverterSequenceTypeSchemaInfo: FfiConverterRustBuffer<List<Sc
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeTextSegment: FfiConverterRustBuffer<List<TextSegment>> {
+    override fun read(buf: ByteBuffer): List<TextSegment> {
+        val len = buf.getInt()
+        return List<TextSegment>(len) {
+            FfiConverterTypeTextSegment.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<TextSegment>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeTextSegment.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<TextSegment>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeTextSegment.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypeTooltipSectionStateInfo: FfiConverterRustBuffer<List<TooltipSectionStateInfo>> {
     override fun read(buf: ByteBuffer): List<TooltipSectionStateInfo> {
         val len = buf.getInt()
@@ -5311,6 +5389,34 @@ public object FfiConverterSequenceTypeUserWordInfo: FfiConverterRustBuffer<List<
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeUserWordInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceSequenceTypeTextSegment: FfiConverterRustBuffer<List<List<TextSegment>>> {
+    override fun read(buf: ByteBuffer): List<List<TextSegment>> {
+        val len = buf.getInt()
+        return List<List<TextSegment>>(len) {
+            FfiConverterSequenceTypeTextSegment.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<List<TextSegment>>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterSequenceTypeTextSegment.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<List<TextSegment>>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterSequenceTypeTextSegment.write(it, buf)
         }
     }
 }

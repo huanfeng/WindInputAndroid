@@ -241,6 +241,7 @@ class RustSession(
             total = w.total.toInt(),
             selected = w.selected.toInt(),
             comments = w.comments,
+            segments = w.textSegments.map { segs -> segs.map { TextSegment(it.text, it.role) } },
             rebuilt = w.rebuilt,
         )
     }

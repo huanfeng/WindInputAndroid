@@ -10,6 +10,7 @@ import android.view.VelocityTracker
 import android.view.View
 import android.view.ViewConfiguration
 import android.widget.OverScroller
+import com.windinput.ime.core.TextSegment
 
 /**
  * 候选条：横向展示候选词，**可拖动滚动**，点选上屏。
@@ -70,6 +71,12 @@ class CandidateBarView(context: Context) : View(context) {
         textSize = 19 * density
     }
 
+    /** 正文里的提示段（模糊音的正确拼音「(ping)」）：与正文同字号，只换颜色 */
+    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Palette.current.hint
+        textSize = 19 * density
+    }
+
     /** 注释灰字（码表剩余编码、拼音候选反查码）：候选字号的 0.6 倍，紧跟在字后 */
     private val commentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Palette.current.hint
@@ -83,6 +90,7 @@ class CandidateBarView(context: Context) : View(context) {
             if (field == value) return
             field = value
             textPaint.textSize = value * density
+            hintPaint.textSize = value * density
             commentPaint.textSize = value * density * COMMENT_SCALE
             itemBounds.clear()
             contentWidth = 0f
@@ -95,6 +103,9 @@ class CandidateBarView(context: Context) : View(context) {
 
     /** 与 [candidates] 一一对应的注释；可以比它短（没开注释时为空） */
     private var comments: List<String> = emptyList()
+
+    /** 与 [candidates] 一一对应的分段正文（见 [CandidateText]）；可以比它短，缺的那条按原文画 */
+    private var segments: List<List<TextSegment>> = emptyList()
 
     /** 每个候选的命中区域（内容坐标系，未减滚动量） */
     private val itemBounds = mutableListOf<RectF>()
@@ -126,9 +137,14 @@ class CandidateBarView(context: Context) : View(context) {
     private var loadingMore = false
 
     /** 新一轮候选（替换全部） */
-    fun setCandidates(items: List<String>, itemComments: List<String> = emptyList()) {
+    fun setCandidates(
+        items: List<String>,
+        itemComments: List<String> = emptyList(),
+        itemSegments: List<List<TextSegment>> = emptyList(),
+    ) {
         candidates = items
         comments = itemComments
+        segments = itemSegments
         pressedIndex = -1
         loadingMore = false
         // 新一轮候选从头看起：保留上一轮的滚动位置会让用户以为候选没更新
@@ -145,9 +161,14 @@ class CandidateBarView(context: Context) : View(context) {
      * 核心扩容重建后整份替换：内容可能整体变了，全部重量；**滚动位置保留**（夹回新范围）——
      * 用户正往后滑，跳回开头会以为列表被清空了。
      */
-    fun replaceCandidates(items: List<String>, itemComments: List<String>) {
+    fun replaceCandidates(
+        items: List<String>,
+        itemComments: List<String>,
+        itemSegments: List<List<TextSegment>> = emptyList(),
+    ) {
         candidates = items
         comments = itemComments
+        segments = itemSegments
         pressedIndex = -1
         loadingMore = false
         itemBounds.clear()
@@ -159,12 +180,17 @@ class CandidateBarView(context: Context) : View(context) {
     }
 
     /** 续取到货：**只量新来的这一段**，已有的量过就不再动 */
-    fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
+    fun appendCandidates(
+        more: List<String>,
+        moreComments: List<String> = emptyList(),
+        moreSegments: List<List<TextSegment>> = emptyList(),
+    ) {
         loadingMore = false
         if (more.isEmpty()) return
         val from = candidates.size
         // 注释与候选按下标对齐：前面那段若没带注释（中途开了开关），先用空串补齐
         if (moreComments.isNotEmpty()) comments = alignComments(comments, from) + moreComments
+        if (moreSegments.isNotEmpty()) segments = CandidateText.align(segments, from, emptyList()) + moreSegments
         candidates = candidates + more
         measureFrom(from)
         invalidate()
@@ -177,12 +203,18 @@ class CandidateBarView(context: Context) : View(context) {
         for (i in from until candidates.size) {
             val comment = comments.getOrNull(i).orEmpty()
             val commentW = if (comment.isEmpty()) 0f else commentGap + commentPaint.measureText(comment)
-            val w = textPaint.measureText(candidates[i]) + commentW + itemPaddingH * 2
+            val w = bodyWidth(i) + commentW + itemPaddingH * 2
             itemBounds += RectF(x, 0f, x + w, barHeightPx.toFloat())
             x += w
         }
         contentWidth = x
     }
+
+    /** 第 [i] 条正文宽（分段时逐段按各自的笔量） */
+    private fun bodyWidth(i: Int): Float =
+        CandidateText.width(candidates[i], segments.getOrNull(i)) { text, hint ->
+            (if (hint) hintPaint else textPaint).measureText(text)
+        }
 
     // ── 无障碍 ──────────────────────────────────────────────────────
     // 候选是画出来的：视口里看得见的每个候选报成一个虚拟节点（读屏念「词，编码 x」），
@@ -293,11 +325,23 @@ class CandidateBarView(context: Context) : View(context) {
                 )
             }
             val y = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2
-            canvas.drawText(item, rect.left + itemPaddingH, y, textPaint)
+            val x0 = rect.left + itemPaddingH
+            val segs = segments.getOrNull(i)
+            if (segs.isNullOrEmpty()) {
+                canvas.drawText(item, x0, y, textPaint)
+            } else {
+                // 逐段落笔，提示段换色；与 bodyWidth 同一种量法，注释位置才对得上
+                var x = x0
+                for (s in segs) {
+                    val paint = if (CandidateText.isHint(s)) hintPaint else textPaint
+                    canvas.drawText(s.text, x, y, paint)
+                    x += paint.measureText(s.text)
+                }
+            }
             val comment = comments.getOrNull(i).orEmpty()
             if (comment.isNotEmpty()) {
                 // 与候选字同一条基线：小字落在字脚，读起来是「字 + 下标式编码」
-                val x = rect.left + itemPaddingH + textPaint.measureText(item) + commentGap
+                val x = x0 + bodyWidth(i) + commentGap
                 canvas.drawText(comment, x, y, commentPaint)
             }
         }

@@ -6,6 +6,8 @@ import android.view.View
 import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.windinput.ime.core.TextSegment
+import com.windinput.ime.keyboard.CandidateText
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.Palette
 
@@ -54,16 +56,24 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
     private var loadingMore = false
 
     /** 会话候选更新入口（附着与否都先存着）：新一轮候选，回到顶部 */
-    fun setCandidates(items: List<String>, comments: List<String> = emptyList()) {
+    fun setCandidates(
+        items: List<String>,
+        comments: List<String> = emptyList(),
+        segments: List<List<TextSegment>> = emptyList(),
+    ) {
         loadingMore = false
-        adapter.submit(items, comments)
+        adapter.submit(items, comments, segments)
         grid?.scrollToPosition(0)
     }
 
     /** 核心扩容重建后整份替换，**不回到顶部**（用户正往下滑） */
-    fun replaceCandidates(items: List<String>, comments: List<String>) {
+    fun replaceCandidates(
+        items: List<String>,
+        comments: List<String>,
+        segments: List<List<TextSegment>> = emptyList(),
+    ) {
         loadingMore = false
-        adapter.submit(items, comments)
+        adapter.submit(items, comments, segments)
     }
 
     /**
@@ -72,10 +82,14 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
      * 不用 `notifyDataSetChanged`——那会让 RecyclerView 丢弃全部 ViewHolder 重新绑定，
      * 用户正在滑动时表现为一顿，而且滚动位置也保不住。
      */
-    fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
+    fun appendCandidates(
+        more: List<String>,
+        moreComments: List<String> = emptyList(),
+        moreSegments: List<List<TextSegment>> = emptyList(),
+    ) {
         loadingMore = false
         if (more.isEmpty()) return
-        adapter.append(more, moreComments)
+        adapter.append(more, moreComments, moreSegments)
     }
 
     override fun onCreateView(context: Context): View {
@@ -118,18 +132,25 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         /** 与 [items] 按下标对应的编码提示灰字；可以比它短（没开提示时为空） */
         private var comments: List<String> = emptyList()
 
+        /** 与 [items] 按下标对应的分段正文（模糊音提示）；可以比它短，缺的那条按原文显示 */
+        private var segments: List<List<TextSegment>> = emptyList()
+
         @Suppress("NotifyDataSetChanged")
-        fun submit(newItems: List<String>, newComments: List<String>) {
+        fun submit(newItems: List<String>, newComments: List<String>, newSegments: List<List<TextSegment>>) {
             items = newItems
             comments = newComments
+            segments = newSegments
             notifyDataSetChanged()
         }
 
         /** 追加：只通知新增区间，不动已绑定的 ViewHolder */
-        fun append(more: List<String>, moreComments: List<String>) {
+        fun append(more: List<String>, moreComments: List<String>, moreSegments: List<List<TextSegment>>) {
             val from = items.size
             if (moreComments.isNotEmpty()) {
                 comments = com.windinput.ime.keyboard.CandidateBarView.alignComments(comments, from) + moreComments
+            }
+            if (moreSegments.isNotEmpty()) {
+                segments = CandidateText.align(segments, from, emptyList()) + moreSegments
             }
             items = items + more
             notifyItemRangeInserted(from, more.size)
@@ -153,14 +174,31 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
 
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val comment = comments.getOrNull(position).orEmpty()
-            holder.view.text = if (comment.isEmpty()) {
+            val segs = segments.getOrNull(position)
+            holder.view.text = if (comment.isEmpty() && segs.isNullOrEmpty()) {
                 items[position]
             } else {
-                // 与候选栏同一种排法：字后跟小一号灰字（码表剩余编码 / 拼音反查码）
-                android.text.SpannableString("${items[position]} $comment").apply {
-                    val start = items[position].length + 1
-                    setSpan(android.text.style.RelativeSizeSpan(0.6f), start, length, 0)
-                    setSpan(android.text.style.ForegroundColorSpan(Palette.current.hint), start, length, 0)
+                android.text.SpannableStringBuilder().apply {
+                    if (segs.isNullOrEmpty()) {
+                        append(items[position])
+                    } else {
+                        // 提示段（模糊音的正确拼音）与正文同字号，只换颜色
+                        for (s in segs) {
+                            val start = length
+                            append(s.text)
+                            if (CandidateText.isHint(s)) {
+                                setSpan(android.text.style.ForegroundColorSpan(Palette.current.hint), start, length, 0)
+                            }
+                        }
+                    }
+                    if (comment.isNotEmpty()) {
+                        // 与候选栏同一种排法：字后跟小一号灰字（码表剩余编码 / 拼音反查码）
+                        append(' ')
+                        val start = length
+                        append(comment)
+                        setSpan(android.text.style.RelativeSizeSpan(0.6f), start, length, 0)
+                        setSpan(android.text.style.ForegroundColorSpan(Palette.current.hint), start, length, 0)
+                    }
                 }
             }
             holder.view.setOnClickListener { onClick(position) }

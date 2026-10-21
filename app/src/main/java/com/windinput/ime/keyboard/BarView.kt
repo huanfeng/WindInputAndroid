@@ -8,6 +8,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.windinput.ime.core.TextSegment
 
 /**
  * 键盘上方的条区，高度恒定 [TOTAL_DP]，三态（候选 / 工具栏 / 剪贴板建议）叠在同一块地方：
@@ -344,8 +345,9 @@ class BarView(
         page: Int,
         totalPages: Int,
         comments: List<String> = emptyList(),
+        segments: List<List<TextSegment>> = emptyList(),
     ) {
-        candidateBar.setCandidates(items, comments)
+        candidateBar.setCandidates(items, comments, segments)
         hasCandidates = items.isNotEmpty()
 
         currentPreedit = preedit
@@ -371,14 +373,22 @@ class BarView(
 
     /** 续取到货：只把新的一段交给候选栏（不重量已有项，见 CandidateBarView 的说明） */
     /** 核心扩容重建后整份替换（保留滚动位置），见 [CandidateBarView.replaceCandidates] */
-    fun replaceCandidates(items: List<String>, comments: List<String>) {
-        candidateBar.replaceCandidates(items, comments)
+    fun replaceCandidates(
+        items: List<String>,
+        comments: List<String>,
+        segments: List<List<TextSegment>> = emptyList(),
+    ) {
+        candidateBar.replaceCandidates(items, comments, segments)
         hasCandidates = items.isNotEmpty()
     }
 
-    fun appendCandidates(more: List<String>, moreComments: List<String> = emptyList()) {
+    fun appendCandidates(
+        more: List<String>,
+        moreComments: List<String> = emptyList(),
+        moreSegments: List<List<TextSegment>> = emptyList(),
+    ) {
         if (more.isEmpty()) return
-        candidateBar.appendCandidates(more, moreComments)
+        candidateBar.appendCandidates(more, moreComments, moreSegments)
         hasCandidates = true
     }
 
