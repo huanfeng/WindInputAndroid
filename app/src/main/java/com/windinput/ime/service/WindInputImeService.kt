@@ -138,6 +138,12 @@ class WindInputImeService :
         dataDirs = dirs
         layoutRepository = LayoutRepository(dirs)
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
+        // 首次弹键盘前把布局与用户配置解析进缓存：tomlj 走 ANTLR，首次解析还要加载一大批类，
+        // 放在 onCreateInputView 里就是主线程上一百多毫秒（模拟器实测，键盘弹出掉帧）
+        Thread({
+            layoutRepository.prewarm()
+            userConfig.readAll()
+        }, "wind-prewarm-ui").start()
         // 核心**异步构造**：它要加载三层配置、开 redb、把词库 yaml 编译成 wdat，
         // 放在主线程会突破系统的输入分发超时（实测直接 ANR）。未就绪期间 keyPressed
         // 返回 false，字母直接上屏——头一两秒不过中文引擎，好过键盘假死。

@@ -5,6 +5,7 @@ import com.windinput.ime.core.DataDirs
 import org.tomlj.Toml
 import org.tomlj.TomlArray
 import org.tomlj.TomlTable
+import java.io.File
 
 /**
  * 布局仓库：TOML 布局文件解析 + 三级覆盖解析。
@@ -12,7 +13,9 @@ import org.tomlj.TomlTable
  * 解析顺序（与桌面 resolve_data_file 同语义，失败静默回退）：
  *   filesDir/user/layouts/{id}.toml → filesDir/data/layouts/{id}.toml → 代码内置。
  */
-class LayoutRepository(private val dirs: DataDirs) {
+class LayoutRepository(private val resolve: (String) -> File?) {
+
+    constructor(dirs: DataDirs) : this(dirs::resolveDataFile)
 
     private companion object {
         const val TAG = "LayoutRepository"
@@ -24,9 +27,31 @@ class LayoutRepository(private val dirs: DataDirs) {
         KeyboardLayer.NUMBER to "number",
     )
 
+    /** 解析结果：文件 + 修改时间对得上才用（用户放了覆盖文件、升级重放出厂数据都会让它失效） */
+    private class Parsed(val path: String?, val modified: Long, val rows: List<List<KeyDef>>)
+
+    private val cache = HashMap<KeyboardLayer, Parsed>()
+
+    /**
+     * 某一层的键位。解析结果按层缓存：此前每次调用都读盘 + 整份 TOML 解析（tomlj 走 ANTLR，
+     * 首次还要加载一大批类），首次弹键盘就在主线程上花去一百多毫秒，之后每切一次层（123、
+     * 数字键盘、回字母）再解析一遍。
+     */
+    @Synchronized
     fun rows(layer: KeyboardLayer): List<List<KeyDef>> {
+        val file = resolve("layouts/${layerToId.getValue(layer)}.toml")
+        val modified = file?.lastModified() ?: 0L
+        cache[layer]?.takeIf { it.path == file?.path && it.modified == modified }?.let { return it.rows }
+        return load(layer, file).also { cache[layer] = Parsed(file?.path, modified, it) }
+    }
+
+    /** 把三层都解析进缓存（服务启动时在后台线程调，首次弹键盘就不用在主线程解析） */
+    fun prewarm() {
+        for (layer in KeyboardLayer.entries) rows(layer)
+    }
+
+    private fun load(layer: KeyboardLayer, file: File?): List<List<KeyDef>> {
         val id = layerToId.getValue(layer)
-        val file = dirs.resolveDataFile("layouts/$id.toml")
         if (file != null) {
             try {
                 val parsed = LayoutParser.parse(file.readText())
