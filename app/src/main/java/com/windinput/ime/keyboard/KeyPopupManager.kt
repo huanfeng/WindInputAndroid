@@ -11,7 +11,7 @@ import android.widget.TextView
 
 /**
  * 按键气泡：按下预览（单字符放大）、长按多字符选择（横移换焦点，抬手上屏）、
- * 功能键长按的选项条、上滑副字符的一体式气泡。
+ * 功能键长按的竖排菜单、上滑副字符的一体式气泡。
  * PopupWindow 关闭裁剪以便伸出 IME 窗口顶部（fcitx5 PopupComponent 同思路）。
  */
 class KeyPopupManager(private val anchor: View) {
@@ -73,60 +73,72 @@ class KeyPopupManager(private val anchor: View) {
     }
 
     /**
-     * 长按功能键的选项条（如中英键：各方案 + 切换输入法）。与字符气泡同一套横移选择，
-     * 只是格子按文字宽度排（方案名长短不一），初始选中 [selected]。
+     * 长按功能键的竖排菜单（如中英键：各方案 + 切换输入法）。从键位上方往上排，左沿对齐键位，
+     * 手指上移逐项选中、抬手定；初始高亮 [selected]（当前状态）。
+     *
+     * 竖排而不是横排：方案名长短不一、个数不定，横排一多就得缩字号挤成一行；中英键又在
+     * 底栏靠边，横条大半伸到手指够不着的另一侧。竖排时手指只管上下，离键最近的是最后一项。
      */
     fun showMenu(keyRect: RectF, labels: List<String>, selected: Int) {
         dismissAll()
         if (labels.isEmpty()) return
-        val h = (48 * density).toInt()
-        val pad = (14 * density).toInt()
-        val row = LinearLayout(anchor.context).apply { orientation = LinearLayout.HORIZONTAL }
+        val pad = (16 * density).toInt()
         val views = labels.map { label ->
-            bubbleText(label, 15f).also {
+            bubbleText(label, 16f).also {
                 it.background = null
                 it.maxLines = 1
+                it.gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                it.setPadding(pad, 0, pad, 0)
             }
         }
-        var widths = views.mapIndexed { i, v ->
-            maxOf((56 * density).toInt(), v.paint.measureText(labels[i]).toInt() + 2 * pad)
+        val w = maxOf(
+            (120 * density).toInt(),
+            views.maxOf { it.paint.measureText(it.text.toString()).toInt() } + 2 * pad,
+        ).coerceAtMost(anchor.width)
+        // 方案多、上方放不下时行高往下收（不低于 32dp），条整个仍在屏内
+        val loc = IntArray(2)
+        anchor.getLocationOnScreen(loc)
+        val room = loc[1] + keyRect.top - 40 * density
+        val rowH = (room / labels.size).coerceIn(32 * density, 44 * density).toInt()
+        val col = LinearLayout(anchor.context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = bubbleBackground()
         }
-        // 方案装得多时一行放不下：均分键盘宽度，字号自动缩到放得下
-        val avail = anchor.width - (16 * density).toInt()
-        if (widths.sum() > avail) {
-            widths = List(views.size) { avail / views.size }
-            for (v in views) {
-                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
-                    v, 9, 15, 1, android.util.TypedValue.COMPLEX_UNIT_SP,
-                )
-                v.setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
-            }
-        }
-        views.forEachIndexed { i, v -> row.addView(v, LinearLayout.LayoutParams(widths[i], h)) }
+        views.forEach { col.addView(it, LinearLayout.LayoutParams(w, rowH)) }
         popupItems = views
-        itemRights = widths.runningReduce(Int::plus)
-        row.background = bubbleBackground()
-        val w = itemRights.last()
-        val pos = positionAbove(keyRect, w, h)
-        popupLeft = pos[0]
+        val h = rowH * labels.size
+        val win = IntArray(2)
+        anchor.getLocationInWindow(win)
+        val x = (win[0] + keyRect.left).toInt().coerceIn(win[0], win[0] + anchor.width - w)
+        val y = (win[1] + keyRect.top - h - 8 * density).toInt()
+        menuTop = y - win[1]
+        menuRowH = rowH
         selectedIndex = selected.coerceIn(0, labels.size - 1)
+        menuInitial = selectedIndex
         highlight()
-        popup = popupWindow(row, w, h).also {
-            it.showAtLocation(anchor, Gravity.NO_GRAVITY, pos[0], pos[1])
+        popup = popupWindow(col, w, h).also {
+            it.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
         }
     }
 
-    /** [showMenu] 的格子右沿（相对条左端，累加）；字符气泡等宽，为空 */
-    private var itemRights: List<Int> = emptyList()
+    /** [showMenu] 的竖排菜单：顶边（anchor 坐标）、行高；行高为 0 表示当前是横排字符气泡 */
+    private var menuTop = 0
+    private var menuRowH = 0
+    private var menuInitial = 0
 
-    /** 手指横移（anchor 窗口坐标系 x）更新选中项 */
-    fun updatePopupSelection(x: Float) {
+    /** 手指位置（anchor 坐标）更新选中项：字符气泡看横向，竖排菜单看纵向 */
+    fun updatePopupSelection(x: Float, y: Float) {
         if (popupItems.isEmpty()) return
-        val dx = x - popupLeft
-        selectedIndex = if (itemRights.isNotEmpty()) {
-            itemRights.indexOfFirst { dx < it }.let { if (it < 0) itemRights.lastIndex else it }
+        selectedIndex = if (menuRowH > 0) {
+            // 手指还在菜单下沿以下（键位上）：不算选了哪项，保持初始项——抬手即作罢。
+            // 否则一按住往旁边蹭一下，就会落到离键最近的最后一项（切换输入法）上
+            val bottom = menuTop + menuRowH * popupItems.size
+            if (y >= bottom) menuInitial
+            else ((y - menuTop) / menuRowH).toInt().coerceIn(0, popupItems.size - 1)
         } else {
-            (dx / itemWidthPx).toInt().coerceIn(0, popupItems.size - 1)
+            val loc = IntArray(2)
+            anchor.getLocationInWindow(loc)
+            ((x + loc[0] - popupLeft) / itemWidthPx).toInt().coerceIn(0, popupItems.size - 1)
         }
         highlight()
     }
@@ -138,7 +150,7 @@ class KeyPopupManager(private val anchor: View) {
         popup?.dismiss()
         popup = null
         popupItems = emptyList()
-        itemRights = emptyList()
+        menuRowH = 0
     }
 
     // ── 上滑一体式气泡 ───────────────────────────────────────────

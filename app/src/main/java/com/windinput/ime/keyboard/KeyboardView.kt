@@ -53,16 +53,16 @@ class KeyboardView(context: Context) : View(context) {
         fun onKeyLongPress(action: KeyAction)
 
         /**
-         * 功能键长按的选项条：手指不抬、横移选、抬手定（中英键：各方案 + 切换输入法）。
-         * null = 没有选项条，长按走 [onKeyLongPress]。
+         * 功能键长按的竖排菜单：手指不抬、上移选、抬手定（中英键：各方案 + 切换输入法）。
+         * null = 没有菜单，长按走 [onKeyLongPress]。
          */
         fun longPressOptions(action: KeyAction): KeyOptions? = null
 
-        /** 选项条抬手：[index] 是手指停住的那项；停在初始项（没滑走）为 null */
+        /** 菜单抬手：[index] 是手指停住的那项；停在初始项或没滑进菜单为 null（作罢） */
         fun onLongPressOption(action: KeyAction, index: Int?) = Unit
     }
 
-    /** 长按选项条的内容：[selected] 为初始选中（通常是当前状态，如当前方案） */
+    /** 长按菜单的内容：[selected] 为初始选中（通常是当前状态，如当前方案） */
     data class KeyOptions(val labels: List<String>, val selected: Int)
 
     var listener: Listener? = null
@@ -309,19 +309,19 @@ class KeyboardView(context: Context) : View(context) {
     /** 上滑已过阈值：抬手上屏副字符 */
     private var swipeArmed = false
 
-    /** 正弹着选项条的功能键（长按中英键）；抬手时按条上的选中项回调 */
+    /** 正弹着长按菜单的功能键（中英键）；抬手时按菜单上的选中项回调 */
     private var optionsAction: KeyAction? = null
     private var optionsInitial = 0
 
     /**
-     * 选项条弹出时手指所在的 x；手指真正横移过触摸阈值之前不改选中项。按住不动时系统照样会发
-     * MOVE（坐标不变），不拦的话选中项立刻跳到手指正上方那一项，抬手就误切了方案
+     * 菜单弹出时手指所在的 y；手指真正上移过触摸阈值之前不改选中项。按住不动时系统照样会发
+     * MOVE（坐标有抖动），不拦的话选中项会跟着跳，抬手就误切了方案
      */
-    private var optionsAnchorX = 0f
+    private var optionsAnchorY = 0f
     private var optionsMoved = false
 
-    /** 本次按压最近一次的手指 x（长按弹选项条时记作锚点） */
-    private var lastX = 0f
+    /** 本次按压最近一次的手指位置（长按弹菜单时记作锚点） */
+    private var lastY = 0f
 
     /** 空格滑动移光标进行中 */
     private var spaceSwipeActive = false
@@ -371,7 +371,7 @@ class KeyboardView(context: Context) : View(context) {
             if (options != null) {
                 optionsAction = key.action
                 optionsInitial = options.selected
-                optionsAnchorX = lastX
+                optionsAnchorY = lastY
                 optionsMoved = false
                 popupManager.dismissPreview()
                 popupManager.showMenu(rect, options.labels, options.selected)
@@ -731,7 +731,7 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun startPress(pointerId: Int, x: Float, y: Float) {
         activePointerId = pointerId
-        lastX = x
+        lastY = y
         downX = x
         downY = y
         swipeShown = false
@@ -770,13 +770,13 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun movePress(x: Float, y: Float) {
         val key = pressedKey ?: return
-        lastX = x
+        lastY = y
         if (popupManager.isPopupShown) {
             if (optionsAction != null && !optionsMoved) {
-                if (kotlin.math.abs(x - optionsAnchorX) < touchSlopPx) return
+                if (kotlin.math.abs(y - optionsAnchorY) < touchSlopPx) return
                 optionsMoved = true
             }
-            popupManager.updatePopupSelection(x)
+            popupManager.updatePopupSelection(x, y)
             return
         }
         val dy = downY - y

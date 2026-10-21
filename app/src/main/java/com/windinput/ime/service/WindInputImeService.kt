@@ -302,7 +302,7 @@ class WindInputImeService :
         /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
         const val ENGLISH_SCHEMA_ID = "english"
 
-        /** 中英键长按里的「切换输入法」（选项条最后一项、卡片最后一格） */
+        /** 中英键长按里的「切换输入法」（长按菜单最后一项、卡片最后一格） */
         const val SWITCH_IME_LABEL = "切换输入法"
         const val ACTION_SWITCH_IME = "switch_ime"
 
@@ -1256,7 +1256,7 @@ class WindInputImeService :
         }
     }
 
-    /** 从中英键（卡片或长按选项条）选中一个方案 */
+    /** 从中英键（卡片或长按菜单）选中一个方案 */
     private fun selectSchemaFromKey(schemas: List<SchemaEntry>, target: SchemaEntry) {
         if (target.id != ENGLISH_SCHEMA_ID) {
             statePrefs.edit().putString(KEY_LAST_CHINESE, target.id).apply()
@@ -1270,7 +1270,7 @@ class WindInputImeService :
     }
 
     /**
-     * 长按中英键、手指不抬：键上方弹选项条（各方案 + 切换输入法），横移选、抬手定。
+     * 长按中英键、手指不抬：键上方弹竖排菜单（各方案 + 切换输入法），上移选、抬手定。
      * 「切换输入法」原来在长按空格上，归到这里——它和切方案是同一类事（换一种打字方式）。
      */
     override fun longPressOptions(action: KeyAction): KeyboardView.KeyOptions? {
@@ -1283,12 +1283,14 @@ class WindInputImeService :
         )
     }
 
-    /** 选项条抬手：滑到哪项就是哪项；没滑走（停在当前方案）就换成可点的方案卡片，抬手后再点着选 */
+    /**
+     * 菜单抬手：滑到哪项就是哪项；没滑进菜单（或停回当前方案）就作罢。
+     * 以前这里会改弹可点的方案卡片，按久一点没滑就弹出一张卡挡住键盘，真机反馈像误触
+     */
     override fun onLongPressOption(action: KeyAction, index: Int?) {
-        if (action != KeyAction.SwitchLang) return
+        if (action != KeyAction.SwitchLang || index == null) return
         val schemas = session.schemas()
         when {
-            index == null -> onKeyLongPress(action)
             index >= schemas.size -> {
                 abandonComposition()
                 onSwitchInputMethod()
@@ -1334,8 +1336,6 @@ class WindInputImeService :
         }
     }
 
-    // ── 工具栏 ───────────────────────────────────────────────────
-
     /**
      * 退格上滑抬手：有编码 → 清空编码；否则清空整个输入框。走宿主的文本删除，
      * 误清了可以在编辑面板「撤销」找回（文本框自带的撤销栈）
@@ -1368,6 +1368,8 @@ class WindInputImeService :
         ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_Z, 0, meta))
         ic.sendKeyEvent(KeyEvent(now, now, KeyEvent.ACTION_UP, KeyEvent.KEYCODE_Z, 0, meta))
     }
+
+    // ── 工具栏 ───────────────────────────────────────────────────
 
     override fun onToolbarAction(action: BarView.ToolbarAction) {
         val wm = windowManager ?: return
@@ -1596,10 +1598,10 @@ class WindInputImeService :
             }
             TextEditingWindow.EditAction.PASTE -> ic.performContextMenuAction(android.R.id.paste)
             TextEditingWindow.EditAction.BACKSPACE -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
-            else -> moveCaret(ic, action)
-        }
             TextEditingWindow.EditAction.UNDO -> sendUndoRedo(redo = false)
             TextEditingWindow.EditAction.REDO -> sendUndoRedo(redo = true)
+            else -> moveCaret(ic, action)
+        }
     }
 
     /** 当前选区的绝对偏移 (start, end)；宿主不支持 ExtractedText 时为 null */

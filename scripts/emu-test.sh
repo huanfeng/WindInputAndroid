@@ -1117,22 +1117,37 @@ adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 restart_pad
 
-section "[39] 长按中英键弹方案卡片：切到全拼打 ni，再切回五笔"
-# 卡片与候选长按菜单同一组件，格子坐标同 menu_cell；方案顺序按核心给的列表：
-# 清风英文 · 全拼 · 双拼 · 五笔 · 五笔拼音（第 1 行 4 格）
+section "[39] 长按中英键竖排菜单：上滑选全拼打 ni，再选回五笔；不滑就松手什么都不做"
+# 菜单从中英键上方往上排，左沿对齐键位，行高 44dp，下沿离键顶 8dp。项按核心给的方案列表
+# 再加末项「切换输入法」：清风英文 · 全拼 · 双拼 · 五笔 · 五笔拼音 · 切换输入法（共 6 项）
+lang_menu_pick() {   # 第几项（从 0 起）：按住中英键等菜单弹出，上滑到该项再松手
+    local lx ly ty
+    read -r lx ly <<< "$(key_center LANG)"
+    ty="$(awk -v y="$ly" -v r="$GEO_ROWPX" -v d="$GEO_DENSITY" -v i="$1" \
+        'BEGIN{ printf "%d", y - r / 2 - 8 * d - (6 - i - 0.5) * 44 * d }')"
+    adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
+    adb_q shell input motionevent MOVE "$lx" $(( (ly + ty) / 2 )); sleep 0.1
+    adb_q shell input motionevent MOVE "$lx" "$ty"; sleep 0.2
+    adb_q shell input motionevent UP "$lx" "$ty"; sleep 0.6
+}
 reset_pad
-read -r lx ly <<< "$(key_center LANG)"
-adb_q shell input swipe "$lx" "$ly" "$lx" "$ly" 900; sleep 0.8
-menu_cell 0 1          # 全拼
+lang_menu_pick 1       # 全拼
 sleep 6                # 模拟器上首次编译拼音词库近 5 秒，期间按键直接上屏字母
 tap_key n; tap_key i; tap_key SPACE
 check "切到全拼后 ni 出「你」" "你" "$(get_pad_text)"
 reset_pad
-adb_q shell input swipe "$lx" "$ly" "$lx" "$ly" 900; sleep 0.8
-menu_cell 0 3          # 五笔
+lang_menu_pick 3       # 五笔
 sleep 2
 tap_key a; tap_key a; tap_key SPACE
 check "切回五笔 aa 出「式」" "式" "$(get_pad_text)"
+# 按住不滑（手指原地轻微抖动）再松手：不弹卡片、不换方案，接着打字照常
+reset_pad
+read -r lx ly <<< "$(key_center LANG)"
+adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
+adb_q shell input motionevent MOVE $(( lx + 3 )) $(( ly + 2 )); sleep 0.2
+adb_q shell input motionevent UP $(( lx + 3 )) $(( ly + 2 )); sleep 0.8
+tap_key a; tap_key a; tap_key SPACE
+check "长按中英键不滑松手：不弹卡片、仍是五笔" "式" "$(get_pad_text)"
 
 section "[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符"
 # 核心在联想态挂一个占位组合（空格等，桌面 TSF 给候选窗定位用）；手机上写进来就是输入框里
@@ -1173,9 +1188,7 @@ tap_key n; tap_key i; tap_key SPACE
 check "首次卡片里选全拼后 ni 出「你」" "你" "$(get_pad_text)"
 # 切回五笔，并确认第二次弹键盘不再出卡片（出了的话 aa 会被卡片挡住）
 reset_pad
-read -r lx ly <<< "$(key_center LANG)"
-adb_q shell input swipe "$lx" "$ly" "$lx" "$ly" 900; sleep 0.8
-menu_cell 0 3          # 五笔
+lang_menu_pick 3       # 五笔
 sleep 2
 adb_q shell am force-stop "$PKG"
 restart_pad
@@ -1356,19 +1369,6 @@ check_match "横屏打字出汉字" "$CN" "$(wait_pad_match "$CN")"
 set_rotation 0
 reset_pad
 
-section "[14] 跑完不改变活跃方案"
-schema_after="$(get_active_schema)"
-if [[ -z "$SCHEMA_BEFORE" ]]; then
-    echo "  ${D}SKIP  首次运行，无基线可比${N}"
-else
-    check "活跃方案未被用例改动" "$SCHEMA_BEFORE" "$schema_after"
-fi
-
-section_end
-restore_suite_kb
-echo; echo "${C}最慢的用例：${N}"
-printf '%s\n' "${SECTION_TIMES[@]}" | sort -rn | head -10 | awk -F'\t' '{ printf "  %4ds  %s\n", $1, $2 }'
-echo "  合计 ${SECONDS}s"
 section "[48] 退格上滑清空输入框，编辑面板撤销找回、重做再清"
 reset_pad
 tap_key a; tap_key a; tap_key SPACE
@@ -1390,6 +1390,19 @@ adb_q shell input tap "$GEO_PANELBACKX" "$GEO_PANELHEADERY"   # 返回键盘
 sleep 1
 reset_pad
 
+section "[14] 跑完不改变活跃方案"
+schema_after="$(get_active_schema)"
+if [[ -z "$SCHEMA_BEFORE" ]]; then
+    echo "  ${D}SKIP  首次运行，无基线可比${N}"
+else
+    check "活跃方案未被用例改动" "$SCHEMA_BEFORE" "$schema_after"
+fi
+
+section_end
+restore_suite_kb
+echo; echo "${C}最慢的用例：${N}"
+printf '%s\n' "${SECTION_TIMES[@]}" | sort -rn | head -10 | awk -F'\t' '{ printf "  %4ds  %s\n", $1, $2 }'
+echo "  合计 ${SECONDS}s"
 echo; echo "${C}================================${N}"
 if (( FAILED == 0 )); then echo "${G}全部通过${N}"; exit 0; fi
 echo "${R}${FAILED} 项失败${N}"
