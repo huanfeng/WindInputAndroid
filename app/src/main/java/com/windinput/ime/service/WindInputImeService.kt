@@ -140,9 +140,11 @@ class WindInputImeService :
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
         // 首次弹键盘前把布局与用户配置解析进缓存：tomlj 走 ANTLR，首次解析还要加载一大批类，
         // 放在 onCreateInputView 里就是主线程上一百多毫秒（模拟器实测，键盘弹出掉帧）
+        // 配置排在最前：onCreateInputView 头一件事就是按配置定键高，它先进缓存，主线程就不用自己解析
         Thread({
-            layoutRepository.prewarm()
             userConfig.readAll()
+            layoutRepository.prewarm()
+            SymbolPages.load(dirs)
         }, "wind-prewarm-ui").start()
         // 核心**异步构造**：它要加载三层配置、开 redb、把词库 yaml 编译成 wdat，
         // 放在主线程会突破系统的输入分发超时（实测直接 ANR）。未就绪期间 keyPressed
