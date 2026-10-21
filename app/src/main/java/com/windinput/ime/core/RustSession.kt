@@ -133,14 +133,24 @@ class RustSession(
         mainHandler.post { listener?.invoke(event) }
     }
 
-    override fun focusGained() = core.focusGained()
+    /**
+     * 每个核心调用都经它：核心 panic 时不让整个输入法崩掉（见 [CoreGuard]）。
+     * 按键兜底为「没处理」（字母交给宿主直接上屏），列表类兜底为空。
+     */
+    private val guard = CoreGuard { what, e, first ->
+        Log.e(TAG, "核心调用 $what 出错，已兜住", e)
+        if (first) post(UiEvent.Toast("输入法核心出错，已恢复；反复出现请反馈"))
+    }
 
-    override fun focusLost() = core.focusLost()
+    override fun focusGained() = guard.run("focusGained", Unit) { core.focusGained() }
 
-    override fun setLearningSuspended(on: Boolean) = core.setLearningSuspended(on)
+    override fun focusLost() = guard.run("focusLost", Unit) { core.focusLost() }
+
+    override fun setLearningSuspended(on: Boolean) =
+        guard.run("setLearningSuspended", Unit) { core.setLearningSuspended(on) }
 
     override fun schemas(): List<SchemaEntry> =
-        core.schemas().mapIndexed { i, s ->
+        guard.run("schemas", emptyList()) { core.schemas() }.mapIndexed { i, s ->
             SchemaEntry(
                 index = i,
                 id = s.id,
@@ -151,7 +161,7 @@ class RustSession(
         }
 
     override fun shuangpinLayouts(): List<LayoutEntry> =
-        core.shuangpinLayouts().map { LayoutEntry(id = it.id, name = it.name, active = it.active) }
+        guard.run("shuangpinLayouts", emptyList()) { core.shuangpinLayouts() }.map { LayoutEntry(id = it.id, name = it.name, active = it.active) }
 
     override fun runCommand(cmd: EngineCmd) {
         val native = when (cmd) {
@@ -165,7 +175,7 @@ class RustSession(
             is EngineCmd.SetShuangpinLayout ->
                 uniffi.wind_android.EngineCommand.SetShuangpinLayout(cmd.id)
         }
-        core.runCommand(native)
+        guard.run("runCommand($cmd)", Unit) { core.runCommand(native) }
     }
 
     /** 见 [ImeSession.setLatinSchema] */
@@ -189,7 +199,7 @@ class RustSession(
      */
     override fun candidateSelected(index: Int): Boolean {
         if (index < 0) return false
-        val result = core.selectCandidate(index.toUInt())
+        val result = guard.run("selectCandidate", null) { core.selectCandidate(index.toUInt()) } ?: return false
         if (result.ops.isNotEmpty()) {
             listener?.invoke(UiEvent.Edits(result.ops.map(::toEditOp)))
         }
@@ -198,26 +208,28 @@ class RustSession(
 
     override fun candidateMenu(index: Int): List<CandidateMenuEntry> {
         if (index < 0) return emptyList()
-        return core.candidateMenu(index.toUInt()).map { CandidateMenuEntry(it.label, it.action, it.enabled) }
+        return guard.run("candidateMenu", emptyList()) { core.candidateMenu(index.toUInt()) }.map { CandidateMenuEntry(it.label, it.action, it.enabled) }
     }
 
     override fun candidateTooltip(index: Int): List<TooltipSection> {
         if (index < 0) return emptyList()
-        return core.candidateTooltip(index.toUInt()).map { TooltipSection(it.title, it.inline, it.lines) }
+        return guard.run("candidateTooltip", emptyList()) { core.candidateTooltip(index.toUInt()) }.map { TooltipSection(it.title, it.inline, it.lines) }
     }
 
     override fun candidateMenuRun(index: Int, action: String): Boolean =
-        index >= 0 && core.candidateMenuRun(index.toUInt(), action)
+        index >= 0 && guard.run("candidateMenuRun", false) { core.candidateMenuRun(index.toUInt(), action) }
 
     override var candidateComments: Boolean = false
 
     override fun candidateWindow(offset: Int, limit: Int): CandidatePage {
         val t0 = SystemClock.elapsedRealtimeNanos()
-        val w = if (candidateComments) {
-            core.candidatesWithComments(offset.toUInt(), limit.toUInt())
-        } else {
-            core.candidates(offset.toUInt(), limit.toUInt())
-        }
+        val w = guard.run("candidates", null) {
+            if (candidateComments) {
+                core.candidatesWithComments(offset.toUInt(), limit.toUInt())
+            } else {
+                core.candidates(offset.toUInt(), limit.toUInt())
+            }
+        } ?: return CandidatePage(emptyList(), offset, 0, 0)
         val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
         // 与 keyDown 同一条标尺：它同样在主线程上同步阻塞，超一帧就得改预取策略
         if (costUs > FRAME_BUDGET_US) {
@@ -242,7 +254,8 @@ class RustSession(
         // JNI 往返耗时单独计：它在**主线程**上同步阻塞，是输入延迟里唯一不可
         // 让位给渲染的一段。超过一帧（16ms）就必须改成异步，故按帧标注。
         val t0 = SystemClock.elapsedRealtimeNanos()
-        val result = core.keyDown(vk, modifiers)
+        // 核心出错时当作「没处理」：这一下交给宿主（字母直接上屏），输入法不崩
+        val result = guard.run("keyDown", null) { core.keyDown(vk, modifiers) } ?: return false
         val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
         if (costUs > FRAME_BUDGET_US) {
             Log.w(TAG, "keyDown 阻塞主线程 ${costUs}µs（超一帧）vk=0x${vk.toString(16)}")

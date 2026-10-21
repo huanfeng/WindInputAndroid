@@ -36,7 +36,9 @@ internal fun TooltipSectionsSection() {
     var reload by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(reload) {
-        sections = withContext(Dispatchers.IO) { CoreAccess.obtainCore(context)?.tooltipSections().orEmpty() }
+        sections = withContext(Dispatchers.IO) {
+            runCatching { CoreAccess.obtainCore(context)?.tooltipSections() }.getOrNull().orEmpty()
+        }
     }
     // 「完整原文」只在候选被截断时出现、「调试」是排查用的，手机上开关它们没有意义
     val shown = sections.filter { it.title.isNotEmpty() && it.title !in HIDDEN }

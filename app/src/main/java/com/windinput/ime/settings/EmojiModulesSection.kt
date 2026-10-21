@@ -32,7 +32,9 @@ internal fun EmojiModulesSection() {
     var reload by remember { mutableStateOf(0) }
 
     LaunchedEffect(reload) {
-        modules = withContext(Dispatchers.IO) { CoreAccess.obtainCore(context)?.emojiModules().orEmpty() }
+        modules = withContext(Dispatchers.IO) {
+            runCatching { CoreAccess.obtainCore(context)?.emojiModules() }.getOrNull().orEmpty()
+        }
     }
     if (modules.isEmpty()) return
 

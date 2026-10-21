@@ -36,7 +36,8 @@ internal fun SchemaDictsSection(title: String, schemaIds: List<String>) {
     var reload by remember { mutableIntStateOf(0) }
     LaunchedEffect(reload) {
         dicts = withContext(Dispatchers.IO) {
-            CoreAccess.obtainCore(context)?.schemaDicts(schemaIds.first()).orEmpty()
+            // 读列表出错（核心 panic 经 UniFFI 抛出）就当没有：设置页不该因此崩
+            runCatching { CoreAccess.obtainCore(context)?.schemaDicts(schemaIds.first()) }.getOrNull().orEmpty()
         }
     }
     if (dicts.isEmpty()) return

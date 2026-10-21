@@ -115,7 +115,7 @@ private fun DictContent(
         if (mode == DictMode.ADD) return@LaunchedEffect // 加词页用不到列表，不扫整张表
         if (query.isNotEmpty()) delay(SEARCH_DEBOUNCE_MS)
         val page = withContext(Dispatchers.IO) {
-            CoreAccess.obtainCore(context)?.userWords(schema.id, query.trim(), 0u, limit)
+            runCatching { CoreAccess.obtainCore(context)?.userWords(schema.id, query.trim(), 0u, limit) }.getOrNull()
         }
         words = page?.items.orEmpty()
         total = page?.total ?: 0uL
