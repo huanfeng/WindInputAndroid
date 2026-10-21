@@ -266,6 +266,16 @@ title = "英文候选"
 [[item]]
 page = "schema"
 section = "拼音"
+key = "schema.pinyin.english_merge.prefix_complete"
+source = "engine"
+type = "toggle"
+title = "英文前缀补全"
+summary = "有中文候选时也补至多 2 个英文词，但只在打的不是完整拼音时补：至少 5 个字母，且怎么切都切不成完整拼音（templa 补 template，shang 不补）。双拼方案不生效"
+enabled_when = "schema.pinyin.english_merge.enable"
+
+[[item]]
+page = "schema"
+section = "拼音"
 key = "schema.pinyin.code_hint_source"
 source = "engine"
 type = "select"
@@ -689,6 +699,16 @@ source = "engine"
 type = "toggle"
 title = "启用分类词"
 summary = "「动物」「水果」等分类词会带出整组 emoji，数量受每词上限约束"
+enabled_when = "input.emoji.enabled"
+
+[[item]]
+page = "input"
+section = "Emoji/OpenCC"
+key = "input.emoji.block_auto_commit"
+source = "engine"
+type = "toggle"
+title = "有追加时不自动上屏"
+summary = "全码唯一自动上屏时，若候选追加了 emoji 或附加模块的符号（如「提手旁」→ 扌），不自动上屏，留出选择的机会"
 enabled_when = "input.emoji.enabled"
 
 [[item]]
