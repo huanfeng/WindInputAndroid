@@ -57,6 +57,12 @@ jobs:
         working-directory: WindInputAndroid
         run: ./gradlew :app:assembleDebug --no-daemon
 
+      # Kotlin 单测（JVM）：布局解析、设置清单、许可声明、备份文案等纯逻辑。只读仓库里的
+      # assets，不要主仓数据，所以与上面「不跑 Rust 测试」的理由无关，CI 上照跑
+      - name: Kotlin 单测
+        working-directory: WindInputAndroid
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
       # CI 没有 local.properties → 走仓库里公开的 debug 密钥。核对一下确实是它，
       # 而不是 runner 上凭空生成的一把（那样每次 CI 产物签名都不同，谁也装不上谁）。
       - name: debug 包签名 = keystore/debug.keystore
