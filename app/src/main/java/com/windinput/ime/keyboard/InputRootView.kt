@@ -25,10 +25,16 @@ class InputRootView(context: Context) : LinearLayout(context) {
      * 从 0 起步的话键盘刚弹出那一下按无避让的高度测量，最后一排被手势条盖住，
      * insets 到了才长高（肉眼可见地「先被遮住、再恢复」）。所以先用上次收到的真值，
      * 没有就按当前窗口的 WindowMetrics 估一个，insets 到了再校正（通常不变，不会跳）。
-     * API 30+ 一律按 WindowMetrics 估：它跟着当前横竖屏走，而缓存的是上一个方向的值
-     * （三键导航横屏时导航栏在侧边、底部为 0，带进竖屏首帧就少了一截）。
+     * API 30+ 按 WindowMetrics 估：它跟着当前横竖屏走。
+     *
+     * 估值在部分系统上不可靠（真机反馈：首次弹出仍被小横条盖住，之后才恢复）。故再按
+     * **横竖屏分别**记住上次收到的真值、跨进程持久化（进程被杀后的「首次」也有据可依），
+     * 首帧取两者较大的——宁可首帧多垫几个像素，也不能让最后一排被盖住。
      */
-    private var insetBottom = initialInset(context)
+    private val portrait = context.resources.configuration.orientation !=
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    private val estimated = initialInset(context)
+    private var insetBottom = maxOf(estimated, savedInset(context, portrait))
 
     /**
      * 用户设的额外留空（px）：底部加在避让占位上（窗口跟着长高，最后一排不被裁），左右用内边距
@@ -77,7 +83,9 @@ class InputRootView(context: Context) : LinearLayout(context) {
             insets.systemWindowInsetBottom
         }
         lastInsetBottom = bottom
+        if (bottom != savedInset(context, portrait)) saveInset(context, portrait, bottom)
         if (bottom != insetBottom) {
+            android.util.Log.i("InputRootView", "导航避让首帧 $insetBottom（估值 $estimated）→ 实际 $bottom")
             insetBottom = bottom
             applySpacer()
         }
@@ -87,6 +95,16 @@ class InputRootView(context: Context) : LinearLayout(context) {
     companion object {
         /** 进程内记住上次的真值：API 26–29 没有 WindowMetrics，重建输入视图时用它 */
         private var lastInsetBottom = -1
+
+        private fun prefs(context: Context) =
+            context.getSharedPreferences("ime_insets", Context.MODE_PRIVATE)
+
+        private fun savedInset(context: Context, portrait: Boolean): Int =
+            prefs(context).getInt(if (portrait) "bottom_portrait" else "bottom_landscape", 0)
+
+        private fun saveInset(context: Context, portrait: Boolean, value: Int) {
+            prefs(context).edit().putInt(if (portrait) "bottom_portrait" else "bottom_landscape", value).apply()
+        }
 
         private fun initialInset(context: Context): Int =
             if (Build.VERSION.SDK_INT >= 30) {

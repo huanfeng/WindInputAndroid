@@ -12,7 +12,9 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.windinput.ime.core.RecentStore
 import com.windinput.ime.keyboard.InputWindow
+import com.windinput.ime.keyboard.GlyphDrawable
 import com.windinput.ime.keyboard.Palette
+import com.windinput.ime.keyboard.PanelIcon
 
 /**
  * 表情面板：分类 Tab（最近使用置首）+ 多行网格 + 退格。
@@ -57,6 +59,11 @@ class EmojiWindow(
                     gravity = Gravity.CENTER
                     setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
                     setOnClickListener { selectTab(index) }
+                    // 「最近」不是表情，用矢量图标（同快捷面板那一套），不拿 🕐 冒充分类
+                    if (index == 0) {
+                        minWidth = (44 * density).toInt()
+                        GlyphDrawable.apply(this, PanelIcon.Glyph.CLOCK, Palette.current.text, 20f)
+                    }
                 },
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,

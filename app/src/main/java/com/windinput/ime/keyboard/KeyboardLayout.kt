@@ -150,7 +150,7 @@ object KeyboardLayouts {
             addAll(charKeys("@\"'"))
         },
         buildList {
-            add(KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.5f, isSpecial = true))
+            add(KeyDef("1234", KeyAction.NumberPad, widthWeight = 1.5f, isSpecial = true))
             add(KeyDef(".", KeyAction.Text('.')))
             add(KeyDef(",", KeyAction.Text(',')))
             add(KeyDef("\\", KeyAction.Text('\\'), enText = '\''))
@@ -161,7 +161,7 @@ object KeyboardLayouts {
         // 与字母层底行同宽对齐：「返回」正好落在字母层「123」那一格（哪里进、哪里回）；
         // 「1234」在左下，与数字键盘左下的「返回」同位
         listOf(
-            KeyDef("1234", KeyAction.NumberPad, widthWeight = 1.35f, isSpecial = true),
+            KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.35f, isSpecial = true),
             KeyDef("返回", KeyAction.SwitchSymbols, widthWeight = 1.15f, isSpecial = true, isAccent = true),
             KeyDef("☺", KeyAction.Emoji, isSpecial = true),
             KeyDef("空格", KeyAction.Space, widthWeight = 5.1f),
@@ -185,8 +185,8 @@ object KeyboardLayouts {
         listOf(sideSpacer, digit('7'), digit('8'), digit('9'),
             KeyDef("换行", KeyAction.Enter, isSpecial = true, rowSpan = 2)),
         listOf(
-            KeyDef("返回", KeyAction.SwitchSymbols, isSpecial = true, isAccent = true),
-            KeyDef("符号", KeyAction.SymbolPage, widthWeight = 1.4f, isSpecial = true),
+            KeyDef("符号", KeyAction.SymbolPage, isSpecial = true),
+            KeyDef("返回", KeyAction.SwitchSymbols, widthWeight = 1.4f, isSpecial = true, isAccent = true),
             digit('0'),
             KeyDef(".", KeyAction.Commit("."), widthWeight = 1.4f),
             sideSpacer,

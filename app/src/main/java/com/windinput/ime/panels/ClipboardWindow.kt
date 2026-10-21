@@ -9,6 +9,7 @@ import android.widget.TextView
 import com.windinput.ime.core.ClipboardStore
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.Palette
+import com.windinput.ime.keyboard.PanelIcon
 
 /**
  * 剪贴板历史面板：点击粘贴、置顶、删除、清空（跳过置顶）。
@@ -86,11 +87,15 @@ class ClipboardWindow(
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
             )
             row.addView(
-                actionButton(context, if (entry.pinned) "📌" else "📍") {
+                actionButton(context, if (entry.pinned) PanelIcon.Glyph.PIN else PanelIcon.Glyph.PIN_OUTLINE) {
                     store.setPinned(entry.text, !entry.pinned)
                 },
+                LinearLayout.LayoutParams((44 * density).toInt(), (44 * density).toInt()),
             )
-            row.addView(actionButton(context, "✕") { store.remove(entry.text) })
+            row.addView(
+                actionButton(context, PanelIcon.Glyph.CLOSE) { store.remove(entry.text) },
+                LinearLayout.LayoutParams((44 * density).toInt(), (44 * density).toInt()),
+            )
 
             val lp = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -102,13 +107,12 @@ class ClipboardWindow(
         }
     }
 
-    private fun actionButton(context: Context, label: String, onClick: () -> Unit): TextView =
-        TextView(context).apply {
-            val density = context.resources.displayMetrics.density
-            text = label
-            textSize = 16f
-            gravity = Gravity.CENTER
-            setPadding((10 * density).toInt(), 0, (10 * density).toInt(), 0)
+    /** 条目右侧的小按钮（置顶 / 删除）：矢量图标，与键盘其他功能图标同一套 */
+    private fun actionButton(context: Context, glyph: PanelIcon.Glyph, onClick: () -> Unit): PanelIcon =
+        PanelIcon(context).apply {
+            this.glyph = glyph
+            tint = if (glyph == PanelIcon.Glyph.PIN) Palette.current.accentText else Palette.current.hint
+            scale = 0.5f
             setOnClickListener { onClick() }
         }
 }

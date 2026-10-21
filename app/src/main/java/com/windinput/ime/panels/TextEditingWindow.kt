@@ -9,7 +9,9 @@ import android.widget.TextView
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.KeyIcons
+import com.windinput.ime.keyboard.GlyphDrawable
 import com.windinput.ime.keyboard.Palette
+import com.windinput.ime.keyboard.PanelIcon
 
 /**
  * 文本编辑面板：光标移动/选择/剪切复制粘贴（参考 fcitx5 TextEditingWindow）。
@@ -33,6 +35,13 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
 
     private var selectButton: TextView? = null
 
+    private val ARROWS = mapOf(
+        EditAction.UP to PanelIcon.Glyph.ARROW_UP,
+        EditAction.DOWN to PanelIcon.Glyph.ARROW_DOWN,
+        EditAction.LEFT to PanelIcon.Glyph.ARROW_LEFT,
+        EditAction.RIGHT to PanelIcon.Glyph.ARROW_RIGHT,
+    )
+
     override fun onCreateView(context: Context): View {
         val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
@@ -52,6 +61,8 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
                 }
                 if (action == EditAction.TOGGLE_SELECT) selectButton = btn
                 if (action == EditAction.BACKSPACE) KeyIcons.applyBackspace(btn, Palette.current.text)
+                // 方向键用矢量箭头，与键盘上其他功能图标同一套笔画（字体里的 ↑↓←→ 细且各机型不一）
+                ARROWS[action]?.let { GlyphDrawable.apply(btn, it, Palette.current.text) }
                 val gap = (3 * context.resources.displayMetrics.density).toInt()
                 rowView.addView(
                     btn,

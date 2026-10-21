@@ -107,6 +107,31 @@ class MultiTouchTest {
     }
 
     @Test
+    fun secondFingerOnNumberPadSideColumnDoesNotTypeANeighbourKey() {
+        inst.runOnMainSync {
+            val actions = mutableListOf<KeyAction>()
+            val view = newKeyboard(actions)
+            view.setLayer(KeyboardLayer.NUMBER)
+            view.sideSymbols = listOf("+", "-")
+            view.measure(
+                View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(2000, View.MeasureSpec.AT_MOST),
+            )
+            view.layout(0, 0, view.measuredWidth, view.measuredHeight)
+            val five = center(view, "5")
+            // 左列（侧列符号区）与 5 同一行：侧列不是键，以前会命中同行最近的「4」
+            val side = 20f to five.second
+
+            view.onTouchEvent(event(MotionEvent.ACTION_DOWN, Finger(0, five)))
+            view.onTouchEvent(event(pointer(MotionEvent.ACTION_POINTER_DOWN, 1), Finger(0, five), Finger(1, side)))
+            view.onTouchEvent(event(pointer(MotionEvent.ACTION_POINTER_UP, 1), Finger(0, five), Finger(1, side)))
+            view.onTouchEvent(event(MotionEvent.ACTION_UP, Finger(0, five)))
+
+            assertEquals(1, actions.size)
+        }
+    }
+
+    @Test
     fun movesOfAFinishedFingerDoNotCancelTheActiveKey() {
         inst.runOnMainSync {
             val actions = mutableListOf<KeyAction>()

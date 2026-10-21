@@ -10,7 +10,8 @@ import android.widget.PopupWindow
 import android.widget.TextView
 
 /**
- * 按键气泡：按下预览（单字符放大）与长按多字符选择（横移换焦点，抬手上屏）。
+ * 按键气泡：按下预览（单字符放大）、长按多字符选择（横移换焦点，抬手上屏）、
+ * 功能键长按的选项条、上滑副字符的一体式气泡。
  * PopupWindow 关闭裁剪以便伸出 IME 窗口顶部（fcitx5 PopupComponent 同思路）。
  */
 class KeyPopupManager(private val anchor: View) {
@@ -71,11 +72,62 @@ class KeyPopupManager(private val anchor: View) {
         }
     }
 
+    /**
+     * 长按功能键的选项条（如中英键：各方案 + 切换输入法）。与字符气泡同一套横移选择，
+     * 只是格子按文字宽度排（方案名长短不一），初始选中 [selected]。
+     */
+    fun showMenu(keyRect: RectF, labels: List<String>, selected: Int) {
+        dismissAll()
+        if (labels.isEmpty()) return
+        val h = (48 * density).toInt()
+        val pad = (14 * density).toInt()
+        val row = LinearLayout(anchor.context).apply { orientation = LinearLayout.HORIZONTAL }
+        val views = labels.map { label ->
+            bubbleText(label, 15f).also {
+                it.background = null
+                it.maxLines = 1
+            }
+        }
+        var widths = views.mapIndexed { i, v ->
+            maxOf((56 * density).toInt(), v.paint.measureText(labels[i]).toInt() + 2 * pad)
+        }
+        // 方案装得多时一行放不下：均分键盘宽度，字号自动缩到放得下
+        val avail = anchor.width - (16 * density).toInt()
+        if (widths.sum() > avail) {
+            widths = List(views.size) { avail / views.size }
+            for (v in views) {
+                androidx.core.widget.TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+                    v, 9, 15, 1, android.util.TypedValue.COMPLEX_UNIT_SP,
+                )
+                v.setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
+            }
+        }
+        views.forEachIndexed { i, v -> row.addView(v, LinearLayout.LayoutParams(widths[i], h)) }
+        popupItems = views
+        itemRights = widths.runningReduce(Int::plus)
+        row.background = bubbleBackground()
+        val w = itemRights.last()
+        val pos = positionAbove(keyRect, w, h)
+        popupLeft = pos[0]
+        selectedIndex = selected.coerceIn(0, labels.size - 1)
+        highlight()
+        popup = popupWindow(row, w, h).also {
+            it.showAtLocation(anchor, Gravity.NO_GRAVITY, pos[0], pos[1])
+        }
+    }
+
+    /** [showMenu] 的格子右沿（相对条左端，累加）；字符气泡等宽，为空 */
+    private var itemRights: List<Int> = emptyList()
+
     /** 手指横移（anchor 窗口坐标系 x）更新选中项 */
     fun updatePopupSelection(x: Float) {
         if (popupItems.isEmpty()) return
-        selectedIndex = ((x - popupLeft) / itemWidthPx).toInt()
-            .coerceIn(0, popupItems.size - 1)
+        val dx = x - popupLeft
+        selectedIndex = if (itemRights.isNotEmpty()) {
+            itemRights.indexOfFirst { dx < it }.let { if (it < 0) itemRights.lastIndex else it }
+        } else {
+            (dx / itemWidthPx).toInt().coerceIn(0, popupItems.size - 1)
+        }
         highlight()
     }
 
@@ -86,11 +138,64 @@ class KeyPopupManager(private val anchor: View) {
         popup?.dismiss()
         popup = null
         popupItems = emptyList()
+        itemRights = emptyList()
+    }
+
+    // ── 上滑一体式气泡 ───────────────────────────────────────────
+    private var swipeBubble: PopupWindow? = null
+    private var swipeTop: TextView? = null
+    private var swipeMain: TextView? = null
+
+    /**
+     * 上滑副字符的一体式气泡：从键位向上长出一截（下沿与键位齐平、比键略宽），把键整个罩住，
+     * 上半是副字符、下半是主字符——看着是键自己伸长了，而不是另外飘出一个框。
+     * 上滑过阈值时副字符放大变强调色（[setSwipeArmed]），抬手上屏的就是它；退回来恢复。
+     */
+    fun showSwipeBubble(keyRect: RectF, main: String, swipe: String) {
+        dismissAll()
+        val w = (keyRect.width() + 8 * density).toInt()
+        val h = (keyRect.height() * 2 + 4 * density).toInt()
+        val top = bubbleText(swipe, 22f).also { it.background = null }
+        val bottom = bubbleText(main, 18f).also { it.background = null }
+        swipeTop = top
+        swipeMain = bottom
+        val col = LinearLayout(anchor.context).apply {
+            orientation = LinearLayout.VERTICAL
+            background = bubbleBackground()
+            addView(top, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.1f))
+            addView(bottom, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 0.9f))
+        }
+        val loc = IntArray(2)
+        anchor.getLocationInWindow(loc)
+        val x = (loc[0] + keyRect.centerX() - w / 2f).toInt().coerceIn(loc[0], loc[0] + anchor.width - w)
+        val y = (loc[1] + keyRect.bottom + 2 * density - h).toInt()
+        setSwipeArmed(false)
+        swipeBubble = popupWindow(col, w, h).also {
+            it.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
+        }
+    }
+
+    fun setSwipeArmed(armed: Boolean) {
+        val p = Palette.current
+        swipeTop?.apply {
+            setTextColor(if (armed) p.accentText else p.hint)
+            textSize = if (armed) 28f else 22f
+            typeface = if (armed) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+        }
+        swipeMain?.setTextColor(if (armed) p.hint else p.text)
+    }
+
+    private fun dismissSwipeBubble() {
+        swipeBubble?.dismiss()
+        swipeBubble = null
+        swipeTop = null
+        swipeMain = null
     }
 
     fun dismissAll() {
         dismissPreview()
         dismissPopup()
+        dismissSwipeBubble()
     }
 
     // ── 内部 ─────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.core.suspendsLearning
 import com.windinput.ime.keyboard.HardwareKeys
+import com.windinput.ime.keyboard.ToolbarItem
 import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.CandidateBarView
@@ -91,9 +92,8 @@ class WindInputImeService :
     /** 剪贴板建议条开关（设置项 ui.android.clip_suggestion） */
     private var clipSuggestionEnabled = true
 
-    /** 英文输入三个开关（设置项 ui.android.auto_cap / double_space_period / auto_space） */
+    /** 英文输入两个开关（设置项 ui.android.auto_cap / auto_space） */
     private var autoCapEnabled = true
-    private var doubleSpacePeriod = true
     private var autoSpaceEnabled = true
 
     /**
@@ -101,9 +101,6 @@ class WindInputImeService :
      * （`word ` + `.` → `word. `），否则就成了「word .」。按了别的键即作废。
      */
     private var autoSpaced = false
-
-    /** 上一次按空格的时刻，双击空格出句号用；按了别的键清零 */
-    private var lastSpaceAt = 0L
 
     private lateinit var layoutRepository: LayoutRepository
     private lateinit var userConfig: UserConfig
@@ -285,6 +282,10 @@ class WindInputImeService :
         /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
         const val ENGLISH_SCHEMA_ID = "english"
 
+        /** 中英键长按里的「切换输入法」（选项条最后一项、卡片最后一格） */
+        const val SWITCH_IME_LABEL = "切换输入法"
+        const val ACTION_SWITCH_IME = "switch_ime"
+
         /** 英文切回中文时，找不到切走前的方案（首次安装就在英文里）就回出厂默认方案 */
         const val DEFAULT_CHINESE_SCHEMA_ID = "wubi86"
         const val KEY_LAST_CHINESE = "last_chinese_schema"
@@ -302,6 +303,9 @@ class WindInputImeService :
          */
         val SPLIT_SCHEMAS = setOf("pinyin")
 
+        /** 不是码表的方案：临时拼音对它们没有意义 */
+        val NON_CODETABLE_SCHEMAS = setOf("pinyin", "shuangpin", "english")
+
         /**
          * 九宫格数字键盘左列的符号（可上下滚动）。数字框放算式和常见分隔符；
          * 电话框放拨号会用到的 `* # +` 和分隔用的 `- ( )`，`,` `;` 是拨号里的暂停 / 等待。
@@ -311,9 +315,6 @@ class WindInputImeService :
 
         /** 英文里紧跟单词、后面该带空格的标点（自动补的空格遇到它们要挪到后面） */
         val AUTO_SPACE_PUNCT = setOf('.', ',', '?', '!', ';', ':')
-
-        /** 双击空格出句号：两下空格的最大间隔 */
-        const val DOUBLE_SPACE_MS = 600L
 
         /**
          * 每次按键预取的候选条数。
@@ -387,19 +388,37 @@ class WindInputImeService :
      * 应用收到的就是普通按键。
      */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (!directInput && currentInputConnection != null) {
-            if (keyCode == KeyEvent.KEYCODE_ESCAPE && composing) {
-                session.reset()
-                consumedHardKeys += keyCode
-                return true
-            }
-            val mapped = HardwareKeys.map(keyCode, event.getUnicodeChar(event.metaState), event.metaState)
-            if (mapped != null && session.keyPressed(mapped.action, mapped.shifted)) {
-                consumedHardKeys += keyCode
-                return true
-            }
+        // 只露条区的模式下空闲时屏幕上什么都没有，但窗口在系统眼里是「显示着」的：
+        // 交给基类会把这一下返回当成「收起输入法」吃掉，用户得按两下才退得出页面
+        if (keyCode == KeyEvent.KEYCODE_BACK && hardKeyboardOnly && !composing) return false
+        // 一次按压归谁，在首次按下时定；按住产生的重复按下沿用，不能半途换手——
+        // 否则按住退格删完编码后，应用收到的是一串没有首次按下、也没有抬起的重复事件
+        if (event.repeatCount > 0) {
+            if (keyCode !in consumedHardKeys) return super.onKeyDown(keyCode, event)
+            hardKeyToEngine(keyCode, event)
+            return true
+        }
+        if (hardKeyToEngine(keyCode, event)) {
+            consumedHardKeys += keyCode
+            return true
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    /** @return 引擎是否接了这个键 */
+    private fun hardKeyToEngine(keyCode: Int, event: KeyEvent): Boolean {
+        if (directInput || currentInputConnection == null) return false
+        // 输入法完全不可见（软键盘被收起，又不在只露条区的模式）：编码与候选无处显示，
+        // 按键原样给应用，好过敲出一串看不见的编码
+        if (!hardKeyboardOnly && !isInputViewShown) return false
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE) {
+            if (!composing) return false
+            abandonComposition()
+            return true
+        }
+        val mapped = HardwareKeys.map(keyCode, event.getUnicodeChar(event.metaState), event.metaState)
+            ?: return false
+        return engineKey(mapped.action, mapped.shifted)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
@@ -416,9 +435,25 @@ class WindInputImeService :
         } else {
             userConfig.getInt("ui.android.row_height_landscape", 44)
         }
-        // 条区跟着收：横屏 60dp 的条区加四行键就占去七成屏高，正文只剩两三行
-        KeyboardDimens.barPreeditDp = if (portrait) 20f else 16f
-        KeyboardDimens.barMainRowDp = if (portrait) 40f else 34f
+        val (preedit, main) = barDims()
+        KeyboardDimens.barPreeditDp = preedit
+        KeyboardDimens.barMainRowDp = main
+    }
+
+    /**
+     * 条区两段高度（编码行, 候选/工具栏行）。横屏跟着收：60dp 的条区加四行键就占去七成屏高。
+     * 编码写在输入框里（ui.android.inline_preedit）时**不要编码行**：编码只出现在一处，
+     * 两处都写是重复（真机反馈），条区也因此矮一截。
+     */
+    private fun barDims(): Pair<Float, Float> {
+        val portrait =
+            resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+        val preedit = when {
+            userConfig.getBoolean("ui.android.inline_preedit", false) -> 0f
+            portrait -> 16f
+            else -> 14f
+        }
+        return preedit to (if (portrait) 38f else 32f)
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
@@ -427,6 +462,10 @@ class WindInputImeService :
         // 先定学习开关再给焦点：焦点一到，引擎就可能开始记东西
         fieldSuspendsLearning = suspendsLearning(attribute?.inputType ?: 0, attribute?.imeOptions ?: 0)
         applyLearningSuspended()
+        // 密码框直输在这里就要定：接物理键盘时窗口可能根本不弹，onStartInputView 不来，
+        // 只在那里判的话会沿用上一个输入框的结论
+        directInput = isPasswordField(attribute)
+        consumedHardKeys.clear()
         refreshHardKeyboardOnly()
         session.focusGained()
     }
@@ -435,7 +474,10 @@ class WindInputImeService :
         super.onStartInputView(info, restarting)
         // 配色核对：视图是按构造那一刻的深浅色画的，系统没发配置变更时不会重建。
         // 对不上（刚装好时拿到了旧配置、或设置页改了深浅色）就当场重建整个输入视图。
-        if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current) {
+        // 条区高度同理：设置页切了编码显示方式，要按新高度重建
+        if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current ||
+            barDims() != (KeyboardDimens.barPreeditDp to KeyboardDimens.barMainRowDp)
+        ) {
             setInputView(onCreateInputView())
         }
         session.candidateComments = userConfig.getBoolean("ui.android.candidate_comment", true)
@@ -448,7 +490,7 @@ class WindInputImeService :
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
             longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)
             spaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_space_cursor", true)
-            spaceLongPressEnabled = userConfig.getString("ui.android.space_long_press", "switch_ime") != "none"
+            spaceLongPressEnabled = userConfig.getString("ui.android.space_long_press", "none") != "none"
             backspaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
             swipeSymbolsEnabled = userConfig.getBoolean("ui.android.gesture_swipe_symbols", true)
             showSwipeHints = userConfig.getBoolean("ui.android.show_swipe_hints", true)
@@ -457,14 +499,13 @@ class WindInputImeService :
         barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 19).toFloat()
         // 输入视图可能刚重建（配色变了），无痕标记跟着重设
         barView?.setIncognito(manualIncognito || fieldSuspendsLearning)
+        barView?.setPinned(visiblePins())
         clipSuggestionEnabled = userConfig.getBoolean("ui.android.clip_suggestion", true)
         inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
         autoCapEnabled = userConfig.getBoolean("ui.android.auto_cap", true)
-        doubleSpacePeriod = userConfig.getBoolean("ui.android.double_space_period", true)
         autoSpaceEnabled = userConfig.getBoolean("ui.android.auto_space", true)
         selecting = false
         autoSpaced = false
-        lastSpaceAt = 0L
         applyGaps()
         windowManager?.showKeyboard()
         applyEditorScene(info)
@@ -610,21 +651,27 @@ class WindInputImeService :
     }
 
     override fun onFinishInput() {
+        consumedHardKeys.clear()
         session.focusLost()
         super.onFinishInput()
+    }
+
+    private fun isPasswordField(info: EditorInfo?): Boolean {
+        val inputType = info?.inputType ?: 0
+        return (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT &&
+            (inputType and InputType.TYPE_MASK_VARIATION) in setOf(
+                InputType.TYPE_TEXT_VARIATION_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
+                InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
+            )
     }
 
     /** EditorInfo 场景感知：密码框直输、数字/电话框初始切符号层 */
     private fun applyEditorScene(info: EditorInfo?) {
         val inputType = info?.inputType ?: 0
         val clazz = inputType and InputType.TYPE_MASK_CLASS
-        val variation = inputType and InputType.TYPE_MASK_VARIATION
 
-        directInput = clazz == InputType.TYPE_CLASS_TEXT && variation in setOf(
-            InputType.TYPE_TEXT_VARIATION_PASSWORD,
-            InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD,
-            InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD,
-        )
+        directInput = isPasswordField(info)
         if (directInput) {
             session.reset()
         }
@@ -646,8 +693,10 @@ class WindInputImeService :
      * 空格上一直是空的。
      */
     private fun refreshSchemaKeys() {
-        val english = modeLabel == "英"
         val active = session.schemas().firstOrNull { it.active }
+        // 切到英文方案时，方案列表先变、模式短称后到：只看短称的话中间那一下空格上写的是
+        // 英文方案自己的名字（「清风英文」），随即又变「英文」——看着就是闪一下
+        val english = modeLabel == "英" || active?.id == ENGLISH_SCHEMA_ID
         // ⚠ 别写成 keyboardView.apply { modeLabel = modeLabel }：块内的 modeLabel
         // 解析成视图自己的属性，等于自赋值，英文模式永远进不去
         keyboardWindow?.keyboardView?.let { kv ->
@@ -670,6 +719,8 @@ class WindInputImeService :
         when (event) {
             is UiEvent.Edits -> applyEdits(ic ?: return, event.ops)
             is UiEvent.Candidates -> {
+                // 引擎推来真候选：条区不再是符号页的历史
+                symbolHistoryInBar = false
                 // 推送帧只用来画编码栏（编码/短称/页码）；候选列表另行**拉取**——
                 // 帧里的是当页 6~9 条，装不下一条可滚动的长列表。
                 val page = if (event.items.isEmpty()) {
@@ -800,6 +851,32 @@ class WindInputImeService :
 
     // ── 键盘回调 ─────────────────────────────────────────────────
 
+    /**
+     * 文字/空格/退格/回车键进引擎，连同引擎前后的宿主侧处理（英文自动空格、双空格句号计时）。
+     * 软键（[onKeyAction]）与物理键（[onKeyDown]）共用：两条路的宿主侧行为必须一致。
+     * @return true = 已处理；false = 引擎不接，调用方走默认行为
+     */
+    private fun engineKey(action: KeyAction, shifted: Boolean): Boolean {
+        val english = modeLabel == "英" && !directInput
+        // 自动补的空格遇到句末标点：挪到标点后面（`word ` + `.` → `word. `）
+        val ch = (action as? KeyAction.Text)?.char
+        if (english && autoSpaced && !composing && ch != null && ch in AUTO_SPACE_PUNCT) {
+            val ic = currentInputConnection ?: return true
+            if (ic.getTextBeforeCursor(1, 0) == " ") ic.deleteSurroundingText(1, 0)
+            ic.commitText("$ch ", 1)
+            return true
+        }
+        autoSpaced = false
+        val composingBefore = composing
+        // 联想态（没有编码、候选条上是联想）按空格：两家都是收起联想、出空格，不选联想词。
+        // 这由核心的移动端强制项 `input.association.space_commits = false` 保证（wind-mobile
+        // `apply_mobile_overrides`，重载配置后也会再套上）：引擎收起联想、自己出那个空格。
+        if (directInput || !session.keyPressed(action, shifted)) return false
+        // 英文方案：有编码时空格上屏原文（引擎只出词本身），这里补上词后的空格
+        if (action == KeyAction.Space && english && composingBefore) commitAutoSpace()
+        return true
+    }
+
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {
         // 中英切换 / 表情键是宿主侧动作，不走引擎按键路径
         if (action == KeyAction.SwitchLang) {
@@ -818,34 +895,18 @@ class WindInputImeService :
             commitDirect(action.text)
             return
         }
-        val english = modeLabel == "英" && !directInput
-        if (action != KeyAction.Space) lastSpaceAt = 0L
-        // 自动补的空格遇到句末标点：挪到标点后面（`word ` + `.` → `word. `）
-        val ch = (action as? KeyAction.Text)?.char
-        if (english && autoSpaced && !composing && ch != null && ch in AUTO_SPACE_PUNCT) {
-            val ic = currentInputConnection ?: return
-            if (ic.getTextBeforeCursor(1, 0) == " ") ic.deleteSurroundingText(1, 0)
-            ic.commitText("$ch ", 1)
-            return
-        }
-        autoSpaced = false
-        val composingBefore = composing
-        // 联想态（没有编码、候选条上是联想）按空格：两家都是收起联想、出空格，不选联想词。
-        // 这由核心的移动端强制项 `input.association.space_commits = false` 保证（wind-mobile
-        // `apply_mobile_overrides`，重载配置后也会再套上）：引擎收起联想、自己出那个空格。
-        if (!directInput && session.keyPressed(action, shifted)) {
-            if (action == KeyAction.Space) {
-                if (english && composingBefore) {
-                    // 英文方案：有编码时空格上屏原文（引擎只出词本身），这里补上词后的空格
-                    lastSpaceAt = android.os.SystemClock.uptimeMillis()
-                    commitAutoSpace()
-                } else if (!composingBefore) {
-                    // 联想态的空格由引擎出：照样记下时间，下一下空格才能换成「。」
-                    lastSpaceAt = android.os.SystemClock.uptimeMillis()
-                }
+        // 软键盘上打出的数字（上滑、123 层）不选候选：触屏上点候选比上滑出数字顺手得多，
+        // 打数字就是要数字。有编码先把首选上屏再出数字（同打标点）；联想态先收起联想。
+        // 只有物理键盘的数字仍按电脑的习惯选候选（那条路走 onKeyDown，不经这里）
+        val digit = (action as? KeyAction.Text)?.char?.takeIf { it in '0'..'9' }
+        if (digit != null && !directInput && loadedCandidates.isNotEmpty()) {
+            if (composing) {
+                commitDirect(digit.toString())
+                return
             }
-            return
+            session.reset()
         }
+        if (engineKey(action, shifted)) return
         val ic = currentInputConnection
         if (ic == null) {
             android.util.Log.w(TAG, "默认行为无法执行：currentInputConnection 为 null action=$action")
@@ -856,12 +917,7 @@ class WindInputImeService :
                 val ch = if (shifted) action.char.uppercaseChar() else action.char
                 ic.commitText(ch.toString(), 1)
             }
-            KeyAction.Space -> {
-                if (directInput || !doubleSpacePeriod || !tryDoubleSpacePeriod(ic)) {
-                    ic.commitText(" ", 1)
-                    lastSpaceAt = android.os.SystemClock.uptimeMillis()
-                }
-            }
+            KeyAction.Space -> ic.commitText(" ", 1)
             KeyAction.Backspace -> sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             // 与 enterActionLabel 共用 enterPerformsAction：键面写什么，按下就做什么
             KeyAction.Enter -> {
@@ -988,6 +1044,13 @@ class WindInputImeService :
     }
 
     override fun onCandidateSelected(index: Int) {
+        if (symbolHistoryInBar) {
+            loadedCandidates.getOrNull(index)?.let {
+                recentSymbolStore.record(it)
+                commitDirect(it)
+            }
+            return
+        }
         val english = modeLabel == "英" && !directInput && composing
         session.candidateSelected(index)
         if (english) commitAutoSpace()
@@ -998,25 +1061,6 @@ class WindInputImeService :
         if (!autoSpaceEnabled) return
         currentInputConnection?.commitText(" ", 1)
         autoSpaced = true
-    }
-
-    /**
-     * 双击空格：光标前是「字 + 空格」且两次空格间隔够短，就把那个空格换成句号——
-     * 英文出「. 」（后面接着打下一句），中文出「。」（中文句号后不加空格）。
-     * 换完清零计时，第三下空格就是普通空格，不会连环换。
-     */
-    private fun tryDoubleSpacePeriod(ic: android.view.inputmethod.InputConnection): Boolean {
-        if (android.os.SystemClock.uptimeMillis() - lastSpaceAt > DOUBLE_SPACE_MS) return false
-        val before = ic.getTextBeforeCursor(2, 0) ?: return false
-        if (before.length < 2 || before[1] != ' ' || !Character.isLetterOrDigit(before[0])) return false
-        val english = modeLabel == "英"
-        ic.beginBatchEdit()
-        ic.deleteSurroundingText(1, 0)
-        ic.commitText(if (english) ". " else "。", 1)
-        ic.endBatchEdit()
-        lastSpaceAt = 0L
-        autoSpaced = english
-        return true
     }
 
     /**
@@ -1116,7 +1160,7 @@ class WindInputImeService :
             // 长按空格：切输入法（Gboard 的习惯）或语音（豆包、搜狗的习惯），见设置「长按空格」。
             // 有编码时先丢掉——不然弹出系统选择框回来，编码还悬在条区上
             abandonComposition()
-            when (userConfig.getString("ui.android.space_long_press", "switch_ime")) {
+            when (userConfig.getString("ui.android.space_long_press", "none")) {
                 "voice" -> if (voiceInputAvailable()) onVoiceInput() else onSwitchInputMethod()
                 "switch_ime" -> onSwitchInputMethod()
             }
@@ -1166,33 +1210,76 @@ class WindInputImeService :
         if (bar.width <= 0) return false
         val schemas = session.schemas()
         if (schemas.isEmpty()) return false
-        val english = modeLabel == "英"
-        val entries = schemas.map { s ->
-            // 英文模式下引擎报的 active 仍是切走前的中文方案，勾要打在英文上
-            val current = if (english) s.id == ENGLISH_SCHEMA_ID else s.active && s.id != ENGLISH_SCHEMA_ID
+        val current = currentSchemaIndex(schemas)
+        val entries = schemas.mapIndexed { i, s ->
             com.windinput.ime.core.CandidateMenuEntry(
-                label = (if (current) "✓ " else "") + s.name.ifEmpty { s.id },
+                label = s.name.ifEmpty { s.id },
                 action = s.index.toString(),
-                enabled = !current,
+                enabled = i != current,
+                current = i == current,
             )
-        }
+        } + com.windinput.ime.core.CandidateMenuEntry(SWITCH_IME_LABEL, ACTION_SWITCH_IME, enabled = true)
         candidateMenu?.dismiss()
         schemaPicker?.dismiss()
         schemaPicker = CandidateMenuPopup(bar).also { menu ->
             menu.show(title, entries, dismissOnOutside) { entry ->
-                val target = schemas.firstOrNull { it.index.toString() == entry.action } ?: return@show
-                if (target.id != ENGLISH_SCHEMA_ID) {
-                    statePrefs.edit().putString(KEY_LAST_CHINESE, target.id).apply()
-                } else {
-                    schemas.firstOrNull { it.active && it.id != ENGLISH_SCHEMA_ID }
-                        ?.let { statePrefs.edit().putString(KEY_LAST_CHINESE, it.id).apply() }
+                if (entry.action == ACTION_SWITCH_IME) {
+                    onSwitchInputMethod()
+                    return@show
                 }
-                // 与单击中英键一致：有编码先上屏字母原文再切，打了半截的码不吞掉
-                if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
-                session.runCommand(EngineCmd.SelectSchema(target.index))
+                schemas.firstOrNull { it.index.toString() == entry.action }?.let { selectSchemaFromKey(schemas, it) }
             }
         }
         return schemaPicker?.isShowing == true
+    }
+
+    /** 方案列表里「当前」那项的下标。英文模式下引擎报的 active 仍是切走前的中文方案，当前要算英文 */
+    private fun currentSchemaIndex(schemas: List<SchemaEntry>): Int {
+        val english = modeLabel == "英"
+        return schemas.indexOfFirst {
+            if (english) it.id == ENGLISH_SCHEMA_ID else it.active && it.id != ENGLISH_SCHEMA_ID
+        }
+    }
+
+    /** 从中英键（卡片或长按选项条）选中一个方案 */
+    private fun selectSchemaFromKey(schemas: List<SchemaEntry>, target: SchemaEntry) {
+        if (target.id != ENGLISH_SCHEMA_ID) {
+            statePrefs.edit().putString(KEY_LAST_CHINESE, target.id).apply()
+        } else {
+            schemas.firstOrNull { it.active && it.id != ENGLISH_SCHEMA_ID }
+                ?.let { statePrefs.edit().putString(KEY_LAST_CHINESE, it.id).apply() }
+        }
+        // 与单击中英键一致：有编码先上屏字母原文再切，打了半截的码不吞掉
+        if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
+        session.runCommand(EngineCmd.SelectSchema(target.index))
+    }
+
+    /**
+     * 长按中英键、手指不抬：键上方弹选项条（各方案 + 切换输入法），横移选、抬手定。
+     * 「切换输入法」原来在长按空格上，归到这里——它和切方案是同一类事（换一种打字方式）。
+     */
+    override fun longPressOptions(action: KeyAction): KeyboardView.KeyOptions? {
+        if (action != KeyAction.SwitchLang) return null
+        val schemas = session.schemas()
+        if (schemas.isEmpty()) return null
+        return KeyboardView.KeyOptions(
+            labels = schemas.map { it.name.ifEmpty { it.id } } + SWITCH_IME_LABEL,
+            selected = currentSchemaIndex(schemas).coerceAtLeast(0),
+        )
+    }
+
+    /** 选项条抬手：滑到哪项就是哪项；没滑走（停在当前方案）就换成可点的方案卡片，抬手后再点着选 */
+    override fun onLongPressOption(action: KeyAction, index: Int?) {
+        if (action != KeyAction.SwitchLang) return
+        val schemas = session.schemas()
+        when {
+            index == null -> onKeyLongPress(action)
+            index >= schemas.size -> {
+                abandonComposition()
+                onSwitchInputMethod()
+            }
+            else -> selectSchemaFromKey(schemas, schemas[index])
+        }
     }
 
     /** 空格滑动移光标 */
@@ -1260,6 +1347,59 @@ class WindInputImeService :
     }
 
     override fun onOpenSettings() = openSettings()
+
+    // ── 工具栏常驻按钮（快捷面板「编辑工具栏」里挑）──────────────────
+
+    override fun toolbarPins(): List<ToolbarItem> =
+        ToolbarItem.parse(userConfig.getString(ToolbarItem.CONFIG_KEY, ToolbarItem.DEFAULT_PINS))
+
+    override fun onToolbarPinsChanged(pins: List<ToolbarItem>) {
+        userConfig.put(ToolbarItem.CONFIG_KEY, ToolbarItem.format(pins))
+        barView?.setPinned(visiblePins())
+    }
+
+    /** 实际摆上工具栏的：没有语音输入法时不摆语音，当前方案进不了临时拼音时不摆它 */
+    private fun visiblePins(): List<ToolbarItem> = toolbarPins().filter {
+        when (it) {
+            ToolbarItem.VOICE -> voiceInputAvailable()
+            ToolbarItem.TEMP_PINYIN -> tempPinyinAvailable()
+            else -> true
+        }
+    }
+
+    /** 临时拼音是码表方案（五笔）里临时打一个拼音；拼音、双拼、英文方案用不上 */
+    override fun tempPinyinAvailable(): Boolean {
+        val active = session.schemas().firstOrNull { it.active } ?: return false
+        return modeLabel != "英" && active.id !in NON_CODETABLE_SCHEMAS
+    }
+
+    override fun onToolbarItemFromPanel(item: ToolbarItem) {
+        windowManager?.showKeyboard()
+        onToolbarItem(item)
+    }
+
+    override fun onToolbarItem(item: ToolbarItem) {
+        when (item) {
+            ToolbarItem.CLIPBOARD -> onOpenPanel(QuickPanelWindow.Target.CLIPBOARD)
+            ToolbarItem.TEXT_EDIT -> onOpenPanel(QuickPanelWindow.Target.TEXT_EDIT)
+            ToolbarItem.EMOJI -> onOpenPanel(QuickPanelWindow.Target.EMOJI)
+            ToolbarItem.VOICE -> onVoiceInput()
+            ToolbarItem.SWITCH_IME -> onSwitchInputMethod()
+            ToolbarItem.SETTINGS -> onOpenSettings()
+            ToolbarItem.ONE_HAND -> onToggleOneHand()
+            ToolbarItem.INCOGNITO -> onToggleIncognito()
+            // 替用户按一下引导键（电脑上空码时按 ` / ; 进这两个模式），引擎侧行为一致。
+            // 有编码先上屏首选：引导键只在空码时生效
+            ToolbarItem.TEMP_PINYIN -> sendLeadKey('`')
+            ToolbarItem.QUICK_INPUT -> sendLeadKey(';')
+        }
+    }
+
+    private fun sendLeadKey(key: Char) {
+        if (directInput) return
+        if (composing) commitDirect("")
+        engineKey(KeyAction.Text(key), shifted = false)
+    }
 
     /**
      * 系统输入法选择器。`switchToNextInputMethod` 是盲切，用户看不到切去了哪个；
@@ -1504,6 +1644,31 @@ class WindInputImeService :
 
     override fun onSymbolSelected(symbol: String) {
         commitDirect(symbol)
+    }
+
+    /** 符号页开着时条区候选行放最近用过的符号（点了直接上屏）；为 false 时条区照常 */
+    private var symbolHistoryInBar = false
+
+    /**
+     * 符号页打开：没在打字时，把最近用过的符号摆进条区的候选行——符号页的「常用」里它们
+     * 也排在前面，但候选行一眼就看得到、不用翻页。收起符号页时还原。
+     */
+    override fun onSymbolPageShown(shown: Boolean) {
+        if (shown) {
+            if (composing) return
+            val recent = recentSymbolStore.list()
+            if (recent.isEmpty()) return
+            symbolHistoryInBar = true
+            loadedCandidates = recent
+            loadedComments = emptyList()
+            candidateTotal = recent.size
+            barView?.setCandidateFrame(recent, preedit = "", modeLabel = "", page = 1, totalPages = 1)
+        } else if (symbolHistoryInBar) {
+            symbolHistoryInBar = false
+            loadedCandidates = emptyList()
+            candidateTotal = 0
+            barView?.setCandidateFrame(emptyList(), preedit = "", modeLabel = "", page = 1, totalPages = 1)
+        }
     }
 
     override fun onSymbolBackspace() {

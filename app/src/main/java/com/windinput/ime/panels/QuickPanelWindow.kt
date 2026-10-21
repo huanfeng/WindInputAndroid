@@ -13,6 +13,8 @@ import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.Palette
+import com.windinput.ime.keyboard.PanelIcon
+import com.windinput.ime.keyboard.ToolbarItem
 
 /**
  * 快捷功能面板：主流输入法「更多」页的形态——**方案一行 + 4 列图标格子**。
@@ -65,6 +67,18 @@ class QuickPanelWindow(
 
         /** 单手模式开关：打开到上次那一侧，再点关掉 */
         fun onToggleOneHand()
+
+        /** 工具栏上常驻的按钮（顺序即排列） */
+        fun toolbarPins(): List<ToolbarItem>
+
+        /** 编辑工具栏后保存 */
+        fun onToolbarPinsChanged(pins: List<ToolbarItem>)
+
+        /** 当前方案能进临时拼音（码表方案） */
+        fun tempPinyinAvailable(): Boolean
+
+        /** 面板里点了一个也能常驻工具栏的入口（临时拼音 / 快捷输入），与工具栏上点它同一处理 */
+        fun onToolbarItemFromPanel(item: ToolbarItem)
     }
 
     enum class Target { EMOJI, CLIPBOARD, TEXT_EDIT }
@@ -78,6 +92,14 @@ class QuickPanelWindow(
     }
 
     private var schemaRow: LinearLayout? = null
+
+    /**
+     * 编辑工具栏中：能常驻的格子右上角出图钉（实心 = 已常驻），点格子改为切换常驻，
+     * 不能常驻的格子（中文标点等开关）变淡、点了无效。顶栏右侧「编辑工具栏 / 完成」切换。
+     */
+    private var editingPins = false
+    private var editButton: TextView? = null
+    private var editHint: TextView? = null
     private var tileGrid: GridLayout? = null
     private var status: UiEvent.Status? = null
 
@@ -96,6 +118,20 @@ class QuickPanelWindow(
             schemas,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(38)).apply {
                 bottomMargin = dp(10)
+            },
+        )
+
+        val hint = TextView(context).apply {
+            text = "点带图钉的格子，选常驻在工具栏上的按钮（最多 ${ToolbarItem.MAX_PINS} 个）"
+            textSize = 12f
+            setTextColor(Palette.current.hint)
+            visibility = View.GONE
+        }
+        editHint = hint
+        column.addView(
+            hint,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(8)
             },
         )
 
@@ -118,12 +154,35 @@ class QuickPanelWindow(
             isVerticalScrollBarEnabled = false
             addView(column)
         }
+        val edit = PanelScaffold.headerButton(context, "编辑工具栏") { setEditing(context, !editingPins) }
+        editButton = edit
         return PanelScaffold.build(
             context = context,
             title = "快捷功能",
             onBack = listener::onBackToKeyboard,
             content = scroll,
+            rightView = edit,
         )
+    }
+
+    private fun setEditing(context: Context, on: Boolean) {
+        editingPins = on
+        editButton?.text = if (on) "完成" else "编辑工具栏"
+        editHint?.visibility = if (on) View.VISIBLE else View.GONE
+        rebuildTiles(context)
+    }
+
+    /** 离开面板就退出编辑：下次进来是正常的快捷面板 */
+    override fun onDetached() {
+        val ctx = schemaRow?.context ?: return
+        if (editingPins) setEditing(ctx, false)
+    }
+
+    private fun togglePin(context: Context, item: ToolbarItem) {
+        val pins = listener.toolbarPins()
+        val next = if (item in pins) pins - item else (pins + item).take(ToolbarItem.MAX_PINS)
+        listener.onToolbarPinsChanged(next)
+        rebuildTiles(context)
     }
 
     /**
@@ -181,8 +240,18 @@ class QuickPanelWindow(
         grid.removeAllViews()
         val st = status
         val tiles = mutableListOf<View>()
-        fun add(icon: String, label: String, selected: Boolean? = null, onClick: () -> Unit) {
-            tiles += tile(context, icon, label, selected, onClick)
+        val pins = listener.toolbarPins()
+
+        /**
+         * [icon]：字（「，」「Ａ」这类本身就是字符的）或矢量图标 [PanelIcon.Glyph]。
+         * [pin]：这一格能常驻工具栏时对应的项（编辑工具栏时据此出图钉）
+         */
+        fun add(icon: Any, label: String, selected: Boolean? = null, pin: ToolbarItem? = null, onClick: () -> Unit) {
+            tiles += when {
+                !editingPins -> tile(context, icon, label, selected, null, onClick)
+                pin == null -> tile(context, icon, label, selected, null) {}.apply { alpha = 0.35f }
+                else -> tile(context, icon, label, selected, pin in pins) { togglePin(context, pin) }
+            }
         }
         add("，", "中文标点", selected = st?.chinesePunct ?: true) {
             listener.onQuickCommand(EngineCmd.TogglePunct)
@@ -199,20 +268,25 @@ class QuickPanelWindow(
         // 无痕是键盘自己的状态（引擎只管「这次学不学」），选中态取本端，不等引擎推送。
         // 选中态显示**实际**是否无痕：密码框里条区亮着「🕶 无痕」，这格却灭着，就对不上了
         val forced = listener.incognitoForced()
-        add("🕶", if (forced) "无痕·本框" else "无痕", selected = listener.incognito() || forced) {
+        add(PanelIcon.Glyph.INCOGNITO, if (forced) "无痕·本框" else "无痕", selected = listener.incognito() || forced, pin = ToolbarItem.INCOGNITO) {
             listener.onToggleIncognito()
             rebuildTiles(context)
         }
-        add("😀", "表情") { listener.onOpenPanel(Target.EMOJI) }
-        add("📋", "剪贴板") { listener.onOpenPanel(Target.CLIPBOARD) }
-        add("✂", "文本编辑") { listener.onOpenPanel(Target.TEXT_EDIT) }
-        if (listener.voiceInputAvailable()) {
-            add("🎤", "语音输入") { listener.onVoiceInput() }
+        // 临时拼音只对码表方案（五笔）有意义：拼音方案本来就在打拼音
+        if (listener.tempPinyinAvailable()) {
+            add("拼", "临时拼音", pin = ToolbarItem.TEMP_PINYIN) { listener.onToolbarItemFromPanel(ToolbarItem.TEMP_PINYIN) }
         }
-        add("🌐", "切换输入法") { listener.onSwitchInputMethod() }
-        add("⚙", "设置") { listener.onOpenSettings() }
+        add(";", "快捷输入", pin = ToolbarItem.QUICK_INPUT) { listener.onToolbarItemFromPanel(ToolbarItem.QUICK_INPUT) }
+        add(PanelIcon.Glyph.EMOJI, "表情", pin = ToolbarItem.EMOJI) { listener.onOpenPanel(Target.EMOJI) }
+        add(PanelIcon.Glyph.CLIPBOARD, "剪贴板", pin = ToolbarItem.CLIPBOARD) { listener.onOpenPanel(Target.CLIPBOARD) }
+        add(PanelIcon.Glyph.TEXT_EDIT, "文本编辑", pin = ToolbarItem.TEXT_EDIT) { listener.onOpenPanel(Target.TEXT_EDIT) }
+        if (listener.voiceInputAvailable()) {
+            add(PanelIcon.Glyph.MIC, "语音输入", pin = ToolbarItem.VOICE) { listener.onVoiceInput() }
+        }
+        add(PanelIcon.Glyph.GLOBE, "切换输入法", pin = ToolbarItem.SWITCH_IME) { listener.onSwitchInputMethod() }
+        add(PanelIcon.Glyph.SETTINGS, "设置", pin = ToolbarItem.SETTINGS) { listener.onOpenSettings() }
         // 放最后：插在中间会把后面各格整体挪一位，老用户的肌肉记忆（与按位置点的测试）全乱
-        add("🤚", "单手", selected = listener.oneHand()) {
+        add(PanelIcon.Glyph.ONE_HAND, "单手", selected = listener.oneHand(), pin = ToolbarItem.ONE_HAND) {
             listener.onToggleOneHand() // 选中态由 Service 改完配置后经 refresh 重画
         }
         val heightPx = tileHeightPx(context, rows = (tiles.size + COLUMNS - 1) / COLUMNS)
@@ -245,29 +319,45 @@ class QuickPanelWindow(
      */
     private fun tile(
         context: Context,
-        icon: String,
+        icon: Any,
         label: String,
         selected: Boolean?,
+        pinned: Boolean?,
         onClick: () -> Unit,
     ): View {
         val density = context.resources.displayMetrics.density
         val p = Palette.current
         val on = selected == true
-        return LinearLayout(context).apply {
+        val body = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
                 cornerRadius = 10 * density
                 setColor(if (on) p.accent else p.key)
             }
-            addView(
-                TextView(context).apply {
-                    text = icon
-                    textSize = 20f
-                    gravity = Gravity.CENTER
-                    setTextColor(if (on) p.onAccent else p.text)
-                },
-            )
+            val fg = if (on) p.onAccent else p.text
+            if (icon is PanelIcon.Glyph) {
+                // 矢量图标而不是 emoji：emoji 各机型长相不一、颜色写死，跟着选中态变不了色
+                val size = (28 * density).toInt()
+                addView(
+                    PanelIcon(context).apply {
+                        glyph = icon
+                        tint = fg
+                        scale = 0.86f
+                        decorative = true
+                    },
+                    LinearLayout.LayoutParams(size, size),
+                )
+            } else {
+                addView(
+                    TextView(context).apply {
+                        text = icon.toString()
+                        textSize = 20f
+                        gravity = Gravity.CENTER
+                        setTextColor(fg)
+                    },
+                )
+            }
             addView(
                 TextView(context).apply {
                     text = label
@@ -280,7 +370,27 @@ class QuickPanelWindow(
             )
             setOnClickListener { onClick() }
         }
+        if (pinned == null) return body
+        // 编辑工具栏：右上角图钉，实心 = 已常驻
+        val badge = (18 * density).toInt()
+        return android.widget.FrameLayout(context).apply {
+            addView(body, android.widget.FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(
+                PanelIcon(context).apply {
+                    glyph = if (pinned) PanelIcon.Glyph.PIN else PanelIcon.Glyph.PIN_OUTLINE
+                    tint = if (pinned) p.accentText else p.hint
+                    scale = 0.9f
+                    decorative = true
+                },
+                android.widget.FrameLayout.LayoutParams(badge, badge, Gravity.TOP or Gravity.END).apply {
+                    topMargin = (3 * density).toInt()
+                    marginEnd = (3 * density).toInt()
+                },
+            )
+        }
     }
+
+    private val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT
 
     private fun chip(
         context: Context,

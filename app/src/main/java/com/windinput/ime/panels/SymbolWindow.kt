@@ -17,11 +17,13 @@ import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.windinput.ime.core.RecentStore
+import com.windinput.ime.keyboard.GlyphDrawable
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.KeyIcons
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.Palette
+import com.windinput.ime.keyboard.PanelIcon
 
 /**
  * 分类符号页（docs/android-ime-features.md §14.3）：上面 3 行是和键盘同样样式的符号键，
@@ -46,12 +48,27 @@ class SymbolWindow(
         fun onSymbolSelected(symbol: String)
         fun onSymbolBackspace()
         fun onSymbolBack()
+
+        /** 符号页打开 / 收起：打开时条区的候选行用来放最近用过的符号 */
+        fun onSymbolPageShown(shown: Boolean) = Unit
     }
 
     private companion object {
         const val COLUMNS = 10
         const val GRID_ROWS = 3
-        const val RECENT_LABEL = "最近"
+        const val COMMON_LABEL = "常用"
+
+        /** 「常用」里最近用过的排在前面，最多这么多个；其余用 [COMMON_DEFAULTS] 补齐 */
+        const val RECENT_IN_COMMON = 20
+
+        /**
+         * 「常用」的底子：此前这一格只放点过的符号，点过一个再进来就只剩那一个（真机反馈）。
+         * 现在常用 = 最近用过的 + 这一组常见符号，永远是满的。
+         */
+        val COMMON_DEFAULTS = (
+            "， 。 ？ ！ 、 ： ； “ ” ‘ ’ （ ） 《 》 【 】 … — ～ · ￥ " +
+                "@ # % & * + - = / _ ~ ^ | \\ < > ( ) [ ] { } ' \" ` $"
+            ).split(' ').filter { it.isNotEmpty() }
 
         /** 退格按住连删：起始延迟与间隔，和键盘上的退格手感一致 */
         const val REPEAT_START_MS = 400L
@@ -97,6 +114,8 @@ class SymbolWindow(
 
         bottom.addView(
             keyCell(context, "返回", palette.accent, palette.onAccent).apply {
+                // 矢量返回箭头，与面板左上角的返回同一个图标
+                GlyphDrawable.apply(this, PanelIcon.Glyph.BACK, palette.onAccent)
                 contentDescription = "symbol-back"
                 setOnClickListener {
                     KeyHaptics.tap(it)
@@ -111,7 +130,7 @@ class SymbolWindow(
             gravity = Gravity.CENTER_VERTICAL
         }
         tabsRow = tabs
-        val labels = listOf(RECENT_LABEL) + categories.map { it.name }
+        val labels = listOf(COMMON_LABEL) + categories.map { it.name }
         labels.forEachIndexed { index, label ->
             tabs.addView(
                 TextView(context).apply {
@@ -146,16 +165,20 @@ class SymbolWindow(
     }
 
     override fun onAttached() {
-        // 有最近使用就进「最近」（两家的默认），否则进第一个分类
-        selectTab(if (recentStore.list().isEmpty() && categories.isNotEmpty()) 1 else 0)
+        selectTab(0)
+        listener.onSymbolPageShown(true)
     }
 
     override fun onDetached() {
         handler.removeCallbacksAndMessages(null)
+        listener.onSymbolPageShown(false)
     }
 
+    private fun commonSymbols(): List<String> =
+        (recentStore.list().take(RECENT_IN_COMMON) + COMMON_DEFAULTS).distinct()
+
     private fun selectTab(index: Int) {
-        adapter.submit(if (index == 0) recentStore.list() else categories[index - 1].items)
+        adapter.submit(if (index == 0) commonSymbols() else categories[index - 1].items)
         grid?.scrollToPosition(0)
         val palette = Palette.current
         val density = grid?.resources?.displayMetrics?.density ?: 1f

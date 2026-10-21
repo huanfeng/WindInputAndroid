@@ -3,7 +3,7 @@
 # 形态按豆包 / 微信（docs/android-ime-features.md §14.4）：
 #   左列前三行是占位空白，视图在那里画可上下滚动的符号列（电话框换成 * # +）；
 #   右列 ⌫ · 空格 · 换行，换行占两行（第 4 行同一位置放等宽 spacer）。
-#   左下「返回」与 123 层左下的「1234」在同一位置：从哪里进，原地点一下就回去。
+#   底行左起「符号」「返回」与字母层、123 层同一位置：符号入口不随层变，返回总在第二格。
 # 数字和句点用 commit 原样上屏：中文模式下句点不能变「。」，有编码时数字不能变成选词。
 
 [meta]
@@ -33,8 +33,8 @@ key = [
 
 [[rows]]
 key = [
-  { label = "返回", action = "switch_symbols", accent = true },
-  { label = "符号", action = "symbol_page", width = 1.4 },
+  { label = "符号", action = "symbol_page" },
+  { label = "返回", action = "switch_symbols", width = 1.4, accent = true },
   { commit = "0", width = 1.4 },
   { commit = ".", width = 1.4 },
   { spacer = 1 },

@@ -53,6 +53,7 @@ object PanelScaffold {
      *
      * @param onBack 返回键盘（左上角）
      * @param rightActions 顶栏右侧动作按钮（label → onClick）
+     * @param rightView 顶栏右侧自定义控件（要随状态改字的按钮，如快捷面板的「编辑工具栏 / 完成」）
      */
     fun build(
         context: Context,
@@ -60,6 +61,7 @@ object PanelScaffold {
         onBack: () -> Unit,
         content: View,
         rightActions: List<Pair<String, () -> Unit>> = emptyList(),
+        rightView: View? = null,
     ): View {
         val density = context.resources.displayMetrics.density
         val root = LinearLayout(context).apply {
@@ -101,6 +103,15 @@ object PanelScaffold {
                 ),
             )
         }
+        rightView?.let {
+            header.addView(
+                it,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
         root.addView(
             header,
             LinearLayout.LayoutParams(
@@ -123,7 +134,7 @@ object PanelScaffold {
             setOnClickListener { onBack() }
         }
 
-    private fun headerButton(context: Context, label: String, onClick: () -> Unit): TextView =
+    fun headerButton(context: Context, label: String, onClick: () -> Unit): TextView =
         TextView(context).apply {
             val density = context.resources.displayMetrics.density
             text = label

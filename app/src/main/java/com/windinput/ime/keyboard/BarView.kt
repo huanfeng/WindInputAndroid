@@ -52,6 +52,9 @@ class BarView(
         fun onNeedMoreCandidates()
 
         fun onPasteSuggestion(text: String)
+
+        /** 工具栏上常驻的功能按钮（见 [setPinned]） */
+        fun onToolbarItem(item: ToolbarItem)
     }
 
     enum class ToolbarAction { QUICK_PANEL, HIDE_IME }
@@ -173,12 +176,58 @@ class BarView(
      * 必须常驻可见；只在工具栏态显示（打字时条区归候选）。
      */
     private val incognitoLabel = TextView(context).apply {
-        text = "🕶 无痕"
-        gravity = Gravity.CENTER
+        gravity = Gravity.CENTER_VERTICAL
         textSize = 13f
+        maxLines = 1
+        ellipsize = TextUtils.TruncateAt.END
         setTextColor(Palette.current.hint)
-        // INVISIBLE 不是 GONE：它兼做中间的弹性占位，GONE 掉尾格就挤到左边去了
+    }
+
+    /** 无痕时写在字前面的图标（与快捷面板「无痕」格同一个矢量图标，不用 emoji） */
+    private val incognitoIcon = PanelIcon(context).apply {
+        glyph = PanelIcon.Glyph.INCOGNITO
+        tint = Palette.current.hint
+        scale = 0.9f
+        decorative = true
+        visibility = GONE
+    }
+
+    /**
+     * 中间那一格（图标 + 字）。INVISIBLE 不是 GONE：它兼做中间的弹性占位，GONE 掉尾格就挤到左边去了
+     */
+    private val centerNote = LinearLayout(context).apply {
+        orientation = HORIZONTAL
+        gravity = Gravity.CENTER
+        addView(incognitoIcon, LayoutParams(dp(18), dp(18)).apply { marginEnd = dp(4) })
+        addView(incognitoLabel, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
         visibility = INVISIBLE
+    }
+
+    /** 工具栏上常驻的功能按钮，排在「快捷功能」之后 */
+    private val pinnedRow = LinearLayout(context).apply { orientation = HORIZONTAL }
+
+    /** 设置常驻按钮（顺序即排列顺序）。快捷面板里编辑完、每次弹键盘时由 Service 调 */
+    fun setPinned(items: List<ToolbarItem>) {
+        pinnedRow.removeAllViews()
+        for (item in items) {
+            val glyph = item.glyph
+            val view: View = if (glyph != null) {
+                icon(glyph) { listener.onToolbarItem(item) }
+            } else {
+                TextView(context).apply {
+                    text = item.text
+                    textSize = 17f
+                    gravity = Gravity.CENTER
+                    setTextColor(Palette.current.icon)
+                    setOnClickListener {
+                        KeyHaptics.tap(it)
+                        listener.onToolbarItem(item)
+                    }
+                }
+            }
+            view.contentDescription = item.label
+            pinnedRow.addView(view, LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT))
+        }
     }
 
     /** 学习是否暂停（手动无痕或输入框要求），见 [incognitoLabel] */
@@ -195,12 +244,13 @@ class BarView(
         val text = when {
             preparing -> PREPARING_TEXT
             expanded && currentPreedit.isNotEmpty() -> currentPreedit
-            incognito -> "🕶 无痕"
+            incognito -> "无痕"
             else -> ""
         }
         incognitoLabel.text = text
         incognitoLabel.setTextColor(if (preparing) Palette.current.preedit else Palette.current.hint)
-        incognitoLabel.visibility = if (text.isEmpty()) INVISIBLE else VISIBLE
+        incognitoIcon.visibility = if (text == "无痕" && !preparing) VISIBLE else GONE
+        centerNote.visibility = if (text.isEmpty()) INVISIBLE else VISIBLE
     }
 
     private val trailingIcon = PanelIcon(context).apply {
@@ -246,13 +296,12 @@ class BarView(
             orientation = HORIZONTAL
             setBackgroundColor(Palette.current.surface)
             addView(
-                TextView(context).apply {
-                    text = "📋"
-                    textSize = 16f
-                    gravity = Gravity.CENTER
-                    setPadding(dp(12), 0, dp(8), 0)
+                PanelIcon(context).apply {
+                    glyph = PanelIcon.Glyph.CLIPBOARD
+                    tint = Palette.current.hint
+                    decorative = true
                 },
-                LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT),
+                LayoutParams(dp(40), LayoutParams.MATCH_PARENT),
             )
             addView(suggestionText, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
             addView(
@@ -409,7 +458,8 @@ class BarView(
             icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) },
             LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT),
         )
-        addView(incognitoLabel, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
+        addView(pinnedRow, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
+        addView(centerNote, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         addView(trailingIcon, LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT))
     }
 

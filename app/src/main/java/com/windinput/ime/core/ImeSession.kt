@@ -237,7 +237,13 @@ interface ImeSession {
  * 候选菜单的一项。[action] ∈ move_top / move_up / move_down / delete / reset / toggle_common / copy，
  * 与核心约定的动作名，菜单显示用 [label]（核心给的文案，与电脑版右键菜单同一份）。
  */
-data class CandidateMenuEntry(val label: String, val action: String, val enabled: Boolean)
+/** @param current 当前状态那项（如当前方案）：高亮显示、点了无动作 */
+data class CandidateMenuEntry(
+    val label: String,
+    val action: String,
+    val enabled: Boolean,
+    val current: Boolean = false,
+)
 
 /** 候选提示的一段：[title] 为空 = 无标题；[inline] = 标题与首行写在同一行（`段名: 内容`） */
 data class TooltipSection(val title: String?, val inline: Boolean, val lines: List<String>)

@@ -46,9 +46,21 @@ class KeyboardView(context: Context) : View(context) {
         /** 退格滑动抬手：删除当前选区 */
         fun onBackspaceSwipeDelete()
 
-        /** 功能键长按（当前用于中英键 → 打开快捷面板） */
+        /** 功能键长按（中英键 → 方案卡片，空格 → 按设置切输入法 / 语音） */
         fun onKeyLongPress(action: KeyAction)
+
+        /**
+         * 功能键长按的选项条：手指不抬、横移选、抬手定（中英键：各方案 + 切换输入法）。
+         * null = 没有选项条，长按走 [onKeyLongPress]。
+         */
+        fun longPressOptions(action: KeyAction): KeyOptions? = null
+
+        /** 选项条抬手：[index] 是手指停住的那项；停在初始项（没滑走）为 null */
+        fun onLongPressOption(action: KeyAction, index: Int?) = Unit
     }
+
+    /** 长按选项条的内容：[selected] 为初始选中（通常是当前状态，如当前方案） */
+    data class KeyOptions(val labels: List<String>, val selected: Int)
 
     var listener: Listener? = null
 
@@ -288,8 +300,25 @@ class KeyboardView(context: Context) : View(context) {
     private var downX = 0f
     private var downY = 0f
 
-    /** 上滑副字符已触发（本次按压后续事件忽略） */
-    private var swipeConsumed = false
+    /** 上滑的一体式气泡已长出（本次按压改由气泡决定上屏什么） */
+    private var swipeShown = false
+
+    /** 上滑已过阈值：抬手上屏副字符 */
+    private var swipeArmed = false
+
+    /** 正弹着选项条的功能键（长按中英键）；抬手时按条上的选中项回调 */
+    private var optionsAction: KeyAction? = null
+    private var optionsInitial = 0
+
+    /**
+     * 选项条弹出时手指所在的 x；手指真正横移过触摸阈值之前不改选中项。按住不动时系统照样会发
+     * MOVE（坐标不变），不拦的话选中项立刻跳到手指正上方那一项，抬手就误切了方案
+     */
+    private var optionsAnchorX = 0f
+    private var optionsMoved = false
+
+    /** 本次按压最近一次的手指 x（长按弹选项条时记作锚点） */
+    private var lastX = 0f
 
     /** 空格滑动移光标进行中 */
     private var spaceSwipeActive = false
@@ -335,7 +364,17 @@ class KeyboardView(context: Context) : View(context) {
             // 否则「长按开面板」会连带触发一次「点击切模式」。
             longPressFired = true
             repeatHaptic()
-            listener?.onKeyLongPress(key.action)
+            val options = listener?.longPressOptions(key.action)
+            if (options != null) {
+                optionsAction = key.action
+                optionsInitial = options.selected
+                optionsAnchorX = lastX
+                optionsMoved = false
+                popupManager.dismissPreview()
+                popupManager.showMenu(rect, options.labels, options.selected)
+            } else {
+                listener?.onKeyLongPress(key.action)
+            }
         }
     }
 
@@ -655,6 +694,13 @@ class KeyboardView(context: Context) : View(context) {
                 if (pressedKey != null && gestureInProgress()) return true
                 val i = event.actionIndex
                 if (pressedKey != null) finishPress()
+                // 落在左侧符号列：那里不是键（占位空白），按键位找会命中同行最近的数字键、打错字。
+                // 侧列滚动只认单指，这根手指忽略
+                val side = sideRect
+                if (side != null && sideSymbols.isNotEmpty() && side.contains(event.getX(i), event.getY(i))) {
+                    activePointerId = MotionEvent.INVALID_POINTER_ID
+                    return true
+                }
                 startPress(event.getPointerId(i), event.getX(i), event.getY(i))
             }
             MotionEvent.ACTION_MOVE -> {
@@ -677,13 +723,17 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun gestureInProgress(): Boolean =
-        popupManager.isPopupShown || spaceSwipeActive || backspaceSwipeActive || repeatFired || longPressFired
+        popupManager.isPopupShown || swipeShown || spaceSwipeActive || backspaceSwipeActive ||
+            repeatFired || longPressFired
 
     private fun startPress(pointerId: Int, x: Float, y: Float) {
         activePointerId = pointerId
+        lastX = x
         downX = x
         downY = y
-        swipeConsumed = false
+        swipeShown = false
+        swipeArmed = false
+        optionsAction = null
         repeatFired = false
         longPressFired = false
         spaceSwipeActive = false
@@ -717,8 +767,12 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun movePress(x: Float, y: Float) {
         val key = pressedKey ?: return
-        if (swipeConsumed) return
+        lastX = x
         if (popupManager.isPopupShown) {
+            if (optionsAction != null && !optionsMoved) {
+                if (kotlin.math.abs(x - optionsAnchorX) < touchSlopPx) return
+                optionsMoved = true
+            }
             popupManager.updatePopupSelection(x)
             return
         }
@@ -760,15 +814,25 @@ class KeyboardView(context: Context) : View(context) {
             }
         }
 
-        // 上滑副字符：位移超阈值且以纵向为主
+        // 上滑副字符：往上一动就从键位长出一体式气泡（上半副字符、下半主字符），过阈值副字符
+        // 变强调色，抬手才上屏——上滑途中看得见要出什么，滑过头了退回来还能反悔
         val swipeChar = key.swipeFor(englishMode)
-        if (swipeSymbolsEnabled && swipeChar != null && dy > swipeThresholdPx && dy > kotlin.math.abs(dx)) {
-            swipeConsumed = true
-            cancelTimers()
-            popupManager.dismissAll()
-            listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
-            clearPressed()
-            return
+        if (swipeSymbolsEnabled && swipeChar != null) {
+            if (!swipeShown && dy > swipeActivatePx && dy > kotlin.math.abs(dx)) {
+                val rect = pressedRect ?: return
+                swipeShown = true
+                cancelTimers()
+                popupManager.showSwipeBubble(rect, displayLabel(key), Punct.display(swipeChar, chinesePunct))
+            }
+            if (swipeShown) {
+                val armed = dy > swipeThresholdPx
+                if (armed != swipeArmed) {
+                    swipeArmed = armed
+                    popupManager.setSwipeArmed(armed)
+                    if (armed) KeyHaptics.tap(this)
+                }
+                return
+            }
         }
         // 滑出键位即取消（滑动输入为二期能力）
         if (findKey(x, y) !== key && dy < swipeThresholdPx / 2) {
@@ -778,7 +842,15 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 当前手指抬起（或被下一指顶替）：按本次按压的状态决定发什么 */
     private fun finishPress() {
+        optionsAction?.let { action ->
+            val index = popupManager.popupSelectedIndex()?.takeIf { it != optionsInitial }
+            optionsAction = null
+            cancelPress()
+            listener?.onLongPressOption(action, index)
+            return
+        }
         val key = pressedKey
+        val swipeChar = if (swipeArmed) key?.swipeFor(englishMode) else null
         val popupChoice = popupManager.popupSelectedIndex()
             ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
         val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
@@ -786,7 +858,8 @@ class KeyboardView(context: Context) : View(context) {
         val wasBackspaceSwipe = backspaceSwipeActive
         cancelPress()
         when {
-            swipeConsumed || wasSpaceSwipe -> Unit
+            swipeChar != null -> listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
+            wasSpaceSwipe -> Unit
             wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
             // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
             popupChoice != null && popupChoice.isUpperCase() ->

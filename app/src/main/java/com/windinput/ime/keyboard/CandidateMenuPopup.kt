@@ -143,7 +143,7 @@ class CandidateMenuPopup(private val anchor: View) {
             )
             for ((label, onClick) in actions) {
                 addView(
-                    actionCell(label, enabled = true, onClick).apply { setPadding(dp(14), 0, dp(14), 0) },
+                    actionCell(label, enabled = true, onClick = onClick).apply { setPadding(dp(14), 0, dp(14), 0) },
                     LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, dp(36)).apply {
                         marginStart = dp(6)
                     },
@@ -162,17 +162,28 @@ class CandidateMenuPopup(private val anchor: View) {
         }
     }
 
-    private fun actionCell(label: String, enabled: Boolean, onClick: () -> Unit): TextView {
+    /**
+     * 卡片里的一格。层次：**当前项**用强调色底 + 强调色粗字（一眼看出「现在是它」），可点的项
+     * 用正文色，不可用的灰。此前可点的是强调色、当前项是灰的，主次正好反了（真机反馈）。
+     */
+    private fun actionCell(label: String, enabled: Boolean, current: Boolean = false, onClick: () -> Unit): TextView {
         val p = Palette.current
         return TextView(anchor.context).apply {
             text = label
             textSize = 14f
             gravity = Gravity.CENTER
             maxLines = 1
-            setTextColor(if (enabled) p.accentText else p.hint)
+            setTextColor(
+                when {
+                    current -> p.accentText
+                    enabled -> p.text
+                    else -> p.hint
+                },
+            )
+            if (current) typeface = android.graphics.Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
                 cornerRadius = 6 * density
-                setColor(p.key)
+                setColor(if (current) p.accentSoft else p.key)
             }
             isEnabled = enabled
             setOnClickListener { onClick() }
@@ -183,7 +194,7 @@ class CandidateMenuPopup(private val anchor: View) {
         val grid = GridLayout(anchor.context).apply { columnCount = COLUMNS }
         for (item in items) {
             grid.addView(
-                actionCell(item.label, item.enabled) {
+                actionCell(item.label, item.enabled, item.current) {
                     dismiss()
                     onPick(item)
                 },
