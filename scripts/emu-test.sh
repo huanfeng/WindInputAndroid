@@ -1036,7 +1036,7 @@ restart_pad
 wait_chinese >/dev/null
 
 section "[50] 联想看光标前文：逐字上屏「今」「天」，下一词按「今天」接"
-# 只看「天」的话下一词表里没有「晚上」；「今天」后面有。前文由核心随上屏跟踪、宿主在
+# 只看「天」的话下一词表里没有「早上」；「今天」后面有。前文由核心随上屏跟踪、宿主在
 # onUpdateSelection 里报真值（setPrecedingText）
 reset_pad
 for w in w y n b; do tap_key "$w"; done
@@ -1048,7 +1048,7 @@ sleep 0.5
 check "逐字上屏「今」「天」" "今天" "$(get_pad_text)"
 assoc_nodes="$(ime_xml | grep -oE 'class="android.widget.Button" package="'"$PKG"'" content-desc="[^"]*"' \
     | sed -E 's/.*content-desc="([^"]*)"/\1/')"
-check "下一词按「今天」接（有「晚上」）" "yes" "$(grep -qE '^晚上(，|$)' <<< "$assoc_nodes" && echo yes || echo no)"
+check "下一词按「今天」接（有「早上」）" "yes" "$(grep -qE '^早上(，|$)' <<< "$assoc_nodes" && echo yes || echo no)"
 
 section "[35] 简入繁出：开启后「我们」上屏为「我們」"
 # 要 APK 带上 opencc 数据才有效——没带时开关照样能开，上屏却还是简体，且不报错。
