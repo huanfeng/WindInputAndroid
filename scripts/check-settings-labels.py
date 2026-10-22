@@ -26,6 +26,7 @@ MOBILE_ONLY = {
     "mobile.association.kind": "移动端覆盖键，电脑版清单按设计不收（wind-setting 豁免名单 ⑳）",
     "mobile.association.mode": "同上",
     "mobile.association.punct": "同上",
+    "mobile.association.space_commits": "同上",
 }
 
 

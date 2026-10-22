@@ -888,9 +888,9 @@ class WindInputImeService :
         }
         autoSpaced = false
         val composingBefore = composing
-        // 联想态（没有编码、候选条上是联想）按空格：两家都是收起联想、出空格，不选联想词。
-        // 这由核心的移动端强制项 `input.association.space_commits = false` 保证（wind-mobile
-        // `apply_mobile_overrides`，重载配置后也会再套上）：引擎收起联想、自己出那个空格。
+        // 联想态（没有编码、候选条上是联想）按空格：出厂同豆包、微信，收起联想、出空格，不选联想词；
+        // 设置里打开「空格选首个联想」则上屏首个联想。都由核心按 `mobile.association.space_commits`
+        // 处置（引擎收起联想、自己出那个空格，或上屏联想），这里不分支。
         if (directInput || !session.keyPressed(action, shifted)) return false
         // 英文方案：有编码时空格上屏原文（引擎只出词本身），这里补上词后的空格
         if (action == KeyAction.Space && english && composingBefore) commitAutoSpace()

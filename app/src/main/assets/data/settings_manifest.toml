@@ -686,6 +686,15 @@ summary = "上屏后在联想里给出常接的标点，省去切到符号键盘
 [[item]]
 page = "input"
 section = "联想输入"
+key = "mobile.association.space_commits"
+source = "engine"
+type = "toggle"
+title = "空格选首个联想"
+summary = "关闭时联想态按空格出空格并收起联想（汉字后双击空格出「。」）"
+
+[[item]]
+page = "input"
+section = "联想输入"
 key = "input.association.max_count"
 source = "engine"
 type = "int"
