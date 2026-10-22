@@ -82,6 +82,13 @@ license = "LGPL-3.0"
 url = "https://github.com/rime/rime-emoji"
 
 [[notice]]
+group = "词库与数据"
+name = "八股文语言模型（rime-octagram-data）"
+usage = "智能联想的「下一词」表：从 zh-hans-t-essay-bgw 模型离线蒸馏出常用词后面常接的词"
+license = "LGPL-3.0"
+url = "https://github.com/lotem/rime-octagram-data"
+
+[[notice]]
 group = "程序库"
 name = "AndroidX / Jetpack Compose"
 usage = "设置界面"

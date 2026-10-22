@@ -1005,7 +1005,7 @@ tap_edit; sleep 1.2
 tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 1
 check_match "收起后数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 
-section "[49] 智能联想的前缀词只显示补出的那一截；可开「空格选首个联想」"
+section "[49] 智能联想：前缀词只显示补出的一截、出下一词；可开「空格选首个联想」"
 # 上屏「我」（五笔 q）后，前缀词「我们」在候选条上该是「们」，不该整词「我们」（与下一词、标点同栏）。
 # 候选是自绘的，读输入法窗口的无障碍节点（文字即 content-desc，可能带「，编码 …」）
 reset_pad
@@ -1015,6 +1015,8 @@ assoc_nodes="$(ime_xml | grep -oE 'class="android.widget.Button" package="'"$PKG
     | sed -E 's/.*content-desc="([^"]*)"/\1/')"
 check "候选条上没有以「我」开头的整词" "no" "$(grep -q '^我' <<< "$assoc_nodes" && echo yes || echo no)"
 check "前缀词「我们」只显示「们」" "yes" "$(grep -qE '^们(，|$)' <<< "$assoc_nodes" && echo yes || echo no)"
+# 下一词表（data/assoc/assoc_bigram.txt）：「我」后常接「的」
+check "联想里有下一词「的」" "yes" "$(grep -qE '^的(，|$)' <<< "$assoc_nodes" && echo yes || echo no)"
 # 打开 mobile.association.space_commits：联想态空格上屏首个联想，而不是出空格
 cfg_orig="$(read_core_cfg)"
 restore_cfg() { write_core_cfg "$cfg_orig"; }
