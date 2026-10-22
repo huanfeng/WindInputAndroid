@@ -760,6 +760,18 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 联想学习数据（联想里选过的词 + 学到的「下一词」）的条数，所有方案合计。
+    pub fn assoc_history_count(&self) -> u64 {
+        self.core.assoc_history_count()
+    }
+
+    /// 清空全部方案的联想学习数据，返回删掉的条数。词频、用户词不动。
+    pub fn assoc_history_clear(&self) -> Result<u64, ConfigError> {
+        self.core
+            .assoc_history_clear()
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     /// 清空某方案的全部用户词，返回删掉的条数。
     pub fn user_words_clear(&self, schema_id: String) -> Result<u64, ConfigError> {
         self.core

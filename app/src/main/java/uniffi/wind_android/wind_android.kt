@@ -723,6 +723,10 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_toast(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_assoc_history_clear(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_assoc_history_count(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidate_menu(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidate_menu_run(
@@ -843,6 +847,10 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_free_windcore(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_constructor_windcore_new(`dataDir`: RustBuffer.ByValue,`userRoot`: RustBuffer.ByValue,`schema`: RustBuffer.ByValue,`listener`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_wind_android_fn_method_windcore_assoc_history_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Long
+    external fun uniffi_wind_android_fn_method_windcore_assoc_history_count(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_wind_android_fn_method_windcore_candidate_menu(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1058,6 +1066,12 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_toast() != 36283) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_assoc_history_clear() != 9869) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_assoc_history_count() != 9201) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_candidate_menu() != 58187) {
@@ -2118,6 +2132,16 @@ public object FfiConverterTypeUiEventListener: FfiConverter<UiEventListener, Lon
 public interface WindCoreInterface {
     
     /**
+     * 清空全部方案的联想学习数据，返回删掉的条数。词频、用户词不动。
+     */
+    fun `assocHistoryClear`(): kotlin.ULong
+    
+    /**
+     * 联想学习数据（联想里选过的词 + 学到的「下一词」）的条数，所有方案合计。
+     */
+    fun `assocHistoryCount`(): kotlin.ULong
+    
+    /**
      * 候选长按菜单：按候选类型给出菜单项（文案、启用态与电脑版右键菜单同一份）。
      * `index` 是绝对下标；无候选或越界时为空。
      */
@@ -2470,6 +2494,39 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
             UniffiLib.uniffi_wind_android_fn_clone_windcore(handle, status)
         }
     }
+
+    
+    /**
+     * 清空全部方案的联想学习数据，返回删掉的条数。词频、用户词不动。
+     */
+    @Throws(ConfigException::class)override fun `assocHistoryClear`(): kotlin.ULong {
+            return FfiConverterULong.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_assoc_history_clear(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 联想学习数据（联想里选过的词 + 学到的「下一词」）的条数，所有方案合计。
+     */override fun `assocHistoryCount`(): kotlin.ULong {
+            return FfiConverterULong.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_assoc_history_count(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
 
     
     /**

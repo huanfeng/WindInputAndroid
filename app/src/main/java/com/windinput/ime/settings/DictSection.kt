@@ -47,10 +47,10 @@ private const val PAGE_SIZE = 50u
 private const val SEARCH_DEBOUNCE_MS = 250L
 
 /** 清空确认：第二下至少隔这么久（挡误触双击） */
-private const val CONFIRM_MIN_GAP_MS = 600L
+internal const val CONFIRM_MIN_GAP_MS = 600L
 
 /** 清空确认：这么久没点第二下就复位 */
-private const val CONFIRM_RESET_MS = 5000L
+internal const val CONFIRM_RESET_MS = 5000L
 
 /**
  * 词库页：当前方案的个人词（自己加的、打字时学到的）。

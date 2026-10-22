@@ -651,6 +651,7 @@ private fun SubScreen(
             // 方案的附加词库挂在对应的二级页底下：拼音细胞词库在「拼音」，五笔附加库在「码表」
             if (page.id == "schema" && sub == "拼音") SchemaDictsSection("细胞词库", listOf("pinyin", "shuangpin"))
             if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
+            if (sub == "联想输入") AssocLearningSection()
             // Emoji 开着才列附加模块（同电脑版的 enabled_when）
             if (sub == EMOJI_SECTION &&
                 manifest.items.firstOrNull { it.key == EMOJI_ENABLED_KEY }?.let(values::bool) == true

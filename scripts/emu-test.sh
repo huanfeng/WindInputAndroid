@@ -1108,7 +1108,7 @@ tap_key e; tap_key m; tap_key o; tap_key j; tap_key SPACE
 # uiautomator 把 BMP 以外的字符写成 XML 数字实体：😂（U+1F602）读回来是 &#128514;
 check "emoj 上屏表情" "😂" "$(get_pad_text)"
 
-section "[38] 设置页层级：首页 → 方案 → 码表 → 返回；词库 → 我的词条、词库统计"
+section "[38] 设置页层级：首页 → 方案 → 码表 → 返回；词库 → 我的词条、词库统计；联想学习数据"
 # 设置页分了两层（方案 / 输入按组进二级页，词库拆成入口），返回走预测性返回的回调。
 # 这里只验「点得进、退得回、每层该有的东西在」，不验视觉。
 has_text() {   # 当前界面有没有这段文字（等界面稳定，最多约 4 秒）
@@ -1146,6 +1146,10 @@ tap_text "初始语言模式"
 check "下拉项点开不崩、列出选项" "yes" "$(has_text 英文)"
 adb_q shell input keyevent BACK; sleep 1
 check "返回先收起下拉，仍在本页" "yes" "$(has_text 初始字符宽度)"
+adb_q shell input keyevent BACK; sleep 1
+# 联想输入页底部：学习数据可清空（条数由核心算，读完才出这一行）
+tap_text "联想输入"
+check "联想输入页有「清空联想学习」" "yes" "$(has_text 清空联想学习)"
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
