@@ -413,6 +413,13 @@ impl WindCore {
         self.core.focus_gained();
     }
 
+    /// 报告光标前的正文（不含组合区），联想据此把逐字上屏拆开的词凑回来。
+    /// 光标被挪动或正文被别人改过之后报（onUpdateSelection）、换输入框时报一次；
+    /// 自己上屏的不必报，核心已按下发的编辑指令跟上。读不到报空串。
+    pub fn set_preceding_text(&self, text: String) {
+        self.core.set_preceding_text(text);
+    }
+
     /// 暂停 / 恢复学习（无痕）。宿主每次 onStartInput 都要按当前输入框显式传一次：
     /// `IME_FLAG_NO_PERSONALIZED_LEARNING` 或密码框传 true，其余传 false——开关不落盘，
     /// 不传就会把上一个无痕框的暂停带进普通输入框。暂停期间照常出候选，只是什么都不记

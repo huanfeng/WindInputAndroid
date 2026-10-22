@@ -149,6 +149,9 @@ class RustSession(
     override fun setLearningSuspended(on: Boolean) =
         guard.run("setLearningSuspended", Unit) { core.setLearningSuspended(on) }
 
+    override fun setPrecedingText(text: String) =
+        guard.run("setPrecedingText", Unit) { core.setPrecedingText(text) }
+
     override fun schemas(): List<SchemaEntry> =
         guard.run("schemas", emptyList()) { core.schemas() }.mapIndexed { i, s ->
             SchemaEntry(

@@ -192,6 +192,12 @@ interface ImeSession {
      */
     fun setLearningSuspended(on: Boolean) = Unit
 
+    /**
+     * 报告光标前的正文（不含组合区），联想据此把逐字上屏拆开的词凑回来。
+     * 光标被挪动、正文被别人改过之后报；自己上屏的不必报，核心已跟上。读不到报空串。
+     */
+    fun setPrecedingText(text: String) = Unit
+
     /** @return true = 会话消费该键；false = 由调用方执行默认行为 */
     fun keyPressed(action: KeyAction, shifted: Boolean): Boolean
 

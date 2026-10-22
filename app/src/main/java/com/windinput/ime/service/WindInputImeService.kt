@@ -296,6 +296,9 @@ class WindInputImeService :
         /** 退格上滑清空时向前 / 向后各取多少字：够一般输入框，超长文档清不干净好过一次读几 MB */
         const val CLEAR_ALL_MAX = 100_000
 
+        /** 光标前文报几个字给核心：联想的下一词表只看 4 个字，留些余量 */
+        const val PRECEDING_CHARS = 32
+
         /** 切方案超过这么久还没完才提示「词库准备中」 */
         const val SWITCH_HINT_DELAY_MS = 300L
 
@@ -486,6 +489,7 @@ class WindInputImeService :
         consumedHardKeys.clear()
         refreshHardKeyboardOnly()
         session.focusGained()
+        reportPrecedingText()
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
@@ -531,13 +535,27 @@ class WindInputImeService :
         maybeShowFirstRunPicker()
     }
 
-    /** 光标动了（上屏、删除、点击挪光标）：重新判断要不要句首大写 */
+    /** 光标动了（上屏、删除、点击挪光标）：重新判断要不要句首大写，光标前文报给核心 */
     override fun onUpdateSelection(
         oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int,
         candidatesStart: Int, candidatesEnd: Int,
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         updateAutoCaps()
+        // 挂着内联编码时光标前是组合区里的码，不是正文；组合开始前报的那份仍然对
+        if (candidatesStart < 0) reportPrecedingText()
+    }
+
+    /**
+     * 光标前文报给核心（联想用它把逐字上屏拆开的词凑回来）。
+     *
+     * 读的时机是光标变动之后：`getTextBeforeCursor` 与我们发出的编辑同走一条队列，
+     * 读到的总是已含此前全部上屏的正文，即使这次回调是为更早的一次上屏来的。
+     * 密码框不读。
+     */
+    private fun reportPrecedingText() {
+        val text = if (directInput) null else currentInputConnection?.getTextBeforeCursor(PRECEDING_CHARS, 0)
+        session.setPrecedingText(text?.toString().orEmpty())
     }
 
     /**

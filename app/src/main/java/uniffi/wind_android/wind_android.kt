@@ -783,6 +783,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_preceding_text(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_enabled(
@@ -907,6 +909,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_emoji_module(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_preceding_text(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1156,6 +1160,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_learning_suspended() != 58911) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_preceding_text() != 37493) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled() != 12394) {
@@ -2306,6 +2313,13 @@ public interface WindCoreInterface {
     fun `setLearningSuspended`(`on`: kotlin.Boolean)
     
     /**
+     * 报告光标前的正文（不含组合区），联想据此把逐字上屏拆开的词凑回来。
+     * 光标被挪动或正文被别人改过之后报（onUpdateSelection）、换输入框时报一次；
+     * 自己上屏的不必报，核心已按下发的编辑指令跟上。读不到报空串。
+     */
+    fun `setPrecedingText`(`text`: kotlin.String)
+    
+    /**
      * 开 / 关一个附加词库：落盘到方案覆盖并即时生效（已加载的引擎热切换或重建）。
      */
     fun `setSchemaDictEnabled`(`schemaId`: kotlin.String, `dictId`: kotlin.String, `on`: kotlin.Boolean)
@@ -3027,6 +3041,24 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         it,
         
         FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 报告光标前的正文（不含组合区），联想据此把逐字上屏拆开的词凑回来。
+     * 光标被挪动或正文被别人改过之后报（onUpdateSelection）、换输入框时报一次；
+     * 自己上屏的不必报，核心已按下发的编辑指令跟上。读不到报空串。
+     */override fun `setPrecedingText`(`text`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_preceding_text(
+        it,
+        
+        FfiConverterString.lower(`text`),_status)
 }
     }
     
