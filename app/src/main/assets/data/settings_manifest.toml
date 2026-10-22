@@ -22,7 +22,11 @@
 #   min / max / step / unit   int 的范围、步长、单位
 #   advanced true = 收进卡片底部的「进阶」折叠区（工程参数）
 #   exclusive_with  另一个开关键：本项打开时把它关掉（二选一，照电脑版清单）
-#   enabled_when    另一个开关键：它开着时本项才显示（电脑版写 "键 == true"，这里只写键）
+#   enabled_when    另一个开关键：它开着时本项才显示（电脑版写 "键 == true"，这里只写键）；
+#            依赖链逐级生效：A 依赖 B、B 依赖 C，C 关着时 A、B 都不显示
+
+#   card     二级页里再分卡片：同 section 内按 card 首次出现序各成一张带标题的卡（缺省 = 无标题的头一张）
+#   grid     true = 这张卡画成两列勾选网格（只用于短标题的开关，如模糊音的拼音对）
 #   preview  int 项拖动时的预览：keyboard_rows（按所选行高画四行键）/ candidate_text（按所选字号写一行候选）
 #
 # 引擎项写入后会发 ReloadConfig 让核心即时重读；键盘项在下次弹出键盘时生效。
@@ -288,6 +292,8 @@ options = [
   { value = "off", label = "不显示" },
 ]
 
+# 模糊音二级页：总开关一行；拼音对按声母 / 韵母各一张网格卡（card + grid），总开关关着时整组收起；
+# 正确拼音提示单独一张卡。顺序同电脑版拼音对话框的紧凑网格
 [[item]]
 page = "schema"
 section = "模糊音"
@@ -295,123 +301,166 @@ key = "schema.pinyin.fuzzy.enabled"
 source = "engine"
 type = "toggle"
 title = "模糊音"
+summary = "打开后勾选要互不区分的拼音对"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "声母"
+grid = true
 key = "schema.pinyin.fuzzy.zh_z"
 source = "engine"
 type = "toggle"
 title = "zh ↔ z"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "声母"
+grid = true
 key = "schema.pinyin.fuzzy.ch_c"
 source = "engine"
 type = "toggle"
 title = "ch ↔ c"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "声母"
+grid = true
 key = "schema.pinyin.fuzzy.sh_s"
 source = "engine"
 type = "toggle"
 title = "sh ↔ s"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "声母"
+grid = true
 key = "schema.pinyin.fuzzy.n_l"
 source = "engine"
 type = "toggle"
 title = "n ↔ l"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
-key = "schema.pinyin.fuzzy.r_l"
-source = "engine"
-type = "toggle"
-title = "r ↔ l"
-
-[[item]]
-page = "schema"
-section = "模糊音"
+card = "声母"
+grid = true
 key = "schema.pinyin.fuzzy.f_h"
 source = "engine"
 type = "toggle"
 title = "f ↔ h"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "声母"
+grid = true
+key = "schema.pinyin.fuzzy.r_l"
+source = "engine"
+type = "toggle"
+title = "r ↔ l"
+enabled_when = "schema.pinyin.fuzzy.enabled"
+
+[[item]]
+page = "schema"
+section = "模糊音"
+card = "韵母"
+grid = true
 key = "schema.pinyin.fuzzy.an_ang"
 source = "engine"
 type = "toggle"
 title = "an ↔ ang"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "韵母"
+grid = true
 key = "schema.pinyin.fuzzy.en_eng"
 source = "engine"
 type = "toggle"
 title = "en ↔ eng"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "韵母"
+grid = true
 key = "schema.pinyin.fuzzy.in_ing"
 source = "engine"
 type = "toggle"
 title = "in ↔ ing"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "韵母"
+grid = true
 key = "schema.pinyin.fuzzy.ian_iang"
 source = "engine"
 type = "toggle"
 title = "ian ↔ iang"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "韵母"
+grid = true
 key = "schema.pinyin.fuzzy.uan_uang"
 source = "engine"
 type = "toggle"
 title = "uan ↔ uang"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "韵母"
+grid = true
 key = "schema.pinyin.fuzzy.un_ong"
 source = "engine"
 type = "toggle"
 title = "un ↔ ong"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "韵母"
+grid = true
 key = "schema.pinyin.fuzzy.eng_ong"
 source = "engine"
 type = "toggle"
 title = "eng ↔ ong"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "正确拼音提示"
 key = "schema.pinyin.fuzzy.hint"
 source = "engine"
 type = "toggle"
 title = "显示正确拼音"
 summary = "模糊命中的候选里内嵌正确拼音，如「苹(ping)果」"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "正确拼音提示"
 key = "schema.pinyin.fuzzy.hint_scope"
 source = "engine"
 type = "select"
@@ -425,11 +474,13 @@ options = [
 [[item]]
 page = "schema"
 section = "模糊音"
+card = "正确拼音提示"
 key = "schema.pinyin.fuzzy.hint_tone"
 source = "engine"
 type = "toggle"
 title = "提示带声调"
 summary = "作用于正文提示与注释变量 ${fuzzy_pinyin}，如「苹(píng)果」"
+enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"

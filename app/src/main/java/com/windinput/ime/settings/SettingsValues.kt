@@ -69,11 +69,14 @@ class SettingsValues(
     /**
      * 这一项现在该不该显示：[SettingItem.enabledWhen] 指向的开关关着就藏起来。
      * 照电脑版的 enabled_when，只是电脑版置灰、手机上直接不显示——屏幕小，一列灰掉的选项只是噪声。
+     * 逐级看：依赖的开关自己被收起（它的依赖关着）时本项也收起，否则总开关关着时
+     * 「提示范围」还会因「显示正确拼音」开着而单独露出来。
      */
-    fun visible(item: SettingItem, all: List<SettingItem>): Boolean {
+    fun visible(item: SettingItem, all: List<SettingItem>, depth: Int = 0): Boolean {
         val dep = item.enabledWhen ?: return true
         val depItem = all.firstOrNull { it.key == dep } ?: return true
-        return bool(depItem)
+        // 清单解析时不查环；写成环也只是收起，不会栈溢出
+        return bool(depItem) && (depth >= 8 || visible(depItem, all, depth + 1))
     }
 
     private fun raw(item: SettingItem): Any? = when (item.source) {

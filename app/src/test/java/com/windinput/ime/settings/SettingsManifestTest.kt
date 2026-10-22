@@ -155,5 +155,37 @@ class SettingsManifestTest {
             }
         }
     }
-}
 
+    /** 模糊音页：总开关一行，拼音对分声母 / 韵母两张网格卡，正确拼音提示单独一张；总开关关着全收起 */
+    @Test
+    fun fuzzyPageSplitsIntoCards() {
+        val items = bundled.sectionsOf("schema").first { it.first == "模糊音" }.second
+        assertEquals(listOf(null, "声母", "韵母", "正确拼音提示"), items.map { it.card }.distinct())
+        assertEquals("schema.pinyin.fuzzy.enabled", items.first().key)
+        val pairs = items.filter { it.card == "声母" || it.card == "韵母" }
+        assertEquals(13, pairs.size)
+        assertTrue("拼音对都画成网格", pairs.all { it.grid })
+        val dependents = items.drop(1).filter { it.key != "schema.pinyin.fuzzy.hint_scope" }
+        assertTrue(
+            "总开关关着时拼音对与提示都收起",
+            dependents.all { it.enabledWhen == "schema.pinyin.fuzzy.enabled" },
+        )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun gridOnlyOnToggles() {
+        SettingsManifest.parse(
+            """
+            [[page]]
+            id = "a"
+            [[item]]
+            page = "a"
+            key = "input.x"
+            source = "engine"
+            type = "select"
+            grid = true
+            options = [{ value = "1" }]
+            """.trimIndent(),
+        )
+    }
+}

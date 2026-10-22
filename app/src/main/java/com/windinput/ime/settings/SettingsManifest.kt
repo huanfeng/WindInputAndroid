@@ -51,6 +51,10 @@ data class SettingItem(
     val exclusiveWith: String? = null,
     /** 另一个开关键：它开着时本项才显示（照电脑版清单的 enabled_when，这里只写键） */
     val enabledWhen: String? = null,
+    /** 二级页里的子卡片名：同 section 内按它再分卡，null = 无标题的头一张 */
+    val card: String? = null,
+    /** 本项所在卡画成两列勾选网格（只用于短标题的开关） */
+    val grid: Boolean = false,
 )
 
 data class SettingsManifestData(
@@ -140,6 +144,8 @@ object SettingsManifest {
                 },
                 exclusiveWith = t.getString("exclusive_with"),
                 enabledWhen = t.getString("enabled_when"),
+                card = t.getString("card"),
+                grid = t.getBoolean("grid") ?: false,
             )
         }
         // 引用的键必须是清单里的开关：写错一个字，二选一就变成能同时开、依赖项就永远不显示
@@ -148,6 +154,7 @@ object SettingsManifest {
             for (ref in listOfNotNull(item.exclusiveWith, item.enabledWhen)) {
                 require(ref in toggles) { "${item.key} 引用的「$ref」不是清单里的开关" }
             }
+            require(!item.grid || item.type == "toggle") { "${item.key}：grid 只能用在开关上" }
             // 二选一只在引擎项上实现（先关对方、一次重载），写在键盘项上会被静默忽略
             item.exclusiveWith?.let { other ->
                 require(item.source == SettingSource.ENGINE && toggles.getValue(other).source == SettingSource.ENGINE) {

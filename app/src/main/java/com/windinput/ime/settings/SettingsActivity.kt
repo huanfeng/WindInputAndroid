@@ -18,7 +18,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +35,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,12 +51,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.windinput.ime.WindInputApp
@@ -634,7 +642,12 @@ private fun SubScreen(
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
             if (page.id == "schema" && sub == SECTION_SHUANGPIN) ShuangpinLayouts(schemaState)
-            if (items.isNotEmpty()) SettingsCard(if (sub == SECTION_SHUANGPIN) "选项" else "", items, values)
+            // 组内再按 card 分卡（模糊音：总开关 / 声母 / 韵母 / 正确拼音提示）
+            for ((card, cardItems) in items.groupBy { it.card }) {
+                val title = card ?: if (sub == SECTION_SHUANGPIN) "选项" else ""
+                if (cardItems.all { it.grid }) ToggleGridCard(title, cardItems, values)
+                else SettingsCard(title, cardItems, values)
+            }
             // 方案的附加词库挂在对应的二级页底下：拼音细胞词库在「拼音」，五笔附加库在「码表」
             if (page.id == "schema" && sub == "拼音") SchemaDictsSection("细胞词库", listOf("pinyin", "shuangpin"))
             if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
@@ -662,6 +675,53 @@ private fun SettingsCard(title: String, items: List<SettingItem>, values: Settin
             NavRow(if (expanded) "进阶 ▴" else "进阶 ▾", "工程参数，一般不用改") { expanded = !expanded }
             if (expanded) for (item in advanced) key(item.key) { ItemRow(item, values) }
         }
+    }
+}
+
+/** 两列勾选网格：短标题的一组开关（模糊音的拼音对），一行一个开关太稀、一屏看不全 */
+@Composable
+private fun ToggleGridCard(title: String, items: List<SettingItem>, values: SettingsValues) {
+    val scope = rememberCoroutineScope()
+    @Suppress("UNUSED_EXPRESSION") values.version
+    if (title.isNotEmpty()) SmallTitle(title)
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            for (row in items.chunked(2)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (item in row) key(item.key) {
+                        val on = values.bool(item)
+                        GridChip(item.title, on, Modifier.weight(1f)) {
+                            scope.launch { withContext(Dispatchers.IO) { values.set(item, !on) } }
+                        }
+                    }
+                    if (row.size == 1) Spacer(Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GridChip(text: String, checked: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val colors = MiuixTheme.colorScheme
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        modifier = modifier
+            .height(48.dp)
+            .clip(shape)
+            .background(if (checked) colors.primary.copy(alpha = 0.12f) else colors.secondaryContainer)
+            .border(1.dp, if (checked) colors.primary else Color.Transparent, shape)
+            .toggleable(value = checked, role = Role.Checkbox, onValueChange = { onClick() }),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            color = if (checked) colors.primary else colors.onSurface,
+            fontSize = 15.sp,
+        )
     }
 }
 
