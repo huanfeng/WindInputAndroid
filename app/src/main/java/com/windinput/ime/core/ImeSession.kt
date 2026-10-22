@@ -109,11 +109,28 @@ data class CandidatePage(
     /** 与 [items] 一一对应的注释灰字；没开「候选显示编码提示」时为空 */
     val comments: List<String> = emptyList(),
     /**
+     * 与 [items] 一一对应的显示用分段正文；某条为空 = 按 [items] 那条纯文字画。
+     * 目前只有模糊音提示：「苹果」→「苹」「(ping)」「果」。[items] 仍是上屏文字，长按标题等照旧读它。
+     */
+    val segments: List<List<TextSegment>> = emptyList(),
+    /**
      * 这次拉取让核心扩容重建了候选（滑到尾部、首批没取够）：池子变大后词频重排可能改了
      * 前面的顺序，已显示的那段要整份重取，不能只把新的一段接在旧列表后面。
      */
     val rebuilt: Boolean = false,
 )
+
+/**
+ * 候选正文的一段（核心 `TextSegment` 的投影）。
+ *
+ * @param role 角色名，`null` = 正文；[ROLE_FUZZY_HINT] 是模糊音的正确拼音「(ping)」。
+ *   字号一律与正文相同，只按角色换色——标哪几条由核心按设置定，K 侧照画、不自己判。
+ */
+data class TextSegment(val text: String, val role: String?) {
+    companion object {
+        const val ROLE_FUZZY_HINT = "fuzzy_hint"
+    }
+}
 
 /**
  * 双拼布局条目（设置页「双拼布局」数据源）。

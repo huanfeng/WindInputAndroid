@@ -358,6 +358,9 @@ class WindInputImeService :
     /** 与 [loadedCandidates] 对应的注释灰字（开了「候选显示编码提示」才有） */
     private var loadedComments: List<String> = emptyList()
 
+    /** 与 [loadedCandidates] 对应的分段正文（模糊音提示「苹(ping)果」）；某条为空即按原文画 */
+    private var loadedSegments: List<List<com.windinput.ime.core.TextSegment>> = emptyList()
+
     /** 核心侧候选全量总数：`loadedCandidates.size < candidateTotal` 即还有得取 */
     private var candidateTotal = 0
 
@@ -746,6 +749,7 @@ class WindInputImeService :
                 }
                 loadedCandidates = page.items
                 loadedComments = page.comments
+                loadedSegments = page.segments
                 candidateTotal = page.total
                 val composingChanged = composing != event.composing
                 composing = event.composing
@@ -758,12 +762,13 @@ class WindInputImeService :
                 barView?.setCandidateFrame(
                     items = loadedCandidates,
                     comments = loadedComments,
+                    segments = loadedSegments,
                     preedit = event.preedit,
                     modeLabel = event.modeLabel,
                     page = event.page,
                     totalPages = event.totalPages,
                 )
-                expandedCandidatesWindow?.setCandidates(loadedCandidates, loadedComments)
+                expandedCandidatesWindow?.setCandidates(loadedCandidates, loadedComments, loadedSegments)
                 // 候选清空时若停留在展开面板，收回键盘
                 if (loadedCandidates.isEmpty() &&
                     windowManager?.current === expandedCandidatesWindow
@@ -1095,6 +1100,7 @@ class WindInputImeService :
             val target = loadedCandidates.size + CANDIDATE_CHUNK
             val items = ArrayList<String>(target)
             val comments = ArrayList<String>(target)
+            val segments = ArrayList<List<com.windinput.ime.core.TextSegment>>(target)
             var total = page.total
             while (items.size < target) {
                 val w = session.candidateWindow(items.size, minOf(target - items.size, CANDIDATE_WINDOW_MAX))
@@ -1102,14 +1108,16 @@ class WindInputImeService :
                 // 注释可能比候选短（开关中途切换）：按下标补齐后再接，保证两边一一对应
                 comments += com.windinput.ime.keyboard.CandidateBarView.alignComments(w.comments, w.items.size)
                     .takeIf { w.comments.isNotEmpty() } ?: List(w.items.size) { "" }
+                segments += com.windinput.ime.keyboard.CandidateText.align(w.segments, w.items.size, emptyList())
                 items += w.items
                 total = w.total
             }
             loadedCandidates = items
             loadedComments = comments
+            loadedSegments = segments
             candidateTotal = total
-            barView?.replaceCandidates(items, comments)
-            expandedCandidatesWindow?.replaceCandidates(items, comments)
+            barView?.replaceCandidates(items, comments, segments)
+            expandedCandidatesWindow?.replaceCandidates(items, comments, segments)
             return
         }
         if (page.items.isEmpty()) return
@@ -1121,9 +1129,16 @@ class WindInputImeService :
                 loadedCandidates.size - page.items.size,
             ) + page.comments
         }
+        if (page.segments.isNotEmpty()) {
+            loadedSegments = com.windinput.ime.keyboard.CandidateText.align(
+                loadedSegments,
+                loadedCandidates.size - page.items.size,
+                emptyList(),
+            ) + page.segments
+        }
         candidateTotal = page.total
-        barView?.appendCandidates(page.items, page.comments)
-        expandedCandidatesWindow?.appendCandidates(page.items, page.comments)
+        barView?.appendCandidates(page.items, page.comments, page.segments)
+        expandedCandidatesWindow?.appendCandidates(page.items, page.comments, page.segments)
     }
 
     /**
@@ -1713,6 +1728,7 @@ class WindInputImeService :
             symbolHistoryInBar = true
             loadedCandidates = recent
             loadedComments = emptyList()
+            loadedSegments = emptyList()
             candidateTotal = recent.size
             barView?.setCandidateFrame(recent, preedit = "", modeLabel = "", page = 1, totalPages = 1)
         } else if (symbolHistoryInBar) {
