@@ -96,6 +96,13 @@ license = "CC-BY-SA-4.0"
 url = "https://zh.wikipedia.org"
 
 [[notice]]
+group = "词库与数据"
+name = "万象拼音语法模型（rime-wanxiang-data）"
+usage = "拼音整句打分：wanxiang-mini.gram 是万象 LTS 语法模型的子集（作者 amzxyz），按 Tatoeba、KdConv、CrossWOZ、CPED、中文维基里用得到的条目挑出"
+license = "CC-BY-4.0"
+url = "https://github.com/amzxyz/rime-wanxiang-data"
+
+[[notice]]
 group = "程序库"
 name = "AndroidX / Jetpack Compose"
 usage = "设置界面"

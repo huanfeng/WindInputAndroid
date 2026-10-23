@@ -40,6 +40,7 @@ class NoticesTest {
             "charsets/emoji.yaml" to "Unicode emoji-data",
             "assoc/assoc_bigram.txt" to "rime-octagram-data",
             "assoc/assoc_bigram.txt" to "中文维基百科",
+            "schemas/pinyin/grammar/wanxiang-mini.gram" to "万象拼音语法模型（rime-wanxiang-data）",
         )
         val data = File("src/main/assets/data")
         for ((path, notice) in required) {
