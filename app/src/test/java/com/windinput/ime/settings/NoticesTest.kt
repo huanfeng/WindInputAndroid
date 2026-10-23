@@ -26,7 +26,8 @@ class NoticesTest {
     @Test
     fun bundledDataHasNotices() {
         val names = notices.joinToString(" ") { it.name + it.usage }
-        val required = mapOf(
+        // 列表而非 map：一份数据可以有几个来源，各要一条声明
+        val required = listOf(
             "schemas/wubi86" to "rime-wubi86-jidian",
             "schemas/wubi86/wubi86_chaizi.txt" to "wubi86_chaizi.txt",
             "schemas/wubi86/HeiTiZiGen.ttf" to "HeiTiZiGen.ttf",
@@ -37,6 +38,8 @@ class NoticesTest {
             "pinyin_map.txt" to "pinyin-data",
             "charsets/common_han.yaml" to "通用规范汉字表",
             "charsets/emoji.yaml" to "Unicode emoji-data",
+            "assoc/assoc_bigram.txt" to "rime-octagram-data",
+            "assoc/assoc_bigram.txt" to "中文维基百科",
         )
         val data = File("src/main/assets/data")
         for ((path, notice) in required) {

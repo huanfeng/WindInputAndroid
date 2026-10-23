@@ -5,7 +5,7 @@
 #   name     名称
 #   usage    在本输入法里用来做什么
 #   license  许可证；有全文的写 licenses/ 下的文件名去掉 .txt（GPL-3.0 / LGPL-3.0 /
-#            Apache-2.0 / MIT / MPL-2.0），点开显示全文
+#            Apache-2.0 / MIT / MPL-2.0 / CC-BY-SA-4.0），点开显示全文
 #   url      来源
 #
 # 数据条目的来源与加工方式以主仓 WindInput/NOTICE.md 为准；往 assets/data 里加了新数据，
@@ -87,6 +87,13 @@ name = "八股文语言模型（rime-octagram-data）"
 usage = "智能联想的「下一词」表：从 zh-hans-t-essay-bgw 模型离线蒸馏出常用词后面常接的词"
 license = "LGPL-3.0"
 url = "https://github.com/lotem/rime-octagram-data"
+
+[[notice]]
+group = "词库与数据"
+name = "中文维基百科"
+usage = "智能联想「下一词」表里的标点：按维基正文统计每个词后面最常接的句读（「吗」后给「？」）"
+license = "CC-BY-SA-4.0"
+url = "https://zh.wikipedia.org"
 
 [[notice]]
 group = "程序库"
