@@ -260,13 +260,13 @@ pub struct CandidateWindow {
     /// 只有 [`WindCore::candidates_with_comments`] 填，否则为空
     pub comments: Vec<String>,
     /// 与 items 一一对应的显示用分段正文；某条为空 = 按 items 那条纯文字画。
-    /// 目前只有模糊音提示：items「苹果」→「苹」「(ping)」「果」，提示段 role = `fuzzy_hint`
+    /// 目前只有正确拼音提示：items「苹果」→「苹」「(ping)」「果」，提示段 role = `pinyin_hint`
     pub text_segments: Vec<Vec<TextSegment>>,
     /// 本次拉取触发了核心扩容重建：前面已取到的候选可能变了，宿主须整份重取已显示的范围
     pub rebuilt: bool,
 }
 
-/// 分段正文的一段：`role` 为角色名（如 `fuzzy_hint`），`None` = 正文。字号与正文相同，按角色取色。
+/// 分段正文的一段：`role` 为角色名（如 `pinyin_hint`），`None` = 正文。字号与正文相同，按角色取色。
 #[derive(Debug, uniffi::Record)]
 pub struct TextSegment {
     pub text: String,

@@ -156,20 +156,36 @@ class SettingsManifestTest {
         }
     }
 
-    /** 模糊音页：总开关一行，拼音对分声母 / 韵母两张网格卡，正确拼音提示单独一张；总开关关着全收起 */
+    /** 模糊音页：总开关一行，拼音对分声母 / 韵母两张网格卡；总开关关着全收起 */
     @Test
     fun fuzzyPageSplitsIntoCards() {
         val items = bundled.sectionsOf("schema").first { it.first == "模糊音" }.second
-        assertEquals(listOf(null, "声母", "韵母", "正确拼音提示"), items.map { it.card }.distinct())
+        assertEquals(listOf(null, "声母", "韵母"), items.map { it.card }.distinct())
         assertEquals("schema.pinyin.fuzzy.enabled", items.first().key)
-        val pairs = items.filter { it.card == "声母" || it.card == "韵母" }
-        assertEquals(13, pairs.size)
-        assertTrue("拼音对都画成网格", pairs.all { it.grid })
-        val dependents = items.drop(1).filter { it.key != "schema.pinyin.fuzzy.hint_scope" }
+        assertEquals(13, items.drop(1).size)
+        assertTrue("拼音对都画成网格", items.drop(1).all { it.grid })
         assertTrue(
-            "总开关关着时拼音对与提示都收起",
-            dependents.all { it.enabledWhen == "schema.pinyin.fuzzy.enabled" },
+            "总开关关着时拼音对都收起",
+            items.drop(1).all { it.enabledWhen == "schema.pinyin.fuzzy.enabled" },
         )
+    }
+
+    /**
+     * 纠错与提示页：纠错总开关一行，规则随它收起；提示来源与带声调还管注释变量 `${correct_pinyin}`，
+     * 不随「显示正确拼音」收起，只有提示范围跟它走
+     */
+    @Test
+    fun correctionPageSplitsIntoCards() {
+        val items = bundled.sectionsOf("input").first { it.first == "纠错与提示" }.second
+        assertEquals(listOf(null, "纠错规则", "正确拼音提示"), items.map { it.card }.distinct())
+        assertEquals("input.correction.enabled", items.first().key)
+        val rules = items.filter { it.card == "纠错规则" }
+        assertEquals(8, rules.size)
+        assertTrue("规则随纠错总开关收起", rules.all { it.enabledWhen == "input.correction.enabled" })
+        val hints = items.filter { it.card == "正确拼音提示" }.associateBy { it.key }
+        assertEquals("input.correction.hint.enabled", hints.getValue("input.correction.hint.scope").enabledWhen)
+        val free = hints.keys - "input.correction.hint.scope"
+        assertTrue("其余提示项不收起", free.all { hints.getValue(it).enabledWhen == null })
     }
 
     @Test(expected = IllegalArgumentException::class)

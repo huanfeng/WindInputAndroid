@@ -132,7 +132,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         /** 与 [items] 按下标对应的编码提示灰字；可以比它短（没开提示时为空） */
         private var comments: List<String> = emptyList()
 
-        /** 与 [items] 按下标对应的分段正文（模糊音提示）；可以比它短，缺的那条按原文显示 */
+        /** 与 [items] 按下标对应的分段正文（正确拼音提示）；可以比它短，缺的那条按原文显示 */
         private var segments: List<List<TextSegment>> = emptyList()
 
         @Suppress("NotifyDataSetChanged")
@@ -182,7 +182,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
                     if (segs.isNullOrEmpty()) {
                         append(items[position])
                     } else {
-                        // 提示段（模糊音的正确拼音）与正文同字号，只换颜色
+                        // 提示段（正确拼音）与正文同字号，只换颜色
                         for (s in segs) {
                             val start = length
                             append(s.text)

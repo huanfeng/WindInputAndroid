@@ -5,7 +5,7 @@ import com.windinput.ime.core.TextSegment
 /**
  * 候选正文的分段排法：候选栏与展开面板共用，纯逻辑（量宽靠传入的函数），可在 JVM 上单测。
  *
- * 某条候选的分段为空 = 按原文整段画；非空时各段首尾相接，提示段（[TextSegment.ROLE_FUZZY_HINT]）
+ * 某条候选的分段为空 = 按原文整段画；非空时各段首尾相接，提示段（[TextSegment.ROLE_PINYIN_HINT]）
  * 只换颜色、字号与正文相同。
  */
 object CandidateText {
@@ -14,7 +14,7 @@ object CandidateText {
     fun display(item: String, segments: List<TextSegment>?): String =
         if (segments.isNullOrEmpty()) item else segments.joinToString("") { it.text }
 
-    fun isHint(segment: TextSegment): Boolean = segment.role == TextSegment.ROLE_FUZZY_HINT
+    fun isHint(segment: TextSegment): Boolean = segment.role == TextSegment.ROLE_PINYIN_HINT
 
     /**
      * 提示段的颜色：强调色的文字形态。不用 [Palette.hint]——那是注释灰，提示要与正文、注释

@@ -11,6 +11,7 @@ import top.yukonga.miuix.kmp.icon.extended.Edit
 import top.yukonga.miuix.kmp.icon.extended.Favorites
 import top.yukonga.miuix.kmp.icon.extended.Filter
 import top.yukonga.miuix.kmp.icon.extended.GridView
+import top.yukonga.miuix.kmp.icon.extended.Help
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Import
 import top.yukonga.miuix.kmp.icon.extended.Info
@@ -47,7 +48,7 @@ object SettingsIcons {
     /** 有专属图标的二级入口名（与 [bySection] 同步） */
     val SECTION_ICON_NAMES = setOf(
         "码表", "拼音", "模糊音", "双拼", "混输", "英文",
-        "默认状态", "字符与标点", "标点配对", "联想输入", "简繁转换", "Emoji/OpenCC",
+        "默认状态", "字符与标点", "标点配对", "联想输入", "简繁转换", "Emoji/OpenCC", "纠错与提示",
     )
 
     /** 清单 `icon` 字段可写的名字 */
@@ -81,6 +82,7 @@ object SettingsIcons {
             "联想输入" to MiuixIcons.Link,
             "简繁转换" to MiuixIcons.ConvertFile,
             "Emoji/OpenCC" to MiuixIcons.Favorites,
+            "纠错与提示" to MiuixIcons.Help,
         )
     }
 

@@ -642,7 +642,7 @@ private fun SubScreen(
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
             if (page.id == "schema" && sub == SECTION_SHUANGPIN) ShuangpinLayouts(schemaState)
-            // 组内再按 card 分卡（模糊音：总开关 / 声母 / 韵母 / 正确拼音提示）
+            // 组内再按 card 分卡（模糊音：总开关 / 声母 / 韵母；纠错与提示：总开关 / 纠错规则 / 正确拼音提示）
             for ((card, cardItems) in items.groupBy { it.card }) {
                 val title = card ?: if (sub == SECTION_SHUANGPIN) "选项" else ""
                 if (cardItems.all { it.grid }) ToggleGridCard(title, cardItems, values)

@@ -448,42 +448,6 @@ enabled_when = "schema.pinyin.fuzzy.enabled"
 
 [[item]]
 page = "schema"
-section = "模糊音"
-card = "正确拼音提示"
-key = "schema.pinyin.fuzzy.hint"
-source = "engine"
-type = "toggle"
-title = "显示正确拼音"
-summary = "模糊命中的候选里内嵌正确拼音，如「苹(ping)果」"
-enabled_when = "schema.pinyin.fuzzy.enabled"
-
-[[item]]
-page = "schema"
-section = "模糊音"
-card = "正确拼音提示"
-key = "schema.pinyin.fuzzy.hint_scope"
-source = "engine"
-type = "select"
-title = "提示范围"
-enabled_when = "schema.pinyin.fuzzy.hint"
-options = [
-  { value = "first", label = "首个模糊候选" },
-  { value = "all", label = "全部模糊候选" },
-]
-
-[[item]]
-page = "schema"
-section = "模糊音"
-card = "正确拼音提示"
-key = "schema.pinyin.fuzzy.hint_tone"
-source = "engine"
-type = "toggle"
-title = "提示带声调"
-summary = "作用于正文提示与注释变量 ${fuzzy_pinyin}，如「苹(píng)果」"
-enabled_when = "schema.pinyin.fuzzy.enabled"
-
-[[item]]
-page = "schema"
 section = "双拼"
 key = "schema.pinyin.shuangpin.allow_full_pinyin"
 source = "engine"
@@ -829,6 +793,170 @@ min = 1
 max = 8
 advanced = true
 enabled_when = "input.emoji.enabled"
+
+# 纠错与提示（input.correction）：电脑版另有纠错标记、自定义规则与误读表，手机端不列；
+# 移动端候选不加纠错标记。
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+key = "input.correction.enabled"
+source = "engine"
+type = "toggle"
+title = "拼写纠错"
+summary = "打错的拼音按纠正后的拼写也出候选，如 gogn 出「公」"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.gn_ng"
+source = "engine"
+type = "toggle"
+title = "ng 打成 gn（ogn→ong）"
+summary = "冲突：简拼下 xign 也可是 xi+g+n"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.on_ong"
+source = "engine"
+type = "toggle"
+title = "漏 g：on→ong"
+summary = "冲突：lone 也可是 lo+ne"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.vowel_swap"
+source = "engine"
+type = "toggle"
+title = "韵母字母颠倒"
+summary = "ia↔ai、ie↔ei 等；无已知冲突"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.legacy_spelling"
+source = "engine"
+type = "toggle"
+title = "旧式拼写 uei/iou/uen"
+summary = "冲突：liou 也可是 li+ou"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.h_misplaced"
+source = "engine"
+type = "toggle"
+title = "h 错位（hz→zh、zih→zhi）"
+summary = "冲突：h+zi 是简拼"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.mg_ng"
+source = "engine"
+type = "toggle"
+title = "ng 打成 mg"
+summary = "冲突：m 是简拼首字母"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.n_before_g"
+source = "engine"
+type = "toggle"
+title = "ng 打成 nag 类"
+summary = "冲突：nage 也可是 na+ge"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "纠错规则"
+key = "input.correction.rules.ai_ia"
+source = "engine"
+type = "toggle"
+title = "简拼冲突类"
+summary = "冲突：x'ai 喜爱 会被纠成 xia"
+enabled_when = "input.correction.enabled"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "正确拼音提示"
+key = "input.correction.hint.enabled"
+source = "engine"
+type = "toggle"
+title = "显示正确拼音"
+summary = "带提示的候选在正文里内嵌正确拼音，如「苹(ping)果」；上屏不受影响"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "正确拼音提示"
+key = "input.correction.hint.fuzzy"
+source = "engine"
+type = "toggle"
+title = "模糊音提示"
+summary = "靠模糊音匹配上的字（模糊音开着才有）"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "正确拼音提示"
+key = "input.correction.hint.misread"
+source = "engine"
+type = "toggle"
+title = "误读提示"
+summary = "易读错的词，打错误读音时也带出，如 xinxin 带出「莘(shen)莘(shen)」"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "正确拼音提示"
+key = "input.correction.hint.correction"
+source = "engine"
+type = "toggle"
+title = "纠错提示"
+summary = "经拼写纠错得到的候选（拼写纠错开着才有）"
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "正确拼音提示"
+key = "input.correction.hint.scope"
+source = "engine"
+type = "select"
+title = "提示范围"
+enabled_when = "input.correction.hint.enabled"
+options = [
+  { value = "first", label = "首个带提示的候选" },
+  { value = "all", label = "全部带提示的候选" },
+]
+
+[[item]]
+page = "input"
+section = "纠错与提示"
+card = "正确拼音提示"
+key = "input.correction.hint.tone"
+source = "engine"
+type = "toggle"
+title = "提示带声调"
+summary = "作用于正文提示与注释变量 ${correct_pinyin}，如「苹(píng)果」"
 
 # ═══ 外观 ═══════════════════════════════════════════════════════
 # 主题暂用键盘自己的深浅色（键盘配色还没接核心的主题系统，接上后改走 ui.theme.*）

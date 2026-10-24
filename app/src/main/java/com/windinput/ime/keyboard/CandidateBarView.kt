@@ -71,7 +71,7 @@ class CandidateBarView(context: Context) : View(context) {
         textSize = 19 * density
     }
 
-    /** 正文里的提示段（模糊音的正确拼音「(ping)」）：与正文同字号，只换颜色 */
+    /** 正文里的提示段（正确拼音「(ping)」）：与正文同字号，只换颜色 */
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = CandidateText.hintColor(Palette.current)
         textSize = 19 * density
