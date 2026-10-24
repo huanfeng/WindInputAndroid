@@ -35,14 +35,14 @@ class BundledSchemasTest {
     }
 
     /**
-     * 内置误读表：核心按 `schemas/pinyin_misread.txt` 读，缺了不报错，只是误读提示与召回悄悄没了。
+     * 内置误读表：核心按 `schemas/pinyin_misread.yaml` 读，缺了不报错，只是误读提示与召回悄悄没了。
      * 主仓在隔壁时内容须与主仓 `data/schemas/` 那份一致（手工同步，改主仓后记得拷过来）。
      */
     @Test
     fun misreadTableIsBundledAndInSync() {
-        val bundled = File(schemaDir, "pinyin_misread.txt")
+        val bundled = File(schemaDir, "pinyin_misread.yaml")
         assertTrue("缺内置误读表 ${bundled.path}", bundled.isFile)
-        val upstream = File("../../WindInput/data/schemas/pinyin_misread.txt")
+        val upstream = File("../../WindInput/data/schemas/pinyin_misread.yaml")
         if (upstream.isFile) {
             assertTrue("误读表与主仓不一致，从 ${upstream.path} 拷过来", upstream.readBytes().contentEquals(bundled.readBytes()))
         }

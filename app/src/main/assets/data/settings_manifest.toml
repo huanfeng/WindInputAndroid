@@ -922,7 +922,7 @@ key = "input.correction.hint.misread"
 source = "engine"
 type = "toggle"
 title = "误读提示"
-summary = "易读错的词，打错误读音时也带出，如 xinxin 带出「莘(shen)莘(shen)」"
+summary = "易读错的词，打错误读音时也带出，如 tiaoyan 带出「调(diao)研」"
 
 [[item]]
 page = "input"
