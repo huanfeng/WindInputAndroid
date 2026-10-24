@@ -11,7 +11,7 @@ class CandidateTextTest {
 
     private val pingguo = listOf(
         TextSegment("苹", null),
-        TextSegment("(ping)", TextSegment.ROLE_FUZZY_HINT),
+        TextSegment("(ping)", TextSegment.ROLE_PINYIN_HINT),
         TextSegment("果", null),
     )
 

@@ -361,7 +361,7 @@ class WindInputImeService :
     /** 与 [loadedCandidates] 对应的注释灰字（开了「候选显示编码提示」才有） */
     private var loadedComments: List<String> = emptyList()
 
-    /** 与 [loadedCandidates] 对应的分段正文（模糊音提示「苹(ping)果」）；某条为空即按原文画 */
+    /** 与 [loadedCandidates] 对应的分段正文（正确拼音提示「苹(ping)果」）；某条为空即按原文画 */
     private var loadedSegments: List<List<com.windinput.ime.core.TextSegment>> = emptyList()
 
     /** 核心侧候选全量总数：`loadedCandidates.size < candidateTotal` 即还有得取 */
