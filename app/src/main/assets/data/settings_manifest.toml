@@ -227,6 +227,16 @@ source = "engine"
 type = "toggle"
 title = "智能组词"
 
+# 整句语法模型写移动端覆盖键 mobile.grammar.enabled（手机默认开，电脑版出厂关，各管各的）
+[[item]]
+page = "schema"
+section = "拼音"
+key = "mobile.grammar.enabled"
+source = "engine"
+type = "toggle"
+title = "整句语法模型"
+summary = "按上下文搭配给整句挑更通顺的结果，如 womenzaigongyuanjianmian 出「我们在公园见面」而非「公元」"
+
 [[item]]
 page = "schema"
 section = "拼音"
