@@ -6,9 +6,9 @@ import org.junit.Test
 class ToolbarItemTest {
 
     @Test
-    fun defaultPinsAreClipboardAndTextEdit() {
+    fun defaultPinsAreEmojiClipboardAndTextEdit() {
         assertEquals(
-            listOf(ToolbarItem.CLIPBOARD, ToolbarItem.TEXT_EDIT),
+            listOf(ToolbarItem.EMOJI, ToolbarItem.CLIPBOARD, ToolbarItem.TEXT_EDIT),
             ToolbarItem.parse(ToolbarItem.DEFAULT_PINS),
         )
     }

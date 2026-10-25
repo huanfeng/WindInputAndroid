@@ -33,7 +33,8 @@ import com.windinput.ime.keyboard.PanelIcon
  * - 两家第 3 行两端是 `123` 和 `⌫`。这里符号区要能上下滚（日文、序号一类一页放不下），
  *   固定在滚动区里的两个键不好处理，于是 `⌫` 挪到底行，`←` 直接回进来前的那一层（123 层或数字键盘），
  *   就不再要单独的 `123`。
- * - 点一个符号后**停在本页**（跟微信；豆包会回到字母键盘）：连着打几个符号时不用每次重进三层。
+ * - 点一个符号后回到进来前的那一层（主流做法）；底行的锁定键锁上后改为**停在本页**，
+ *   连着打几个符号时不用每次重进三层。锁定态由宿主持久化（[Listener.isSymbolLocked]）。
  *
  * 符号原样上屏，不经引擎（中文模式下点「,」就是半角逗号，这一页本来就是按形态挑的）。
  * 窗口保留条区（[keepsBar]），与键盘同高，进出时整个输入法不跳。
@@ -48,6 +49,10 @@ class SymbolWindow(
         fun onSymbolSelected(symbol: String)
         fun onSymbolBackspace()
         fun onSymbolBack()
+
+        /** 锁定态（点完符号是否停在本页）：由宿主持久化，缺省不锁 */
+        fun isSymbolLocked(): Boolean = false
+        fun onSymbolLockChanged(locked: Boolean) = Unit
 
         /** 符号页打开 / 收起：打开时条区的候选行用来放最近用过的符号 */
         fun onSymbolPageShown(shown: Boolean) = Unit
@@ -84,7 +89,9 @@ class SymbolWindow(
         // 只记不刷：正在看「最近」时不让格子在手指底下挪位（微信也是下次进来才更新）
         recentStore.record(symbol)
         listener.onSymbolSelected(symbol)
+        if (!locked) listener.onSymbolBack()
     }
+    private var locked = false
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreateView(context: Context): View {
@@ -151,6 +158,22 @@ class SymbolWindow(
             },
             LinearLayout.LayoutParams(0, rowHeight, 1f).apply { gravity = Gravity.CENTER_VERTICAL },
         )
+
+        val lockCell = keyCell(context, "", palette.keySpecial, palette.text)
+        lockCell.contentDescription = "symbol-lock"
+        fun paintLock() {
+            val tint = if (locked) palette.accentText else palette.text
+            GlyphDrawable.apply(lockCell, if (locked) PanelIcon.Glyph.LOCK else PanelIcon.Glyph.UNLOCK, tint)
+        }
+        locked = listener.isSymbolLocked()
+        paintLock()
+        lockCell.setOnClickListener {
+            KeyHaptics.tap(it)
+            locked = !locked
+            listener.onSymbolLockChanged(locked)
+            paintLock()
+        }
+        bottom.addView(lockCell, LinearLayout.LayoutParams(sideWidth * 2 / 3, rowHeight))
 
         bottom.addView(
             keyCell(context, "⌫", palette.keySpecial, palette.text).apply {

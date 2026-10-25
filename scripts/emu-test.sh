@@ -906,7 +906,7 @@ check "数字框直接是九宫格" "50" "$(get_pad_text)"
 # 场景复位：点回「普通」（场景是分段，不必重启进程——重启会连输入法一起杀掉、核心冷启动）
 tap_text "普通"
 
-section "[25] 分类符号页：选符号上屏、停在本页、退格、返回"
+section "[25] 分类符号页：锁定后选符号上屏并停在本页、退格、返回"
 # 符号页在 IME 窗口里，uiautomator 只 dump 应用窗口，格子和 tab 看不到，只能按坐标点。
 # 先清掉最近用过的（debug 包可 run-as），进页面落在「常用」、内容只有出厂那一组：
 # 第 1 行是 ， 。 ？ ！ 、 …（SymbolWindow.COMMON_DEFAULTS），每行 10 格。
@@ -919,12 +919,18 @@ sym_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 20 )) $(( GEO_KBTO
 # 有编码时点符号：先上屏首选再接符号（与打标点的效果一致）
 tap_key a; tap_key a
 tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
+# 默认点完符号回到进来前的层（不锁）；先点底行的锁定键锁上，才会停在本页（锁在 ui.android.symbol_lock）
+sym_lock_x=$(( GEO_W * 80 / 100 ))
+sym_lock_y=$(( GEO_KBBOTTOM - GEO_ROWPX / 2 ))
+adb_q shell input tap "$sym_lock_x" "$sym_lock_y"; sleep 0.4
 sym_cell 0 0; sym_cell 0 1
-check_match "首选 + ，。（点完停在本页）" '^[\x{4e00}-\x{9fa5}]，。$' "$(get_pad_text)"
+check_match "首选 + ，。（锁定后点完停在本页）" '^[\x{4e00}-\x{9fa5}]，。$' "$(get_pad_text)"
 sym_bs_x=$(( GEO_W * 925 / 1000 )); sym_back_x=$(( GEO_W * 75 / 1000 ))
 sym_bottom_y=$(( GEO_KBBOTTOM - GEO_ROWPX / 2 ))
 adb_q shell input tap "$sym_bs_x" "$sym_bottom_y"; sleep 0.4
 check_match "符号页退格" '^[\x{4e00}-\x{9fa5}]，$' "$(get_pad_text)"
+# 解锁，恢复默认（锁定态会落盘，不解开会影响后面的用例）
+adb_q shell input tap "$sym_lock_x" "$sym_lock_y"; sleep 0.4
 # ← 回到 123 层（不是字母层）：点第 1 行第 1 格应出 1
 adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
 tap_cell 0 "${SYM_W[0]}" 0

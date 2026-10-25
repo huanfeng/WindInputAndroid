@@ -89,6 +89,10 @@ class QuickPanelWindow(
         const val COLUMNS = 4
         const val TILE_HEIGHT_DP = 64
         const val MIN_TILE_HEIGHT_DP = 40
+        const val EDIT_MIN_TILE_HEIGHT_DP = 54
+
+        /** 编辑工具栏时「当前顺序」行的高度（dp） */
+        const val ORDER_ROW_DP = 46
     }
 
     private var schemaRow: LinearLayout? = null
@@ -101,6 +105,9 @@ class QuickPanelWindow(
     private var editButton: TextView? = null
     private var editHint: TextView? = null
     private var tileGrid: GridLayout? = null
+
+    /** 编辑工具栏时的「当前顺序」行：每个常驻项带 ‹ › 两个移位钮 */
+    private var orderRow: LinearLayout? = null
     private var status: UiEvent.Status? = null
 
     override fun onCreateView(context: Context): View {
@@ -122,7 +129,7 @@ class QuickPanelWindow(
         )
 
         val hint = TextView(context).apply {
-            text = "点带图钉的格子，选常驻在工具栏上的按钮（最多 ${ToolbarItem.MAX_PINS} 个）"
+            text = "点带图钉的格子选常驻按钮（最多 ${ToolbarItem.MAX_PINS} 个），用下面的箭头调顺序"
             textSize = 12f
             setTextColor(Palette.current.hint)
             visibility = View.GONE
@@ -131,6 +138,18 @@ class QuickPanelWindow(
         column.addView(
             hint,
             LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = dp(8)
+            },
+        )
+
+        val order = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            visibility = View.GONE
+        }
+        orderRow = order
+        column.addView(
+            order,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(ORDER_ROW_DP)).apply {
                 bottomMargin = dp(8)
             },
         )
@@ -238,6 +257,7 @@ class QuickPanelWindow(
     private fun rebuildTiles(context: Context) {
         val grid = tileGrid ?: return
         grid.removeAllViews()
+        rebuildOrder(context)
         val st = status
         val tiles = mutableListOf<View>()
         val pins = listener.toolbarPins()
@@ -293,6 +313,97 @@ class QuickPanelWindow(
         for (t in tiles) grid.addView(t, cell(context, heightPx))
     }
 
+    /** 当前顺序行：只在编辑工具栏时出现；常驻为空时给一句空态提示 */
+    private fun rebuildOrder(context: Context) {
+        val row = orderRow ?: return
+        row.removeAllViews()
+        row.visibility = if (editingPins) View.VISIBLE else View.GONE
+        if (!editingPins) return
+        val density = context.resources.displayMetrics.density
+        val p = Palette.current
+        val pins = listener.toolbarPins()
+        if (pins.isEmpty()) {
+            row.addView(
+                TextView(context).apply {
+                    text = "工具栏上还没有常驻按钮"
+                    textSize = 13f
+                    gravity = Gravity.CENTER_VERTICAL
+                    setTextColor(p.hint)
+                },
+                LinearLayout.LayoutParams(MATCH, MATCH),
+            )
+            return
+        }
+        fun move(from: Int, to: Int) {
+            val next = pins.toMutableList()
+            next.add(to, next.removeAt(from))
+            listener.onToolbarPinsChanged(next)
+            rebuildOrder(context)
+        }
+        fun arrow(glyph: PanelIcon.Glyph, enabled: Boolean, onClick: () -> Unit) = PanelIcon(context).apply {
+            this.glyph = glyph
+            tint = if (enabled) p.text else p.hint
+            alpha = if (enabled) 1f else 0.3f
+            scale = 0.8f
+            decorative = true
+            if (enabled) setOnClickListener { onClick() }
+        }
+        pins.forEachIndexed { i, item ->
+            val cell = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER
+                background = GradientDrawable().apply {
+                    cornerRadius = 10 * density
+                    setColor(p.key)
+                }
+            }
+            val size = (20 * density).toInt()
+            cell.addView(arrow(PanelIcon.Glyph.ARROW_LEFT, i > 0) { move(i, i - 1) }, LinearLayout.LayoutParams(size + (8 * density).toInt(), MATCH))
+            cell.addView(
+                glyphOrBadge(context, item.glyph ?: item.text.orEmpty(), p.text, (22 * density).toInt()),
+                LinearLayout.LayoutParams((22 * density).toInt(), (22 * density).toInt()),
+            )
+            cell.addView(arrow(PanelIcon.Glyph.ARROW_RIGHT, i < pins.lastIndex) { move(i, i + 1) }, LinearLayout.LayoutParams(size + (8 * density).toInt(), MATCH))
+            row.addView(
+                cell,
+                LinearLayout.LayoutParams(0, MATCH, 1f).apply { marginEnd = (6 * density).toInt() },
+            )
+        }
+        // 不足 MAX_PINS 个时补空位，让格子宽度稳定、不随个数拉伸
+        repeat(ToolbarItem.MAX_PINS - pins.size) {
+            row.addView(View(context), LinearLayout.LayoutParams(0, MATCH, 1f).apply { marginEnd = (6 * density).toInt() })
+        }
+    }
+
+    /**
+     * 统一的图标视图：矢量图标直接画；本身是字符的（「，」「Ａ」「繁」…）画成同线宽的圆角方框
+     * 里放字，与线条风格的矢量图标并排时看着是一套。
+     */
+    private fun glyphOrBadge(context: Context, icon: Any, color: Int, sizePx: Int): View {
+        if (icon is PanelIcon.Glyph) {
+            return PanelIcon(context).apply {
+                glyph = icon
+                tint = color
+                scale = 0.86f
+                decorative = true
+            }
+        }
+        val density = context.resources.displayMetrics.density
+        return TextView(context).apply {
+            text = icon.toString()
+            textSize = (sizePx / density) * 0.5f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(color)
+            background = GradientDrawable().apply {
+                cornerRadius = 4 * density
+                setColor(android.graphics.Color.TRANSPARENT)
+                setStroke((1.6f * density).toInt(), color)
+            }
+        }
+    }
+
     /**
      * 格子高度：所有行在键盘区里一屏放下（此前固定 64dp，第三行被底边裁掉一大半，「切换输入法」
      * 「设置」只露出图标顶，而滚动条是隐藏的，用户不知道还能滑）。上限是原来的 64dp，下限 40dp
@@ -300,9 +411,12 @@ class QuickPanelWindow(
      */
     private fun tileHeightPx(context: Context, rows: Int): Int {
         val density = context.resources.displayMetrics.density
-        val reserved = (8 + 8 + 38 + 10) * density // 上下内边距 + 方案行及其下间距
+        // 上下内边距 + 方案行及其下间距；编辑工具栏时再多出提示行和顺序行
+        val reserved = (8 + 8 + 38 + 10 + if (editingPins) ORDER_ROW_DP + 8 + 28 else 0) * density
         val perRow = (PanelScaffold.keyboardHeightPx(context) - reserved) / rows.coerceAtLeast(1) - 6 * density
-        return perRow.coerceIn(MIN_TILE_HEIGHT_DP * density, TILE_HEIGHT_DP * density).toInt()
+        // 编辑工具栏时多了两行，一屏放不下就滚，不再往下压：压到 40dp 标签会被裁
+        val min = if (editingPins) EDIT_MIN_TILE_HEIGHT_DP else MIN_TILE_HEIGHT_DP
+        return perRow.coerceIn(min * density, TILE_HEIGHT_DP * density).toInt()
     }
 
     private fun cell(context: Context, heightPx: Int) = GridLayout.LayoutParams().apply {
@@ -336,28 +450,9 @@ class QuickPanelWindow(
                 setColor(if (on) p.accent else p.key)
             }
             val fg = if (on) p.onAccent else p.text
-            if (icon is PanelIcon.Glyph) {
-                // 矢量图标而不是 emoji：emoji 各机型长相不一、颜色写死，跟着选中态变不了色
-                val size = (28 * density).toInt()
-                addView(
-                    PanelIcon(context).apply {
-                        glyph = icon
-                        tint = fg
-                        scale = 0.86f
-                        decorative = true
-                    },
-                    LinearLayout.LayoutParams(size, size),
-                )
-            } else {
-                addView(
-                    TextView(context).apply {
-                        text = icon.toString()
-                        textSize = 20f
-                        gravity = Gravity.CENTER
-                        setTextColor(fg)
-                    },
-                )
-            }
+            // 矢量图标而不是 emoji：emoji 各机型长相不一、颜色写死，跟着选中态变不了色
+            val size = (26 * density).toInt()
+            addView(glyphOrBadge(context, icon, fg, size), LinearLayout.LayoutParams(size, size))
             addView(
                 TextView(context).apply {
                     text = label

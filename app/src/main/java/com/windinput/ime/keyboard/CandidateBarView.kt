@@ -60,7 +60,7 @@ class CandidateBarView(context: Context) : View(context) {
     var listener: Listener? = null
 
     private val density = resources.displayMetrics.density
-    private val barHeightPx = (44 * density).toInt()
+    private var barHeightPx = (44 * density).toInt()
     private val itemPaddingH = 14 * density
 
     private val bgColor = Palette.current.surface
@@ -290,6 +290,14 @@ class CandidateBarView(context: Context) : View(context) {
     private fun maxScroll(): Float = (contentWidth - width).coerceAtLeast(0f)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        // 高度跟父容器走（条区候选行的高度由 KeyboardDimens 定），没给定值才用自带的 44dp
+        val h = MeasureSpec.getSize(heightMeasureSpec).takeIf { it > 0 } ?: barHeightPx
+        if (h != barHeightPx) {
+            barHeightPx = h
+            itemBounds.clear()
+            contentWidth = 0f
+            measureFrom(0)
+        }
         setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec), barHeightPx)
     }
 

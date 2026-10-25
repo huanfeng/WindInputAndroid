@@ -35,8 +35,8 @@ enum class ToolbarItem(
     companion object {
         const val CONFIG_KEY = "ui.android.toolbar_pins"
 
-        /** 出厂常驻：剪贴板、文本编辑（两家输入法工具栏上都有，手机上最常用的两个） */
-        const val DEFAULT_PINS = "clipboard,text_edit"
+        /** 出厂常驻：表情、剪贴板、文本编辑（主流输入法工具栏上都有，表情使用频率最高） */
+        const val DEFAULT_PINS = "emoji,clipboard,text_edit"
 
         /** 工具栏放得下的上限：两头各一格之外，再多就挤得点不准 */
         const val MAX_PINS = 5

@@ -73,6 +73,12 @@ class PanelIcon(context: Context) : View(context) {
         ARROW_DOWN,
         ARROW_LEFT,
         ARROW_RIGHT,
+
+        /** 锁定（挂锁，锁梁合上） */
+        LOCK,
+
+        /** 未锁定（挂锁，锁梁打开） */
+        UNLOCK,
     }
 
     /**
@@ -343,6 +349,19 @@ class GlyphPainter {
                 path.moveTo(px(12f), py(7f))
                 path.lineTo(px(12f), py(12f))
                 path.lineTo(px(15.5f), py(14f))
+                canvas.drawPath(path, stroke)
+            }
+            PanelIcon.Glyph.LOCK, PanelIcon.Glyph.UNLOCK -> {
+                // 锁身：圆角矩形；锁梁：半圆 + 两条竖边，未锁定时右边竖边抬起、整个梁右移
+                oval.set(px(6f), py(11f), px(18f), py(20f))
+                canvas.drawRoundRect(oval, 2f * u, 2f * u, stroke)
+                val open = glyph == PanelIcon.Glyph.UNLOCK
+                val shift = if (open) 3f else 0f
+                path.moveTo(px(8.5f + shift), py(11f))
+                path.lineTo(px(8.5f + shift), py(8f))
+                oval.set(px(8.5f + shift), py(4f), px(15.5f + shift), py(12f))
+                path.arcTo(oval, 180f, 180f)
+                if (!open) path.lineTo(px(15.5f), py(11f))
                 canvas.drawPath(path, stroke)
             }
             PanelIcon.Glyph.ARROW_UP, PanelIcon.Glyph.ARROW_DOWN, PanelIcon.Glyph.ARROW_LEFT, PanelIcon.Glyph.ARROW_RIGHT -> {

@@ -103,7 +103,7 @@ class BarView(
         setPadding(dp(4), 0, dp(4), 0)
     }
     private val preeditText = TextView(context).apply {
-        setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 14f)
+        setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 13f)
         includeFontPadding = false
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.START // 长编码保留末尾（正在打的那几码）
@@ -123,7 +123,7 @@ class BarView(
         gravity = Gravity.CENTER_VERTICAL
         // 横屏编码行只有 16dp：去掉顶部内边距、短称收矮，否则短称被裁、拼音的 g/j/p/q/y 下伸被裁
         val compact = KeyboardDimens.barPreeditDp < 20f
-        setPadding(dp(10), if (compact) 0 else dp(2), 0, 0)
+        setPadding(dp(10), 0, 0, 0)
         setBackgroundColor(Palette.current.surface)
         addView(modeLabel, LayoutParams(LayoutParams.WRAP_CONTENT, dp(if (compact) 13 else 15)))
         addView(preeditText, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))

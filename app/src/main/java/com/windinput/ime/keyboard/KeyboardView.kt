@@ -1076,6 +1076,9 @@ class KeyboardView(context: Context) : View(context) {
                     listener?.onKeyAction(KeyAction.Text(SPLIT_CHAR), shifted = false)
                     return
                 }
+                // 中文有编码、方案又没有分隔键（双拼、码表）：⇧ 没有用处，按下去只会把下一个字母
+                // 顶成大写直出、打断编码，所以忽略
+                if (composing && !englishMode) return
                 val now = android.os.SystemClock.uptimeMillis()
                 autoShifted = false
                 when {

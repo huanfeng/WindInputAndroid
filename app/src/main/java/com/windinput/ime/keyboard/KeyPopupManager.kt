@@ -18,6 +18,11 @@ class KeyPopupManager(private val anchor: View) {
 
     private val density = anchor.resources.displayMetrics.density
 
+    private companion object {
+        /** 上滑气泡下沿高出键位上沿多少（dp），见 [showSwipeBubble] */
+        const val SWIPE_BUBBLE_GAP_DP = 26f
+    }
+
     // ── 预览气泡 ─────────────────────────────────────────────────
     private var preview: PopupWindow? = null
     private var previewLabel: TextView? = null
@@ -156,33 +161,27 @@ class KeyPopupManager(private val anchor: View) {
     // ── 上滑一体式气泡 ───────────────────────────────────────────
     private var swipeBubble: PopupWindow? = null
     private var swipeTop: TextView? = null
-    private var swipeMain: TextView? = null
 
     /**
-     * 上滑副字符的一体式气泡：从键位向上长出一截（下沿与键位齐平、比键略宽），把键整个罩住，
-     * 上半是副字符、下半是主字符——看着是键自己伸长了，而不是另外飘出一个框。
+     * 上滑副字符的气泡：只放副字符，悬在**手指上方**。手指上滑时指尖会越过键位上沿 20dp 左右，
+     * 气泡若贴着键位（此前是罩住整个键、再往上伸一格）就整个被手遮住；这里让它下沿高出键位
+     * [SWIPE_BUBBLE_GAP_DP]，滑到阈值时指尖仍在气泡下方。
      * 上滑过阈值时副字符放大变强调色（[setSwipeArmed]），抬手上屏的就是它；退回来恢复。
+     * [main] 只给读屏 / 调用方对照用，不画。
      */
+    @Suppress("UNUSED_PARAMETER")
     fun showSwipeBubble(keyRect: RectF, main: String, swipe: String) {
         dismissAll()
-        val w = (keyRect.width() + 8 * density).toInt()
-        val h = (keyRect.height() * 2 + 4 * density).toInt()
-        val top = bubbleText(swipe, 22f).also { it.background = null }
-        val bottom = bubbleText(main, 18f).also { it.background = null }
+        val w = (maxOf(keyRect.width(), 52 * density)).toInt()
+        val h = (58 * density).toInt()
+        val top = bubbleText(swipe, 24f)
         swipeTop = top
-        swipeMain = bottom
-        val col = LinearLayout(anchor.context).apply {
-            orientation = LinearLayout.VERTICAL
-            background = bubbleBackground()
-            addView(top, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1.1f))
-            addView(bottom, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 0.9f))
-        }
         val loc = IntArray(2)
         anchor.getLocationInWindow(loc)
         val x = (loc[0] + keyRect.centerX() - w / 2f).toInt().coerceIn(loc[0], loc[0] + anchor.width - w)
-        val y = (loc[1] + keyRect.bottom + 2 * density - h).toInt()
+        val y = (loc[1] + keyRect.top - h - SWIPE_BUBBLE_GAP_DP * density).toInt()
         setSwipeArmed(false)
-        swipeBubble = popupWindow(col, w, h).also {
+        swipeBubble = popupWindow(top, w, h).also {
             it.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
         }
     }
@@ -190,18 +189,16 @@ class KeyPopupManager(private val anchor: View) {
     fun setSwipeArmed(armed: Boolean) {
         val p = Palette.current
         swipeTop?.apply {
-            setTextColor(if (armed) p.accentText else p.hint)
-            textSize = if (armed) 28f else 22f
+            setTextColor(if (armed) p.accentText else p.text)
+            textSize = if (armed) 30f else 24f
             typeface = if (armed) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
         }
-        swipeMain?.setTextColor(if (armed) p.hint else p.text)
     }
 
     private fun dismissSwipeBubble() {
         swipeBubble?.dismiss()
         swipeBubble = null
         swipeTop = null
-        swipeMain = null
     }
 
     fun dismissAll() {

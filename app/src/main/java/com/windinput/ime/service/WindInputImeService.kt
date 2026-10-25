@@ -473,8 +473,8 @@ class WindInputImeService :
      * 两处都写是重复（真机反馈），条区也因此矮一截。
      */
     private fun barDims(): Pair<Float, Float> {
-        val preedit = if (userConfig.getBoolean("ui.android.inline_preedit", false)) 0f else 16f
-        return preedit to 38f
+        val preedit = if (userConfig.getBoolean("ui.android.inline_preedit", false)) 0f else 22f
+        return preedit to 46f
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
@@ -1765,6 +1765,10 @@ class WindInputImeService :
     override fun onSymbolBack() {
         windowManager?.showKeyboard()
     }
+
+    override fun isSymbolLocked(): Boolean = userConfig.getBoolean("ui.android.symbol_lock", false)
+
+    override fun onSymbolLockChanged(locked: Boolean) = userConfig.put("ui.android.symbol_lock", locked)
 
     /**
      * 不经引擎、原样上屏（数字键盘、符号页、表情）。

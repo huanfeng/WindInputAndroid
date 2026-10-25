@@ -42,14 +42,14 @@ swipe = "1234567890"
 # 第 2 行两侧各缩进半个键，键宽与第 1 行相同（大众布局）
 key = [
   { spacer = 0.5 },
-  { chars = "asdfghjkl", swipe = "-/:;()~\"'" },
+  { chars = "asdfghjkl", swipe = "~!@#%^&*?" },
   { spacer = 0.5 },
 ]
 
 [[rows]]
 key = [
   { label = "⇧", action = "shift", width = 1.5 },
-  { chars = "zxcvbnm", swipe = "@`#\\?!^" },
+  { chars = "zxcvbnm", swipe = "()-_:;/" },
   { label = "⌫", action = "backspace", width = 1.5 },
 ]
 
@@ -59,7 +59,7 @@ key = [
 key = [
   { label = "符号", action = "symbol_page", width = 1.35 },
   { label = "123", action = "switch_symbols", width = 1.15 },
-  { text = ",", long_press = ",;:\\" },
+  { text = ",", long_press = ",;:\"'\\" },
   { label = "空格", action = "space", width = 2.95 },
   { text = ".", long_press = ".?!^" },
   # 中英切换固定在回车左侧（主流输入法的位置约定，肌肉记忆在这）
