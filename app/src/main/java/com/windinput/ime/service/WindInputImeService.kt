@@ -316,16 +316,6 @@ class WindInputImeService :
         /** 首次使用的方案卡片弹过没有（ime_onboarding prefs） */
         const val KEY_FIRST_PICK_SHOWN = "first_pick_shown"
 
-        /**
-         * 有编码时 ⇧ 变「分词」的方案。只有全拼：分隔符 `auto` 档下全拼用反引号
-         * （见 KeyboardView.SPLIT_CHAR）；双拼的反引号出厂归辅助码、`'` 归选词键，
-         * `auto` 退化为不启用，发什么都不是分词。码表方案没有分词语义。
-         *
-         * ⚠ 按 id 判断是权宜：绑定层的 SchemaInfo 还没带引擎类型和分隔符设置。
-         * 补上后改为问引擎「当前方案的分隔键是哪个」，见 IMPLEMENTATION_PLAN.md。
-         */
-        val SPLIT_SCHEMAS = setOf("pinyin")
-
         /** 不是码表的方案：临时拼音对它们没有意义 */
         val NON_CODETABLE_SCHEMAS = setOf("pinyin", "shuangpin", "english")
 
@@ -740,7 +730,7 @@ class WindInputImeService :
             // 空格上的灰字：英文写「英文」（引擎没装英文方案时退回系统英文模式，
             // 那时 active 仍是切走前的中文方案），否则写当前方案名
             kv.spaceLabel = if (english) "英文" else active?.name.orEmpty()
-            kv.splitEnabled = !english && active?.id in SPLIT_SCHEMAS
+            kv.splitChar = if (english) null else session.separatorKey()
         }
         session.setLatinSchema(english)
         updateAutoCaps()
@@ -773,7 +763,11 @@ class WindInputImeService :
                 composing = event.composing
                 // 只露条区的模式下，开始/结束打字时跟着显示/收起输入法窗口
                 if (hardKeyboardOnly && composingChanged) updateInputViewShown()
-                keyboardWindow?.keyboardView?.composing = composing
+                keyboardWindow?.keyboardView?.let { kv ->
+                    kv.composing = composing
+                    // 分隔符键随设置（五笔整句开关、分隔符策略）变，开始打字时现问一次
+                    if (composingChanged && composing && modeLabel != "英") kv.splitChar = session.separatorKey()
+                }
                 // 打完一个词（编码清空）后再判一次句首大写：上屏回调可能早于这一帧
                 updateAutoCaps()
 

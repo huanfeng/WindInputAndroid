@@ -189,6 +189,8 @@ class DeferredSession(
         return delegate?.schemas().orEmpty().also { lastSchemas = it }
     }
 
+    override fun separatorKey(): Char? = if (busy) null else delegate?.separatorKey()
+
     override fun shuangpinLayouts(): List<LayoutEntry> =
         if (busy) emptyList() else delegate?.shuangpinLayouts().orEmpty()
 

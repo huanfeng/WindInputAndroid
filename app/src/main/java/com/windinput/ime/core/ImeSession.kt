@@ -243,6 +243,12 @@ interface ImeSession {
     /** 可选方案列表（快捷面板的方案选择器） */
     fun schemas(): List<SchemaEntry> = emptyList()
 
+    /**
+     * 当前方案的手动音节分隔符（`'` 或 `` ` ``）；null = 没有，键盘不摆「分词」键。
+     * 由引擎按键位占用情况定（全拼 `` ` ``，双拼 / 五笔整句 `'`），随方案与设置变，每次现问。
+     */
+    fun separatorKey(): Char? = null
+
     /** 可选双拼布局（设置页「双拼布局」） */
     fun shuangpinLayouts(): List<LayoutEntry> = emptyList()
 

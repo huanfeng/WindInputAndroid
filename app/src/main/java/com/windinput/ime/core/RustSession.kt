@@ -152,6 +152,9 @@ class RustSession(
     override fun setPrecedingText(text: String) =
         guard.run("setPrecedingText", Unit) { core.setPrecedingText(text) }
 
+    override fun separatorKey(): Char? =
+        guard.run<String?>("separatorKey", null) { core.separatorKey() }?.firstOrNull()
+
     override fun schemas(): List<SchemaEntry> =
         guard.run("schemas", emptyList()) { core.schemas() }.mapIndexed { i, s ->
             SchemaEntry(

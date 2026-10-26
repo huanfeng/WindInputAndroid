@@ -22,14 +22,6 @@ class KeyboardView(context: Context) : View(context) {
     private companion object {
         const val TAG = "WindKeyboard"
 
-        /**
-         * 「分词」键发的字符。**是反引号不是 `'`**：出厂二三候选键是 `;` `'`
-         * （`select_key_groups = semicolon_quote`），`'` 被占时引擎的分隔符 `auto` 档改用
-         * 反引号（主仓 `manual_separator_key_of`）。发 `'` 实测是「选第三候选上屏」。
-         * 引擎把两者都显示成 `'`。
-         */
-        const val SPLIT_CHAR = '`'
-
         /** 按下高亮的最小可见时长；约 4 帧，短于此人眼捕捉不到 */
         const val MIN_HIGHLIGHT_MS = 70L
     }
@@ -145,7 +137,7 @@ class KeyboardView(context: Context) : View(context) {
 
     /**
      * 引擎里有未上屏的编码。有编码时回车写「确定」（上屏编码原文），
-     * 可分词的方案（见 [splitEnabled]）⇧ 写「分词」。
+     * 可分词的方案（见 [splitChar]）⇧ 写「分词」。
      */
     var composing = false
         set(value) {
@@ -154,8 +146,12 @@ class KeyboardView(context: Context) : View(context) {
             invalidate()
         }
 
-    /** 当前方案有可用的音节分隔键（见 [SPLIT_CHAR]）。只有它为真，有编码时 ⇧ 才变「分词」 */
-    var splitEnabled = false
+    /**
+     * 当前方案的手动音节分隔符（`'` 或 `` ` ``），由引擎按键位占用情况定：全拼是反引号，
+     * 双拼、五笔整句是 `'`（主仓 `manual_separator_vk_of`）。null = 没有，⇧ 不变「分词」。
+     * 「分词」键发的就是它——写死哪个都会和引擎对不上：发 `'` 给全拼，实测是「选第三候选上屏」。
+     */
+    var splitChar: Char? = null
         set(value) {
             if (field == value) return
             field = value
@@ -594,8 +590,8 @@ class KeyboardView(context: Context) : View(context) {
         KeyIcons.drawBackspace(canvas, rect.centerX(), rect.centerY(), density, iconPaint, iconPath)
     }
 
-    /** 有编码且方案支持分词：⇧ 这一格临时当「分词」用（发 [SPLIT_CHAR]） */
-    private val splitMode get() = composing && splitEnabled
+    /** 有编码且方案支持分词：⇧ 这一格临时当「分词」用（发 [splitChar]） */
+    private val splitMode get() = composing && splitChar != null
 
     private fun displayLabel(key: KeyDef): String {
         if (key.action == KeyAction.Enter) {
@@ -1073,7 +1069,7 @@ class KeyboardView(context: Context) : View(context) {
         when (key.action) {
             KeyAction.Shift -> {
                 if (splitMode) {
-                    listener?.onKeyAction(KeyAction.Text(SPLIT_CHAR), shifted = false)
+                    splitChar?.let { listener?.onKeyAction(KeyAction.Text(it), shifted = false) }
                     return
                 }
                 // 中文有编码、方案又没有分隔键（双拼、码表）：⇧ 没有用处，按下去只会把下一个字母

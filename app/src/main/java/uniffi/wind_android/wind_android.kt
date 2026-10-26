@@ -779,6 +779,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_separator_key(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_emoji_module(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(
@@ -905,6 +907,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_select_candidate(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_separator_key(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_set_emoji_module(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1154,6 +1158,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 14719) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_separator_key() != 19509) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_emoji_module() != 22141) {
@@ -2300,6 +2307,12 @@ public interface WindCoreInterface {
     fun `selectCandidate`(`index`: kotlin.UInt): KeyResult
     
     /**
+     * 活跃方案此刻的手动音节分隔符（`"'"` 或 `` "`" ``）；`None` = 没有，K 侧不该摆「分词」键。
+     * 随方案、`separator` 设置、五笔整句开关变化，每次要用时再问，别缓存。纯读。
+     */
+    fun `separatorKey`(): kotlin.String?
+    
+    /**
      * 打开 / 关闭一个 emoji 附加模块。只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
      */
     fun `setEmojiModule`(`id`: kotlin.String, `on`: kotlin.Boolean)
@@ -3003,6 +3016,23 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         it,
         
         FfiConverterUInt.lower(`index`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 活跃方案此刻的手动音节分隔符（`"'"` 或 `` "`" ``）；`None` = 没有，K 侧不该摆「分词」键。
+     * 随方案、`separator` 设置、五笔整句开关变化，每次要用时再问，别缓存。纯读。
+     */override fun `separatorKey`(): kotlin.String? {
+            return FfiConverterOptionalString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_separator_key(
+        it,
+        _status)
 }
     }
     )

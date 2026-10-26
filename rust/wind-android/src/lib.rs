@@ -449,6 +449,12 @@ impl WindCore {
             .collect()
     }
 
+    /// 活跃方案此刻的手动音节分隔符（`"'"` 或 `` "`" ``）；`None` = 没有，K 侧不该摆「分词」键。
+    /// 随方案、`separator` 设置、五笔整句开关变化，每次要用时再问，别缓存。纯读。
+    pub fn separator_key(&self) -> Option<String> {
+        self.core.separator_key().map(|c| c.to_string())
+    }
+
     /// 拉取候选全量的一个窗口。**纯读**，不改状态，可随时调。
     ///
     /// 别在每次按键都拉一大段：序列化与 K 侧的文字测量都在主线程上。
