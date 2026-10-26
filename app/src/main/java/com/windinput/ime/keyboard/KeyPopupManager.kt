@@ -1,6 +1,5 @@
 package com.windinput.ime.keyboard
 
-import android.graphics.Color
 import android.graphics.RectF
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
@@ -19,8 +18,14 @@ class KeyPopupManager(private val anchor: View) {
     private val density = anchor.resources.displayMetrics.density
 
     private companion object {
-        /** 上滑气泡下沿高出键位上沿多少（dp），见 [showSwipeBubble] */
-        const val SWIPE_BUBBLE_GAP_DP = 26f
+        /** 上滑气泡下沿高出指尖多少（dp），见 [showSwipeBubble]：手指高约 40dp，再近就被遮住 */
+        const val SWIPE_BUBBLE_GAP_DP = 40f
+
+        /** 气泡内容四周的留白（dp）：选中项的圆角底画在留白里面，不顶出气泡的圆角 */
+        const val BUBBLE_INSET_DP = 3f
+
+        /** 气泡外圈圆角（dp）；选中项底的圆角 = 它减去留白，两道圆弧同心 */
+        const val BUBBLE_RADIUS_DP = 14f
     }
 
     // ── 预览气泡 ─────────────────────────────────────────────────
@@ -59,8 +64,12 @@ class KeyPopupManager(private val anchor: View) {
         if (chars.isEmpty()) return
         itemWidthPx = (44 * density).toInt()
         val h = (52 * density).toInt()
-        val w = itemWidthPx * chars.size
-        val row = LinearLayout(anchor.context).apply { orientation = LinearLayout.HORIZONTAL }
+        val inset = (BUBBLE_INSET_DP * density).toInt()
+        val w = itemWidthPx * chars.size + 2 * inset
+        val row = LinearLayout(anchor.context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(inset, inset, inset, inset)
+        }
         popupItems = chars.map { ch ->
             bubbleText(ch, 22f).also {
                 it.background = null
@@ -68,11 +77,11 @@ class KeyPopupManager(private val anchor: View) {
             }
         }
         row.background = bubbleBackground()
-        val pos = positionAbove(keyRect, w, h)
-        popupLeft = pos[0]
+        val pos = positionAbove(keyRect, w, h + 2 * inset)
+        popupLeft = pos[0] + inset
         selectedIndex = 0
         highlight()
-        popup = popupWindow(row, w, h).also {
+        popup = popupWindow(row, w, h + 2 * inset).also {
             it.showAtLocation(anchor, Gravity.NO_GRAVITY, pos[0], pos[1])
         }
     }
@@ -105,23 +114,25 @@ class KeyPopupManager(private val anchor: View) {
         anchor.getLocationOnScreen(loc)
         val room = loc[1] + keyRect.top - 40 * density
         val rowH = (room / labels.size).coerceIn(32 * density, 44 * density).toInt()
+        val inset = (BUBBLE_INSET_DP * density).toInt()
         val col = LinearLayout(anchor.context).apply {
             orientation = LinearLayout.VERTICAL
             background = bubbleBackground()
+            setPadding(inset, inset, inset, inset)
         }
         views.forEach { col.addView(it, LinearLayout.LayoutParams(w, rowH)) }
         popupItems = views
-        val h = rowH * labels.size
+        val h = rowH * labels.size + 2 * inset
         val win = IntArray(2)
         anchor.getLocationInWindow(win)
-        val x = (win[0] + keyRect.left).toInt().coerceIn(win[0], win[0] + anchor.width - w)
+        val x = (win[0] + keyRect.left).toInt().coerceIn(win[0], win[0] + anchor.width - w - 2 * inset)
         val y = (win[1] + keyRect.top - h - 8 * density).toInt()
-        menuTop = y - win[1]
+        menuTop = y - win[1] + inset
         menuRowH = rowH
         selectedIndex = selected.coerceIn(0, labels.size - 1)
         menuInitial = selectedIndex
         highlight()
-        popup = popupWindow(col, w, h).also {
+        popup = popupWindow(col, w + 2 * inset, h).also {
             it.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
         }
     }
@@ -170,7 +181,7 @@ class KeyPopupManager(private val anchor: View) {
      * [main] 只给读屏 / 调用方对照用，不画。
      */
     @Suppress("UNUSED_PARAMETER")
-    fun showSwipeBubble(keyRect: RectF, main: String, swipe: String) {
+    fun showSwipeBubble(keyRect: RectF, main: String, swipe: String, fingerY: Float) {
         dismissAll()
         val w = (maxOf(keyRect.width(), 52 * density)).toInt()
         val h = (58 * density).toInt()
@@ -178,12 +189,29 @@ class KeyPopupManager(private val anchor: View) {
         swipeTop = top
         val loc = IntArray(2)
         anchor.getLocationInWindow(loc)
-        val x = (loc[0] + keyRect.centerX() - w / 2f).toInt().coerceIn(loc[0], loc[0] + anchor.width - w)
-        val y = (loc[1] + keyRect.top - h - SWIPE_BUBBLE_GAP_DP * density).toInt()
+        swipeX = (loc[0] + keyRect.centerX() - w / 2f).toInt().coerceIn(loc[0], loc[0] + anchor.width - w)
+        swipeW = w
+        swipeH = h
         setSwipeArmed(false)
         swipeBubble = popupWindow(top, w, h).also {
-            it.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
+            it.showAtLocation(anchor, Gravity.NO_GRAVITY, swipeX, swipeY(fingerY))
         }
+    }
+
+    private var swipeX = 0
+    private var swipeW = 0
+    private var swipeH = 0
+
+    /** 气泡下沿在指尖上方 [SWIPE_BUBBLE_GAP_DP]；顶到屏幕上沿就停住（PopupWindow 不受键盘窗口裁剪） */
+    private fun swipeY(fingerY: Float): Int {
+        val loc = IntArray(2)
+        anchor.getLocationInWindow(loc)
+        return (loc[1] + fingerY - swipeH - SWIPE_BUBBLE_GAP_DP * density).toInt().coerceAtLeast(0)
+    }
+
+    /** 手指上滑途中气泡跟着指尖走，始终悬在手指上方 */
+    fun moveSwipeBubble(fingerY: Float) {
+        swipeBubble?.update(swipeX, swipeY(fingerY), swipeW, swipeH)
     }
 
     fun setSwipeArmed(armed: Boolean) {
@@ -212,9 +240,14 @@ class KeyPopupManager(private val anchor: View) {
     private fun highlight() {
         popupItems.forEachIndexed { i, tv ->
             tv.setTextColor(if (i == selectedIndex) Palette.current.accentText else Palette.current.text)
-            tv.setBackgroundColor(
-                if (i == selectedIndex) Palette.current.accentSoft else Color.TRANSPARENT,
-            )
+            tv.background = if (i == selectedIndex) {
+                GradientDrawable().apply {
+                    setColor(Palette.current.accentSoft)
+                    cornerRadius = (BUBBLE_RADIUS_DP - BUBBLE_INSET_DP) * density
+                }
+            } else {
+                null
+            }
         }
     }
 
@@ -246,7 +279,7 @@ class KeyPopupManager(private val anchor: View) {
     private fun bubbleBackground(): GradientDrawable =
         GradientDrawable().apply {
             setColor(Palette.current.key)
-            cornerRadius = 10 * density
+            cornerRadius = BUBBLE_RADIUS_DP * density
             setStroke((1 * density).toInt(), Palette.current.border)
         }
 }

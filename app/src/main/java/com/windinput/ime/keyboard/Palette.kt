@@ -17,7 +17,7 @@ import android.content.res.Configuration
 class Palette(
     /** 键盘底色（键与键之间的缝） */
     val background: Int,
-    /** 条区 / 面板顶栏 / 列表行的面 */
+    /** 列表行 / 面板内容区的面（条区与面板顶栏用 [background]，与键盘同色） */
     val surface: Int,
     /** 普通键面 */
     val key: Int,
@@ -47,22 +47,28 @@ class Palette(
     val border: Int,
 ) {
     companion object {
+        /**
+         * 蓝色只出现在三个角色里（同一色相）：实心强调色 [accent]、半透明淡底 [accentSoft]、
+         * 强调字 [accentText]；按下态、编码字、分隔线等一律中性灰——此前混着六种蓝，
+         * 看着不统一。参考电脑端「清风·蓝」，手机端实心色略深（白字对比 4.57）、淡底用透明度叠。
+         * 条区与键盘区共用 [background]：两块异色会在交界处拉出一道硬边。
+         */
         val light = Palette(
-            background = 0xFFF0F2F5.toInt(),
-            surface = 0xFFFAFAFC.toInt(),
+            background = 0xFFEDEFF3.toInt(),
+            surface = 0xFFF7F8FA.toInt(),
             key = 0xFFFFFFFF.toInt(),
             keySpecial = 0xFFD9DDE3.toInt(),
-            keyPressed = 0xFFBBD0F8.toInt(),
-            text = 0xFF1E1E1E.toInt(),
-            hint = 0xFF969696.toInt(),
-            accent = 0xFF4A78C8.toInt(),
+            keyPressed = 0xFFCDD3DD.toInt(),
+            text = 0xFF1A1D24.toInt(),
+            hint = 0xFF8A91A0.toInt(),
+            accent = 0xFF2F6FEB.toInt(),
             onAccent = 0xFFFFFFFF.toInt(),
-            accentSoft = 0xFFE6F0FF.toInt(),
-            accentText = 0xFF3B82F6.toInt(),
-            preedit = 0xFF32568C.toInt(),
-            separator = 0xFFE8EAF0.toInt(),
-            icon = 0xFF4B5563.toInt(),
-            border = 0xFFC8C8C8.toInt(),
+            accentSoft = 0x1A2F6FEB,
+            accentText = 0xFF2563EB.toInt(),
+            preedit = 0xFF5A6072.toInt(),
+            separator = 0xFFDDE1E8.toInt(),
+            icon = 0xFF4A5163.toInt(),
+            border = 0xFFE2E5EB.toInt(),
         )
 
         /**
@@ -70,21 +76,21 @@ class Palette(
          * 白键压灰底，深色里同样是浅灰键压深底），强调色提亮一档保证在深底上可读。
          */
         val dark = Palette(
-            background = 0xFF17181C.toInt(),
-            surface = 0xFF232428.toInt(),
-            key = 0xFF35373D.toInt(),
-            keySpecial = 0xFF26282E.toInt(),
-            keyPressed = 0xFF4F6494.toInt(),
-            text = 0xFFF2F2F2.toInt(),
-            hint = 0xFF9A9DA5.toInt(),
-            accent = 0xFF6B8FD8.toInt(),
+            background = 0xFF12151C.toInt(),
+            surface = 0xFF1B1F2A.toInt(),
+            key = 0xFF2E3442.toInt(),
+            keySpecial = 0xFF232833.toInt(),
+            keyPressed = 0xFF444C5E.toInt(),
+            text = 0xFFF2F3F7.toInt(),
+            hint = 0xFF8F97A8.toInt(),
+            accent = 0xFF3A74E2.toInt(),
             onAccent = 0xFFFFFFFF.toInt(),
-            accentSoft = 0xFF2C3A58.toInt(),
-            accentText = 0xFF8AB4F8.toInt(),
-            preedit = 0xFFA9C4F5.toInt(),
-            separator = 0xFF3A3C42.toInt(),
-            icon = 0xFFC0C4CC.toInt(),
-            border = 0xFF4A4C52.toInt(),
+            accentSoft = 0x3360A5FA,
+            accentText = 0xFF7AB0FF.toInt(),
+            preedit = 0xFF9AA3B4.toInt(),
+            separator = 0xFF2A3040.toInt(),
+            icon = 0xFFB4BBC9.toInt(),
+            border = 0xFF3A4152.toInt(),
         )
 
         /**

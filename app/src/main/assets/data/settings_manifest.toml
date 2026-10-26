@@ -992,11 +992,31 @@ key = "ui.android.candidate_text_sp"
 source = "android"
 type = "int"
 title = "候选字号"
-default = 19
+default = 21
 min = 15
 max = 24
 unit = "sp"
 preview = "candidate_text"
+
+[[item]]
+page = "ui"
+section = "候选字体"
+key = "ui.android.candidate_page_no"
+source = "android"
+type = "toggle"
+title = "显示候选页码"
+summary = "编码行右侧的「1/3」；主流输入法都不显示，候选可左右滑动翻看"
+default = false
+
+[[item]]
+page = "ui"
+section = "候选字体"
+key = "ui.android.candidate_divider"
+source = "android"
+type = "toggle"
+title = "候选之间的分隔线"
+summary = "候选词之间的淡色竖线；关掉后只靠间距分开"
+default = true
 
 [[item]]
 page = "ui"
@@ -1028,7 +1048,7 @@ source = "android"
 type = "int"
 title = "竖屏"
 summary = "每一行键的高度"
-default = 56
+default = 60
 min = 40
 max = 72
 step = 2
@@ -1091,6 +1111,35 @@ options = [
   { value = "off", label = "关闭" },
   { value = "right", label = "右手" },
   { value = "left", label = "左手" },
+]
+
+[[item]]
+page = "keyboard"
+section = "键位"
+key = "ui.android.number_page"
+source = "android"
+type = "select"
+title = "「123」键先进哪一页"
+summary = "全键盘数字页带常用符号，九宫数字页适合只输数字；数字框、电话框始终直接进九宫"
+default = "full"
+options = [
+  { value = "full", label = "全键盘数字" },
+  { value = "pad9", label = "九宫数字" },
+]
+
+[[item]]
+page = "keyboard"
+section = "键位"
+key = "ui.android.bottom_row"
+source = "android"
+type = "select"
+title = "字母页底行"
+summary = "逗号、句号和符号键怎么排（与豆包「26 键键盘布局」三项一致）"
+default = "split"
+options = [
+  { value = "split", label = "逗句号键分开" },
+  { value = "sym", label = "数字符号键分开" },
+  { value = "merge", label = "数字符号键合并" },
 ]
 
 [[item]]

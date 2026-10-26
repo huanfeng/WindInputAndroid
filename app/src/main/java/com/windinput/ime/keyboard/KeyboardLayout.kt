@@ -81,13 +81,19 @@ enum class KeyboardLayer { LETTERS, SYMBOLS, NUMBER }
  * 见 docs/android-ime-features.md §10 建议 3）。面板高度随之联动。
  */
 object KeyboardDimens {
-    var rowHeightDp: Int = 56
+    var rowHeightDp: Int = 60
+
+    /**
+     * 第一排键上方的留白（dp）：条区与键盘共用底色后，条区底边到第一排键只剩半个行距，
+     * 看着贴在一起，这里再垫一点。面板按它算整体高度，切换时窗口不跳。
+     */
+    const val PAD_TOP_DP = 3f
 
     /** 条区编码行高度（dp）；横屏收矮，见 [BarView] */
-    var barPreeditDp: Float = 20f
+    var barPreeditDp: Float = 23f
 
     /** 条区候选行高度（dp） */
-    var barMainRowDp: Float = 40f
+    var barMainRowDp: Float = 42f
 }
 
 object KeyboardLayouts {

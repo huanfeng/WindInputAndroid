@@ -24,6 +24,9 @@ class KeyboardView(context: Context) : View(context) {
 
         /** 按下高亮的最小可见时长；约 4 帧，短于此人眼捕捉不到 */
         const val MIN_HIGHLIGHT_MS = 70L
+
+        /** 键帽高度（dp）；行高减去它就是上下两行之间的间隙（60 − 51 = 9dp ≈ 24px） */
+        const val KEY_HEIGHT_DP = 51f
     }
 
     interface Listener {
@@ -217,7 +220,14 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 行高动态取自 KeyboardDimens（横竖屏配置由 Service 注入） */
     private val rowHeightPx get() = (KeyboardDimens.rowHeightDp * density).toInt()
-    private val keyGapPx = 3 * density
+
+    /** 键与键的间隙是两侧各留一半：横向 14px、纵向 24px（@420dpi），与主流输入法同量级 */
+    private val keyGapPx = 2.7f * density
+    private val keyGapVPx get() = (rowHeightPx - KEY_HEIGHT_DP * density).coerceAtLeast(2 * density) / 2
+
+    /** 键区离视图左右边缘的留白：加上半个键间隙，首末键离屏幕边约 16px，不贴边、少误点 */
+    private val edgePadPx = 3.4f * density
+    private val padTopPx = KeyboardDimens.PAD_TOP_DP * density
     private val keyRadiusPx = 8 * density
     private val swipeThresholdPx = 40 * density
     private val swipeActivatePx = 16 * density
@@ -392,7 +402,7 @@ class KeyboardView(context: Context) : View(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(width, rowHeightPx * rows.size + paddingTop + paddingBottom)
+        setMeasuredDimension(width, (padTopPx + rowHeightPx * rows.size).toInt())
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -412,9 +422,9 @@ class KeyboardView(context: Context) : View(context) {
         keyBounds.clear()
         rows.forEachIndexed { rowIndex, row ->
             val totalWeight = row.sumOf { it.widthWeight.toDouble() }.toFloat()
-            val unit = width / totalWeight
-            var x = 0f
-            val top = (rowIndex * rowHeightPx).toFloat()
+            val unit = (width - 2 * edgePadPx) / totalWeight
+            var x = edgePadPx
+            val top = padTopPx + rowIndex * rowHeightPx
             for (key in row) {
                 val keyWidth = unit * key.widthWeight
                 // 占位空白只占宽度，不进命中表也不绘制
@@ -422,8 +432,8 @@ class KeyboardView(context: Context) : View(context) {
                     keyBounds += KeyBounds(
                         key,
                         RectF(
-                            x + keyGapPx, top + keyGapPx,
-                            x + keyWidth - keyGapPx, top + rowHeightPx * key.rowSpan - keyGapPx,
+                            x + keyGapPx, top + keyGapVPx,
+                            x + keyWidth - keyGapPx, top + rowHeightPx * key.rowSpan - keyGapVPx,
                         ),
                         rowIndex,
                     )
@@ -448,8 +458,11 @@ class KeyboardView(context: Context) : View(context) {
         val count = rows.takeWhile { row ->
             row.firstOrNull()?.let { it.action == KeyAction.Spacer && it.widthWeight == first.widthWeight } == true
         }.size
-        val unit = width / rows[0].sumOf { it.widthWeight.toDouble() }.toFloat()
-        return RectF(keyGapPx, keyGapPx, unit * first.widthWeight - keyGapPx, rowHeightPx * count - keyGapPx)
+        val unit = (width - 2 * edgePadPx) / rows[0].sumOf { it.widthWeight.toDouble() }.toFloat()
+        return RectF(
+            edgePadPx + keyGapPx, padTopPx + keyGapVPx,
+            edgePadPx + unit * first.widthWeight - keyGapPx, padTopPx + rowHeightPx * count - keyGapVPx,
+        )
     }
 
     private val maxSideScroll: Float
@@ -803,9 +816,10 @@ class KeyboardView(context: Context) : View(context) {
                 val rect = pressedRect ?: return
                 swipeShown = true
                 cancelTimers()
-                popupManager.showSwipeBubble(rect, "⌫", "清空")
+                popupManager.showSwipeBubble(rect, "⌫", "清空", y)
             }
             if (swipeShown) {
+                popupManager.moveSwipeBubble(y)
                 val armed = dy > swipeThresholdPx
                 if (armed != swipeArmed) {
                     swipeArmed = armed
@@ -841,9 +855,10 @@ class KeyboardView(context: Context) : View(context) {
                 val rect = pressedRect ?: return
                 swipeShown = true
                 cancelTimers()
-                popupManager.showSwipeBubble(rect, displayLabel(key), Punct.display(swipeChar, chinesePunct))
+                popupManager.showSwipeBubble(rect, displayLabel(key), Punct.display(swipeChar, chinesePunct), y)
             }
             if (swipeShown) {
+                popupManager.moveSwipeBubble(y)
                 val armed = dy > swipeThresholdPx
                 if (armed != swipeArmed) {
                     swipeArmed = armed
@@ -949,7 +964,7 @@ class KeyboardView(context: Context) : View(context) {
      */
     private fun findBounds(x: Float, y: Float): KeyBounds? {
         keyBounds.firstOrNull { it.rect.contains(x, y) }?.let { return it }
-        val row = (y / rowHeightPx).toInt()
+        val row = ((y - padTopPx) / rowHeightPx).toInt().coerceIn(0, rows.size - 1)
         return keyBounds
             .filter { it.row == row }
             .minByOrNull { kotlin.math.abs(it.rect.centerX() - x) }
@@ -991,6 +1006,12 @@ class KeyboardView(context: Context) : View(context) {
         autoShifted = false
         reloadLayout()
     }
+
+    /** 字母层的 123 键先进九宫数字页（设置项 ui.android.number_page = pad9），默认先进全键盘数字 */
+    var numberPad9 = false
+
+    /** 设置里改了布局相关项（底行排法、数字页默认）：按当前设置重取键位 */
+    fun refreshLayout() = reloadLayout()
 
     private fun reloadLayout() {
         rows = layoutProvider(layer)
@@ -1090,6 +1111,10 @@ class KeyboardView(context: Context) : View(context) {
                 invalidate()
             }
             KeyAction.SwitchSymbols -> {
+                if (layer == KeyboardLayer.LETTERS && numberPad9) {
+                    setLayer(KeyboardLayer.NUMBER, returnTo = KeyboardLayer.LETTERS)
+                    return
+                }
                 setLayer(
                     when (layer) {
                         KeyboardLayer.LETTERS -> KeyboardLayer.SYMBOLS
@@ -1098,7 +1123,13 @@ class KeyboardView(context: Context) : View(context) {
                     },
                 )
             }
-            KeyAction.NumberPad -> setLayer(KeyboardLayer.NUMBER, returnTo = layer)
+            // 九宫页上的「123」：去 123 全键盘数字页（九宫作默认时的互切键，见 LayoutTweaks）
+            KeyAction.NumberPad ->
+                if (layer == KeyboardLayer.NUMBER) {
+                    setLayer(KeyboardLayer.SYMBOLS)
+                } else {
+                    setLayer(KeyboardLayer.NUMBER, returnTo = layer)
+                }
             else -> {
                 // 逗号句号合一键：英文模式点按改出句点
                 val action = key.textFor(englishMode)

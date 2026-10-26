@@ -38,6 +38,7 @@ import com.windinput.ime.keyboard.OneHandStrip
 import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardDimens
+import com.windinput.ime.keyboard.LayoutTweaks
 import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
@@ -250,7 +251,16 @@ class WindInputImeService :
         )
         applyOneHand()
 
-        keyboardWindow = KeyboardWindow(listener = this, layoutProvider = layoutRepository::rows)
+        keyboardWindow = KeyboardWindow(
+            listener = this,
+            layoutProvider = { layer ->
+                LayoutTweaks.apply(
+                    layoutRepository.rows(layer), layer,
+                    bottomRow = userConfig.getString("ui.android.bottom_row", LayoutTweaks.BOTTOM_SPLIT),
+                    numberPage = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_FULL),
+                )
+            },
+        )
         textEditingWindow = TextEditingWindow(listener = this)
         clipboardWindow = ClipboardWindow(clipboardStore, listener = this)
         emojiWindow = EmojiWindow(recentEmojiStore, listener = this)
@@ -447,7 +457,7 @@ class WindInputImeService :
         val portrait =
             resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
         KeyboardDimens.rowHeightDp = if (portrait) {
-            userConfig.getInt("ui.android.row_height_portrait", 56)
+            userConfig.getInt("ui.android.row_height_portrait", 60)
         } else {
             userConfig.getInt("ui.android.row_height_landscape", 44)
         }
@@ -463,8 +473,8 @@ class WindInputImeService :
      * 两处都写是重复（真机反馈），条区也因此矮一截。
      */
     private fun barDims(): Pair<Float, Float> {
-        val preedit = if (userConfig.getBoolean("ui.android.inline_preedit", false)) 0f else 22f
-        return preedit to 46f
+        val inline = userConfig.getBoolean("ui.android.inline_preedit", false)
+        return if (inline) 0f to 46f else 23f to 42f
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
@@ -508,7 +518,13 @@ class WindInputImeService :
             showSwipeHints = userConfig.getBoolean("ui.android.show_swipe_hints", true)
             enterLabel = enterActionLabel(info)
         }
-        barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 19).toFloat()
+        barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 21).toFloat()
+        barView?.candidateBar?.showDividers = userConfig.getBoolean("ui.android.candidate_divider", true)
+        barView?.showPageNo = userConfig.getBoolean("ui.android.candidate_page_no", false)
+        keyboardWindow?.keyboardView?.let {
+            it.numberPad9 = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_FULL) == LayoutTweaks.NUMBER_PAD9
+            it.refreshLayout()
+        }
         // 输入视图可能刚重建（配色变了），无痕标记跟着重设
         barView?.setIncognito(manualIncognito || fieldSuspendsLearning)
         barView?.setPinned(visiblePins())

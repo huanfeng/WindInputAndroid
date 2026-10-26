@@ -63,33 +63,40 @@ class CandidateBarView(context: Context) : View(context) {
     private var barHeightPx = (44 * density).toInt()
     private val itemPaddingH = 14 * density
 
-    private val bgColor = Palette.current.surface
+    private val bgColor = Palette.current.background
     private val pressedColor = Palette.current.accentSoft
     private val separatorColor = Palette.current.separator
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Palette.current.text
-        textSize = 19 * density
+        textSize = 21 * density
+    }
+
+    /** 首选的字：强调字色，与其余候选区分开（首选再加一块键面色的圆角底，见 [onDraw]） */
+    private val firstPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Palette.current.accentText
+        textSize = 21 * density
     }
 
     /** 正文里的提示段（正确拼音「(ping)」）：与正文同字号，只换颜色 */
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = CandidateText.hintColor(Palette.current)
-        textSize = 19 * density
+        textSize = 21 * density
     }
 
     /** 注释灰字（码表剩余编码、拼音候选反查码）：候选字号的 0.6 倍，紧跟在字后 */
     private val commentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Palette.current.hint
-        textSize = 19 * density * COMMENT_SCALE
+        textSize = 21 * density * COMMENT_SCALE
     }
     private val commentGap = 3 * density
 
     /** 候选字号（sp，设置项 ui.android.candidate_text_sp）；改后全部重量 */
-    var textSizeSp = 19f
+    var textSizeSp = 21f
         set(value) {
             if (field == value) return
             field = value
             textPaint.textSize = value * density
+            firstPaint.textSize = value * density
             hintPaint.textSize = value * density
             commentPaint.textSize = value * density * COMMENT_SCALE
             itemBounds.clear()
@@ -98,6 +105,27 @@ class CandidateBarView(context: Context) : View(context) {
             invalidate()
         }
     private val helperPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    /** 首选底块与按下底块：圆角，不用整格矩形（两家主流都是圆角块） */
+    private val pillColor = Palette.current.key
+    private val pillRadius = 11 * density
+    private val pillHeight = 34 * density
+    private val pillInsetH = 2 * density
+    private val pillRect = RectF()
+
+    /** 候选之间的竖分隔线（设置项 ui.android.candidate_divider）；很淡，只起分格作用 */
+    var showDividers = true
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+
+    private fun pill(item: RectF): RectF {
+        val pad = (barHeightPx - pillHeight) / 2
+        pillRect.set(item.left + pillInsetH, pad, item.right - pillInsetH, barHeightPx - pad)
+        return pillRect
+    }
 
     private var candidates: List<String> = emptyList()
 
@@ -318,11 +346,16 @@ class CandidateBarView(context: Context) : View(context) {
             val rect = itemBounds.getOrNull(i) ?: return@forEachIndexed
             // 视口裁剪：只画看得见的
             if (rect.right < scrollX || rect.left > scrollX + width) return@forEachIndexed
+            if (i == 0) {
+                helperPaint.color = pillColor
+                canvas.drawRoundRect(pill(rect), pillRadius, pillRadius, helperPaint)
+            }
             if (i == pressedIndex) {
                 helperPaint.color = pressedColor
-                canvas.drawRect(rect, helperPaint)
+                canvas.drawRoundRect(pill(rect), pillRadius, pillRadius, helperPaint)
             }
-            if (i > 0) {
+            // 首选右边那条线贴着底块，不画
+            if (i > 1 && showDividers) {
                 helperPaint.color = separatorColor
                 canvas.drawLine(
                     rect.left,
@@ -336,12 +369,12 @@ class CandidateBarView(context: Context) : View(context) {
             val x0 = rect.left + itemPaddingH
             val segs = segments.getOrNull(i)
             if (segs.isNullOrEmpty()) {
-                canvas.drawText(item, x0, y, textPaint)
+                canvas.drawText(item, x0, y, if (i == 0) firstPaint else textPaint)
             } else {
                 // 逐段落笔，提示段换色；与 bodyWidth 同一种量法，注释位置才对得上
                 var x = x0
                 for (s in segs) {
-                    val paint = if (CandidateText.isHint(s)) hintPaint else textPaint
+                    val paint = if (CandidateText.isHint(s)) hintPaint else if (i == 0) firstPaint else textPaint
                     canvas.drawText(s.text, x, y, paint)
                     x += paint.measureText(s.text)
                 }

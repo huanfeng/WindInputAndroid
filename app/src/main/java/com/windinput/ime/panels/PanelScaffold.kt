@@ -35,7 +35,7 @@ object PanelScaffold {
     /** 面板整体高度（px）= 条区 + 键盘四行 */
     fun panelHeightPx(context: Context): Int {
         val density = context.resources.displayMetrics.density
-        return ((BarView.TOTAL_DP + KEYBOARD_ROWS * KeyboardDimens.rowHeightDp) * density).toInt()
+        return ((BarView.TOTAL_DP + KeyboardDimens.PAD_TOP_DP + KEYBOARD_ROWS * KeyboardDimens.rowHeightDp) * density).toInt()
     }
 
     /**
@@ -45,7 +45,7 @@ object PanelScaffold {
      */
     fun keyboardHeightPx(context: Context): Int {
         val density = context.resources.displayMetrics.density
-        return (KEYBOARD_ROWS * KeyboardDimens.rowHeightDp * density).toInt()
+        return ((KeyboardDimens.PAD_TOP_DP + KEYBOARD_ROWS * KeyboardDimens.rowHeightDp) * density).toInt()
     }
 
     /**
@@ -76,7 +76,7 @@ object PanelScaffold {
         val header = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Palette.current.surface)
+            setBackgroundColor(Palette.current.background)
         }
         header.addView(
             backButton(context, onBack),

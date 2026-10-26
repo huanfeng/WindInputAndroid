@@ -85,14 +85,15 @@ init_geometry() {
     read -r GEO_DENSITY GEO_ROWPX GEO_KBTOP GEO_KBBOTTOM GEO_BARY GEO_CODEBARY \
             GEO_PANELHEADERY GEO_PANELBACKX < <(awk -v h="$h" -v dpi="$dpi" 'BEGIN{
         d = dpi / 160.0
-        rowPx     = int(56 * d + 0.5)   # KeyboardDimens.rowHeightDp 默认值
+        rowPx     = int(60 * d + 0.5)   # KeyboardDimens.rowHeightDp 默认值
+        padTopPx  = int(3 * d + 0.5)    # KeyboardDimens.PAD_TOP_DP：第一排键上方的留白
         # 条区 = 编码行（BarView.PREEDIT_DP）+ 候选行（BarView.MAIN_ROW_DP）；工具栏占满两者
-        codeBarPx = int(20 * d + 0.5)
-        mainRowPx = int(40 * d + 0.5)
+        codeBarPx = int(23 * d + 0.5)
+        mainRowPx = int(42 * d + 0.5)
         # 底部 insets（手势条/导航栏）：InputRootView 的 bottomSpacer 高度
         insetPx   = int(48 * d + 0.5)
         kbBottom  = h - insetPx
-        kbTop     = kbBottom - 4 * rowPx
+        kbTop     = kbBottom - 4 * rowPx - padTopPx
         # 候选行在条区下半：条区顶 = kbTop-(编码栏+主行)，候选行中心再下移半个主行
         barY      = kbTop - int(mainRowPx / 2)
         # 编码行中心（候选态才有，在条区顶上）
@@ -944,7 +945,7 @@ tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
 # 进「常用」，第一格是最后点的那个（[25] 里最后点的是「。」）
 sym_cell 0 0
 check "常用第一格是上次点的「。」" "。" "$(get_pad_text)"
-adb_q shell input tap "$sym_back_x" "$sym_bottom_y"; sleep 0.6
+# 没锁定：点完符号已自动回到 123 层，直接点「返回」回字母层（再点面板的返回会重新进符号页）
 tap_cell 3 "${SYM_W[3]}" 1
 
 section "[27] 英文补全：点候选上屏补全词并自动加空格"

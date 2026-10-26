@@ -102,6 +102,7 @@ class SymbolWindow(
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(palette.background)
+            setPadding(0, (KeyboardDimens.PAD_TOP_DP * density).toInt(), 0, 0)
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 PanelScaffold.keyboardHeightPx(context),
