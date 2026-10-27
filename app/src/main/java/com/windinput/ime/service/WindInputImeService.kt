@@ -524,6 +524,7 @@ class WindInputImeService :
         barView?.candidateBar?.textSizeSp = userConfig.getInt("ui.android.candidate_text_sp", 21).toFloat()
         barView?.candidateBar?.showDividers = userConfig.getBoolean("ui.android.candidate_divider", true)
         barView?.showPageNo = userConfig.getBoolean("ui.android.candidate_page_no", false)
+        barView?.iconChip = userConfig.getBoolean("ui.android.toolbar_icon_chip", false)
         keyboardWindow?.keyboardView?.let {
             it.numberPad9 = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_FULL) == LayoutTweaks.NUMBER_PAD9
             it.refreshLayout()

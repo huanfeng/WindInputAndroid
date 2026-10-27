@@ -1052,6 +1052,16 @@ default = true
 # ═══ 统计（概览由代码画）═══════════════════════════════════════
 
 [[item]]
+page = "ui"
+section = "主题"
+key = "ui.android.toolbar_icon_chip"
+source = "android"
+type = "toggle"
+title = "工具栏图标圆形底托"
+summary = "空闲工具栏的图标是否衬一个白色圆底（微信、豆包是圆底，小米是无底）"
+default = false
+
+[[item]]
 page = "stats"
 section = "统计设置"
 key = "stats.enabled"

@@ -52,13 +52,14 @@ class Palette(
          * 强调字 [accentText]；按下态、编码字、分隔线等一律中性灰——此前混着六种蓝，
          * 看着不统一。参考电脑端「清风·蓝」，手机端实心色略深（白字对比 4.57）、淡底用透明度叠。
          * 条区与键盘区共用 [background]：两块异色会在交界处拉出一道硬边。
+         * 底色取 E0E3E9（微信 D6D8DE、豆包 E0E2E6、小米 E5E6E8 之间）：白键压在上面要有清楚的对比，EDEFF3 太亮、键面发飘。
          */
         val light = Palette(
-            background = 0xFFEDEFF3.toInt(),
+            background = 0xFFE0E3E9.toInt(),
             surface = 0xFFF7F8FA.toInt(),
             key = 0xFFFFFFFF.toInt(),
-            keySpecial = 0xFFD9DDE3.toInt(),
-            keyPressed = 0xFFCDD3DD.toInt(),
+            keySpecial = 0xFFC9CFD9.toInt(),
+            keyPressed = 0xFFBAC2CF.toInt(),
             text = 0xFF1A1D24.toInt(),
             hint = 0xFF8A91A0.toInt(),
             accent = 0xFF2F6FEB.toInt(),
@@ -66,7 +67,7 @@ class Palette(
             accentSoft = 0x1A2F6FEB,
             accentText = 0xFF2563EB.toInt(),
             preedit = 0xFF5A6072.toInt(),
-            separator = 0xFFDDE1E8.toInt(),
+            separator = 0xFFCBD0D9.toInt(),
             icon = 0xFF4A5163.toInt(),
             border = 0xFFE2E5EB.toInt(),
         )

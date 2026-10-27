@@ -83,6 +83,9 @@ class BarView(
         const val TOOLBAR_COLLAPSE_BOX_DP = 27f
         const val TOOLBAR_SIDE_PAD_DP = 10
 
+        /** 圆托直径：比工具栏行（38dp）略小，上下各留 2dp */
+        const val TOOLBAR_CHIP_DP = 34f
+
         /** ViewGroup.LayoutParams.MATCH_PARENT 的短名（类内无法裸用继承来的常量） */
         private const val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT
     }
@@ -98,6 +101,20 @@ class BarView(
 
     /** 编码行右侧的「页/总页」（设置项 ui.android.candidate_page_no，默认关：主流输入法都不显示） */
     var showPageNo = false
+
+    /** 工具栏图标是否带圆形底托（设置项 ui.android.toolbar_icon_chip，默认关：小米式无底） */
+    var iconChip = false
+        set(value) {
+            field = value
+            applyIconChip()
+        }
+
+    private fun applyIconChip() {
+        val d = if (iconChip) TOOLBAR_CHIP_DP else 0f
+        gridIcon.chipDp = d
+        trailingIcon.chipDp = d
+        for (i in 0 until pinnedRow.childCount) (pinnedRow.getChildAt(i) as? PanelIcon)?.chipDp = d
+    }
 
     // ── 编码行 ───────────────────────────────────────────────────
     // 编码行高度固定（竖屏 20dp、横屏 16dp，见 KeyboardDimens），字号按 dp 而非 sp：
@@ -230,7 +247,10 @@ class BarView(
         for (item in items) {
             val glyph = item.glyph
             val view: View = if (glyph != null) {
-                icon(glyph) { listener.onToolbarItem(item) }.apply { boxDp = TOOLBAR_ICON_BOX_DP }
+                icon(glyph) { listener.onToolbarItem(item) }.apply {
+                    boxDp = TOOLBAR_ICON_BOX_DP
+                    chipDp = if (iconChip) TOOLBAR_CHIP_DP else 0f
+                }
             } else {
                 TextView(context).apply {
                     text = item.text
@@ -278,6 +298,9 @@ class BarView(
             if (expanded) listener.onToggleExpanded() else listener.onToolbarAction(ToolbarAction.HIDE_IME)
         }
     }
+
+    private val gridIcon = icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) }
+        .apply { boxDp = TOOLBAR_ICON_BOX_DP }
 
     private val dismissSuggestion = Runnable { hideClipSuggestion() }
 
@@ -483,11 +506,7 @@ class BarView(
         orientation = HORIZONTAL
         setBackgroundColor(Palette.current.background)
         setPadding(dp(TOOLBAR_SIDE_PAD_DP), 0, dp(TOOLBAR_SIDE_PAD_DP), 0)
-        addView(
-            icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) }
-                .apply { boxDp = TOOLBAR_ICON_BOX_DP },
-            LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT),
-        )
+        addView(gridIcon, LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT))
         addView(pinnedRow, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
         addView(centerNote, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         addView(trailingIcon, LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT))

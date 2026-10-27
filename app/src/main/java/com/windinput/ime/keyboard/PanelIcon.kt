@@ -162,7 +162,20 @@ class PanelIcon(context: Context) : View(context) {
             invalidate()
         }
 
+    /** 圆形底托的直径（dp），0 = 不画。设置项 ui.android.toolbar_icon_chip 打开时工具栏图标用，同微信、豆包的圆托按钮 */
+    var chipDp: Float = 0f
+        set(value) {
+            field = value
+            invalidate()
+        }
+
+    private val chipPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
     override fun onDraw(canvas: Canvas) {
+        if (chipDp > 0f) {
+            chipPaint.color = if (pressed) Palette.current.keyPressed else Palette.current.key
+            canvas.drawCircle(width / 2f, height / 2f, chipDp * density / 2f, chipPaint)
+        }
         val size = if (boxDp > 0f) boxDp * density else minOf(width, height) * scale
         painter.draw(canvas, glyph, width / 2f, height / 2f, size, tint, if (pressed) 140 else 255)
     }
