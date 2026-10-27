@@ -56,6 +56,12 @@ class BarView(
 
         /** 工具栏上常驻的功能按钮（见 [setPinned]） */
         fun onToolbarItem(item: ToolbarItem)
+
+        /**
+         * 点了编码行里的拼音：[charOffset] 是点中处在 [BarView] 当前显示串里的字符下标。
+         * 宿主据此把编码光标挪到被点中的那个音节之后（拼音中间修正）。
+         */
+        fun onPreeditTapped(charOffset: Int) = Unit
     }
 
     enum class ToolbarAction { QUICK_PANEL, HIDE_IME }
@@ -138,6 +144,18 @@ class BarView(
         gravity = Gravity.CENTER_VERTICAL
         setTextColor(Palette.current.preedit)
         setPadding(dp(6), 0, dp(6), 0)
+        // 点编码里的拼音 = 把光标挪到被点中的音节后面（核心只在拼音下响应，其余无事发生）
+        setOnTouchListener { v, ev ->
+            if (ev.actionMasked == android.view.MotionEvent.ACTION_UP) {
+                val tv = v as TextView
+                val layout = tv.layout
+                if (layout != null) {
+                    val x = ev.x - tv.totalPaddingLeft + tv.scrollX
+                    listener.onPreeditTapped(layout.getOffsetForHorizontal(0, x))
+                }
+            }
+            true
+        }
         // 行高由设备字体决定（MiSans 等比 Roboto 高），固定 16dp 在 19dp 的行里会裁掉 g/j/p/q/y 的下伸：
         // 按字体实际的 ascent+descent 收字号，让整行字形（含下伸）落在行内、上下各留 1dp
         val fm = paint.fontMetrics
@@ -374,6 +392,25 @@ class BarView(
     }
 
     /**
+     * 编码光标落在编码中间时，光标之后的部分调灰：候选此刻只查光标前那一段（拼音中间修正），
+     * 亮的部分就是「正在匹配的」，灰的是「选完前半段后留下续打的」。光标在末尾 / 未知 → 原样。
+     * [caret] 是 [preedit] 内的**字节**偏移，先换算成字符下标（前缀里可能有已转换的汉字）。
+     */
+    private fun dimAfterCaret(preedit: String, caret: Int): CharSequence {
+        val bytes = preedit.toByteArray(Charsets.UTF_8)
+        if (caret <= 0 || caret >= bytes.size) return preedit
+        val idx = String(bytes, 0, caret, Charsets.UTF_8).length
+        return android.text.SpannableString(preedit).apply {
+            setSpan(
+                android.text.style.ForegroundColorSpan(Palette.current.hint),
+                idx,
+                preedit.length,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+        }
+    }
+
+    /**
      * 候选帧到达：更新编码栏与候选栏。
      *
      * 编码栏的显隐只看 [preedit] 是否为空，**不看候选是否为空**：有编码但零候选
@@ -387,13 +424,14 @@ class BarView(
         totalPages: Int,
         comments: List<String> = emptyList(),
         segments: List<List<TextSegment>> = emptyList(),
+        preeditCaret: Int = -1,
     ) {
         candidateBar.setCandidates(items, comments, segments)
         hasCandidates = items.isNotEmpty()
 
         currentPreedit = preedit
         if (preedit.isNotEmpty()) preparing = false
-        preeditText.text = preedit
+        preeditText.text = dimAfterCaret(preedit, preeditCaret)
         this.modeLabel.text = modeLabel
         this.modeLabel.visibility = if (modeLabel.isEmpty() || preedit.isEmpty()) GONE else VISIBLE
         pagerText.text = if (showPageNo && preedit.isNotEmpty() && totalPages > 1) "$page/$totalPages" else ""

@@ -82,6 +82,7 @@ class SymbolWindow(
     private val categories by lazy(categoriesProvider)
     private var tabsRow: LinearLayout? = null
     private var grid: RecyclerView? = null
+    private var scrollThumb: ScrollThumb? = null
     private val adapter = SymbolAdapter { symbol ->
         // 只记不刷：正在看「最近」时不让格子在手指底下挪位（微信也是下次进来才更新）
         recentStore.record(symbol)
@@ -111,6 +112,7 @@ class SymbolWindow(
             adapter = this@SymbolWindow.adapter
             // 脚本按 content-desc 找到符号区（格子本身是 TextView，文字即符号）
             contentDescription = "symbol-grid"
+            scrollThumb = ScrollThumb(this)
         }
         root.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, rowHeight * GRID_ROWS))
 
@@ -200,6 +202,7 @@ class SymbolWindow(
     private fun selectTab(index: Int) {
         adapter.submit(if (index == 0) commonSymbols() else categories[index - 1].items)
         grid?.scrollToPosition(0)
+        grid?.post { scrollThumb?.flash() } // 换类别 / 打开面板时亮一下，提示这里能上下滑
         val palette = Palette.current
         val density = grid?.resources?.displayMetrics?.density ?: 1f
         tabsRow?.let { tabs ->

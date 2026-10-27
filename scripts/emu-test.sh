@@ -1237,6 +1237,26 @@ adb_q shell input motionevent UP $(( lx + 3 )) $(( ly + 2 )); sleep 0.8
 tap_key a; tap_key a; tap_key SPACE
 check "长按中英键不滑松手：不弹卡片、仍是五笔" "式" "$(get_pad_text)"
 
+section "[47] 拼音中间修正：点编码里的 fang 只筛 fang 的字，选字后 xiang 留在编码栏续打"
+# 点编码行里的音节 → 编码光标挪到该音节后面 → 候选只查光标前一段；选中后上屏前半段，
+# 后半截仍在编码栏。验证方式：选首候选（放）后空格，上屏应是两个字、首字是「放」。
+# 若点编码没生效，首个候选是「方向」之类整句，选完不会再剩 xiang，空格上屏的只有两字且首字不是「放」。
+reset_pad
+lang_menu_pick 1       # 全拼
+sleep 6
+tap_key f; tap_key a; tap_key n; tap_key g; tap_key x; tap_key i; tap_key a; tap_key n; tap_key g
+adb_q shell input tap "$(awk -v w="$GEO_W" 'BEGIN{ printf "%d", int(w * 0.09) }')" "$GEO_CODEBARY"
+sleep 1
+tap_candidate 0
+tap_key SPACE
+sleep 0.6
+txt="$(get_pad_text)"
+check "点 fang 选首候选后空格：首字是「放」" "放" "${txt:0:1}"
+check "选字后 xiang 续打：共两个字" "2" "${#txt}"
+reset_pad
+lang_menu_pick 3       # 切回五笔，别影响后面的用例
+sleep 2
+
 section "[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符"
 # 核心在联想态挂一个占位组合（空格等，桌面 TSF 给候选窗定位用）；手机上写进来就是输入框里
 # 一个带下划线的空格（真机反馈）。键盘侧把纯占位的组合文本挡掉。开关是键盘自己的配置文件。

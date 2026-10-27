@@ -205,6 +205,21 @@ interface ImeSession {
     fun candidateSelected(index: Int): Boolean
 
     /**
+     * 当前拼音编码的音节拆分与编码光标（展开页左栏画它，点音节改光标、改拼写）。
+     * 非拼音方案 / 双拼 / 无编码时为 null。
+     */
+    fun syllableView(): SyllableView? = null
+
+    /** 第 [idx] 个音节的可替换拼写（模糊音 / 纠错 / 误触），已按改动大小排好 */
+    fun syllableFixes(idx: Int): List<SyllableFix> = emptyList()
+
+    /** 把编码光标放到缓冲 [caret]（字节偏移）处，候选随之只查光标前一段。@return 是否有变化 */
+    fun setSyllableCaret(caret: Int): Boolean = false
+
+    /** 应用一条修正。@return 是否改成了 */
+    fun applySyllableFix(fix: SyllableFix): Boolean = false
+
+    /**
      * 拉取候选全量的一个窗口。
      *
      * ⚠ **别在每次按键都拉一大段**：序列化与候选栏的文字测量都在主线程上，
@@ -267,6 +282,18 @@ interface ImeSession {
  * 与核心约定的动作名，菜单显示用 [label]（核心给的文案，与电脑版右键菜单同一份）。
  */
 /** @param current 当前状态那项（如当前方案）：高亮显示、点了无动作 */
+/** 一个拼音音节：文本与它在编码缓冲内的字节区间 */
+data class Syllable(val text: String, val start: Int, val end: Int)
+
+/** 音节视图：拆分 + 编码光标（缓冲内字节偏移） */
+data class SyllableView(val syllables: List<Syllable>, val caret: Int) {
+    /** 光标正好落在哪个音节**之后**（光标在末尾或在某音节中间 → -1） */
+    val caretAfter: Int get() = syllables.indexOfFirst { it.end == caret }
+}
+
+/** 一条可替换的拼写：缓冲 [start, end) 换成 [text] */
+data class SyllableFix(val start: Int, val end: Int, val text: String)
+
 data class CandidateMenuEntry(
     val label: String,
     val action: String,

@@ -173,6 +173,17 @@ class DeferredSession(
         (if (busy) null else delegate?.candidateWindow(offset, limit))
             ?: CandidatePage(emptyList(), offset, 0, 0)
 
+    override fun syllableView(): SyllableView? = if (busy) null else delegate?.syllableView()
+
+    override fun syllableFixes(idx: Int): List<SyllableFix> =
+        if (busy) emptyList() else delegate?.syllableFixes(idx).orEmpty()
+
+    override fun setSyllableCaret(caret: Int): Boolean =
+        if (busy) false else delegate?.setSyllableCaret(caret) ?: false
+
+    override fun applySyllableFix(fix: SyllableFix): Boolean =
+        if (busy) false else delegate?.applySyllableFix(fix) ?: false
+
     override fun candidateMenu(index: Int): List<CandidateMenuEntry> =
         if (busy) emptyList() else delegate?.candidateMenu(index).orEmpty()
 

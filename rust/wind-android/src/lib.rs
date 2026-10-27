@@ -479,6 +479,49 @@ impl WindCore {
         self.core.select_candidate(index as usize).into()
     }
 
+    /// 当前拼音编码的音节拆分与编码光标（展开页左栏画它）。
+    /// 非拼音方案 / 双拼 / 无编码时为空。
+    pub fn syllable_view(&self) -> Option<SyllableViewInfo> {
+        self.core.syllable_view().map(|v| SyllableViewInfo {
+            syllables: v
+                .syllables
+                .into_iter()
+                .map(|s| SyllableInfo {
+                    text: s.text,
+                    start: s.start as u32,
+                    end: s.end as u32,
+                })
+                .collect(),
+            caret: v.caret as u32,
+        })
+    }
+
+    /// 第 `idx` 个音节的可替换拼写（模糊音 / 纠错 / 误触），已按改动大小排序。
+    pub fn syllable_fixes(&self, idx: u32) -> Vec<SyllableFixInfo> {
+        self.core
+            .syllable_fixes(idx as usize)
+            .into_iter()
+            .map(|f| SyllableFixInfo {
+                start: f.start as u32,
+                end: f.end as u32,
+                text: f.text,
+            })
+            .collect()
+    }
+
+    /// 把编码光标放到缓冲 `caret`（字节偏移）处：候选随之只查光标前一段，
+    /// 选中后上屏、后半截留在编码栏续打。返回的指令流照常执行（刷新组合区）。
+    pub fn set_syllable_caret(&self, caret: u32) -> KeyResult {
+        self.core.set_syllable_caret(caret as usize).into()
+    }
+
+    /// 应用一条修正：缓冲 `[start, end)` 换成 `text`。不合法时返回空（什么都没改）。
+    pub fn apply_syllable_fix(&self, start: u32, end: u32, text: String) -> Option<KeyResult> {
+        self.core
+            .apply_syllable_fix(start as usize, end as usize, &text)
+            .map(Into::into)
+    }
+
     /// 候选长按菜单：按候选类型给出菜单项（文案、启用态与电脑版右键菜单同一份）。
     /// `index` 是绝对下标；无候选或越界时为空。
     pub fn candidate_menu(&self, index: u32) -> Vec<CandidateMenuItemInfo> {
@@ -997,6 +1040,29 @@ pub struct CandidateTooltipInfo {
 }
 
 /// 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
+/// 一个拼音音节：文本与它在编码缓冲内的字节区间
+#[derive(Debug, uniffi::Record)]
+pub struct SyllableInfo {
+    pub text: String,
+    pub start: u32,
+    pub end: u32,
+}
+
+/// 音节视图：拆分 + 编码光标（缓冲内字节偏移）
+#[derive(Debug, uniffi::Record)]
+pub struct SyllableViewInfo {
+    pub syllables: Vec<SyllableInfo>,
+    pub caret: u32,
+}
+
+/// 一条可替换的拼写：缓冲 `[start, end)` 换成 `text`
+#[derive(Debug, uniffi::Record)]
+pub struct SyllableFixInfo {
+    pub start: u32,
+    pub end: u32,
+    pub text: String,
+}
+
 #[derive(Debug, uniffi::Record)]
 pub struct CandidateMenuItemInfo {
     pub label: String,
