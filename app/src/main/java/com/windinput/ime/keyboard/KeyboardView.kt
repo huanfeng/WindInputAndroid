@@ -219,7 +219,7 @@ class KeyboardView(context: Context) : View(context) {
     private val density = resources.displayMetrics.density
 
     /** 行高动态取自 KeyboardDimens（横竖屏配置由 Service 注入） */
-    private val rowHeightPx get() = (KeyboardDimens.rowHeightDp * density).toInt()
+    private val rowHeightPx get() = KeyboardDimens.rowHeightPx(density)
 
     /** 键与键的间隙是两侧各留一半：横向 14px、纵向 24px（@420dpi），与主流输入法同量级 */
     private val keyGapPx = 2.7f * density
@@ -402,7 +402,7 @@ class KeyboardView(context: Context) : View(context) {
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)
-        setMeasuredDimension(width, (padTopPx + rowHeightPx * rows.size).toInt())
+        setMeasuredDimension(width, KeyboardDimens.keyboardHeightPx(density, rows.size))
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {

@@ -84,16 +84,32 @@ object KeyboardDimens {
     var rowHeightDp: Int = 60
 
     /**
-     * 第一排键上方的留白（dp）：条区与键盘共用底色后，条区底边到第一排键只剩半个行距，
-     * 看着贴在一起，这里再垫一点。面板按它算整体高度，切换时窗口不跳。
+     * 第一排键上方额外的留白（dp）。条区与键盘共用底色后，第一排键本身在行内就下移了
+     * 半个行距（行高 60 − 键高 51 的一半 = 4.5dp），已经不贴条区；实测对照微信、豆包，
+     * 再垫 3dp 就比它们高出约 8px，故取 0。保留常量是因为面板（符号、快捷功能）
+     * 都按它算整体高度，日后想调只改这一处，切换时窗口不跳。
      */
-    const val PAD_TOP_DP = 3f
+    const val PAD_TOP_DP = 0f
 
     /** 条区编码行高度（dp）；横屏收矮，见 [BarView] */
-    var barPreeditDp: Float = 23f
+    var barPreeditDp: Float = 21f
 
     /** 条区候选行高度（dp） */
-    var barMainRowDp: Float = 42f
+    var barMainRowDp: Float = 41f
+
+    // ── 像素高度：取整规则只在这里写一份 ──
+    // 键盘、条区、面板（符号、快捷功能…）各自 dp→px 时取整方式不同，整体高度就会差几个像素，
+    // 展开面板时窗口轻微跳变。三方都走这三个函数，面板高度 = 条区 + 键盘，恒等于键盘态的整体高度。
+
+    /** 一行的像素高度（先取整，再乘行数：与 KeyboardView 逐行布局一致） */
+    fun rowHeightPx(density: Float): Int = (rowHeightDp * density).toInt()
+
+    /** 键盘 [rows] 行的像素高度 */
+    fun keyboardHeightPx(density: Float, rows: Int): Int =
+        (PAD_TOP_DP * density + rowHeightPx(density) * rows).toInt()
+
+    /** 条区的像素高度 */
+    fun barHeightPx(density: Float): Int = ((barPreeditDp + barMainRowDp) * density).toInt()
 }
 
 object KeyboardLayouts {

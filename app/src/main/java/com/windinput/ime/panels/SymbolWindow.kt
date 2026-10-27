@@ -63,12 +63,9 @@ class SymbolWindow(
         const val GRID_ROWS = 3
         const val COMMON_LABEL = "常用"
 
-        /** 「常用」里最近用过的排在前面，最多这么多个；其余用 [COMMON_DEFAULTS] 补齐 */
-        const val RECENT_IN_COMMON = 20
-
         /**
-         * 「常用」的底子：此前这一格只放点过的符号，点过一个再进来就只剩那一个（真机反馈）。
-         * 现在常用 = 最近用过的 + 这一组常见符号，永远是满的。
+         * 「常用」是固定的一组常见符号，不混入最近用过的：最近用过的在条区候选行里（一眼可见、
+         * 点了直接上屏），两处都放就重复了。日后「常用」支持自定义，改的也是这一份。
          */
         val COMMON_DEFAULTS = (
             "， 。 ？ ！ 、 ： ； “ ” ‘ ’ （ ） 《 》 【 】 … — ～ · ￥ " +
@@ -198,8 +195,7 @@ class SymbolWindow(
         listener.onSymbolPageShown(false)
     }
 
-    private fun commonSymbols(): List<String> =
-        (recentStore.list().take(RECENT_IN_COMMON) + COMMON_DEFAULTS).distinct()
+    private fun commonSymbols(): List<String> = COMMON_DEFAULTS
 
     private fun selectTab(index: Int) {
         adapter.submit(if (index == 0) commonSymbols() else categories[index - 1].items)

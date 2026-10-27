@@ -29,13 +29,10 @@ object PanelScaffold {
 
     const val KEYBOARD_ROWS = 4
 
-    /** 顶栏高度：与条区的编码栏 + 主行等高，面板占位才与键盘态严丝合缝 */
-    val headerHeightDp: Float get() = BarView.TOTAL_DP
-
     /** 面板整体高度（px）= 条区 + 键盘四行 */
     fun panelHeightPx(context: Context): Int {
         val density = context.resources.displayMetrics.density
-        return ((BarView.TOTAL_DP + KeyboardDimens.PAD_TOP_DP + KEYBOARD_ROWS * KeyboardDimens.rowHeightDp) * density).toInt()
+        return KeyboardDimens.barHeightPx(density) + KeyboardDimens.keyboardHeightPx(density, KEYBOARD_ROWS)
     }
 
     /**
@@ -45,7 +42,7 @@ object PanelScaffold {
      */
     fun keyboardHeightPx(context: Context): Int {
         val density = context.resources.displayMetrics.density
-        return ((KeyboardDimens.PAD_TOP_DP + KEYBOARD_ROWS * KeyboardDimens.rowHeightDp) * density).toInt()
+        return KeyboardDimens.keyboardHeightPx(density, KEYBOARD_ROWS)
     }
 
     /**
@@ -116,7 +113,7 @@ object PanelScaffold {
             header,
             LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                (headerHeightDp * density).toInt(),
+                KeyboardDimens.barHeightPx(density),
             ),
         )
         root.addView(

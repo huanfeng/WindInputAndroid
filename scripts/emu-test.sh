@@ -86,10 +86,10 @@ init_geometry() {
             GEO_PANELHEADERY GEO_PANELBACKX < <(awk -v h="$h" -v dpi="$dpi" 'BEGIN{
         d = dpi / 160.0
         rowPx     = int(60 * d + 0.5)   # KeyboardDimens.rowHeightDp 默认值
-        padTopPx  = int(3 * d + 0.5)    # KeyboardDimens.PAD_TOP_DP：第一排键上方的留白
+        padTopPx  = int(0 * d + 0.5)    # KeyboardDimens.PAD_TOP_DP：第一排键上方的留白
         # 条区 = 编码行（BarView.PREEDIT_DP）+ 候选行（BarView.MAIN_ROW_DP）；工具栏占满两者
-        codeBarPx = int(23 * d + 0.5)
-        mainRowPx = int(42 * d + 0.5)
+        codeBarPx = int(21 * d + 0.5)
+        mainRowPx = int(41 * d + 0.5)
         # 底部 insets（手势条/导航栏）：InputRootView 的 bottomSpacer 高度
         insetPx   = int(48 * d + 0.5)
         kbBottom  = h - insetPx
@@ -938,13 +938,21 @@ tap_cell 0 "${SYM_W[0]}" 0
 check_match "← 回到 123 层" '^[\x{4e00}-\x{9fa5}]，1$' "$(get_pad_text)"
 tap_cell 3 "${SYM_W[3]}" 1
 
-section "[26] 常用里最近用过的置首、重启后保留"
+section "[26] 符号页：最近用过的放条区（重启后保留），常用格子不重复；点条区的符号也自动退回"
 restart_pad
 reset_pad
-tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
-# 进「常用」，第一格是最后点的那个（[25] 里最后点的是「。」）
+tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.8
+# 最近用过的摆在条区候选行（[25] 里最后点的是「。」）
+bar_nodes="$(ime_xml | grep -oE 'class="android.widget.Button" package="'"$PKG"'" content-desc="[^"]*"' \
+    | sed -E 's/.*content-desc="([^"]*)"/\1/')"
+check "条区里有最近点的「。」" "yes" "$(grep -qE '^。(，|$)' <<< "$bar_nodes" && echo yes || echo no)"
+# 点条区的符号：与点格子一样，没锁定就自动回到 123 层
+adb_q shell input tap 60 "$GEO_BARY"; sleep 0.6
+check "点条区的「。」上屏" "。" "$(get_pad_text)"
+# 已回到 123 层：再进符号页，「常用」第一格始终是固定的「，」，不混入最近点的「。」
+tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
 sym_cell 0 0
-check "常用第一格是上次点的「。」" "。" "$(get_pad_text)"
+check "常用第一格仍是固定的「，」" "。，" "$(get_pad_text)"
 # 没锁定：点完符号已自动回到 123 层，直接点「返回」回字母层（再点面板的返回会重新进符号页）
 tap_cell 3 "${SYM_W[3]}" 1
 

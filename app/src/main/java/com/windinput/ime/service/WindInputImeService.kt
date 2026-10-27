@@ -477,7 +477,7 @@ class WindInputImeService :
      */
     private fun barDims(): Pair<Float, Float> {
         val inline = userConfig.getBoolean("ui.android.inline_preedit", false)
-        return if (inline) 0f to 46f else 23f to 42f
+        return if (inline) 0f to 44f else 21f to 41f
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
@@ -1104,6 +1104,8 @@ class WindInputImeService :
             loadedCandidates.getOrNull(index)?.let {
                 recentSymbolStore.record(it)
                 commitDirect(it)
+                // 与点符号格子一致：没锁定就退回键盘，锁定则停在本页继续点
+                if (!isSymbolLocked()) onSymbolBack()
             }
             return
         }
@@ -1753,8 +1755,8 @@ class WindInputImeService :
     private var symbolHistoryInBar = false
 
     /**
-     * 符号页打开：没在打字时，把最近用过的符号摆进条区的候选行——符号页的「常用」里它们
-     * 也排在前面，但候选行一眼就看得到、不用翻页。收起符号页时还原。
+     * 符号页打开：没在打字时，把最近用过的符号摆进条区的候选行，一眼就看得到、不用翻页
+     * （「常用」格子里不再重复放它们）。收起符号页时还原。
      */
     override fun onSymbolPageShown(shown: Boolean) {
         if (shown) {

@@ -335,7 +335,7 @@ class BarView(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(
             widthMeasureSpec,
-            MeasureSpec.makeMeasureSpec(dp(TOTAL_DP), MeasureSpec.EXACTLY),
+            MeasureSpec.makeMeasureSpec(KeyboardDimens.barHeightPx(density), MeasureSpec.EXACTLY),
         )
     }
 
