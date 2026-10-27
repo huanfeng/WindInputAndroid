@@ -121,6 +121,12 @@ class BarView(
         gravity = Gravity.CENTER_VERTICAL
         setTextColor(Palette.current.preedit)
         setPadding(dp(6), 0, dp(6), 0)
+        // 行高由设备字体决定（MiSans 等比 Roboto 高），固定 16dp 在 19dp 的行里会裁掉 g/j/p/q/y 的下伸：
+        // 按字体实际的 ascent+descent 收字号，让整行字形（含下伸）落在行内、上下各留 1dp
+        val fm = paint.fontMetrics
+        val lineEm = (fm.descent - fm.ascent) / paint.textSize
+        val fit = (KeyboardDimens.barPreeditDp - 2f) / lineEm
+        if (fit < 16f) setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, fit)
     }
     private val pagerText = TextView(context).apply {
         setTextSize(android.util.TypedValue.COMPLEX_UNIT_DIP, 11f)
