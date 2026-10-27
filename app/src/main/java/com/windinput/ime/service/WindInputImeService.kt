@@ -40,6 +40,7 @@ import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.LayoutTweaks
 import com.windinput.ime.keyboard.KeyboardLayer
+import com.windinput.ime.keyboard.IconSet
 import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
@@ -139,6 +140,8 @@ class WindInputImeService :
         dataDirs = dirs
         layoutRepository = LayoutRepository(dirs)
         userConfig = UserConfig(File(dirs.userDir, "config.toml"))
+        // 图标：用户目录 icons/ 下的同名 SVG 覆盖内置图标（日后主题包挂同一机制）
+        IconSet.init(assets, listOf(File(dirs.userDir, "icons")))
         // 首次弹键盘前把布局与用户配置解析进缓存：tomlj 走 ANTLR，首次解析还要加载一大批类，
         // 放在 onCreateInputView 里就是主线程上一百多毫秒（模拟器实测，键盘弹出掉帧）
         // 配置排在最前：onCreateInputView 头一件事就是按配置定键高，它先进缓存，主线程就不用自己解析
@@ -944,15 +947,20 @@ class WindInputImeService :
             return
         }
         // 软键盘上打出的数字（上滑、123 层）不选候选：触屏上点候选比上滑出数字顺手得多，
-        // 打数字就是要数字。有编码先把首选上屏再出数字（同打标点）；联想态先收起联想。
+        // 打数字就是要数字。中文有编码先把首选上屏再出数字（同打标点）；联想态先收起联想。
+        // 英文有编码时数字是词的一部分（mp3、h2o、win10）：交给引擎进编码栏，不顶屏
+        // （核心 `digit_enters_english_buffer` 只在移动端英文组码中接这一键）。
         // 只有物理键盘的数字仍按电脑的习惯选候选（那条路走 onKeyDown，不经这里）
         val digit = (action as? KeyAction.Text)?.char?.takeIf { it in '0'..'9' }
         if (digit != null && !directInput && loadedCandidates.isNotEmpty()) {
             if (composing) {
-                commitDirect(digit.toString())
-                return
+                if (modeLabel != "英") {
+                    commitDirect(digit.toString())
+                    return
+                }
+            } else {
+                session.reset()
             }
-            session.reset()
         }
         if (engineKey(action, shifted)) return
         val ic = currentInputConnection

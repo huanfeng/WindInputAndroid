@@ -1008,6 +1008,21 @@ tap_key ENTER
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 check "一下回车就换行" $'式\n式' "$(get_pad_text)"
 
+section "[33b] 英文下数字进编码栏（mp3、win10），中文下仍是首选上屏 + 数字"
+reset_pad; tap_key LANG; sleep 4
+tap_key h; tap_key e; tap_key l
+tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0; tap_cell 3 "${SYM_W[3]}" 1
+# 数字进了编码：此刻输入框里还没有任何字（编码在条区），空格才上屏整串
+check "数字没有顶屏" "" "$(get_pad_text)"
+tap_key SPACE; sleep 0.4
+check "空格上屏 hel1" "hel1 " "$(get_pad_text)"
+tap_key LANG; sleep 4
+reset_pad
+tap_key a; tap_key a
+tap_key SYM; tap_cell 0 "${SYM_W[0]}" 0
+check_match "中文：首选上屏再出数字" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
+tap_cell 3 "${SYM_W[3]}" 1
+
 section "[34] 收起键盘后联想不残留"
 # 联想还在的话，数字键会选联想词；收起再弹出后数字应原样上屏
 reset_pad
@@ -1284,16 +1299,22 @@ reset_pad
 
 section "[43] 单手模式：快捷面板开、收窄后照常打字、换边、退出"
 # 单手时键盘几何变了，tap_key 的全宽坐标不能用——全程按无障碍节点（文字 / 描述）点
+# 开出来靠哪边由 one_hand_last 记着（跨运行持久化），所以不假定起始边：先看开在哪边，再断言换边后到了另一边
 reset_pad
 q_full="$(ime_bounds Q | cut -d' ' -f1)"
+qw_full="$(ime_bounds Q | awk '{print $3 - $1}')"
 tap_ime 快捷功能; tap_ime 单手; tap_ime 返回
-q_right="$(ime_bounds Q | cut -d' ' -f1)"
-check "开单手（右手）：键盘靠右，Q 右移" "yes" "$( (( ${q_right:-0} > ${q_full:-0} + 100 )) && echo yes || echo no)"
+q_open="$(ime_bounds Q | cut -d' ' -f1)"
+qw_open="$(ime_bounds Q | awk '{print $3 - $1}')"
+check "开单手：键盘收窄" "yes" "$( (( ${qw_open:-999} < ${qw_full:-0} - 10 )) && echo yes || echo no)"
+if (( ${q_open:-0} > ${q_full:-0} + 100 )); then side_open=right; else side_open=left; fi
+echo "  ${D}开在${side_open}边${N}"
 tap_ime A; tap_ime A; tap_ime 空格
 check "单手下照常打字" "式" "$(get_pad_text)"
 tap_ime 换边
-q_left="$(ime_bounds Q | cut -d' ' -f1)"
-check "换边：键盘靠左，Q 回到最左" "yes" "$( (( ${q_left:-999} <= ${q_full:-0} + 10 )) && echo yes || echo no)"
+q_flip="$(ime_bounds Q | cut -d' ' -f1)"
+if (( ${q_flip:-0} > ${q_full:-0} + 100 )); then side_flip=right; else side_flip=left; fi
+check "换边：键盘到了另一边" "yes" "$([[ "$side_flip" != "$side_open" ]] && echo yes || echo no)"
 tap_ime '退出&#10;单手'
 q_back="$(ime_bounds Q | cut -d' ' -f1)"
 check "退出单手：恢复满宽" "${q_full:-?}" "${q_back:-}"

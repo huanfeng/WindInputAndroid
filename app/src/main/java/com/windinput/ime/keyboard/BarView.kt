@@ -76,7 +76,7 @@ class BarView(
         const val TOOLBAR_ICON_DP = 52
 
         /** 空闲工具栏图标的圆托直径 */
-        const val TOOLBAR_CHIP_DP = 36f
+        const val TOOLBAR_CHIP_DP = 38f
 
         /** ViewGroup.LayoutParams.MATCH_PARENT 的短名（类内无法裸用继承来的常量） */
         private const val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT

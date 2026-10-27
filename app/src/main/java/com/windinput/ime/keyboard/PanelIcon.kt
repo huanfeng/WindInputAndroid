@@ -3,8 +3,6 @@ package com.windinput.ime.keyboard
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 
@@ -79,6 +77,16 @@ class PanelIcon(context: Context) : View(context) {
 
         /** 未锁定（挂锁，锁梁打开） */
         UNLOCK,
+        ;
+
+        /**
+         * 语义名，也是图标文件名（`text_edit` → `icons/text_edit.svg`）。
+         * 调用方只认枚举，具体长什么样由 [IconSet] 决定，所以换图标集或主题自定义都不动调用方。
+         */
+        val iconName: String get() = name.lowercase()
+
+        /** 描边之外再填充（「已置顶」的实心图钉）。其余图标一律只描边 */
+        val filled: Boolean get() = this == PIN
     }
 
     /**
@@ -115,7 +123,7 @@ class PanelIcon(context: Context) : View(context) {
         }
 
     /** 图标边长占控件短边的比例；留白让触摸区大于视觉尺寸 */
-    var scale: Float = 0.46f
+    var scale: Float = 0.5f
 
     private val density = resources.displayMetrics.density
 
@@ -167,7 +175,7 @@ class PanelIcon(context: Context) : View(context) {
 
     companion object {
         /** 圆托里图标占直径的比例 */
-        private const val CHIP_GLYPH_RATIO = 0.56f
+        private const val CHIP_GLYPH_RATIO = 0.62f
 
         fun labelOf(glyph: Glyph): String? = A11Y_LABELS[glyph]
 
@@ -208,200 +216,26 @@ class GlyphPainter {
         strokeJoin = Paint.Join.ROUND
     }
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
-    private val path = Path()
-    private val oval = RectF()
 
-    /** 以 ([cx], [cy]) 为中心、边长 [size] 画 [glyph] */
+    /**
+     * 以 ([cx], [cy]) 为中心、边长 [size] 画 [glyph]。图标本身来自 [IconSet]（SVG），
+     * 这里只管缩放与着色：线宽跟随 SVG 声明的 stroke-width，随整体等比缩放，
+     * 所以任何一套图标换进来，线粗与外框的比例都保持图标集自己的设计。
+     */
     fun draw(canvas: Canvas, glyph: PanelIcon.Glyph, cx: Float, cy: Float, size: Float, tint: Int, alpha: Int = 255) {
-        // 名义网格 24×24 → 实际尺寸
-        val u = size / 24f
+        val loaded = IconSet.get(glyph.iconName) ?: return
         stroke.color = tint
-        stroke.strokeWidth = 2f * u
         stroke.alpha = alpha
+        stroke.strokeWidth = loaded.icon.strokeWidth
         fill.color = tint
         fill.alpha = alpha
-
-        path.reset()
-        // p(x, y)：把 24×24 网格坐标（原点在中心）换算到画布
-        fun px(x: Float) = cx + (x - 12f) * u
-        fun py(y: Float) = cy + (y - 12f) * u
-
-        when (glyph) {
-            PanelIcon.Glyph.BACK -> {
-                path.moveTo(px(15f), py(5f))
-                path.lineTo(px(8f), py(12f))
-                path.lineTo(px(15f), py(19f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.COLLAPSE -> {
-                path.moveTo(px(5f), py(9f))
-                path.lineTo(px(12f), py(16f))
-                path.lineTo(px(19f), py(9f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.EXPAND -> {
-                path.moveTo(px(6f), py(10f))
-                path.lineTo(px(12f), py(16f))
-                path.lineTo(px(18f), py(10f))
-                path.close()
-                canvas.drawPath(path, fill)
-            }
-            PanelIcon.Glyph.CLOSE -> {
-                path.moveTo(px(6f), py(6f))
-                path.lineTo(px(18f), py(18f))
-                path.moveTo(px(18f), py(6f))
-                path.lineTo(px(6f), py(18f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.GRID -> {
-                // 2×2 圆点阵：比线框更轻，且小尺寸下不糊
-                val r = 2.1f * u
-                for (gx in floatArrayOf(8f, 16f)) {
-                    for (gy in floatArrayOf(8f, 16f)) {
-                        canvas.drawCircle(px(gx), py(gy), r, fill)
-                    }
-                }
-            }
-            PanelIcon.Glyph.EMOJI -> {
-                canvas.drawCircle(cx, cy, 8f * u, stroke)
-                canvas.drawCircle(px(9f), py(10f), 1.2f * u, fill)
-                canvas.drawCircle(px(15f), py(10f), 1.2f * u, fill)
-                oval.set(px(7.5f), py(11f), px(16.5f), py(18f))
-                canvas.drawArc(oval, 20f, 140f, false, stroke)
-            }
-            PanelIcon.Glyph.CLIPBOARD -> {
-                oval.set(px(6f), py(6f), px(18f), py(20f))
-                canvas.drawRoundRect(oval, 2f * u, 2f * u, stroke)
-                oval.set(px(9.5f), py(3.5f), px(14.5f), py(7.5f))
-                canvas.drawRoundRect(oval, 1.2f * u, 1.2f * u, fill)
-            }
-            PanelIcon.Glyph.TEXT_EDIT -> {
-                // I 形光标 + 左右指示，表达「在文本里移动」
-                path.moveTo(px(12f), py(6f))
-                path.lineTo(px(12f), py(18f))
-                path.moveTo(px(10f), py(6f))
-                path.lineTo(px(14f), py(6f))
-                path.moveTo(px(10f), py(18f))
-                path.lineTo(px(14f), py(18f))
-                canvas.drawPath(path, stroke)
-                path.reset()
-                path.moveTo(px(7f), py(9f))
-                path.lineTo(px(4f), py(12f))
-                path.lineTo(px(7f), py(15f))
-                path.moveTo(px(17f), py(9f))
-                path.lineTo(px(20f), py(12f))
-                path.lineTo(px(17f), py(15f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.SETTINGS -> {
-                // 内圈 + 外圈 + 短齿。齿必须**短**且贴着外圈：先前齿长到 9.2u、
-                // 又没有外圈，整体看着像太阳而不是齿轮。
-                canvas.drawCircle(cx, cy, 3.0f * u, stroke)
-                canvas.drawCircle(cx, cy, 6.6f * u, stroke)
-                for (i in 0 until 8) {
-                    val a = Math.toRadians((i * 45).toDouble())
-                    val sx = cx + (6.6f * u * Math.cos(a)).toFloat()
-                    val sy = cy + (6.6f * u * Math.sin(a)).toFloat()
-                    val ex = cx + (8.6f * u * Math.cos(a)).toFloat()
-                    val ey = cy + (8.6f * u * Math.sin(a)).toFloat()
-                    canvas.drawLine(sx, sy, ex, ey, stroke)
-                }
-            }
-            PanelIcon.Glyph.INCOGNITO -> {
-                // 帽顶 + 帽檐
-                path.moveTo(px(7f), py(10f))
-                path.lineTo(px(8.5f), py(4.5f))
-                path.lineTo(px(15.5f), py(4.5f))
-                path.lineTo(px(17f), py(10f))
-                path.moveTo(px(3.5f), py(10.5f))
-                path.lineTo(px(20.5f), py(10.5f))
-                canvas.drawPath(path, stroke)
-                // 眼镜
-                canvas.drawCircle(px(8f), py(16f), 3f * u, stroke)
-                canvas.drawCircle(px(16f), py(16f), 3f * u, stroke)
-                canvas.drawLine(px(11f), py(16f), px(13f), py(16f), stroke)
-            }
-            PanelIcon.Glyph.MIC -> {
-                oval.set(px(9f), py(3f), px(15f), py(14f))
-                canvas.drawRoundRect(oval, 3f * u, 3f * u, stroke)
-                oval.set(px(6f), py(6f), px(18f), py(17f))
-                canvas.drawArc(oval, 0f, 180f, false, stroke)
-                path.moveTo(px(12f), py(17f))
-                path.lineTo(px(12f), py(21f))
-                path.moveTo(px(9f), py(21f))
-                path.lineTo(px(15f), py(21f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.GLOBE -> {
-                canvas.drawCircle(cx, cy, 8.5f * u, stroke)
-                oval.set(px(8.3f), py(3.5f), px(15.7f), py(20.5f))
-                canvas.drawOval(oval, stroke)
-                path.moveTo(px(3.5f), py(12f))
-                path.lineTo(px(20.5f), py(12f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.ONE_HAND -> {
-                // 手机靠右 + 左边一个指向它的箭头：「键盘收到一边」
-                oval.set(px(11f), py(3.5f), px(19f), py(20.5f))
-                canvas.drawRoundRect(oval, 2f * u, 2f * u, stroke)
-                canvas.drawLine(px(14f), py(17.5f), px(16f), py(17.5f), stroke)
-                path.moveTo(px(4f), py(12f))
-                path.lineTo(px(8.5f), py(12f))
-                path.moveTo(px(6.5f), py(9.5f))
-                path.lineTo(px(9f), py(12f))
-                path.lineTo(px(6.5f), py(14.5f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.PIN, PanelIcon.Glyph.PIN_OUTLINE -> {
-                path.moveTo(px(9f), py(4f))
-                path.lineTo(px(15f), py(4f))
-                path.lineTo(px(14f), py(10f))
-                path.lineTo(px(17.5f), py(13.5f))
-                path.lineTo(px(6.5f), py(13.5f))
-                path.lineTo(px(10f), py(10f))
-                path.close()
-                canvas.drawPath(path, if (glyph == PanelIcon.Glyph.PIN) fill else stroke)
-                canvas.drawLine(px(12f), py(13.5f), px(12f), py(20.5f), stroke)
-            }
-            PanelIcon.Glyph.CLOCK -> {
-                canvas.drawCircle(cx, cy, 8.5f * u, stroke)
-                path.moveTo(px(12f), py(7f))
-                path.lineTo(px(12f), py(12f))
-                path.lineTo(px(15.5f), py(14f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.LOCK, PanelIcon.Glyph.UNLOCK -> {
-                // 锁身：圆角矩形；锁梁：半圆 + 两条竖边，未锁定时右边竖边抬起、整个梁右移
-                oval.set(px(6f), py(11f), px(18f), py(20f))
-                canvas.drawRoundRect(oval, 2f * u, 2f * u, stroke)
-                val open = glyph == PanelIcon.Glyph.UNLOCK
-                val shift = if (open) 3f else 0f
-                path.moveTo(px(8.5f + shift), py(11f))
-                path.lineTo(px(8.5f + shift), py(8f))
-                oval.set(px(8.5f + shift), py(4f), px(15.5f + shift), py(12f))
-                path.arcTo(oval, 180f, 180f)
-                if (!open) path.lineTo(px(15.5f), py(11f))
-                canvas.drawPath(path, stroke)
-            }
-            PanelIcon.Glyph.ARROW_UP, PanelIcon.Glyph.ARROW_DOWN, PanelIcon.Glyph.ARROW_LEFT, PanelIcon.Glyph.ARROW_RIGHT -> {
-                // 统一按「朝上」描点，再绕中心转到各方向
-                val angle = when (glyph) {
-                    PanelIcon.Glyph.ARROW_RIGHT -> 90f
-                    PanelIcon.Glyph.ARROW_DOWN -> 180f
-                    PanelIcon.Glyph.ARROW_LEFT -> 270f
-                    else -> 0f
-                }
-                canvas.save()
-                canvas.rotate(angle, cx, cy)
-                path.moveTo(px(12f), py(19f))
-                path.lineTo(px(12f), py(5f))
-                path.moveTo(px(6.5f), py(10.5f))
-                path.lineTo(px(12f), py(5f))
-                path.lineTo(px(17.5f), py(10.5f))
-                canvas.drawPath(path, stroke)
-                canvas.restore()
-            }
-        }
+        val scale = size / loaded.icon.viewBox
+        canvas.save()
+        canvas.translate(cx - size / 2f, cy - size / 2f)
+        canvas.scale(scale, scale)
+        if (glyph.filled) for (p in loaded.paths) canvas.drawPath(p, fill)
+        for (p in loaded.paths) canvas.drawPath(p, stroke)
+        canvas.restore()
     }
 }
 
