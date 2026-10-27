@@ -73,10 +73,15 @@ class BarView(
         private const val PREPARING_TEXT = "词库准备中…"
 
         /** 工具栏两端图标格的宽度（dp）：入口在最左、尾格在最右，中间留空 */
-        const val TOOLBAR_ICON_DP = 52
-
-        /** 空闲工具栏图标的圆托直径 */
-        const val TOOLBAR_CHIP_DP = 38f
+        /**
+         * 空闲工具栏的图标尺寸，量自小米小爱输入法（1080 宽、2.625 倍屏）：格宽 128px、
+         * 宫格 45px / 笑脸 51px，Lucide 的 24 格图标框折合 60px，线宽 5px；
+         * 收起箭头 41px 宽，按它自己的比例单独放大。首尾图标中心离屏幕边 91px。
+         */
+        const val TOOLBAR_ICON_DP = 49
+        const val TOOLBAR_ICON_BOX_DP = 21f
+        const val TOOLBAR_COLLAPSE_BOX_DP = 27f
+        const val TOOLBAR_SIDE_PAD_DP = 10
 
         /** ViewGroup.LayoutParams.MATCH_PARENT 的短名（类内无法裸用继承来的常量） */
         private const val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT
@@ -219,7 +224,7 @@ class BarView(
         for (item in items) {
             val glyph = item.glyph
             val view: View = if (glyph != null) {
-                icon(glyph) { listener.onToolbarItem(item) }.apply { chipDp = TOOLBAR_CHIP_DP }
+                icon(glyph) { listener.onToolbarItem(item) }.apply { boxDp = TOOLBAR_ICON_BOX_DP }
             } else {
                 TextView(context).apply {
                     text = item.text
@@ -262,7 +267,7 @@ class BarView(
 
     private val trailingIcon = PanelIcon(context).apply {
         glyph = PanelIcon.Glyph.COLLAPSE
-        chipDp = TOOLBAR_CHIP_DP
+        boxDp = TOOLBAR_COLLAPSE_BOX_DP
         setOnClickListener {
             if (expanded) listener.onToggleExpanded() else listener.onToolbarAction(ToolbarAction.HIDE_IME)
         }
@@ -471,9 +476,10 @@ class BarView(
     private fun buildToolbar(): View = LinearLayout(context).apply {
         orientation = HORIZONTAL
         setBackgroundColor(Palette.current.background)
+        setPadding(dp(TOOLBAR_SIDE_PAD_DP), 0, dp(TOOLBAR_SIDE_PAD_DP), 0)
         addView(
             icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) }
-                .apply { chipDp = TOOLBAR_CHIP_DP },
+                .apply { boxDp = TOOLBAR_ICON_BOX_DP },
             LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT),
         )
         addView(pinnedRow, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))

@@ -92,10 +92,10 @@ object KeyboardDimens {
     const val PAD_TOP_DP = 0f
 
     /** 条区编码行高度（dp）；横屏收矮，见 [BarView] */
-    var barPreeditDp: Float = 21f
+    var barPreeditDp: Float = 19f
 
     /** 条区候选行高度（dp） */
-    var barMainRowDp: Float = 41f
+    var barMainRowDp: Float = 38f
 
     // ── 像素高度：取整规则只在这里写一份 ──
     // 键盘、条区、面板（符号、快捷功能…）各自 dp→px 时取整方式不同，整体高度就会差几个像素，

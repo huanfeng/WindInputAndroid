@@ -88,8 +88,8 @@ init_geometry() {
         rowPx     = int(60 * d + 0.5)   # KeyboardDimens.rowHeightDp 默认值
         padTopPx  = int(0 * d + 0.5)    # KeyboardDimens.PAD_TOP_DP：第一排键上方的留白
         # 条区 = 编码行（BarView.PREEDIT_DP）+ 候选行（BarView.MAIN_ROW_DP）；工具栏占满两者
-        codeBarPx = int(21 * d + 0.5)
-        mainRowPx = int(41 * d + 0.5)
+        codeBarPx = int(19 * d + 0.5)
+        mainRowPx = int(38 * d + 0.5)
         # 底部 insets（手势条/导航栏）：InputRootView 的 bottomSpacer 高度
         insetPx   = int(48 * d + 0.5)
         kbBottom  = h - insetPx

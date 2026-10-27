@@ -477,7 +477,7 @@ class WindInputImeService :
      */
     private fun barDims(): Pair<Float, Float> {
         val inline = userConfig.getBoolean("ui.android.inline_preedit", false)
-        return if (inline) 0f to 44f else 21f to 41f
+        return if (inline) 0f to 42f else 19f to 38f
     }
 
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
