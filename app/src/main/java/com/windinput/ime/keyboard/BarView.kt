@@ -75,6 +75,9 @@ class BarView(
         /** 工具栏两端图标格的宽度（dp）：入口在最左、尾格在最右，中间留空 */
         const val TOOLBAR_ICON_DP = 52
 
+        /** 空闲工具栏图标的圆托直径 */
+        const val TOOLBAR_CHIP_DP = 36f
+
         /** ViewGroup.LayoutParams.MATCH_PARENT 的短名（类内无法裸用继承来的常量） */
         private const val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT
     }
@@ -216,7 +219,7 @@ class BarView(
         for (item in items) {
             val glyph = item.glyph
             val view: View = if (glyph != null) {
-                icon(glyph) { listener.onToolbarItem(item) }
+                icon(glyph) { listener.onToolbarItem(item) }.apply { chipDp = TOOLBAR_CHIP_DP }
             } else {
                 TextView(context).apply {
                     text = item.text
@@ -259,6 +262,7 @@ class BarView(
 
     private val trailingIcon = PanelIcon(context).apply {
         glyph = PanelIcon.Glyph.COLLAPSE
+        chipDp = TOOLBAR_CHIP_DP
         setOnClickListener {
             if (expanded) listener.onToggleExpanded() else listener.onToolbarAction(ToolbarAction.HIDE_IME)
         }
@@ -468,7 +472,8 @@ class BarView(
         orientation = HORIZONTAL
         setBackgroundColor(Palette.current.background)
         addView(
-            icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) },
+            icon(PanelIcon.Glyph.GRID) { listener.onToolbarAction(ToolbarAction.QUICK_PANEL) }
+                .apply { chipDp = TOOLBAR_CHIP_DP },
             LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT),
         )
         addView(pinnedRow, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))

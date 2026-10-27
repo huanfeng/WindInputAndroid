@@ -680,10 +680,31 @@ advanced = true
 [[item]]
 page = "input"
 section = "联想输入"
-key = "input.association.backspace_cancels_only"
+key = "mobile.association.backspace_cancels_only"
 source = "engine"
 type = "toggle"
 title = "退格仅取消联想"
+summary = "关闭时联想态按退格直接删字；打开则第一下只收起联想"
+advanced = true
+
+[[item]]
+page = "input"
+section = "联想输入"
+key = "mobile.association.enter_cancels_only"
+source = "engine"
+type = "toggle"
+title = "回车仅取消联想"
+summary = "关闭时联想态按回车直接换行或发送；打开则第一下只收起联想"
+advanced = true
+
+[[item]]
+page = "input"
+section = "联想输入"
+key = "mobile.association.select_keys_commit"
+source = "engine"
+type = "toggle"
+title = "分号、单引号选联想"
+summary = "打开后联想态按 ; 或 ' 选第二、三个联想；关闭时只点候选选词"
 advanced = true
 
 # 简繁两个方向互斥（exclusive_with，开一个自动关另一个），同卡三行才看得出是二选一。

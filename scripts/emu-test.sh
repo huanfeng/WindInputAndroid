@@ -995,13 +995,18 @@ tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 tap_key SPACE
 check_match "联想态空格出空格" '^[\x{4e00}-\x{9fa5}] $' "$(get_pad_text)"
 
-section "[33] 联想态按退格先收联想、不删正文"
+section "[33] 联想态按退格直接删字、回车直接换行（移动端不让联想拦正事）"
+# 出厂 [mobile.association] backspace/enter_cancels_only = false：联想只是建议，不吞这两个键
 reset_pad
 tap_key a; tap_key a; tap_key SPACE; sleep 0.4
 tap_key BS
-check_match "第一下退格只收联想" '^[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
-tap_key BS
-check "第二下退格才删字" "" "$(get_pad_text)"
+check "一下退格就删掉刚上屏的字" "" "$(get_pad_text)"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+tap_key ENTER
+# 回车后再打一个字：中间必须有换行（$(...) 会吃掉末尾换行，所以不能只看回车之后那一刻）
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+check "一下回车就换行" $'式\n式' "$(get_pad_text)"
 
 section "[34] 收起键盘后联想不残留"
 # 联想还在的话，数字键会选联想词；收起再弹出后数字应原样上屏
