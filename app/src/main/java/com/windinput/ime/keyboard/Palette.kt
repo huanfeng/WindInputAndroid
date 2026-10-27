@@ -56,7 +56,7 @@ class Palette(
          */
         val light = Palette(
             background = 0xFFE0E3E9.toInt(),
-            surface = 0xFFF7F8FA.toInt(),
+            surface = 0xFFE9ECF1.toInt(),
             key = 0xFFFFFFFF.toInt(),
             keySpecial = 0xFFC9CFD9.toInt(),
             keyPressed = 0xFFBAC2CF.toInt(),
