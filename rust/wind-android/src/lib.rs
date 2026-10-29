@@ -479,46 +479,24 @@ impl WindCore {
         self.core.select_candidate(index as usize).into()
     }
 
-    /// 当前拼音编码的音节拆分与编码光标（展开页左栏画它）。
-    /// 非拼音方案 / 双拼 / 无编码时为空。
-    pub fn syllable_view(&self) -> Option<SyllableViewInfo> {
-        self.core.syllable_view().map(|v| SyllableViewInfo {
-            syllables: v
-                .syllables
-                .into_iter()
-                .map(|s| SyllableInfo {
-                    text: s.text,
-                    start: s.start as u32,
-                    end: s.end as u32,
-                })
-                .collect(),
-            caret: v.caret as u32,
-        })
-    }
-
-    /// 第 `idx` 个音节的可替换拼写（模糊音 / 纠错 / 误触），已按改动大小排序。
-    pub fn syllable_fixes(&self, idx: u32) -> Vec<SyllableFixInfo> {
+    /// 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分、模糊音兄弟、只取声母。
+    /// 没得选 / 非全拼 / 无编码时为空。不改编码，只影响候选。
+    pub fn leading_readings(&self) -> Vec<LeadingReadingInfo> {
         self.core
-            .syllable_fixes(idx as usize)
+            .leading_readings()
             .into_iter()
-            .map(|f| SyllableFixInfo {
-                start: f.start as u32,
-                end: f.end as u32,
-                text: f.text,
+            .map(|r| LeadingReadingInfo {
+                head: r.head,
+                orig_len: r.orig_len as u32,
+                selected: r.selected,
             })
             .collect()
     }
 
-    /// 把编码光标放到缓冲 `caret`（字节偏移）处：候选随之只查光标前一段，
-    /// 选中后上屏、后半截留在编码栏续打。返回的指令流照常执行（刷新组合区）。
-    pub fn set_syllable_caret(&self, caret: u32) -> KeyResult {
-        self.core.set_syllable_caret(caret as usize).into()
-    }
-
-    /// 应用一条修正：缓冲 `[start, end)` 换成 `text`。不合法时返回空（什么都没改）。
-    pub fn apply_syllable_fix(&self, start: u32, end: u32, text: String) -> Option<KeyResult> {
+    /// 选定首单元的一种读法，候选按它重算。读法已过期（编码变了）时返回空。
+    pub fn set_leading_reading(&self, head: String, orig_len: u32) -> Option<KeyResult> {
         self.core
-            .apply_syllable_fix(start as usize, end as usize, &text)
+            .set_leading_reading(&head, orig_len as usize)
             .map(Into::into)
     }
 
@@ -1040,27 +1018,12 @@ pub struct CandidateTooltipInfo {
 }
 
 /// 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
-/// 一个拼音音节：文本与它在编码缓冲内的字节区间
+/// 首单元的一种读法：`head` 是左栏显示、也是写进查询的首单元；`orig_len` 是它占原始编码的字节数
 #[derive(Debug, uniffi::Record)]
-pub struct SyllableInfo {
-    pub text: String,
-    pub start: u32,
-    pub end: u32,
-}
-
-/// 音节视图：拆分 + 编码光标（缓冲内字节偏移）
-#[derive(Debug, uniffi::Record)]
-pub struct SyllableViewInfo {
-    pub syllables: Vec<SyllableInfo>,
-    pub caret: u32,
-}
-
-/// 一条可替换的拼写：缓冲 `[start, end)` 换成 `text`
-#[derive(Debug, uniffi::Record)]
-pub struct SyllableFixInfo {
-    pub start: u32,
-    pub end: u32,
-    pub text: String,
+pub struct LeadingReadingInfo {
+    pub head: String,
+    pub orig_len: u32,
+    pub selected: bool,
 }
 
 #[derive(Debug, uniffi::Record)]

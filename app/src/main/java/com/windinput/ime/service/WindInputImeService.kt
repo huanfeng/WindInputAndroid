@@ -49,7 +49,7 @@ import com.windinput.ime.panels.ClipboardWindow
 import com.windinput.ime.panels.EmojiWindow
 import com.windinput.ime.panels.SymbolPages
 import com.windinput.ime.panels.SymbolWindow
-import com.windinput.ime.core.SyllableFix
+import com.windinput.ime.core.LeadingReading
 import com.windinput.ime.panels.ExpandedCandidatesWindow
 import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
@@ -120,9 +120,6 @@ class WindInputImeService :
     private var emojiWindow: EmojiWindow? = null
     private var symbolWindow: SymbolWindow? = null
     private var expandedCandidatesWindow: ExpandedCandidatesWindow? = null
-
-    /** 最近一帧候选里的编码显示串，点编码定位音节用（见 [onPreeditTapped]） */
-    private var lastPreedit = ""
     private var quickPanelWindow: QuickPanelWindow? = null
 
     /** 编码是否同时写进宿主组合区（ui.android.inline_preedit，默认关，见 onUiEvent） */
@@ -783,7 +780,6 @@ class WindInputImeService :
                 loadedComments = page.comments
                 loadedSegments = page.segments
                 candidateTotal = page.total
-                lastPreedit = event.preedit
                 val composingChanged = composing != event.composing
                 composing = event.composing
                 // 只露条区的模式下，开始/结束打字时跟着显示/收起输入法窗口
@@ -804,10 +800,9 @@ class WindInputImeService :
                     modeLabel = event.modeLabel,
                     page = event.page,
                     totalPages = event.totalPages,
-                    preeditCaret = event.preeditCaret,
                 )
                 expandedCandidatesWindow?.setCandidates(loadedCandidates, loadedComments, loadedSegments)
-                if (windowManager?.current === expandedCandidatesWindow) refreshSyllables()
+                if (windowManager?.current === expandedCandidatesWindow) refreshReadings()
                 // 候选清空时若停留在展开面板，收回键盘
                 if (loadedCandidates.isEmpty() &&
                     windowManager?.current === expandedCandidatesWindow
@@ -1605,7 +1600,7 @@ class WindInputImeService :
         } else {
             expandedCandidatesWindow?.let {
                 wm.show(it)
-                refreshSyllables()
+                refreshReadings()
             }
         }
     }
@@ -1614,35 +1609,13 @@ class WindInputImeService :
         currentInputConnection?.commitText(text, 1)
     }
 
-    /** 展开页的音节栏：拉一次核心的音节视图与光标所在音节的备选拼写（非拼音为空，栏自动收起） */
-    private fun refreshSyllables() {
-        val view = session.syllableView()
-        val fixes = view?.caretAfter?.takeIf { it >= 0 }?.let(session::syllableFixes).orEmpty()
-        expandedCandidatesWindow?.setSyllables(view, fixes)
+    /** 展开页的读法栏：拉一次核心的首单元读法（没得选 / 非全拼为空，栏自动收起） */
+    private fun refreshReadings() {
+        expandedCandidatesWindow?.setReadings(session.leadingReadings())
     }
 
-    override fun onSyllableTapped(index: Int) {
-        val view = session.syllableView() ?: return
-        val syl = view.syllables.getOrNull(index) ?: return
-        session.setSyllableCaret(syl.end)
-    }
-
-    override fun onSyllableFixTapped(fix: SyllableFix) {
-        session.applySyllableFix(fix)
-    }
-
-    /**
-     * 点了编码行里的拼音（不展开候选也能改）：把点中的字符位置换算成「第几个字母」，
-     * 找到它所在的音节，光标挪到该音节之后。
-     */
-    override fun onPreeditTapped(charOffset: Int) {
-        val view = session.syllableView() ?: return
-        // 显示串可能带已转换的汉字前缀、音节间有 '：只数缓冲里的小写字母
-        val shown = lastPreedit.take(charOffset.coerceAtLeast(0))
-        val letters = shown.count { it in 'a'..'z' }
-        var acc = 0
-        val hit = view.syllables.firstOrNull { acc += it.end - it.start; letters < acc } ?: view.syllables.lastOrNull() ?: return
-        session.setSyllableCaret(hit.end)
+    override fun onReadingTapped(reading: LeadingReading) {
+        session.setLeadingReading(reading)
     }
 
     override fun onExpandedCandidateSelected(index: Int) {

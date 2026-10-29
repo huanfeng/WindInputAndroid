@@ -875,8 +875,6 @@ internal object IntegrityCheckingUniffiLib {
 
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_toast(): Int
 
-    external fun uniffi_wind_android_checksum_method_windcore_apply_syllable_fix(): Int
-
     external fun uniffi_wind_android_checksum_method_windcore_assoc_history_clear(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_assoc_history_count(): Int
@@ -915,6 +913,8 @@ internal object IntegrityCheckingUniffiLib {
 
     external fun uniffi_wind_android_checksum_method_windcore_key_down(): Int
 
+    external fun uniffi_wind_android_checksum_method_windcore_leading_readings(): Int
+
     external fun uniffi_wind_android_checksum_method_windcore_phrase_add(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_phrase_remove(): Int
@@ -937,6 +937,8 @@ internal object IntegrityCheckingUniffiLib {
 
     external fun uniffi_wind_android_checksum_method_windcore_set_emoji_module(): Int
 
+    external fun uniffi_wind_android_checksum_method_windcore_set_leading_reading(): Int
+
     external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_set_preceding_text(): Int
@@ -944,8 +946,6 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_enabled(): Int
-
-    external fun uniffi_wind_android_checksum_method_windcore_set_syllable_caret(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled(): Int
 
@@ -956,10 +956,6 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_stats_daily(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_stats_summary(): Int
-
-    external fun uniffi_wind_android_checksum_method_windcore_syllable_fixes(): Int
-
-    external fun uniffi_wind_android_checksum_method_windcore_syllable_view(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_tooltip_sections(): Int
 
@@ -1039,14 +1035,6 @@ internal object UniffiLib {
         `listener`: Long,
         uniffi_out_err: UniffiRustCallStatus,
     ): Long
-
-    external fun uniffi_wind_android_fn_method_windcore_apply_syllable_fix(
-        `ptr`: Long,
-        `start`: Int,
-        `end`: Int,
-        `text`: RustBuffer.ByValue,
-        uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
 
     external fun uniffi_wind_android_fn_method_windcore_assoc_history_clear(
         `ptr`: Long,
@@ -1162,6 +1150,11 @@ internal object UniffiLib {
         uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
 
+    external fun uniffi_wind_android_fn_method_windcore_leading_readings(
+        `ptr`: Long,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+
     external fun uniffi_wind_android_fn_method_windcore_phrase_add(
         `ptr`: Long,
         `code`: RustBuffer.ByValue,
@@ -1229,6 +1222,13 @@ internal object UniffiLib {
         uniffi_out_err: UniffiRustCallStatus,
     ): Unit
 
+    external fun uniffi_wind_android_fn_method_windcore_set_leading_reading(
+        `ptr`: Long,
+        `head`: RustBuffer.ByValue,
+        `origLen`: Int,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+
     external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(
         `ptr`: Long,
         `on`: Byte,
@@ -1256,12 +1256,6 @@ internal object UniffiLib {
         uniffi_out_err: UniffiRustCallStatus,
     ): Unit
 
-    external fun uniffi_wind_android_fn_method_windcore_set_syllable_caret(
-        `ptr`: Long,
-        `caret`: Int,
-        uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
     external fun uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(
         `ptr`: Long,
         `label`: RustBuffer.ByValue,
@@ -1287,17 +1281,6 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
 
     external fun uniffi_wind_android_fn_method_windcore_stats_summary(
-        `ptr`: Long,
-        uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    external fun uniffi_wind_android_fn_method_windcore_syllable_fixes(
-        `ptr`: Long,
-        `idx`: Int,
-        uniffi_out_err: UniffiRustCallStatus,
-    ): RustBuffer.ByValue
-
-    external fun uniffi_wind_android_fn_method_windcore_syllable_view(
         `ptr`: Long,
         uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
@@ -1572,9 +1555,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_toast() != 36283) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_apply_syllable_fix() != 31733) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
     if (lib.uniffi_wind_android_checksum_method_windcore_assoc_history_clear() != 9869) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1632,6 +1612,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 7962) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_leading_readings() != 47407) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_phrase_add() != 54643) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1665,6 +1648,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_set_emoji_module() != 22141) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_leading_reading() != 10411) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_learning_suspended() != 58911) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1675,9 +1661,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_enabled() != 53133) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_wind_android_checksum_method_windcore_set_syllable_caret() != 57296) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled() != 59430) {
@@ -1693,12 +1676,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_stats_summary() != 63898) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_wind_android_checksum_method_windcore_syllable_fixes() != 52341) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_wind_android_checksum_method_windcore_syllable_view() != 65125) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_tooltip_sections() != 33354) {
@@ -2648,15 +2625,6 @@ public object FfiConverterTypeUiEventListener : FfiConverter<UiEventListener, Lo
  */
 public interface WindCoreInterface {
     /**
-     * 应用一条修正：缓冲 `[start, end)` 换成 `text`。不合法时返回空（什么都没改）。
-     */
-    fun `applySyllableFix`(
-        `start`: kotlin.UInt,
-        `end`: kotlin.UInt,
-        `text`: kotlin.String,
-    ): KeyResult?
-
-    /**
      * 清空全部方案的联想学习数据，返回删掉的条数。词频、用户词不动。
      */
     fun `assocHistoryClear`(): kotlin.ULong
@@ -2790,6 +2758,12 @@ public interface WindCoreInterface {
     ): KeyResult
 
     /**
+     * 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分、模糊音兄弟、只取声母。
+     * 没得选 / 非全拼 / 无编码时为空。不改编码，只影响候选。
+     */
+    fun `leadingReadings`(): List<LeadingReadingInfo>
+
+    /**
      * 加一条用户短语。
      */
     fun `phraseAdd`(
@@ -2865,6 +2839,14 @@ public interface WindCoreInterface {
     )
 
     /**
+     * 选定首单元的一种读法，候选按它重算。读法已过期（编码变了）时返回空。
+     */
+    fun `setLeadingReading`(
+        `head`: kotlin.String,
+        `origLen`: kotlin.UInt,
+    ): KeyResult?
+
+    /**
      * 暂停 / 恢复学习（无痕）。宿主每次 onStartInput 都要按当前输入框显式传一次：
      * `IME_FLAG_NO_PERSONALIZED_LEARNING` 或密码框传 true，其余传 false——开关不落盘，
      * 不传就会把上一个无痕框的暂停带进普通输入框。暂停期间照常出候选，只是什么都不记
@@ -2898,12 +2880,6 @@ public interface WindCoreInterface {
     )
 
     /**
-     * 把编码光标放到缓冲 `caret`（字节偏移）处：候选随之只查光标前一段，
-     * 选中后上屏、后半截留在编码栏续打。返回的指令流照常执行（刷新组合区）。
-     */
-    fun `setSyllableCaret`(`caret`: kotlin.UInt): KeyResult
-
-    /**
      * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
      * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
      */
@@ -2935,17 +2911,6 @@ public interface WindCoreInterface {
      * 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
      */
     fun `statsSummary`(): StatsSummaryInfo?
-
-    /**
-     * 第 `idx` 个音节的可替换拼写（模糊音 / 纠错 / 误触），已按改动大小排序。
-     */
-    fun `syllableFixes`(`idx`: kotlin.UInt): List<SyllableFixInfo>
-
-    /**
-     * 当前拼音编码的音节拆分与编码光标（展开页左栏画它）。
-     * 非拼音方案 / 双拼 / 无编码时为空。
-     */
-    fun `syllableView`(): SyllableViewInfo?
 
     /**
      * 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。
@@ -3116,28 +3081,6 @@ open class WindCore :
             UniffiLib.uniffi_wind_android_fn_clone_windcore(handle, status)
         }
     }
-
-    /**
-     * 应用一条修正：缓冲 `[start, end)` 换成 `text`。不合法时返回空（什么都没改）。
-     */
-    override fun `applySyllableFix`(
-        `start`: kotlin.UInt,
-        `end`: kotlin.UInt,
-        `text`: kotlin.String,
-    ): KeyResult? =
-        FfiConverterOptionalTypeKeyResult.lift(
-            callWithHandle {
-                uniffiRustCall { _status ->
-                    UniffiLib.uniffi_wind_android_fn_method_windcore_apply_syllable_fix(
-                        it,
-                        FfiConverterUInt.lower(`start`),
-                        FfiConverterUInt.lower(`end`),
-                        FfiConverterString.lower(`text`),
-                        _status,
-                    )
-                }
-            },
-        )
 
     /**
      * 清空全部方案的联想学习数据，返回删掉的条数。词频、用户词不动。
@@ -3480,6 +3423,22 @@ open class WindCore :
         )
 
     /**
+     * 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分、模糊音兄弟、只取声母。
+     * 没得选 / 非全拼 / 无编码时为空。不改编码，只影响候选。
+     */
+    override fun `leadingReadings`(): List<LeadingReadingInfo> =
+        FfiConverterSequenceTypeLeadingReadingInfo.lift(
+            callWithHandle {
+                uniffiRustCall { _status ->
+                    UniffiLib.uniffi_wind_android_fn_method_windcore_leading_readings(
+                        it,
+                        _status,
+                    )
+                }
+            },
+        )
+
+    /**
      * 加一条用户短语。
      */
     @Throws(ConfigException::class)
@@ -3668,6 +3627,26 @@ open class WindCore :
     }
 
     /**
+     * 选定首单元的一种读法，候选按它重算。读法已过期（编码变了）时返回空。
+     */
+    override fun `setLeadingReading`(
+        `head`: kotlin.String,
+        `origLen`: kotlin.UInt,
+    ): KeyResult? =
+        FfiConverterOptionalTypeKeyResult.lift(
+            callWithHandle {
+                uniffiRustCall { _status ->
+                    UniffiLib.uniffi_wind_android_fn_method_windcore_set_leading_reading(
+                        it,
+                        FfiConverterString.lower(`head`),
+                        FfiConverterUInt.lower(`origLen`),
+                        _status,
+                    )
+                }
+            },
+        )
+
+    /**
      * 暂停 / 恢复学习（无痕）。宿主每次 onStartInput 都要按当前输入框显式传一次：
      * `IME_FLAG_NO_PERSONALIZED_LEARNING` 或密码框传 true，其余传 false——开关不落盘，
      * 不传就会把上一个无痕框的暂停带进普通输入框。暂停期间照常出候选，只是什么都不记
@@ -3738,23 +3717,6 @@ open class WindCore :
             )
         }
     }
-
-    /**
-     * 把编码光标放到缓冲 `caret`（字节偏移）处：候选随之只查光标前一段，
-     * 选中后上屏、后半截留在编码栏续打。返回的指令流照常执行（刷新组合区）。
-     */
-    override fun `setSyllableCaret`(`caret`: kotlin.UInt): KeyResult =
-        FfiConverterTypeKeyResult.lift(
-            callWithHandle {
-                uniffiRustCall { _status ->
-                    UniffiLib.uniffi_wind_android_fn_method_windcore_set_syllable_caret(
-                        it,
-                        FfiConverterUInt.lower(`caret`),
-                        _status,
-                    )
-                }
-            },
-        )
 
     /**
      * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
@@ -3833,38 +3795,6 @@ open class WindCore :
             callWithHandle {
                 uniffiRustCall { _status ->
                     UniffiLib.uniffi_wind_android_fn_method_windcore_stats_summary(
-                        it,
-                        _status,
-                    )
-                }
-            },
-        )
-
-    /**
-     * 第 `idx` 个音节的可替换拼写（模糊音 / 纠错 / 误触），已按改动大小排序。
-     */
-    override fun `syllableFixes`(`idx`: kotlin.UInt): List<SyllableFixInfo> =
-        FfiConverterSequenceTypeSyllableFixInfo.lift(
-            callWithHandle {
-                uniffiRustCall { _status ->
-                    UniffiLib.uniffi_wind_android_fn_method_windcore_syllable_fixes(
-                        it,
-                        FfiConverterUInt.lower(`idx`),
-                        _status,
-                    )
-                }
-            },
-        )
-
-    /**
-     * 当前拼音编码的音节拆分与编码光标（展开页左栏画它）。
-     * 非拼音方案 / 双拼 / 无编码时为空。
-     */
-    override fun `syllableView`(): SyllableViewInfo? =
-        FfiConverterOptionalTypeSyllableViewInfo.lift(
-            callWithHandle {
-                uniffiRustCall { _status ->
-                    UniffiLib.uniffi_wind_android_fn_method_windcore_syllable_view(
                         it,
                         _status,
                     )
@@ -4699,6 +4629,46 @@ public object FfiConverterTypeLayoutInfo : FfiConverterRustBuffer<LayoutInfo> {
 }
 
 /**
+ * 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
+ * 首单元的一种读法：`head` 是左栏显示、也是写进查询的首单元；`orig_len` 是它占原始编码的字节数
+ */
+data class LeadingReadingInfo(
+    var `head`: kotlin.String,
+    var `origLen`: kotlin.UInt,
+    var `selected`: kotlin.Boolean,
+) {
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeLeadingReadingInfo : FfiConverterRustBuffer<LeadingReadingInfo> {
+    override fun read(buf: ByteBuffer): LeadingReadingInfo =
+        LeadingReadingInfo(
+            FfiConverterString.read(buf),
+            FfiConverterUInt.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+
+    override fun allocationSize(value: LeadingReadingInfo) =
+        (
+            FfiConverterString.allocationSize(value.`head`) +
+                FfiConverterUInt.allocationSize(value.`origLen`) +
+                FfiConverterBoolean.allocationSize(value.`selected`)
+        )
+
+    override fun write(
+        value: LeadingReadingInfo,
+        buf: ByteBuffer,
+    ) {
+        FfiConverterString.write(value.`head`, buf)
+        FfiConverterUInt.write(value.`origLen`, buf)
+        FfiConverterBoolean.write(value.`selected`, buf)
+    }
+}
+
+/**
  * 一条快捷短语：系统短语只能开关，用户短语可删。
  */
 data class PhraseInfo(
@@ -4935,120 +4905,6 @@ public object FfiConverterTypeStatsSummaryInfo : FfiConverterRustBuffer<StatsSum
         FfiConverterUInt.write(value.`todaySpeed`, buf)
         FfiConverterUInt.write(value.`overallSpeed`, buf)
         FfiConverterUInt.write(value.`maxSpeed`, buf)
-    }
-}
-
-/**
- * 一条可替换的拼写：缓冲 `[start, end)` 换成 `text`
- */
-data class SyllableFixInfo(
-    var `start`: kotlin.UInt,
-    var `end`: kotlin.UInt,
-    var `text`: kotlin.String,
-) {
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeSyllableFixInfo : FfiConverterRustBuffer<SyllableFixInfo> {
-    override fun read(buf: ByteBuffer): SyllableFixInfo =
-        SyllableFixInfo(
-            FfiConverterUInt.read(buf),
-            FfiConverterUInt.read(buf),
-            FfiConverterString.read(buf),
-        )
-
-    override fun allocationSize(value: SyllableFixInfo) =
-        (
-            FfiConverterUInt.allocationSize(value.`start`) +
-                FfiConverterUInt.allocationSize(value.`end`) +
-                FfiConverterString.allocationSize(value.`text`)
-        )
-
-    override fun write(
-        value: SyllableFixInfo,
-        buf: ByteBuffer,
-    ) {
-        FfiConverterUInt.write(value.`start`, buf)
-        FfiConverterUInt.write(value.`end`, buf)
-        FfiConverterString.write(value.`text`, buf)
-    }
-}
-
-/**
- * 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
- * 一个拼音音节：文本与它在编码缓冲内的字节区间
- */
-data class SyllableInfo(
-    var `text`: kotlin.String,
-    var `start`: kotlin.UInt,
-    var `end`: kotlin.UInt,
-) {
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeSyllableInfo : FfiConverterRustBuffer<SyllableInfo> {
-    override fun read(buf: ByteBuffer): SyllableInfo =
-        SyllableInfo(
-            FfiConverterString.read(buf),
-            FfiConverterUInt.read(buf),
-            FfiConverterUInt.read(buf),
-        )
-
-    override fun allocationSize(value: SyllableInfo) =
-        (
-            FfiConverterString.allocationSize(value.`text`) +
-                FfiConverterUInt.allocationSize(value.`start`) +
-                FfiConverterUInt.allocationSize(value.`end`)
-        )
-
-    override fun write(
-        value: SyllableInfo,
-        buf: ByteBuffer,
-    ) {
-        FfiConverterString.write(value.`text`, buf)
-        FfiConverterUInt.write(value.`start`, buf)
-        FfiConverterUInt.write(value.`end`, buf)
-    }
-}
-
-/**
- * 音节视图：拆分 + 编码光标（缓冲内字节偏移）
- */
-data class SyllableViewInfo(
-    var `syllables`: List<SyllableInfo>,
-    var `caret`: kotlin.UInt,
-) {
-    companion object
-}
-
-/**
- * @suppress
- */
-public object FfiConverterTypeSyllableViewInfo : FfiConverterRustBuffer<SyllableViewInfo> {
-    override fun read(buf: ByteBuffer): SyllableViewInfo =
-        SyllableViewInfo(
-            FfiConverterSequenceTypeSyllableInfo.read(buf),
-            FfiConverterUInt.read(buf),
-        )
-
-    override fun allocationSize(value: SyllableViewInfo) =
-        (
-            FfiConverterSequenceTypeSyllableInfo.allocationSize(value.`syllables`) +
-                FfiConverterUInt.allocationSize(value.`caret`)
-        )
-
-    override fun write(
-        value: SyllableViewInfo,
-        buf: ByteBuffer,
-    ) {
-        FfiConverterSequenceTypeSyllableInfo.write(value.`syllables`, buf)
-        FfiConverterUInt.write(value.`caret`, buf)
     }
 }
 
@@ -5711,38 +5567,6 @@ public object FfiConverterOptionalTypeStatsSummaryInfo : FfiConverterRustBuffer<
 /**
  * @suppress
  */
-public object FfiConverterOptionalTypeSyllableViewInfo : FfiConverterRustBuffer<SyllableViewInfo?> {
-    override fun read(buf: ByteBuffer): SyllableViewInfo? {
-        if (buf.get().toInt() == 0) {
-            return null
-        }
-        return FfiConverterTypeSyllableViewInfo.read(buf)
-    }
-
-    override fun allocationSize(value: SyllableViewInfo?): ULong {
-        if (value == null) {
-            return 1UL
-        } else {
-            return 1UL + FfiConverterTypeSyllableViewInfo.allocationSize(value)
-        }
-    }
-
-    override fun write(
-        value: SyllableViewInfo?,
-        buf: ByteBuffer,
-    ) {
-        if (value == null) {
-            buf.put(0)
-        } else {
-            buf.put(1)
-            FfiConverterTypeSyllableViewInfo.write(value, buf)
-        }
-    }
-}
-
-/**
- * @suppress
- */
 public object FfiConverterSequenceString : FfiConverterRustBuffer<List<kotlin.String>> {
     override fun read(buf: ByteBuffer): List<kotlin.String> {
         val len = buf.getInt()
@@ -6023,6 +5847,34 @@ public object FfiConverterSequenceTypeLayoutInfo : FfiConverterRustBuffer<List<L
 /**
  * @suppress
  */
+public object FfiConverterSequenceTypeLeadingReadingInfo : FfiConverterRustBuffer<List<LeadingReadingInfo>> {
+    override fun read(buf: ByteBuffer): List<LeadingReadingInfo> {
+        val len = buf.getInt()
+        return List<LeadingReadingInfo>(len) {
+            FfiConverterTypeLeadingReadingInfo.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<LeadingReadingInfo>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeLeadingReadingInfo.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(
+        value: List<LeadingReadingInfo>,
+        buf: ByteBuffer,
+    ) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeLeadingReadingInfo.write(it, buf)
+        }
+    }
+}
+
+/**
+ * @suppress
+ */
 public object FfiConverterSequenceTypePhraseInfo : FfiConverterRustBuffer<List<PhraseInfo>> {
     override fun read(buf: ByteBuffer): List<PhraseInfo> {
         val len = buf.getInt()
@@ -6100,62 +5952,6 @@ public object FfiConverterSequenceTypeSchemaInfo : FfiConverterRustBuffer<List<S
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeSchemaInfo.write(it, buf)
-        }
-    }
-}
-
-/**
- * @suppress
- */
-public object FfiConverterSequenceTypeSyllableFixInfo : FfiConverterRustBuffer<List<SyllableFixInfo>> {
-    override fun read(buf: ByteBuffer): List<SyllableFixInfo> {
-        val len = buf.getInt()
-        return List<SyllableFixInfo>(len) {
-            FfiConverterTypeSyllableFixInfo.read(buf)
-        }
-    }
-
-    override fun allocationSize(value: List<SyllableFixInfo>): ULong {
-        val sizeForLength = 4UL
-        val sizeForItems = value.map { FfiConverterTypeSyllableFixInfo.allocationSize(it) }.sum()
-        return sizeForLength + sizeForItems
-    }
-
-    override fun write(
-        value: List<SyllableFixInfo>,
-        buf: ByteBuffer,
-    ) {
-        buf.putInt(value.size)
-        value.iterator().forEach {
-            FfiConverterTypeSyllableFixInfo.write(it, buf)
-        }
-    }
-}
-
-/**
- * @suppress
- */
-public object FfiConverterSequenceTypeSyllableInfo : FfiConverterRustBuffer<List<SyllableInfo>> {
-    override fun read(buf: ByteBuffer): List<SyllableInfo> {
-        val len = buf.getInt()
-        return List<SyllableInfo>(len) {
-            FfiConverterTypeSyllableInfo.read(buf)
-        }
-    }
-
-    override fun allocationSize(value: List<SyllableInfo>): ULong {
-        val sizeForLength = 4UL
-        val sizeForItems = value.map { FfiConverterTypeSyllableInfo.allocationSize(it) }.sum()
-        return sizeForLength + sizeForItems
-    }
-
-    override fun write(
-        value: List<SyllableInfo>,
-        buf: ByteBuffer,
-    ) {
-        buf.putInt(value.size)
-        value.iterator().forEach {
-            FfiConverterTypeSyllableInfo.write(it, buf)
         }
     }
 }

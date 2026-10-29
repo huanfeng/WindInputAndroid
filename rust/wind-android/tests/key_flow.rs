@@ -1290,3 +1290,65 @@ fn enabled_schemas_survive_reload_and_can_be_toggled() {
     reload_config(&core);
     assert!(ids(&core).contains(&"shuangpin".to_string()), "重新启用后回到可选里");
 }
+
+/// 手机端「首单元读法」：列出的读法随编码变，选读法只重算候选、不改编码；
+/// 选 `xi` 读法后 `xian` 变成 `xi'an`，首选应是「西安」而非「先」；选回默认读法恢复原样。
+#[test]
+fn leading_readings_follow_the_pinyin_buffer() {
+    use wind_android::EngineCommand;
+    let Some((core, rec, _env)) = setup_exclusive("leading_readings") else {
+        return;
+    };
+    let schemas = core.schemas();
+    let Some(idx) = schemas.iter().position(|s| s.id == "pinyin") else {
+        eprintln!("跳过：没有拼音方案");
+        return;
+    };
+    core.run_command(EngineCommand::SelectSchema { index: idx as u32 });
+    // 首次编译拼音词库要几秒，期间按键直接上屏字母
+    std::thread::sleep(std::time::Duration::from_secs(8));
+    for vk in [0x58u32, 0x49, 0x41, 0x4E] {
+        core.key_down(vk, 0); // x i a n
+    }
+    settle();
+
+    let heads = |core: &WindCore| -> Vec<(String, bool)> {
+        core.leading_readings()
+            .into_iter()
+            .map(|r| (r.head, r.selected))
+            .collect()
+    };
+    let readings = heads(&core);
+    assert_eq!(readings.first(), Some(&("xian".to_string(), true)), "默认读法在最前且选中：{readings:?}");
+    assert!(readings.iter().any(|(h, _)| h == "xi"), "另一种切法 xi'an：{readings:?}");
+    assert!(readings.iter().any(|(h, _)| h == "x"), "只取声母：{readings:?}");
+
+    let default_items = core.candidates(0, 30).items;
+    assert!(default_items.iter().any(|t| t == "先"), "默认读法有「先」：{default_items:?}");
+
+    // 选 xi 读法：编码不动，候选换成 xi'an 的
+    let xi_len = readings.iter().find(|(h, _)| h == "xi").map(|_| 2).unwrap();
+    assert!(core.set_leading_reading("xi".into(), xi_len).is_some());
+    settle();
+    let xi_items = core.candidates(0, 30).items;
+    assert!(xi_items.iter().any(|t| t == "西安"), "xi 读法下应有「西安」：{xi_items:?}");
+    let after = heads(&core);
+    assert!(after.iter().any(|(h, sel)| h == "xi" && *sel), "选中态跟着变：{after:?}");
+    let preedit = rec.candidates.lock().unwrap().last().map(|(p, _)| p.clone()).unwrap_or_default();
+    assert!(preedit.replace('\'', "") == "xian", "编码栏仍是用户打的那串：{preedit}");
+
+    // 选「西安」：整串消费，直接上屏
+    let at = xi_items.iter().position(|t| t == "西安").unwrap();
+    let r = core.select_candidate(at as u32);
+    assert!(has_text(&r), "选「西安」应上屏：{r:?}");
+
+    // 选回默认读法 = 清除选择（先重新打一遍）
+    for vk in [0x58u32, 0x49, 0x41, 0x4E] {
+        core.key_down(vk, 0);
+    }
+    settle();
+    assert!(core.set_leading_reading("xi".into(), 2).is_some());
+    assert!(core.set_leading_reading("xian".into(), 4).is_some());
+    settle();
+    assert!(core.candidates(0, 30).items.iter().any(|t| t == "先"), "选回默认读法恢复原候选");
+}

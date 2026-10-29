@@ -1237,22 +1237,22 @@ adb_q shell input motionevent UP $(( lx + 3 )) $(( ly + 2 )); sleep 0.8
 tap_key a; tap_key a; tap_key SPACE
 check "长按中英键不滑松手：不弹卡片、仍是五笔" "式" "$(get_pad_text)"
 
-section "[47] 拼音中间修正：点编码里的 fang 只筛 fang 的字，选字后 xiang 留在编码栏续打"
-# 点编码行里的音节 → 编码光标挪到该音节后面 → 候选只查光标前一段；选中后上屏前半段，
-# 后半截仍在编码栏。验证方式：选首候选（放）后空格，上屏应是两个字、首字是「放」。
-# 若点编码没生效，首个候选是「方向」之类整句，选完不会再剩 xiang，空格上屏的只有两字且首字不是「放」。
+section "[47] 拼音首单元读法：xian 展开后左栏点 xi，候选换成 xi'an 的（西安）"
+# 展开页左栏列最前面那个单元的几种读法（xian / xi / x）；点一项候选按它重算，编码不动。
+# 默认读法 xian 的候选是「先、现、县…」，点 xi 读法后 xi'an 的「西安」才进候选。
+# 判据：点「西安」能上屏——默认读法下它不在首批里就点不到（核心侧另有集成测试守逻辑）。
 reset_pad
 lang_menu_pick 1       # 全拼
 sleep 6
-tap_key f; tap_key a; tap_key n; tap_key g; tap_key x; tap_key i; tap_key a; tap_key n; tap_key g
-adb_q shell input tap "$(awk -v w="$GEO_W" 'BEGIN{ printf "%d", int(w * 0.09) }')" "$GEO_CODEBARY"
+tap_key x; tap_key i; tap_key a; tap_key n
+sleep 0.8
+tap_ime 展开候选
 sleep 1
-tap_candidate 0
-tap_key SPACE
+tap_ime xi
+sleep 1
+tap_ime 西安
 sleep 0.6
-txt="$(get_pad_text)"
-check "点 fang 选首候选后空格：首字是「放」" "放" "${txt:0:1}"
-check "选字后 xiang 续打：共两个字" "2" "${#txt}"
+check "点 xi 读法后选「西安」上屏" "西安" "$(get_pad_text)"
 reset_pad
 lang_menu_pick 3       # 切回五笔，别影响后面的用例
 sleep 2

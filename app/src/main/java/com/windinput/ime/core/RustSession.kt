@@ -212,34 +212,15 @@ class RustSession(
         return result.consumed
     }
 
-    override fun syllableView(): SyllableView? =
-        guard.run("syllableView", null) { core.syllableView() }?.let { v ->
-            SyllableView(v.syllables.map { Syllable(it.text, it.start.toInt(), it.end.toInt()) }, v.caret.toInt())
-        }
+    override fun leadingReadings(): List<LeadingReading> =
+        guard.run("leadingReadings", emptyList()) { core.leadingReadings() }
+            .map { LeadingReading(it.head, it.origLen.toInt(), it.selected) }
 
-    override fun syllableFixes(idx: Int): List<SyllableFix> {
-        if (idx < 0) return emptyList()
-        return guard.run("syllableFixes", emptyList()) { core.syllableFixes(idx.toUInt()) }
-            .map { SyllableFix(it.start.toInt(), it.end.toInt(), it.text) }
-    }
-
-    override fun setSyllableCaret(caret: Int): Boolean {
-        if (caret < 0) return false
-        val result = guard.run("setSyllableCaret", null) { core.setSyllableCaret(caret.toUInt()) } ?: return false
-        return dispatchEdits(result.ops)
-    }
-
-    override fun applySyllableFix(fix: SyllableFix): Boolean {
-        val result = guard.run("applySyllableFix", null) {
-            core.applySyllableFix(fix.start.toUInt(), fix.end.toUInt(), fix.text)
+    override fun setLeadingReading(reading: LeadingReading): Boolean {
+        val result = guard.run("setLeadingReading", null) {
+            core.setLeadingReading(reading.head, reading.origLen.toUInt())
         } ?: return false
-        return dispatchEdits(result.ops)
-    }
-
-    /** 把核心回的指令流交给宿主执行；@return 是否有指令 */
-    private fun dispatchEdits(ops: List<uniffi.wind_android.EditOp>): Boolean {
-        if (ops.isEmpty()) return false
-        listener?.invoke(UiEvent.Edits(ops.map(::toEditOp)))
+        if (result.ops.isNotEmpty()) listener?.invoke(UiEvent.Edits(result.ops.map(::toEditOp)))
         return true
     }
 
