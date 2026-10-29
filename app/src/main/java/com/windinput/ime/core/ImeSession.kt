@@ -277,10 +277,11 @@ interface ImeSession {
  */
 /** @param current 当前状态那项（如当前方案）：高亮显示、点了无动作 */
 /**
- * 首单元的一种读法。[head] 是左栏显示的文字，也是写进查询的首单元；[origLen] 是它占原始编码的字节数
- * （`fang` 读成 `fan` 时是 4，不是 3），回传给核心时原样带上。
+ * 首单元的一种读法。[label] 是左栏显示的文字（双拼下是拼音 `deng`）；[head] 是写进查询的首单元形态
+ * （双拼下是击键 `dg`）；[origLen] 是它占原始编码的字节数（`fang` 读成 `fan` 时是 4，不是 3）。
+ * [head] 与 [origLen] 回传给核心时原样带上。
  */
-data class LeadingReading(val head: String, val origLen: Int, val selected: Boolean)
+data class LeadingReading(val label: String, val head: String, val origLen: Int, val selected: Boolean)
 
 data class CandidateMenuEntry(
     val label: String,

@@ -1352,3 +1352,57 @@ fn leading_readings_follow_the_pinyin_buffer() {
     settle();
     assert!(core.candidates(0, 30).items.iter().any(|t| t == "先"), "选回默认读法恢复原候选");
 }
+
+/// 双拼下的首单元读法：首单元是一个击键对，**显示拼音、写进查询用击键**。
+/// 小鹤 `dg` = deng：默认读法显示 deng、回传击键 dg；另有「只取声母」d。
+/// 选「只取声母」后后面的键重新起单元，候选随之改变；选回默认恢复。
+#[test]
+fn shuangpin_leading_readings_display_pinyin_and_query_with_keys() {
+    use wind_android::EngineCommand;
+    let Some((core, rec, _env)) = setup_exclusive("leading_readings_sp") else {
+        return;
+    };
+    let schemas = core.schemas();
+    let Some(idx) = schemas.iter().position(|s| s.id == "shuangpin") else {
+        eprintln!("跳过：没有双拼方案");
+        return;
+    };
+    core.run_command(EngineCommand::SelectSchema { index: idx as u32 });
+    std::thread::sleep(std::time::Duration::from_secs(8));
+    for vk in [0x44u32, 0x47, 0x46, 0x47] {
+        core.key_down(vk, 0); // d g f g
+    }
+    settle();
+
+    let readings = core.leading_readings();
+    let view: Vec<(String, String, u32, bool)> = readings
+        .iter()
+        .map(|r| (r.label.clone(), r.head.clone(), r.orig_len, r.selected))
+        .collect();
+    assert_eq!(
+        view.first(),
+        Some(&("deng".to_string(), "dg".to_string(), 2, true)),
+        "默认读法：显示拼音 deng、查询用击键 dg：{view:?}"
+    );
+    assert!(
+        view.iter().any(|(l, h, n, _)| l == "d" && h == "d" && *n == 1),
+        "只取声母：{view:?}"
+    );
+
+    let default_items = core.candidates(0, 30).items;
+    assert!(default_items.iter().any(|t| t == "登封"), "默认读法有「登封」：{default_items:?}");
+
+    assert!(core.set_leading_reading("d".into(), 1).is_some());
+    settle();
+    let initial_items = core.candidates(0, 30).items;
+    assert_ne!(initial_items, default_items, "选声母读法后候选应变化");
+    let preedit = rec.candidates.lock().unwrap().last().map(|(p, _)| p.clone()).unwrap_or_default();
+    assert_eq!(preedit.replace('\'', ""), "dgfg", "编码栏仍是用户打的击键：{preedit}");
+
+    assert!(core.set_leading_reading("dg".into(), 2).is_some());
+    settle();
+    assert!(
+        core.candidates(0, 30).items.iter().any(|t| t == "登封"),
+        "选回默认读法恢复原候选"
+    );
+}

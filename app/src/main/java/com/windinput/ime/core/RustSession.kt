@@ -214,7 +214,7 @@ class RustSession(
 
     override fun leadingReadings(): List<LeadingReading> =
         guard.run("leadingReadings", emptyList()) { core.leadingReadings() }
-            .map { LeadingReading(it.head, it.origLen.toInt(), it.selected) }
+            .map { LeadingReading(it.label, it.head, it.origLen.toInt(), it.selected) }
 
     override fun setLeadingReading(reading: LeadingReading): Boolean {
         val result = guard.run("setLeadingReading", null) {

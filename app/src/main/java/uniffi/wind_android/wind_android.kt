@@ -4630,9 +4630,11 @@ public object FfiConverterTypeLayoutInfo : FfiConverterRustBuffer<LayoutInfo> {
 
 /**
  * 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
- * 首单元的一种读法：`head` 是左栏显示、也是写进查询的首单元；`orig_len` 是它占原始编码的字节数
+ * 首单元的一种读法：`label` 是左栏显示的文字（双拼下是拼音），`head` 是写进查询的首单元形态
+ * （双拼下是击键，回传核心时原样带上）；`orig_len` 是它占原始编码的字节数
  */
 data class LeadingReadingInfo(
+    var `label`: kotlin.String,
     var `head`: kotlin.String,
     var `origLen`: kotlin.UInt,
     var `selected`: kotlin.Boolean,
@@ -4647,13 +4649,15 @@ public object FfiConverterTypeLeadingReadingInfo : FfiConverterRustBuffer<Leadin
     override fun read(buf: ByteBuffer): LeadingReadingInfo =
         LeadingReadingInfo(
             FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterBoolean.read(buf),
         )
 
     override fun allocationSize(value: LeadingReadingInfo) =
         (
-            FfiConverterString.allocationSize(value.`head`) +
+            FfiConverterString.allocationSize(value.`label`) +
+                FfiConverterString.allocationSize(value.`head`) +
                 FfiConverterUInt.allocationSize(value.`origLen`) +
                 FfiConverterBoolean.allocationSize(value.`selected`)
         )
@@ -4662,6 +4666,7 @@ public object FfiConverterTypeLeadingReadingInfo : FfiConverterRustBuffer<Leadin
         value: LeadingReadingInfo,
         buf: ByteBuffer,
     ) {
+        FfiConverterString.write(value.`label`, buf)
         FfiConverterString.write(value.`head`, buf)
         FfiConverterUInt.write(value.`origLen`, buf)
         FfiConverterBoolean.write(value.`selected`, buf)

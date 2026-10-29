@@ -185,7 +185,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         val palette = Palette.current
         for (r in readings) {
             val row = TextView(ctx).apply {
-                text = r.head
+                text = r.label
                 textSize = 17f
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding((14 * density).toInt(), 0, (6 * density).toInt(), 0)

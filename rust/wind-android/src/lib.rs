@@ -486,6 +486,7 @@ impl WindCore {
             .leading_readings()
             .into_iter()
             .map(|r| LeadingReadingInfo {
+                label: r.label,
                 head: r.head,
                 orig_len: r.orig_len as u32,
                 selected: r.selected,
@@ -1018,9 +1019,11 @@ pub struct CandidateTooltipInfo {
 }
 
 /// 候选菜单的一项。`action` 是与核心约定的动作名，`label` 是显示文案。
-/// 首单元的一种读法：`head` 是左栏显示、也是写进查询的首单元；`orig_len` 是它占原始编码的字节数
+/// 首单元的一种读法：`label` 是左栏显示的文字（双拼下是拼音），`head` 是写进查询的首单元形态
+/// （双拼下是击键，回传核心时原样带上）；`orig_len` 是它占原始编码的字节数
 #[derive(Debug, uniffi::Record)]
 pub struct LeadingReadingInfo {
+    pub label: String,
     pub head: String,
     pub orig_len: u32,
     pub selected: bool,
