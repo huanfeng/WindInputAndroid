@@ -2789,7 +2789,7 @@ public interface WindCoreInterface {
     )
 
     /**
-     * 全部快捷短语（系统 + 用户，按编码升序）。
+     * 全部命令短语（系统 + 用户，按编码升序）。
      */
     fun `phrases`(): List<PhraseInfo>
 
@@ -3495,7 +3495,7 @@ open class WindCore :
     }
 
     /**
-     * 全部快捷短语（系统 + 用户，按编码升序）。
+     * 全部命令短语（系统 + 用户，按编码升序）。
      */
     override fun `phrases`(): List<PhraseInfo> =
         FfiConverterSequenceTypePhraseInfo.lift(
@@ -4674,7 +4674,7 @@ public object FfiConverterTypeLeadingReadingInfo : FfiConverterRustBuffer<Leadin
 }
 
 /**
- * 一条快捷短语：系统短语只能开关，用户短语可删。
+ * 一条命令短语：系统短语只能开关，用户短语可删。
  */
 data class PhraseInfo(
     var `code`: kotlin.String,

@@ -213,7 +213,7 @@ private data class Route(val page: String? = null, val sub: String? = null) {
 /** 词库页的二级页（不来自清单，代码画）；名字即路由，DictSection 的入口用同一份 */
 internal const val DICT_WORDS = "我的词条"
 internal const val DICT_ADD = "添加词条"
-internal const val DICT_PHRASES = "快捷短语"
+internal const val DICT_PHRASES = "命令短语"
 internal const val DICT_STATS = "词库统计"
 
 /** 方案页里代码画的二级页 */
@@ -529,7 +529,7 @@ private fun pageSummary(
         "schema" -> schemaState?.slowSwitching?.let { "正在切换到「$it」…" }
             ?: schemaState?.activeName?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
-        "dict" -> "我的词条 · 添加词条 · 快捷短语 · 词库统计"
+        "dict" -> "我的词条 · 添加词条 · 命令短语 · 词库统计"
         "about" -> "版本 $versionName"
         else -> sectionList(manifest, page.id)
     }

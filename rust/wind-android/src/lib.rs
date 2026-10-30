@@ -752,7 +752,7 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
-    /// 全部快捷短语（系统 + 用户，按编码升序）。
+    /// 全部命令短语（系统 + 用户，按编码升序）。
     pub fn phrases(&self) -> Vec<PhraseInfo> {
         self.core
             .phrases()
@@ -974,7 +974,7 @@ pub struct UserWordInfo {
     pub weight: i32,
 }
 
-/// 一条快捷短语：系统短语只能开关，用户短语可删。
+/// 一条命令短语：系统短语只能开关，用户短语可删。
 #[derive(Debug, uniffi::Record)]
 pub struct PhraseInfo {
     pub code: String,

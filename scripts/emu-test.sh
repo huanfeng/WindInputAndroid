@@ -1394,8 +1394,8 @@ check "工具栏「文本编辑」直达编辑面板" "yes" "$(ime_xml | grep -q
 tap_ime 返回
 reset_pad
 
-section "[46] 快捷短语：打开出厂关闭的时间戳 tmts，打出来，再恢复默认"
-# 时间戳出厂关闭（主仓 system.phrases.toml 的 enabled = false），设置页「词库 → 快捷短语」能打开。
+section "[46] 命令短语：打开出厂关闭的时间戳 tmts，打出来，再恢复默认"
+# 时间戳出厂关闭（主仓 system.phrases.toml 的 enabled = false），设置页「词库 → 命令短语」能打开。
 # 设置页与输入法同一进程、共用一个核心：设置里改了短语，输入法立刻生效，不必重启测试台。
 # 滑动找某段文字所在行的纵坐标（列表长，只往下翻；要从顶上找就先 scroll_top）；按字面匹配（文字里有 $）
 row_y_of() {
@@ -1417,7 +1417,7 @@ scroll_top() {
     done
     sleep 0.6
 }
-# 打开设置的快捷短语页：NEW_TASK | CLEAR_TASK 新开一个设置（总从首页起；前面的用例可能把设置
+# 打开设置的命令短语页：NEW_TASK | CLEAR_TASK 新开一个设置（总从首页起；前面的用例可能把设置
 # 留在别的页上，如 [38] 停在「我的词条」——那里点不到「词库」），不杀进程，输入法与核心照旧
 open_phrases_page() {
     adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SettingsActivity"
@@ -1426,8 +1426,8 @@ open_phrases_page() {
     # 词库总览先显示「正在启动…」、方案读到后才铺卡片：布局还在动时点，会点到挪过来的别的行
     [[ "$(has_text 添加词条)" == yes ]] || die "词库页没出来"
     sleep 0.8
-    tap_text "快捷短语"
-    [[ "$(has_text 添加短语)" == yes ]] || die "没进到快捷短语页"
+    tap_text "命令短语"
+    [[ "$(has_text 添加短语)" == yes ]] || die "没进到命令短语页"
 }
 # 从设置回测试台：设置在前台时普通的 am start 拉不回测试台（两者可能同在一个任务栈里），
 # 用 NEW_TASK | CLEAR_TASK 新开一个——不杀进程，输入法与核心照旧
@@ -1445,7 +1445,7 @@ phrases_restore_defaults() {
 # 先恢复默认：上一次运行若中途断掉，tmts 可能还开着，下面「点一下开关」就成了关掉它
 phrases_restore_defaults
 scroll_top
-ts_y="$(row_y_of '$ts')" || die "快捷短语页找不到 tmts"
+ts_y="$(row_y_of '$ts')" || die "命令短语页找不到 tmts"
 # 开关在行尾、与两行字（编码 / 内容）居中对齐：内容那行的中线往上挪一点
 adb_q shell input tap $(( GEO_W - 90 )) $(( ts_y - 20 )); sleep 1
 back_to_pad
