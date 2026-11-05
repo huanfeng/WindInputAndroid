@@ -26,7 +26,8 @@ Android 上 IME 就是 `InputMethodService` 进程本身，因此 **IPC 层与�
 │   读写用户层 config.toml / 主题选择 / 词库管理          │
 ├─────────────────────────────────────────────────────┤
 │ IME 层（Kotlin，InputMethodService）                  │
-│   生命周期、InputConnection 上屏、EditorInfo 场景感知   │
+│   生命周期、InputConnection 执行编辑指令、EditorInfo     │
+│   场景感知、directInput、句首大写、方案选择记忆         │
 ├─────────────────────────────────────────────────────┤
 │ 键盘 UI（Android 原生渲染：自定义 View + Canvas）       │
 │   软键盘布局、按键触摸、候选条、长按气泡、震动/音效       │
@@ -35,7 +36,8 @@ Android 上 IME 就是 `InputMethodService` 进程本身，因此 **IPC 层与�
 │   只做类型投影：核心类型 ↔ UniFFI Record/Enum          │
 ├───────────────── 唯一一条依赖边 ─────────────────────┤
 │ wind-mobile（主仓门面，纯 Rust 无绑定框架）             │
-│   会话门面：键事件进 → 候选/状态/编辑指令出             │
+│   会话门面：press(PressKey, KeySource) 进 →           │
+│   候选/状态/编辑指令出；按键翻译与自动空格在 touch.rs    │
 ├─────────────────────────────────────────────────────┤
 │ 复用的 Rust 核心（主仓 wind_input workspace）          │
 │   wind-coordinator（headless）+ wind-engine /        │
@@ -76,11 +78,16 @@ Android 上 IME 就是 `InputMethodService` 进程本身，因此 **IPC 层与�
 - 绑定用 **UniFFI** 自动生成 Kotlin（回调接口、错误传递均为生成代码，避免手写 JNI）。
 - API 形状参考 `wind_bridge::MessageHandler` trait（key_event、focus_gained/lost 等
   与 `onStartInput`/`onFinishInput`/键事件几乎一一对应）。
-- 反向通道：`Coordinator::new_headless_with_ui` 已返回 `Receiver<UiCommand>`，
-  `wind-mobile` 的泵线程消费该通道并转成中立的 `MobileEventSink` 回调，绑定层再投影
-  到 UniFFI callback interface 推给 Kotlin，由原生 UI 渲染。
-- `UiCommand` 42 个变体需逐一标注「接 / 不接 / 语义变化」（方法论沿用
-  `wind_macos/AGENTS.md` 的功能差距表，macOS 接了 29 个）。
+- 平台行为由 `InputProfile` 决定（移动端 Profile 与桌面分开，不再靠 `cfg!`）。
+- 正向通道：软键和物理键统一经 `MobileCore::press(PressKey, KeySource)` 进核心。按键翻译
+  （美式键盘 VK 表）、英文自动补空格、句末标点换位、触摸数字不选候选都在主仓
+  `wind-mobile/src/touch.rs`；返回的 `KeyOutcome.ops` 已含补的空格与换位，Kotlin 只按序执行。
+  `consumed=false` 时走宿主默认行为。
+- 反向通道：核心对移动端输出中立的 `SessionEvent`（`View` / `Hide` / `Status` / `Notice`），
+  `wind-mobile` 的泵线程消费后转成 `MobileEventSink` 回调，绑定层再投影到 UniFFI callback
+  interface 推给 Kotlin，由原生 UI 渲染。
+- Kotlin 保留的宿主能力：`directInput`（密码框等直出，**此时绝不调用 `press`**，核心的英文
+  判断含密码框强制英文）、`EditorInfo` 场景、句首自动大写、方案选择记忆。
 
 #### 为什么把绑定层搬进本仓
 
@@ -100,11 +107,12 @@ Android 上 IME 就是 `InputMethodService` 进程本身，因此 **IPC 层与�
 - 两仓各有 `Cargo.lock` 与 `target/`，同一批依赖会编译两遍。
 - 本仓不能单独 clone 后构建，必须与主仓并列存放。
 
-### 3.2 事件模型：软键盘点按合成为 VK 键事件
+### 3.2 事件模型：软键盘点按经 `press` 合成为 VK 键事件
 
-软键盘每个键位映射为 `wind-keys` 的 VK 码，合成键事件喂入
-`handle_key_event` 优先级链——协调器的候选翻页、加词、临时英文、标点、
-模式切换逻辑全部保留。硬件键盘（平板/蓝牙）经 `onKeyDown` 走同一条路，几乎免费。
+软键盘每个键位以 `PressKey`（字符/空格/退格/回车）报给核心，核心在 `touch.rs` 译成
+`wind-keys` 的 VK 码，喂入 `handle_key_event` 优先级链——协调器的候选翻页、加词、
+临时英文、标点、模式切换逻辑全部保留。硬件键盘（平板/蓝牙）经 `onKeyDown` 走同一条路，
+仅 `KeySource` 不同（物理键盘的数字照电脑习惯选候选）。
 
 ### 3.3 配置：同一格式 + 新增平台域
 
@@ -209,5 +217,5 @@ PC 端已有配套工具站（主题编辑器、主题市场、码表编辑）�
 
 - 包名前缀：`com.windinput.`（applicationId：`com.windinput.ime`）。
 - Rust 代码不入本仓，一律在主仓演进；本仓通过路径引用主仓（CI 可改为拉预编译产物）。
-- Android 版功能差距表（对照 `UiCommand` 42 变体）建立后维护在本仓 docs 下，
+- Android 版功能差距表（对照 `SessionEvent` 及其承载的命令）建立后维护在本仓 docs 下，
   模板参考主仓 `wind_macos/AGENTS.md`。
