@@ -774,7 +774,12 @@ impl WindCore {
     }
 
     /// 开 / 关一条短语（出厂关着的系统短语在这里打开）。
-    pub fn phrase_set_enabled(&self, code: String, text: String, enabled: bool) -> Result<(), ConfigError> {
+    pub fn phrase_set_enabled(
+        &self,
+        code: String,
+        text: String,
+        enabled: bool,
+    ) -> Result<(), ConfigError> {
         self.core
             .phrase_set_enabled(&code, &text, enabled)
             .map_err(|reason| ConfigError::Rejected { reason })
@@ -831,7 +836,12 @@ impl WindCore {
     /// 统计方案的系统词库（条目、码长、重码、字集覆盖），回包为 JSON 文本，形态同电脑版
     /// 「词库统计」（`dict.systemStats`）。O(全表)，K 侧须在后台线程调用。
     /// 未知方案等 → Rejected(原因)。
-    pub fn dict_stats(&self, schema_id: String, top_n: u32, refresh: bool) -> Result<String, ConfigError> {
+    pub fn dict_stats(
+        &self,
+        schema_id: String,
+        top_n: u32,
+        refresh: bool,
+    ) -> Result<String, ConfigError> {
         self.core
             .dict_stats(&schema_id, top_n, refresh)
             .map_err(|reason| ConfigError::Rejected { reason })
