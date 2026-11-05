@@ -1577,3 +1577,45 @@ fn press_english_word_space_period_swaps_auto_space() {
         dot.ops
     );
 }
+
+/// `select_candidate_plain`：英文组码选词不补空格，普通版补。
+#[test]
+fn select_candidate_plain_skips_auto_space_in_english() {
+    use wind_android::{EngineCommand, KeySource, PressKey};
+    let Some((core, _rec, _env)) = setup_exclusive("plain_select_english") else {
+        return;
+    };
+    let schemas = core.schemas();
+    let Some(en) = schemas.iter().position(|s| s.id == "english") else {
+        eprintln!("跳过：未安装英文方案");
+        return;
+    };
+    core.run_command(EngineCommand::SelectSchema { index: en as u32 });
+    settle();
+    let type_hel = || {
+        for c in "hel".chars() {
+            core.press(
+                PressKey::Char {
+                    ch: c.to_string(),
+                    shifted: false,
+                },
+                KeySource::Touch,
+            );
+        }
+    };
+    type_hel();
+    let plain = core.select_candidate_plain(0);
+    assert!(plain.consumed);
+    assert!(
+        !plain.ops.iter().any(|o| o.kind == 0 && o.text == " "),
+        "plain 不补空格: {:?}",
+        plain.ops
+    );
+    type_hel();
+    let normal = core.select_candidate(0);
+    assert!(
+        normal.ops.iter().any(|o| o.kind == 0 && o.text == " "),
+        "普通版补空格: {:?}",
+        normal.ops
+    );
+}

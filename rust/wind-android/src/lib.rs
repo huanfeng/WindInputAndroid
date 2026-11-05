@@ -540,6 +540,12 @@ impl WindCore {
         self.core.select_candidate(index as usize).into()
     }
 
+    /// 同 [`Self::select_candidate`]，但英文组码选词后**不补空格**。
+    /// 宿主紧接着自己上屏表情 / 符号 / 数字键盘字符时用。
+    pub fn select_candidate_plain(&self, index: u32) -> KeyResult {
+        self.core.select_candidate_plain(index as usize).into()
+    }
+
     /// 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分、模糊音兄弟、只取声母。
     /// 没得选 / 非全拼 / 无编码时为空。不改编码，只影响候选。
     pub fn leading_readings(&self) -> Vec<LeadingReadingInfo> {

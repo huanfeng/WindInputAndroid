@@ -1770,7 +1770,7 @@ class WindInputImeService :
     private fun commitDirect(text: String) {
         if (composing && !directInput) {
             if (loadedCandidates.isNotEmpty()) {
-                session.candidateSelected(0)
+                session.candidateSelected(0, autoSpace = false)
             } else {
                 session.keyPressed(KeyAction.Enter, false)
             }

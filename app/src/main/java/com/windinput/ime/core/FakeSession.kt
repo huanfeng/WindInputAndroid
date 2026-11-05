@@ -54,7 +54,7 @@ class FakeSession : ImeSession {
         }
     }
 
-    override fun candidateSelected(index: Int): Boolean {
+    override fun candidateSelected(index: Int, autoSpace: Boolean): Boolean {
         val items = candidates()
         if (buffer.isEmpty() || index !in items.indices) return false
         commit(items[index])

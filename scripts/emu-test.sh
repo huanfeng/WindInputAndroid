@@ -1580,6 +1580,25 @@ sleep 0.8
 check_match "联想态上滑数字：数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 reset_pad
 
+section "[53] 英文组码时点符号页符号、九宫格数字：选词后不多补空格（commitDirect 不补）"
+reset_pad
+tap_key LANG; sleep 4
+tap_key h; tap_key e; tap_key l
+tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
+sym_cell() { adb_q shell input tap $(( GEO_W * (2 * $2 + 1) / 20 )) $(( GEO_KBTOP + GEO_ROWPX * (2 * $1 + 1) / 2 )); sleep 0.4; }
+sym_cell 0 0
+check_match "英文组码点符号：词后紧跟符号，无空格" '^[A-Za-z]+[^ A-Za-z]$' "$(get_pad_text)"
+tap_cell 3 "${SYM_W[3]}" 1
+reset_pad
+tap_key h; tap_key e; tap_key l
+tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0
+tap_cell 0 "$NUM_W" 1
+check_match "英文组码点九宫格数字：词后紧跟数字，无空格" '^[A-Za-z]+1$' "$(get_pad_text)"
+tap_cell 3 "$NUM_W" 1; tap_cell 3 "${SYM_W[3]}" 1
+tap_key LANG; sleep 3
+[[ -n "$(wait_chinese)" ]] || die "[53] 切不回中文"
+reset_pad
+
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then

@@ -935,6 +935,8 @@ internal object IntegrityCheckingUniffiLib {
 
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(): Int
 
+    external fun uniffi_wind_android_checksum_method_windcore_select_candidate_plain(): Int
+
     external fun uniffi_wind_android_checksum_method_windcore_separator_key(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_set_auto_space(): Int
@@ -1216,6 +1218,12 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
 
     external fun uniffi_wind_android_fn_method_windcore_select_candidate(
+        `ptr`: Long,
+        `index`: Int,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+
+    external fun uniffi_wind_android_fn_method_windcore_select_candidate_plain(
         `ptr`: Long,
         `index`: Int,
         uniffi_out_err: UniffiRustCallStatus,
@@ -1660,6 +1668,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 14719) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate_plain() != 1554) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_separator_key() != 19509) {
@@ -2862,6 +2873,12 @@ public interface WindCoreInterface {
     fun `selectCandidate`(`index`: kotlin.UInt): KeyResult
 
     /**
+     * 同 [`Self::select_candidate`]，但英文组码选词后**不补空格**。
+     * 宿主紧接着自己上屏表情 / 符号 / 数字键盘字符时用。
+     */
+    fun `selectCandidatePlain`(`index`: kotlin.UInt): KeyResult
+
+    /**
      * 活跃方案此刻的手动音节分隔符（`"'"` 或 `` "`" ``）；`None` = 没有，K 侧不该摆「分词」键。
      * 随方案、`separator` 设置、五笔整句开关变化，每次要用时再问，别缓存。纯读。
      */
@@ -3652,6 +3669,23 @@ open class WindCore :
             callWithHandle {
                 uniffiRustCall { _status ->
                     UniffiLib.uniffi_wind_android_fn_method_windcore_select_candidate(
+                        it,
+                        FfiConverterUInt.lower(`index`),
+                        _status,
+                    )
+                }
+            },
+        )
+
+    /**
+     * 同 [`Self::select_candidate`]，但英文组码选词后**不补空格**。
+     * 宿主紧接着自己上屏表情 / 符号 / 数字键盘字符时用。
+     */
+    override fun `selectCandidatePlain`(`index`: kotlin.UInt): KeyResult =
+        FfiConverterTypeKeyResult.lift(
+            callWithHandle {
+                uniffiRustCall { _status ->
+                    UniffiLib.uniffi_wind_android_fn_method_windcore_select_candidate_plain(
                         it,
                         FfiConverterUInt.lower(`index`),
                         _status,

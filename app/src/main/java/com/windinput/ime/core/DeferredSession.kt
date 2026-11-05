@@ -160,8 +160,8 @@ class DeferredSession(
     override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean =
         if (busy) false else delegate?.keyPressed(action, shifted, source) ?: false
 
-    override fun candidateSelected(index: Int): Boolean =
-        if (busy) false else delegate?.candidateSelected(index) ?: false
+    override fun candidateSelected(index: Int, autoSpace: Boolean): Boolean =
+        if (busy) false else delegate?.candidateSelected(index, autoSpace) ?: false
 
     /** 未就绪时先记下，核心就绪后补设（同 [learningSuspended]） */
     override var candidateComments: Boolean = false

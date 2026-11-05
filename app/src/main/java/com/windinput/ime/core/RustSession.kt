@@ -211,9 +211,11 @@ class RustSession(
      * 此前是「合成页内数字键 1-9」——那把点选限死在前 9 个，第 10 个及以后
      * 永远点不到，而候选栏的滚动因此也没有意义。
      */
-    override fun candidateSelected(index: Int): Boolean {
+    override fun candidateSelected(index: Int, autoSpace: Boolean): Boolean {
         if (index < 0) return false
-        val result = guard.run("selectCandidate", null) { core.selectCandidate(index.toUInt()) } ?: return false
+        val result = guard.run("selectCandidate", null) {
+            if (autoSpace) core.selectCandidate(index.toUInt()) else core.selectCandidatePlain(index.toUInt())
+        } ?: return false
         if (result.ops.isNotEmpty()) {
             listener?.invoke(UiEvent.Edits(result.ops.map(::toEditOp)))
         }

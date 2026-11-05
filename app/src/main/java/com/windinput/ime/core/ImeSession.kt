@@ -206,8 +206,12 @@ interface ImeSession {
      */
     fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource = KeySource.TOUCH): Boolean
 
-    /** 点选候选，[index] 是**全量里的绝对下标**（不受分页限制）。@return true = 已处理 */
-    fun candidateSelected(index: Int): Boolean
+    /**
+     * 点选候选，[index] 是**全量里的绝对下标**（不受分页限制）。
+     * [autoSpace] = false：英文组码选词后不补空格（宿主紧接着自己上屏别的东西时用）。
+     * @return true = 已处理
+     */
+    fun candidateSelected(index: Int, autoSpace: Boolean = true): Boolean
 
     /**
      * 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分（`xian` → `xi'an`）、模糊音兄弟、
