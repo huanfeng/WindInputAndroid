@@ -851,7 +851,11 @@ private const val EMOJI_SECTION = "Emoji/OpenCC"
 private fun AboutSection(versionName: String) {
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow("清风输入法", "版本 $versionName", icon = SettingsIcons.page("Info"))
+        BasicComponent(
+            title = "清风输入法",
+            summary = "版本 $versionName",
+            startAction = { WindInputLogo(Modifier.padding(end = 14.dp).size(40.dp)) },
+        )
         NavRow(
             if (showLicenses) "开源许可 ▴" else "开源许可 ▾",
             "随包分发的词库数据与程序库的来源和许可证",
