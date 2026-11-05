@@ -502,6 +502,11 @@ if printf '%s\n' "$cfg_now" | grep -qx '\[input.s2t\]'; then
     write_core_cfg "$(strip_section "$cfg_now" input.s2t)"
     restart_pad
 fi
+if printf '%s\n' "$cfg_now" | grep -q '^english = "A" # emu-test'; then
+    echo "${Y}残留 [ui.labels] english = A，清掉后重启${N}"
+    write_core_cfg "$(strip_section "$cfg_now" ui.labels)"
+    restart_pad
+fi
 if adb_ shell run-as "$PKG" cat "$WUBI_SHADOW" | grep -q $'^aa\t'; then
     echo "${Y}残留 aa 的候选调整规则，清掉后重启${N}"
     adb_q shell "run-as $PKG sed -i '/^aa\t/d' $WUBI_SHADOW"
@@ -1503,6 +1508,36 @@ check "重做再次清空" "" "$(get_pad_text)"
 adb_q shell input tap "$GEO_PANELBACKX" "$GEO_PANELHEADERY"   # 返回键盘
 sleep 1
 reset_pad
+
+section "[51] 英文标签改成 A：中英键、英文补空格、联想态回车照常（判据是引擎的 latin_input，不是标签文字）"
+# 以前宿主拿短称 == "英" 判断英文模式，用户把 [ui.labels] english 改成别的字就全线失效：
+# 中英键切不回来、英文空格不补空格、英文下的候选条行为错位。这里把标签改成 A 再走一遍。
+# 带 `# emu-test` 标记，中途断掉留下的下次开跑时清掉（见上方残留检查）
+LABELS_CFG_BEFORE="$(read_core_cfg)"
+write_core_cfg "$(strip_section "$LABELS_CFG_BEFORE" ui.labels)"$'\n[ui.labels]\nenglish = "A" # emu-test'
+restart_pad
+[[ -n "$(wait_chinese)" ]] || die "改标签后起不来中文"
+reset_pad
+tap_key LANG; sleep 4
+tap_key h; tap_key i; tap_key SPACE
+check "标签为 A 时英文空格上屏原文 + 自动空格" "hi " "$(get_pad_text)"
+tap_key PERIOD
+check "标签为 A 时英文句点吃掉自动空格" "hi. " "$(get_pad_text)"
+"$ADB" -s "$SERIAL" exec-out screencap -p > "${SHOT_DIR:-/tmp}/label-A-english.png" 2>/dev/null
+tap_key LANG; sleep 3
+[[ -n "$(wait_chinese)" ]] || die "标签为 A 时中英键切不回中文"
+check_match "标签为 A 时切回中文出汉字" "$CN" "$(wait_chinese)"
+# 联想态回车：直接换行，不被联想拦住（键面不写「确定」，截图留证）
+reset_pad
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+"$ADB" -s "$SERIAL" exec-out screencap -p > "${SHOT_DIR:-/tmp}/label-A-assoc-enter.png" 2>/dev/null
+tap_key ENTER
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+check "标签为 A 时联想态回车换行" $'式\n式' "$(get_pad_text)"
+# 恢复用户配置
+write_core_cfg "$LABELS_CFG_BEFORE"
+restart_pad
+[[ -n "$(wait_chinese)" ]] || die "恢复标签配置后起不来中文"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
