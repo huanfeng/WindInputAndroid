@@ -165,6 +165,9 @@ sealed interface EngineCmd {
     data class SetShuangpinLayout(val id: String) : EngineCmd
 }
 
+/** 按键来源：触摸键盘的数字就是数字，物理键盘的数字照电脑习惯选候选 */
+enum class KeySource { TOUCH, PHYSICAL }
+
 /**
  * 输入会话接口：UniFFI 绑定（主仓 wind-android crate）的落位形状。
  *
@@ -193,8 +196,15 @@ interface ImeSession {
      */
     fun setPrecedingText(text: String) = Unit
 
-    /** @return true = 会话消费该键；false = 由调用方执行默认行为 */
-    fun keyPressed(action: KeyAction, shifted: Boolean): Boolean
+    /**
+     * 按键进核心：翻译、英文自动空格、标点换位都在核心里，编辑指令经 [listener] 回来。
+     *
+     * ⚠ 前置条件：宿主处于直出（密码框等 `directInput`）时**不得调用**。核心的 `latin_input()`
+     * 含密码框强制英文，调了会让按键进编码缓冲而不是直接上屏；该判断留在宿主，调用之前做。
+     *
+     * @return true = 会话消费该键；false = 由调用方执行默认行为
+     */
+    fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource = KeySource.TOUCH): Boolean
 
     /** 点选候选，[index] 是**全量里的绝对下标**（不受分页限制）。@return true = 已处理 */
     fun candidateSelected(index: Int): Boolean
@@ -259,11 +269,8 @@ interface ImeSession {
     /** 下达引擎命令；结果经 [UiEvent.Status] 异步回报 */
     fun runCommand(cmd: EngineCmd) = Unit
 
-    /**
-     * 当前是不是英文方案。英文方案下 Shift+字母**进引擎组合**（保留大小写，`Hell` 照样补全
-     * 出 `Hello`）；中文方案下仍直接上屏——那里引擎的 Shift+字母是「临时英文」语义。
-     */
-    fun setLatinSchema(on: Boolean) = Unit
+    /** 英文词后是否自动补空格（设置项 ui.android.auto_space）；补不补由核心决定 */
+    fun setAutoSpace(on: Boolean) = Unit
 }
 
 /**

@@ -925,6 +925,8 @@ internal object IntegrityCheckingUniffiLib {
 
     external fun uniffi_wind_android_checksum_method_windcore_phrases_restore_defaults(): Int
 
+    external fun uniffi_wind_android_checksum_method_windcore_press(): Int
+
     external fun uniffi_wind_android_checksum_method_windcore_run_command(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_schema_dicts(): Int
@@ -934,6 +936,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_separator_key(): Int
+
+    external fun uniffi_wind_android_checksum_method_windcore_set_auto_space(): Int
 
     external fun uniffi_wind_android_checksum_method_windcore_set_emoji_module(): Int
 
@@ -1187,6 +1191,13 @@ internal object UniffiLib {
         uniffi_out_err: UniffiRustCallStatus,
     ): Long
 
+    external fun uniffi_wind_android_fn_method_windcore_press(
+        `ptr`: Long,
+        `key`: RustBuffer.ByValue,
+        `source`: RustBuffer.ByValue,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): RustBuffer.ByValue
+
     external fun uniffi_wind_android_fn_method_windcore_run_command(
         `ptr`: Long,
         `cmd`: RustBuffer.ByValue,
@@ -1214,6 +1225,12 @@ internal object UniffiLib {
         `ptr`: Long,
         uniffi_out_err: UniffiRustCallStatus,
     ): RustBuffer.ByValue
+
+    external fun uniffi_wind_android_fn_method_windcore_set_auto_space(
+        `ptr`: Long,
+        `on`: Byte,
+        uniffi_out_err: UniffiRustCallStatus,
+    ): Unit
 
     external fun uniffi_wind_android_fn_method_windcore_set_emoji_module(
         `ptr`: Long,
@@ -1630,6 +1647,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_phrases_restore_defaults() != 26484) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_press() != 61301) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_run_command() != 36173) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1643,6 +1663,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_separator_key() != 19509) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_auto_space() != 12694) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_emoji_module() != 22141) {
@@ -2799,6 +2822,20 @@ public interface WindCoreInterface {
     fun `phrasesRestoreDefaults`(): kotlin.ULong
 
     /**
+     * 按键：字符/空格/退格/回车，翻译与英文自动空格都在核心里。
+     *
+     * 返回的 `ops` 已含补的空格与标点换位，宿主按序执行即可；`consumed=false` 时
+     * 执行 `ops` 后走默认行为。
+     *
+     * **前置条件**：宿主处于直出（密码框等 `directInput`）时**不得调用**——核心的
+     * `latin_input()` 含密码框强制英文，调用会让按键进编码缓冲而不是直接上屏。
+     */
+    fun `press`(
+        `key`: PressKey,
+        `source`: KeySource,
+    ): KeyResult
+
+    /**
      * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
      * ——同一个变化也可能由按键或焦点事件引发，只留推送一条路，K 侧才不会有两份真值。
      */
@@ -2829,6 +2866,11 @@ public interface WindCoreInterface {
      * 随方案、`separator` 设置、五笔整句开关变化，每次要用时再问，别缓存。纯读。
      */
     fun `separatorKey`(): kotlin.String?
+
+    /**
+     * 英文词后是否自动补空格（默认开）。
+     */
+    fun `setAutoSpace`(`on`: kotlin.Boolean)
 
     /**
      * 打开 / 关闭一个 emoji 附加模块。只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
@@ -3526,6 +3568,32 @@ open class WindCore :
         )
 
     /**
+     * 按键：字符/空格/退格/回车，翻译与英文自动空格都在核心里。
+     *
+     * 返回的 `ops` 已含补的空格与标点换位，宿主按序执行即可；`consumed=false` 时
+     * 执行 `ops` 后走默认行为。
+     *
+     * **前置条件**：宿主处于直出（密码框等 `directInput`）时**不得调用**——核心的
+     * `latin_input()` 含密码框强制英文，调用会让按键进编码缓冲而不是直接上屏。
+     */
+    override fun `press`(
+        `key`: PressKey,
+        `source`: KeySource,
+    ): KeyResult =
+        FfiConverterTypeKeyResult.lift(
+            callWithHandle {
+                uniffiRustCall { _status ->
+                    UniffiLib.uniffi_wind_android_fn_method_windcore_press(
+                        it,
+                        FfiConverterTypePressKey.lower(`key`),
+                        FfiConverterTypeKeySource.lower(`source`),
+                        _status,
+                    )
+                }
+            },
+        )
+
+    /**
      * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
      * ——同一个变化也可能由按键或焦点事件引发，只留推送一条路，K 侧才不会有两份真值。
      */
@@ -3607,6 +3675,20 @@ open class WindCore :
                 }
             },
         )
+
+    /**
+     * 英文词后是否自动补空格（默认开）。
+     */
+    override fun `setAutoSpace`(`on`: kotlin.Boolean) =
+        callWithHandle {
+            uniffiRustCall { _status ->
+                UniffiLib.uniffi_wind_android_fn_method_windcore_set_auto_space(
+                    it,
+                    FfiConverterBoolean.lower(`on`),
+                    _status,
+                )
+            }
+        }
 
     /**
      * 打开 / 关闭一个 emoji 附加模块。只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
@@ -5481,6 +5563,154 @@ public object FfiConverterTypeEngineCommand : FfiConverterRustBuffer<EngineComma
             is EngineCommand.SetShuangpinLayout -> {
                 buf.putInt(7)
                 FfiConverterString.write(value.`id`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+/**
+ * 按键来源（见 [`wind_mobile::KeySource`]）。
+ */
+
+enum class KeySource {
+    TOUCH,
+    PHYSICAL,
+    ;
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeKeySource : FfiConverterRustBuffer<KeySource> {
+    override fun read(buf: ByteBuffer) =
+        try {
+            KeySource.values()[buf.getInt() - 1]
+        } catch (e: IndexOutOfBoundsException) {
+            throw RuntimeException("invalid enum value, something is very wrong!!", e)
+        }
+
+    override fun allocationSize(value: KeySource) = 4UL
+
+    override fun write(
+        value: KeySource,
+        buf: ByteBuffer,
+    ) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+/**
+ * 宿主报上来的按键（见 [`wind_mobile::PressKey`]）。
+ *
+ * `Char.ch` 取首个字符；空串或多字符视为不接（`press` 返回未吃键、无编辑指令）。
+ */
+sealed class PressKey {
+    data class Char(
+        val `ch`: kotlin.String,
+        val `shifted`: kotlin.Boolean,
+    ) : PressKey() {
+        companion object
+    }
+
+    object Space : PressKey()
+
+    object Backspace : PressKey()
+
+    object Enter : PressKey()
+
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypePressKey : FfiConverterRustBuffer<PressKey> {
+    override fun read(buf: ByteBuffer): PressKey =
+        when (buf.getInt()) {
+            1 -> {
+                PressKey.Char(
+                    FfiConverterString.read(buf),
+                    FfiConverterBoolean.read(buf),
+                )
+            }
+
+            2 -> {
+                PressKey.Space
+            }
+
+            3 -> {
+                PressKey.Backspace
+            }
+
+            4 -> {
+                PressKey.Enter
+            }
+
+            else -> {
+                throw RuntimeException("invalid enum value, something is very wrong!!")
+            }
+        }
+
+    override fun allocationSize(value: PressKey): ULong =
+        when (value) {
+            is PressKey.Char -> {
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                (
+                    4UL +
+                        FfiConverterString.allocationSize(value.`ch`) +
+                        FfiConverterBoolean.allocationSize(value.`shifted`)
+                )
+            }
+
+            is PressKey.Space -> {
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                (
+                    4UL
+                )
+            }
+
+            is PressKey.Backspace -> {
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                (
+                    4UL
+                )
+            }
+
+            is PressKey.Enter -> {
+                // Add the size for the Int that specifies the variant plus the size needed for all fields
+                (
+                    4UL
+                )
+            }
+        }
+
+    override fun write(
+        value: PressKey,
+        buf: ByteBuffer,
+    ) {
+        when (value) {
+            is PressKey.Char -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`ch`, buf)
+                FfiConverterBoolean.write(value.`shifted`, buf)
+                Unit
+            }
+
+            is PressKey.Space -> {
+                buf.putInt(2)
+                Unit
+            }
+
+            is PressKey.Backspace -> {
+                buf.putInt(3)
+                Unit
+            }
+
+            is PressKey.Enter -> {
+                buf.putInt(4)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }

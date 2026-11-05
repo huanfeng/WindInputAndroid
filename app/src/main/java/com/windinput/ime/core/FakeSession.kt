@@ -19,7 +19,7 @@ class FakeSession : ImeSession {
 
     override fun focusLost() = reset()
 
-    override fun keyPressed(action: KeyAction, shifted: Boolean): Boolean {
+    override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean {
         when (action) {
             is KeyAction.Text -> {
                 if (!action.char.isLetter()) {

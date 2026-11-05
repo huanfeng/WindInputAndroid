@@ -6,7 +6,7 @@ import android.view.KeyEvent
  * 物理键盘按键 → 软键同款的 [KeyAction]，之后与软键走同一条路进引擎（`ImeSession.keyPressed`）。
  *
  * 字符键不按键码查表，而是用系统按当前键盘布局算好的字符（`KeyEvent.getUnicodeChar`）：
- * 非美式布局、Shift 后的符号都由系统解析，这里只需把字符交给 [Punct] 那张 ASCII → VK 表。
+ * 非美式布局、Shift 后的符号都由系统解析，这里只需把字符交给核心（`press`，美式键盘 VK 表在核心里）。
  *
  * 带 Ctrl / Alt / Meta 的组合键一律不接（null）：那是应用快捷键（Ctrl+C、Alt+Tab），
  * 输入法吃掉就坏了宿主的行为。

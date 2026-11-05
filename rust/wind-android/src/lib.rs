@@ -26,8 +26,8 @@ use std::sync::Arc;
 
 use wind_mobile::{
     CandidateFrame, CandidateWindow as CoreCandidateWindow, EditOp as CoreEditOp,
-    InputStatus as CoreStatus, KeyOutcome, LayoutEntry, MobileCommand, MobileCore, MobileEventSink,
-    SchemaEntry, TextSegment as CoreTextSegment,
+    InputStatus as CoreStatus, KeyOutcome, KeySource as CoreKeySource, LayoutEntry, MobileCommand,
+    MobileCore, MobileEventSink, PressKey as CorePressKey, SchemaEntry, TextSegment as CoreTextSegment,
 };
 
 uniffi::setup_scaffolding!();
@@ -249,6 +249,33 @@ impl From<EngineCommand> for MobileCommand {
     }
 }
 
+/// 按键来源（见 [`wind_mobile::KeySource`]）。
+#[derive(Debug, Clone, Copy, uniffi::Enum)]
+pub enum KeySource {
+    Touch,
+    Physical,
+}
+
+impl From<KeySource> for CoreKeySource {
+    fn from(s: KeySource) -> Self {
+        match s {
+            KeySource::Touch => CoreKeySource::Touch,
+            KeySource::Physical => CoreKeySource::Physical,
+        }
+    }
+}
+
+/// 宿主报上来的按键（见 [`wind_mobile::PressKey`]）。
+///
+/// `Char.ch` 取首个字符；空串或多字符视为不接（`press` 返回未吃键、无编辑指令）。
+#[derive(Debug, Clone, uniffi::Enum)]
+pub enum PressKey {
+    Char { ch: String, shifted: bool },
+    Space,
+    Backspace,
+    Enter,
+}
+
 /// 候选全量的一个窗口（滚动候选栏 / 展开面板的数据源）。
 ///
 /// 推送帧 [`CandidateUpdate`] 给的是**当页**候选，够画编码栏与页码，但装不下一条
@@ -410,6 +437,34 @@ impl WindCore {
     /// K 侧**不要**自己判断哪些键该拦——`consumed=false` 就照系统默认行为走。
     pub fn key_down(&self, vk: u32, modifiers: u32) -> KeyResult {
         self.core.key_down(vk, modifiers).into()
+    }
+
+    /// 按键：字符/空格/退格/回车，翻译与英文自动空格都在核心里。
+    ///
+    /// 返回的 `ops` 已含补的空格与标点换位，宿主按序执行即可；`consumed=false` 时
+    /// 执行 `ops` 后走默认行为。
+    ///
+    /// **前置条件**：宿主处于直出（密码框等 `directInput`）时**不得调用**——核心的
+    /// `latin_input()` 含密码框强制英文，调用会让按键进编码缓冲而不是直接上屏。
+    pub fn press(&self, key: PressKey, source: KeySource) -> KeyResult {
+        let key = match key {
+            PressKey::Char { ch, shifted } => {
+                let mut it = ch.chars();
+                match (it.next(), it.next()) {
+                    (Some(ch), None) => CorePressKey::Char { ch, shifted },
+                    _ => return KeyResult::default(),
+                }
+            }
+            PressKey::Space => CorePressKey::Space,
+            PressKey::Backspace => CorePressKey::Backspace,
+            PressKey::Enter => CorePressKey::Enter,
+        };
+        self.core.press(key, source.into()).into()
+    }
+
+    /// 英文词后是否自动补空格（默认开）。
+    pub fn set_auto_space(&self, on: bool) {
+        self.core.set_auto_space(on);
     }
 
     /// 焦点获得（对应 onStartInput）。

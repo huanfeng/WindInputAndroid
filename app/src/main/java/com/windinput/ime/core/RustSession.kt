@@ -30,13 +30,7 @@ class RustSession(
         private const val FRAME_BUDGET_US = 16_000L
 
         // wind-keys VK 码（SSOT 在主仓 wind-keys/keymap.rs）
-        private const val VK_BACK = 0x08u
-        private const val VK_RETURN = 0x0Du
         private const val VK_ESCAPE = 0x1Bu
-        private const val VK_SPACE = 0x20u
-
-        /** wind_host::Modifiers::SHIFT（SSOT 在主仓 wind-host/src/key.rs） */
-        private const val MOD_SHIFT = 0x0001u
 
         /** 进程内唯一核心（见 [getOrCreate]） */
         @Volatile
@@ -186,17 +180,29 @@ class RustSession(
         guard.run("runCommand($cmd)", Unit) { core.runCommand(native) }
     }
 
-    /** 见 [ImeSession.setLatinSchema] */
-    @Volatile
-    private var latinSchema = false
-
-    override fun setLatinSchema(on: Boolean) {
-        latinSchema = on
+    override fun setAutoSpace(on: Boolean) {
+        guard.run("setAutoSpace", Unit) { core.setAutoSpace(on) }
     }
 
-    override fun keyPressed(action: KeyAction, shifted: Boolean): Boolean {
-        val (vk, mods) = toVk(action, shifted) ?: return false
-        return dispatch(vk, mods)
+    /**
+     * 软键/物理键 → 核心 `press`：翻译 VK、英文自动空格、标点换位都在核心里，这里只执行返回的编辑指令。
+     * 前置条件见 [ImeSession.keyPressed]：直出（密码框）时不得调用。
+     */
+    override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean {
+        val key = when (action) {
+            is KeyAction.Text -> uniffi.wind_android.PressKey.Char(action.char.toString(), shifted)
+            KeyAction.Space -> uniffi.wind_android.PressKey.Space
+            KeyAction.Backspace -> uniffi.wind_android.PressKey.Backspace
+            KeyAction.Enter -> uniffi.wind_android.PressKey.Enter
+            else -> return false
+        }
+        val native = when (source) {
+            KeySource.TOUCH -> uniffi.wind_android.KeySource.TOUCH
+            KeySource.PHYSICAL -> uniffi.wind_android.KeySource.PHYSICAL
+        }
+        val t0 = SystemClock.elapsedRealtimeNanos()
+        val result = guard.run("press", null) { core.press(key, native) } ?: return false
+        return deliver(result, "press", t0)
     }
 
     /**
@@ -267,23 +273,23 @@ class RustSession(
     }
 
     override fun reset() {
-        dispatch(VK_ESCAPE, 0u)
+        val t0 = SystemClock.elapsedRealtimeNanos()
+        // 核心出错时当作「没处理」：输入法不崩
+        val result = guard.run("keyDown", null) { core.keyDown(VK_ESCAPE, 0u) } ?: return
+        deliver(result, "reset", t0)
     }
 
-    /** 喂键并派发编辑指令流。@return 是否被引擎消费 */
-    private fun dispatch(vk: UInt, modifiers: UInt): Boolean {
+    /** 派发核心回的编辑指令流。@return 是否被引擎消费 */
+    private fun deliver(result: uniffi.wind_android.KeyResult, label: String, t0: Long): Boolean {
         // JNI 往返耗时单独计：它在**主线程**上同步阻塞，是输入延迟里唯一不可
         // 让位给渲染的一段。超过一帧（16ms）就必须改成异步，故按帧标注。
-        val t0 = SystemClock.elapsedRealtimeNanos()
-        // 核心出错时当作「没处理」：这一下交给宿主（字母直接上屏），输入法不崩
-        val result = guard.run("keyDown", null) { core.keyDown(vk, modifiers) } ?: return false
         val costUs = (SystemClock.elapsedRealtimeNanos() - t0) / 1000
         if (costUs > FRAME_BUDGET_US) {
-            Log.w(TAG, "keyDown 阻塞主线程 ${costUs}µs（超一帧）vk=0x${vk.toString(16)}")
+            Log.w(TAG, "$label 阻塞主线程 ${costUs}µs（超一帧）")
         }
         Log.d(
             TAG,
-            "vk=0x${vk.toString(16)} ${costUs}µs -> consumed=${result.consumed} " +
+            "$label ${costUs}µs -> consumed=${result.consumed} " +
                 "ops=" + result.ops.joinToString { "k${it.kind}:'${it.text}'" },
         )
         if (result.ops.isNotEmpty()) {
@@ -306,30 +312,5 @@ class RustSession(
         3 -> EditOp.ReplaceBackward(op.count.toInt(), op.text)
         4 -> EditOp.MoveCursor(op.delta)
         else -> error("未知 EditOp.kind=${op.kind}，核心与 K 侧的判别位定义已漂移")
-    }
-
-    /**
-     * 软键 → (wind-keys VK 码, 修饰位)；null = 不进引擎（调用方走默认行为）。
-     *
-     * 标点符号一律按美式键盘译成 VK（+Shift），让引擎做中文标点转换与引号配对
-     * ——桌面就是这么走的，K 侧不长第二份转换逻辑（见 [Punct] 的说明）。
-     * 英文模式下引擎不吃这些键，回到宿主默认行为上屏的就是 ASCII 本身。
-     */
-    private fun toVk(action: KeyAction, shifted: Boolean): Pair<UInt, UInt>? = when (action) {
-        is KeyAction.Text -> {
-            val c = action.char
-            when {
-                c in 'a'..'z' && !shifted -> (0x41u + (c - 'a').toUInt()) to 0u
-                // 英文方案：大写字母也进组合（句首自动大写后补全不能断）
-                c in 'a'..'z' && latinSchema -> (0x41u + (c - 'a').toUInt()) to MOD_SHIFT
-                // 中文方案：Shift 态大写字母绕过引擎直输（引擎的 Shift+字母 是「临时英文」语义）
-                c in 'a'..'z' -> null
-                else -> Punct.vkOf(c)?.let { (vk, shift) -> vk to (if (shift) MOD_SHIFT else 0u) }
-            }
-        }
-        KeyAction.Space -> VK_SPACE to 0u
-        KeyAction.Backspace -> VK_BACK to 0u
-        KeyAction.Enter -> VK_RETURN to 0u
-        else -> null
     }
 }

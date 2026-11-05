@@ -1539,6 +1539,47 @@ write_core_cfg "$LABELS_CFG_BEFORE"
 restart_pad
 [[ -n "$(wait_chinese)" ]] || die "恢复标签配置后起不来中文"
 
+section "[52] 按键语义归核心：关自动空格、挪光标后句点、物理键数字选词、联想态上滑数字"
+# 英文 hi + 空格 + 句点的开启态已由 [51] 覆盖；这里补关闭态、光标挪动、物理数字、联想态数字
+# 1. 关闭自动空格：空格只上屏原文，句点不换位
+write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG" | sed 's/^candidate_comment = false # emu-test$/&\nauto_space = false # emu-test/')"
+restart_pad
+[[ -n "$(wait_chinese)" ]] || die "关自动空格后起不来中文"
+reset_pad
+tap_key LANG; sleep 4
+tap_key h; tap_key i; tap_key SPACE
+check "关自动空格：空格只上屏原文" "hi" "$(get_pad_text)"
+tap_key PERIOD
+check "关自动空格：句点不换位" "hi." "$(get_pad_text)"
+tap_key LANG; sleep 3
+[[ -n "$(wait_chinese)" ]] || die "关自动空格用例切不回中文"
+write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
+restart_pad
+[[ -n "$(wait_chinese)" ]] || die "恢复自动空格后起不来中文"
+# 2. 补空格之后光标被挪走：句点不能再把「光标前一格」换掉
+reset_pad
+tap_key LANG; sleep 4
+tap_key h; tap_key i; tap_key SPACE
+check "补空格后" "hi " "$(get_pad_text)"
+adb_q shell input keyevent KEYCODE_DPAD_LEFT; sleep 0.8
+tap_key PERIOD
+check "挪光标后句点：原地插入，不吃字母" "hi. " "$(get_pad_text)"
+tap_key LANG; sleep 3
+[[ -n "$(wait_chinese)" ]] || die "挪光标用例切不回中文"
+# 3. 物理键盘数字照电脑习惯选候选（软键盘数字不选，见 [45]）
+reset_pad
+adb_q shell input keyevent KEYCODE_A KEYCODE_A KEYCODE_1
+sleep 0.8
+check "物理键 aa + 1 选首个候选" "式" "$(get_pad_text)"
+# 4. 联想态（空格后候选条是联想）软键盘上滑出数字：先收起联想，数字原样上屏
+reset_pad
+tap_key a; tap_key a; tap_key SPACE; sleep 0.4
+read -r qx qy <<< "$(key_center q)"
+adb_q shell input swipe "$qx" "$qy" "$qx" $(( qy - GEO_ROWPX * 3 / 2 )) 250
+sleep 0.8
+check_match "联想态上滑数字：数字原样上屏" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
+reset_pad
+
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then

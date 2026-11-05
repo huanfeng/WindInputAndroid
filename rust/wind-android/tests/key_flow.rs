@@ -1527,3 +1527,53 @@ fn status_reports_latin_input() {
     settle();
     assert_eq!(last_latin(), Some(false), "切回中文方案后不再直出");
 }
+
+/// `press` 经 FFI：英文词 + 空格补空格；句号把补的空格换到标点后；关自动空格后不换位。
+#[test]
+fn press_english_word_space_period_swaps_auto_space() {
+    use wind_android::{EngineCommand, KeySource, PressKey};
+    let Some((core, _rec, _env)) = setup_exclusive("press_english_swap") else {
+        return;
+    };
+    let schemas = core.schemas();
+    let Some(en) = schemas.iter().position(|s| s.id == "english") else {
+        eprintln!("跳过：未安装英文方案");
+        return;
+    };
+    core.run_command(EngineCommand::SelectSchema { index: en as u32 });
+    settle();
+
+    let ch = |c: char| PressKey::Char {
+        ch: c.to_string(),
+        shifted: false,
+    };
+    for c in "hello".chars() {
+        core.press(ch(c), KeySource::Touch);
+    }
+    let sp = core.press(PressKey::Space, KeySource::Touch);
+    assert!(sp.consumed);
+    assert!(
+        sp.ops.iter().any(|o| o.kind == 0 && o.text == " "),
+        "空格后补一个空格: {:?}",
+        sp.ops
+    );
+    let dot = core.press(ch('.'), KeySource::Touch);
+    assert!(dot.consumed);
+    assert_eq!(dot.ops.len(), 1, "句号只换位: {:?}", dot.ops);
+    assert_eq!(dot.ops[0].kind, 3, "ReplaceBackward");
+    assert_eq!(dot.ops[0].text, ". ");
+
+    // 关自动空格：同一序列不再补空格
+    core.set_auto_space(false);
+    for c in "world".chars() {
+        core.press(ch(c), KeySource::Touch);
+    }
+    let sp = core.press(PressKey::Space, KeySource::Touch);
+    assert!(sp.consumed);
+    let dot = core.press(ch('.'), KeySource::Touch);
+    assert!(
+        !dot.ops.iter().any(|o| o.kind == 3),
+        "关闭后不换位: {:?}",
+        dot.ops
+    );
+}

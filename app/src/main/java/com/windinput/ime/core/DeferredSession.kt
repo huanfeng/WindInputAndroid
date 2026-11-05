@@ -129,6 +129,7 @@ class DeferredSession(
             mainHandler.post {
                 session.listener = listener
                 session.setLearningSuspended(learningSuspended)
+                session.setAutoSpace(autoSpace)
                 session.candidateComments = candidateComments
                 delegate = session
                 Log.i(TAG, "核心就绪，耗时 ${cost}ms")
@@ -156,8 +157,8 @@ class DeferredSession(
     override fun setPrecedingText(text: String) = call("setPrecedingText") { it.setPrecedingText(text) }
 
     /** 未就绪 / 切方案中 → 交还宿主（字母直接上屏），绝不吞键、绝不等锁 */
-    override fun keyPressed(action: KeyAction, shifted: Boolean): Boolean =
-        if (busy) false else delegate?.keyPressed(action, shifted) ?: false
+    override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean =
+        if (busy) false else delegate?.keyPressed(action, shifted, source) ?: false
 
     override fun candidateSelected(index: Int): Boolean =
         if (busy) false else delegate?.candidateSelected(index) ?: false
@@ -204,6 +205,12 @@ class DeferredSession(
         if (mayBuildDict(cmd)) enqueue(cmd.toString()) { it.runCommand(cmd) } else call(cmd.toString()) { it.runCommand(cmd) }
     }
 
-    /** 未就绪时不必记：就绪回调里 Service 会按当前方案再设一次 */
-    override fun setLatinSchema(on: Boolean) = call("setLatinSchema") { it.setLatinSchema(on) }
+    /** 核心没起来时先记下，就绪后补设（同 [learningSuspended]） */
+    @Volatile
+    private var autoSpace = true
+
+    override fun setAutoSpace(on: Boolean) {
+        autoSpace = on
+        call("setAutoSpace") { it.setAutoSpace(on) }
+    }
 }

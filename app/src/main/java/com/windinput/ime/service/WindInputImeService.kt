@@ -20,6 +20,7 @@ import com.windinput.ime.core.EditOp
 import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.FakeSession
 import com.windinput.ime.core.ImeSession
+import com.windinput.ime.core.KeySource
 import com.windinput.ime.core.RecentStore
 import com.windinput.ime.core.RustCoreLoader
 import com.windinput.ime.core.RustSession
@@ -95,15 +96,8 @@ class WindInputImeService :
     /** 剪贴板建议条开关（设置项 ui.android.clip_suggestion） */
     private var clipSuggestionEnabled = true
 
-    /** 英文输入两个开关（设置项 ui.android.auto_cap / auto_space） */
+    /** 英文自动大写开关（设置项 ui.android.auto_cap；自动补空格由核心负责，见 setAutoSpace） */
     private var autoCapEnabled = true
-    private var autoSpaceEnabled = true
-
-    /**
-     * 光标前那个空格是英文选词后**自动补**的。紧接着打句末标点时要把它挪到标点后面
-     * （`word ` + `.` → `word. `），否则就成了「word .」。按了别的键即作废。
-     */
-    private var autoSpaced = false
 
     private lateinit var layoutRepository: LayoutRepository
     private lateinit var userConfig: UserConfig
@@ -343,9 +337,6 @@ class WindInputImeService :
         val NUMBER_SIDE_SYMBOLS = listOf("+", "-", "*", "/", "%", "=", ",", ":", "@", "#", "(", ")")
         val PHONE_SIDE_SYMBOLS = listOf("*", "#", "+", "-", "(", ")", ",", ";")
 
-        /** 英文里紧跟单词、后面该带空格的标点（自动补的空格遇到它们要挪到后面） */
-        val AUTO_SPACE_PUNCT = setOf('.', ',', '?', '!', ';', ':')
-
         /**
          * 每次按键预取的候选条数。
          *
@@ -451,7 +442,7 @@ class WindInputImeService :
         }
         val mapped = HardwareKeys.map(keyCode, event.getUnicodeChar(event.metaState), event.metaState)
             ?: return false
-        return engineKey(mapped.action, mapped.shifted)
+        return engineKey(mapped.action, mapped.shifted, KeySource.PHYSICAL)
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
@@ -539,9 +530,8 @@ class WindInputImeService :
         clipSuggestionEnabled = userConfig.getBoolean("ui.android.clip_suggestion", true)
         inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
         autoCapEnabled = userConfig.getBoolean("ui.android.auto_cap", true)
-        autoSpaceEnabled = userConfig.getBoolean("ui.android.auto_space", true)
+        session.setAutoSpace(userConfig.getBoolean("ui.android.auto_space", true))
         selecting = false
-        autoSpaced = false
         applyGaps()
         windowManager?.showKeyboard()
         applyEditorScene(info)
@@ -757,7 +747,6 @@ class WindInputImeService :
             kv.spaceLabel = if (english) "英文" else active?.name.orEmpty()
             kv.splitChar = if (english) null else session.separatorKey()
         }
-        session.setLatinSchema(english)
         updateAutoCaps()
     }
 
@@ -911,29 +900,17 @@ class WindInputImeService :
     // ── 键盘回调 ─────────────────────────────────────────────────
 
     /**
-     * 文字/空格/退格/回车键进引擎，连同引擎前后的宿主侧处理（英文自动空格、双空格句号计时）。
-     * 软键（[onKeyAction]）与物理键（[onKeyDown]）共用：两条路的宿主侧行为必须一致。
+     * 文字/空格/退格/回车键进核心。翻译、英文自动空格、标点换位都在核心（`press`），这里只管
+     * 直出判断。软键（[onKeyAction]）与物理键（[onKeyDown]）共用，区别只在 [source]。
      * @return true = 已处理；false = 引擎不接，调用方走默认行为
      */
-    private fun engineKey(action: KeyAction, shifted: Boolean): Boolean {
-        val english = latinInput && !directInput
-        // 自动补的空格遇到句末标点：挪到标点后面（`word ` + `.` → `word. `）
-        val ch = (action as? KeyAction.Text)?.char
-        if (english && autoSpaced && !composing && ch != null && ch in AUTO_SPACE_PUNCT) {
-            val ic = currentInputConnection ?: return true
-            if (ic.getTextBeforeCursor(1, 0) == " ") ic.deleteSurroundingText(1, 0)
-            ic.commitText("$ch ", 1)
-            return true
-        }
-        autoSpaced = false
-        val composingBefore = composing
+    private fun engineKey(action: KeyAction, shifted: Boolean, source: KeySource = KeySource.TOUCH): Boolean {
+        // 前置条件：直出（密码框等）绝不进核心，核心的英文判断含密码框强制英文
+        if (directInput) return false
         // 联想态（没有编码、候选条上是联想）按空格：出厂同豆包、微信，收起联想、出空格，不选联想词；
         // 设置里打开「空格选首个联想」则上屏首个联想。都由核心按 `mobile.association.space_commits`
-        // 处置（引擎收起联想、自己出那个空格，或上屏联想），这里不分支。
-        if (directInput || !session.keyPressed(action, shifted)) return false
-        // 英文方案：有编码时空格上屏原文（引擎只出词本身），这里补上词后的空格
-        if (action == KeyAction.Space && english && composingBefore) commitAutoSpace()
-        return true
+        // 处置，这里不分支。
+        return session.keyPressed(action, shifted, source)
     }
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {
@@ -953,22 +930,6 @@ class WindInputImeService :
         if (action is KeyAction.Commit) {
             commitDirect(action.text)
             return
-        }
-        // 软键盘上打出的数字（上滑、123 层）不选候选：触屏上点候选比上滑出数字顺手得多，
-        // 打数字就是要数字。中文有编码先把首选上屏再出数字（同打标点）；联想态先收起联想。
-        // 英文有编码时数字是词的一部分（mp3、h2o、win10）：交给引擎进编码栏，不顶屏
-        // （核心 `digit_enters_english_buffer` 只在移动端英文组码中接这一键）。
-        // 只有物理键盘的数字仍按电脑的习惯选候选（那条路走 onKeyDown，不经这里）
-        val digit = (action as? KeyAction.Text)?.char?.takeIf { it in '0'..'9' }
-        if (digit != null && !directInput && loadedCandidates.isNotEmpty()) {
-            if (composing) {
-                if (!latinInput) {
-                    commitDirect(digit.toString())
-                    return
-                }
-            } else {
-                session.reset()
-            }
         }
         if (engineKey(action, shifted)) return
         val ic = currentInputConnection
@@ -1117,16 +1078,7 @@ class WindInputImeService :
             }
             return
         }
-        val english = latinInput && !directInput && composing
         session.candidateSelected(index)
-        if (english) commitAutoSpace()
-    }
-
-    /** 英文选词 / 空格上屏一个词之后补的空格（设置项 ui.android.auto_space） */
-    private fun commitAutoSpace() {
-        if (!autoSpaceEnabled) return
-        currentInputConnection?.commitText(" ", 1)
-        autoSpaced = true
     }
 
     /**
@@ -1624,9 +1576,7 @@ class WindInputImeService :
     }
 
     override fun onExpandedCandidateSelected(index: Int) {
-        val english = latinInput && !directInput && composing
         session.candidateSelected(index)
-        if (english) commitAutoSpace()
         // 选中即原位返回：展开候选的唯一去向就是选一个词
         windowManager?.showKeyboard()
     }

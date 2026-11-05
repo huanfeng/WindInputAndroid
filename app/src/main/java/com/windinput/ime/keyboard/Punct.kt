@@ -11,42 +11,14 @@ package com.windinput.ime.keyboard
  *
  * # 两条路径，两个真值
  *
- * - **输出**：ASCII 字符按美式键盘译成 wind-keys VK（+Shift 位）喂给引擎，中文标点转换、
+ * - **输出**：ASCII 字符经核心 `press` 按美式键盘译成 VK（+Shift 位）进引擎，中文标点转换、
  *   智能引号配对、全角半角都是引擎的事（桌面就是这么走的）。英文模式下引擎不吃，
- *   回到宿主默认行为时上屏的自然是 ASCII。K 侧**不做**任何标点转换。
+ *   回到宿主默认行为时上屏的自然是 ASCII。K 侧**不做**任何标点转换，也不再持有 VK 表。
  * - **显示**：键面 / 角标 / 长按气泡按 [display] 换成中文形态。这只是提示，与引擎的实际
  *   输出可能在个别字符上有差异（引擎的映射表可配置）。宁可显示偏一格，不能让 K 侧长出
  *   第二份转换逻辑——那才是「显示的和打出来的对不上」的根源。
  */
 object Punct {
-
-    /** 美式键盘：字符 → (VK, 需要 Shift)。SSOT 在主仓 wind-keys/keymap.rs 的注释里 */
-    private val US_LAYOUT: Map<Char, Pair<UInt, Boolean>> = buildMap {
-        // 数字行
-        for (d in '0'..'9') put(d, (0x30u + (d - '0').toUInt()) to false)
-        ")!@#$%^&*(".forEachIndexed { i, c -> put(c, (0x30u + i.toUInt()) to true) }
-        // OEM 键（VK_OEM_*），未 Shift / Shift
-        val oem = listOf(
-            0xBAu to (';' to ':'),
-            0xBBu to ('=' to '+'),
-            0xBCu to (',' to '<'),
-            0xBDu to ('-' to '_'),
-            0xBEu to ('.' to '>'),
-            0xBFu to ('/' to '?'),
-            0xC0u to ('`' to '~'),
-            0xDBu to ('[' to '{'),
-            0xDCu to ('\\' to '|'),
-            0xDDu to (']' to '}'),
-            0xDEu to ('\'' to '"'),
-        )
-        for ((vk, pair) in oem) {
-            put(pair.first, vk to false)
-            put(pair.second, vk to true)
-        }
-    }
-
-    /** 字符 → VK；不在美式键盘上的字符（中文标点字面、emoji）返回 null，走宿主直输 */
-    fun vkOf(c: Char): Pair<UInt, Boolean>? = US_LAYOUT[c]
 
     /**
      * 中文标点显示形态（通行约定，与搜狗 / Rime 默认一致）。
