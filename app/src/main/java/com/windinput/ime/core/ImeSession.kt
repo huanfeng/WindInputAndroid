@@ -39,29 +39,22 @@ sealed interface UiEvent {
      * @param preedit 编码区正文（五笔码/拼音串），编码栏显示它
      * @param modeLabel 模式短称（五/拼/英/符），编码栏左侧角标；空 = 不显示
      * @param page 当前页（1 起），[totalPages] ≤ 1 时不显示翻页指示
-     * @param preeditCaret 编码区插入符（[preedit] 内字节偏移）。**联想态恒为 0**：
-     *   那时 [preedit] 装的是「联想输入」标识而不是编码，缓冲是空的，见 [composing]
+     * @param preeditCaret 编码区插入符（[preedit] 内字节偏移）
+     * @param composing 引擎缓冲里真有未上屏的编码（不是联想态）。联想态的 [preedit]
+     *   非空（要显示「联想输入」标识），只看它会把联想当成打字中，故由核心直接给出
+     * @param hasCandidates 当前页是否有候选；候选文本不在帧里，需要时经
+     *   [ImeSession.candidateWindow] 拉取
      */
     data class Candidates(
-        val items: List<String>,
+        val composing: Boolean,
+        val hasCandidates: Boolean,
         val preedit: String = "",
         val preeditCaret: Int = 0,
         val modeLabel: String = "",
         val selected: Int = 0,
         val page: Int = 1,
         val totalPages: Int = 1,
-    ) : UiEvent {
-        /**
-         * 引擎缓冲里真有未上屏的编码（不是联想态）。
-         *
-         * 联想态的 [preedit] 非空（编码栏要显示「联想输入」标识），只看它会把联想当成
-         * 打字中：回车写成「确定」、滑退格去清一串不存在的编码。缓冲为空时插入符恒为 0，
-         * 打字时插入符在编码末尾（手机上没有在编码里移插入符的操作），故用它区分。
-         *
-         * ⚠ 权宜判据：根治是核心在候选帧里直接给出「缓冲是否为空」，见 IMPLEMENTATION_PLAN.md。
-         */
-        val composing: Boolean get() = preedit.isNotEmpty() && preeditCaret > 0
-    }
+    ) : UiEvent
 
     /**
      * 引擎模式真值变化。
@@ -72,6 +65,8 @@ sealed interface UiEvent {
     data class Status(
         val chineseMode: Boolean,
         val iconLabel: String,
+        /** 引擎当前直接输入英文（语义字段；[iconLabel] 用户可配，不能拿来判断） */
+        val latinInput: Boolean,
         val fullWidth: Boolean,
         val chinesePunct: Boolean,
         val s2tEnabled: Boolean,

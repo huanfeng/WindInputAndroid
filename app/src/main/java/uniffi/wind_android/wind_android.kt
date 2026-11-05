@@ -1624,7 +1624,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_phrase_set_enabled() != 6147) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_phrases() != 60600) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_phrases() != 42289) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_phrases_restore_defaults() != 26484) {
@@ -4017,9 +4017,13 @@ data class CandidateUpdate(
      */
     var `modeLabel`: kotlin.String,
     /**
-     * 当前页候选文本
+     * 是否在「打字中」：有组合串且不是联想态
      */
-    var `items`: List<kotlin.String>,
+    var `composing`: kotlin.Boolean,
+    /**
+     * 当前页是否有候选。候选文本不在帧里，需要时经 [`WindCore::candidates`] 拉取
+     */
+    var `hasCandidates`: kotlin.Boolean,
     /**
      * 键盘选中项（页内下标），空格上屏目标
      */
@@ -4045,7 +4049,8 @@ public object FfiConverterTypeCandidateUpdate : FfiConverterRustBuffer<Candidate
             FfiConverterString.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterString.read(buf),
-            FfiConverterSequenceString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
             FfiConverterUInt.read(buf),
@@ -4056,7 +4061,8 @@ public object FfiConverterTypeCandidateUpdate : FfiConverterRustBuffer<Candidate
             FfiConverterString.allocationSize(value.`preedit`) +
                 FfiConverterUInt.allocationSize(value.`preeditCaret`) +
                 FfiConverterString.allocationSize(value.`modeLabel`) +
-                FfiConverterSequenceString.allocationSize(value.`items`) +
+                FfiConverterBoolean.allocationSize(value.`composing`) +
+                FfiConverterBoolean.allocationSize(value.`hasCandidates`) +
                 FfiConverterUInt.allocationSize(value.`selected`) +
                 FfiConverterUInt.allocationSize(value.`page`) +
                 FfiConverterUInt.allocationSize(value.`totalPages`)
@@ -4069,7 +4075,8 @@ public object FfiConverterTypeCandidateUpdate : FfiConverterRustBuffer<Candidate
         FfiConverterString.write(value.`preedit`, buf)
         FfiConverterUInt.write(value.`preeditCaret`, buf)
         FfiConverterString.write(value.`modeLabel`, buf)
-        FfiConverterSequenceString.write(value.`items`, buf)
+        FfiConverterBoolean.write(value.`composing`, buf)
+        FfiConverterBoolean.write(value.`hasCandidates`, buf)
         FfiConverterUInt.write(value.`selected`, buf)
         FfiConverterUInt.write(value.`page`, buf)
         FfiConverterUInt.write(value.`totalPages`, buf)
@@ -4437,6 +4444,10 @@ public object FfiConverterTypeEmojiModuleInfo : FfiConverterRustBuffer<EmojiModu
 data class InputStatus(
     var `chineseMode`: kotlin.Boolean,
     /**
+     * 键是否按拉丁字母直出：英文方案、中文模式关闭、或不可输入（密码框等）
+     */
+    var `latinInput`: kotlin.Boolean,
+    /**
      * 方案短称：中文态取方案 icon_label（"五"/"拼"），英文态为 "英"/大写锁定 "A"
      */
     var `iconLabel`: kotlin.String,
@@ -4458,6 +4469,7 @@ public object FfiConverterTypeInputStatus : FfiConverterRustBuffer<InputStatus> 
     override fun read(buf: ByteBuffer): InputStatus =
         InputStatus(
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
@@ -4468,6 +4480,7 @@ public object FfiConverterTypeInputStatus : FfiConverterRustBuffer<InputStatus> 
     override fun allocationSize(value: InputStatus) =
         (
             FfiConverterBoolean.allocationSize(value.`chineseMode`) +
+                FfiConverterBoolean.allocationSize(value.`latinInput`) +
                 FfiConverterString.allocationSize(value.`iconLabel`) +
                 FfiConverterBoolean.allocationSize(value.`fullWidth`) +
                 FfiConverterBoolean.allocationSize(value.`chinesePunct`) +
@@ -4480,6 +4493,7 @@ public object FfiConverterTypeInputStatus : FfiConverterRustBuffer<InputStatus> 
         buf: ByteBuffer,
     ) {
         FfiConverterBoolean.write(value.`chineseMode`, buf)
+        FfiConverterBoolean.write(value.`latinInput`, buf)
         FfiConverterString.write(value.`iconLabel`, buf)
         FfiConverterBoolean.write(value.`fullWidth`, buf)
         FfiConverterBoolean.write(value.`chinesePunct`, buf)

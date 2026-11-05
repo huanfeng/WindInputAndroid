@@ -75,7 +75,12 @@ class FakeSession : ImeSession {
 
     private fun publish() {
         listener?.invoke(
-            UiEvent.Candidates(items = candidates(), preedit = buffer.toString(), modeLabel = "占"),
+            UiEvent.Candidates(
+                composing = buffer.isNotEmpty(),
+                hasCandidates = buffer.isNotEmpty(),
+                preedit = buffer.toString(),
+                modeLabel = "占",
+            ),
         )
     }
 

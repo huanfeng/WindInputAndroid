@@ -107,17 +107,21 @@ class KeyboardView(context: Context) : View(context) {
         context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
 
     /**
-     * 当前方案短称（「五」/「拼」/「英」）；是「英」即英文模式（见 [englishMode]）。
-     *
-     * 值由引擎推送（Service 转发），**本地不自记**——方案切换、密码框强制英文都发生在
-     * 引擎内部，本地记第二份必然与引擎漂移。用短称而不是 `chineseMode` 布尔：
-     * 英文在本端是一个方案，切过去后 `chineseMode` 仍为 true（见 Service 的说明）。
+     * 当前方案短称（「五」/「拼」/「英」），**只用于显示**。短称是用户可配的
+     * （`ui.labels`），不能拿它判断是不是英文——英文与否看 [latinInput]。
      */
     var modeLabel: String = "中"
+
+    /**
+     * 引擎当前是否直接输入英文（核心给的语义字段，由引擎推送，本地不自记），
+     * 决定 [englishMode]。用它而不是 `chineseMode`：英文在本端是一个方案，
+     * 切过去后 `chineseMode` 仍为 true（见 Service 的说明）。
+     */
+    var latinInput: Boolean = false
         set(value) {
             if (field == value) return
             field = value
-            englishMode = value == "英"
+            englishMode = value
         }
 
     /** 回车键动作标签（imeOptions 驱动：发送/搜索/下一项…），null = 缺省 label */
@@ -129,7 +133,7 @@ class KeyboardView(context: Context) : View(context) {
 
     /**
      * 英文模式（中英键显示「英」时）。决定字母键面大小写（中文大写、英文小写，大众布局）、
-     * 中英键哪个字高亮，以及逗号句号合一键输出哪一个。随 [modeLabel] 自动更新。
+     * 中英键哪个字高亮，以及逗号句号合一键输出哪一个。随 [latinInput] 自动更新。
      */
     var englishMode = false
         set(value) {

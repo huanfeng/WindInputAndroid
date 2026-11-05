@@ -82,7 +82,8 @@ class RustSession(
                         override fun onCandidates(update: uniffi.wind_android.CandidateUpdate) {
                             sessionRef?.post(
                                 UiEvent.Candidates(
-                                    items = update.items,
+                                    composing = update.composing,
+                                    hasCandidates = update.hasCandidates,
                                     preedit = update.preedit,
                                     preeditCaret = update.preeditCaret.toInt(),
                                     modeLabel = update.modeLabel,
@@ -94,7 +95,7 @@ class RustSession(
                         }
 
                         override fun onHideCandidates() {
-                            sessionRef?.post(UiEvent.Candidates(emptyList()))
+                            sessionRef?.post(UiEvent.Candidates(composing = false, hasCandidates = false))
                         }
 
                         override fun onStatus(status: uniffi.wind_android.InputStatus) {
@@ -102,6 +103,7 @@ class RustSession(
                                 UiEvent.Status(
                                     chineseMode = status.chineseMode,
                                     iconLabel = status.iconLabel,
+                                    latinInput = status.latinInput,
                                     fullWidth = status.fullWidth,
                                     chinesePunct = status.chinesePunct,
                                     s2tEnabled = status.s2tEnabled,

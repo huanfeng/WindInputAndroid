@@ -125,15 +125,18 @@ class WindInputImeService :
     /** 编码是否同时写进宿主组合区（ui.android.inline_preedit，默认关，见 onUiEvent） */
     private var inlinePreedit = false
 
+    /** 当前方案短称（引擎推送的 `iconLabel`，用户可配），**只用于显示**，不做判断。 */
+    private var modeLabel = "中"
+
     /**
-     * 当前方案短称（引擎推送的 `iconLabel`：五笔为「五」、英文方案为「英」）。
+     * 引擎当前直接输入英文（引擎推送的语义字段）。
      *
      * ⚠ 中英键**不能**用 `chineseMode` 判据：英文在本端是一个**方案**，而
      * `SelectSchema` 会把 `chinese_mode` 一并设回 true——于是切到英文方案后
      * `chineseMode` 仍是 true，键面显示「中」，再点一次又切去英文，**切不回来**。
-     * 方案短称才是这里要的真值。
+     * 也不能用 [modeLabel] 判据：它是用户可配的显示文案。
      */
-    private var modeLabel = "中"
+    private var latinInput = false
 
     override fun onCreate() {
         super.onCreate()
@@ -578,7 +581,7 @@ class WindInputImeService :
         val kv = keyboardWindow?.keyboardView ?: return
         val info = currentInputEditorInfo
         val ic = currentInputConnection
-        val on = autoCapEnabled && modeLabel == "英" && !directInput && !composing &&
+        val on = autoCapEnabled && latinInput && !directInput && !composing &&
             info != null && ic != null && !noAutoCapField(info) &&
             ic.getCursorCapsMode(info.inputType) != 0
         kv.setAutoCaps(on)
@@ -743,11 +746,12 @@ class WindInputImeService :
         val active = session.schemas().firstOrNull { it.active }
         // 切到英文方案时，方案列表先变、模式短称后到：只看短称的话中间那一下空格上写的是
         // 英文方案自己的名字（「清风英文」），随即又变「英文」——看着就是闪一下
-        val english = modeLabel == "英" || active?.id == ENGLISH_SCHEMA_ID
+        val english = latinInput || active?.id == ENGLISH_SCHEMA_ID
         // ⚠ 别写成 keyboardView.apply { modeLabel = modeLabel }：块内的 modeLabel
         // 解析成视图自己的属性，等于自赋值，英文模式永远进不去
         keyboardWindow?.keyboardView?.let { kv ->
             kv.modeLabel = modeLabel
+            kv.latinInput = latinInput
             // 空格上的灰字：英文写「英文」（引擎没装英文方案时退回系统英文模式，
             // 那时 active 仍是切走前的中文方案），否则写当前方案名
             kv.spaceLabel = if (english) "英文" else active?.name.orEmpty()
@@ -770,7 +774,7 @@ class WindInputImeService :
                 symbolHistoryInBar = false
                 // 推送帧只用来画编码栏（编码/短称/页码）；候选列表另行**拉取**——
                 // 帧里的是当页 6~9 条，装不下一条可滚动的长列表。
-                val page = if (event.items.isEmpty()) {
+                val page = if (!event.hasCandidates) {
                     // 帧说没候选就是没候选，不必再往核心跑一趟
                     com.windinput.ime.core.CandidatePage(emptyList(), 0, 0, 0)
                 } else {
@@ -787,7 +791,7 @@ class WindInputImeService :
                 keyboardWindow?.keyboardView?.let { kv ->
                     kv.composing = composing
                     // 分隔符键随设置（五笔整句开关、分隔符策略）变，开始打字时现问一次
-                    if (composingChanged && composing && modeLabel != "英") kv.splitChar = session.separatorKey()
+                    if (composingChanged && composing && !latinInput) kv.splitChar = session.separatorKey()
                 }
                 // 打完一个词（编码清空）后再判一次句首大写：上屏回调可能早于这一帧
                 updateAutoCaps()
@@ -812,6 +816,7 @@ class WindInputImeService :
             }
             is UiEvent.Status -> {
                 modeLabel = event.iconLabel.ifEmpty { if (event.chineseMode) "中" else "英" }
+                latinInput = event.latinInput
                 refreshSchemaKeys()
                 // 键面标点形态跟引擎的真值走：英文模式或关了中文标点，键面就显示 ASCII
                 keyboardWindow?.keyboardView?.chinesePunct = event.chineseMode && event.chinesePunct
@@ -911,7 +916,7 @@ class WindInputImeService :
      * @return true = 已处理；false = 引擎不接，调用方走默认行为
      */
     private fun engineKey(action: KeyAction, shifted: Boolean): Boolean {
-        val english = modeLabel == "英" && !directInput
+        val english = latinInput && !directInput
         // 自动补的空格遇到句末标点：挪到标点后面（`word ` + `.` → `word. `）
         val ch = (action as? KeyAction.Text)?.char
         if (english && autoSpaced && !composing && ch != null && ch in AUTO_SPACE_PUNCT) {
@@ -957,7 +962,7 @@ class WindInputImeService :
         val digit = (action as? KeyAction.Text)?.char?.takeIf { it in '0'..'9' }
         if (digit != null && !directInput && loadedCandidates.isNotEmpty()) {
             if (composing) {
-                if (modeLabel != "英") {
+                if (!latinInput) {
                     commitDirect(digit.toString())
                     return
                 }
@@ -1112,7 +1117,7 @@ class WindInputImeService :
             }
             return
         }
-        val english = modeLabel == "英" && !directInput && composing
+        val english = latinInput && !directInput && composing
         session.candidateSelected(index)
         if (english) commitAutoSpace()
     }
@@ -1196,7 +1201,7 @@ class WindInputImeService :
         if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
         val schemas = session.schemas()
         val active = schemas.firstOrNull { it.active }
-        if (modeLabel == "英") {
+        if (latinInput) {
             // 回到切走前的中文方案。系统英文模式下引擎报的 active 仍是那个中文方案；
             // 英文方案下 active 是英文，只能靠切走时记下的 id（持久化：输入法进程在
             // 英文里被杀掉后也能原路回去）。
@@ -1306,7 +1311,7 @@ class WindInputImeService :
 
     /** 方案列表里「当前」那项的下标。英文模式下引擎报的 active 仍是切走前的中文方案，当前要算英文 */
     private fun currentSchemaIndex(schemas: List<SchemaEntry>): Int {
-        val english = modeLabel == "英"
+        val english = latinInput
         return schemas.indexOfFirst {
             if (english) it.id == ENGLISH_SCHEMA_ID else it.active && it.id != ENGLISH_SCHEMA_ID
         }
@@ -1476,7 +1481,7 @@ class WindInputImeService :
     /** 临时拼音是码表方案（五笔）里临时打一个拼音；拼音、双拼、英文方案用不上 */
     override fun tempPinyinAvailable(): Boolean {
         val active = session.schemas().firstOrNull { it.active } ?: return false
-        return modeLabel != "英" && active.id !in NON_CODETABLE_SCHEMAS
+        return !latinInput && active.id !in NON_CODETABLE_SCHEMAS
     }
 
     override fun onToolbarItemFromPanel(item: ToolbarItem) {
@@ -1619,7 +1624,7 @@ class WindInputImeService :
     }
 
     override fun onExpandedCandidateSelected(index: Int) {
-        val english = modeLabel == "英" && !directInput && composing
+        val english = latinInput && !directInput && composing
         session.candidateSelected(index)
         if (english) commitAutoSpace()
         // 选中即原位返回：展开候选的唯一去向就是选一个词
