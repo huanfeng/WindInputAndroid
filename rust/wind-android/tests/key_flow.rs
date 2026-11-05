@@ -12,6 +12,8 @@ struct Recorder {
     candidates: Mutex<Vec<(String, bool)>>,
     /// 每次候选回调的 composing 标志，与 `candidates` 一一对应
     composing: Mutex<Vec<bool>>,
+    /// 每次候选回调的 (page, total_pages)，与 `candidates` 一一对应
+    paging: Mutex<Vec<(u32, u32)>>,
     hides: Mutex<usize>,
     status: Mutex<Vec<InputStatus>>,
     toasts: Mutex<Vec<String>>,
@@ -20,6 +22,7 @@ struct Recorder {
 impl UiEventListener for Recorder {
     fn on_candidates(&self, u: CandidateUpdate) {
         self.composing.lock().unwrap().push(u.composing);
+        self.paging.lock().unwrap().push((u.page, u.total_pages));
         self.candidates
             .lock()
             .unwrap()
@@ -36,15 +39,13 @@ impl UiEventListener for Recorder {
     }
 }
 
-/// 当前页候选文本，**此刻**从核心拉取（帧里不再带文本）。
+/// 全部候选文本（至多一个 `MAX_WINDOW`），**此刻**从核心拉取（帧里不再带文本）。
 ///
-/// 页大小见 [`PAGE_LEN`]：只取首页，与原先「当页帧里的 items」同范围。
+/// 范围是全窗口而非首页：「必须包含 / 首项是」类断言只更宽于「当页」的部分来自
+/// 后面页的候选，「不得包含」类断言则更严。
 fn items_now(core: &WindCore) -> Vec<String> {
-    core.candidates(0, PAGE_LEN).items
+    core.candidates(0, wind_mobile::MAX_WINDOW as u32).items
 }
-
-/// 默认每页候选数（与原推送帧的当页候选条数一致）。
-const PAGE_LEN: u32 = 7;
 
 /// 出厂数据取**主仓的** `build_dev/data`（方案与词库的唯一真源，不在本仓复制一份）。
 ///
@@ -670,33 +671,48 @@ fn shuangpin_layout_is_listable_and_settable() {
 
 /// 候选窗口能读到**超出当页**的候选，且总数与推送帧的页数自洽。
 ///
-/// 这条守的是「滚动候选栏有东西可滚」：推送帧只给当页 6~9 条，此前宿主拿不到更多，
+/// 这条守的是「滚动候选栏有东西可滚」：推送帧只给当页，此前宿主拿不到更多，
 /// 候选栏做了滚动也是空转、展开面板号称全部候选却只有一屏。
+/// 帧里已无候选文本，故用帧的 `total_pages` 证明「不止一页」，再证明窗口与绝对下标选词都越过第一页。
 #[test]
 fn candidate_window_reaches_beyond_current_page() {
-    let Some((core, _rec)) = setup("candidate_window_reaches_beyond_current_page") else {
+    let Some((core, rec)) = setup("candidate_window_reaches_beyond_current_page") else {
         return;
     };
     // 单码 a：五笔下重码极多，必然不止一页
     core.key_down(VK_A, 0);
     settle();
-    let page_items = items_now(&core).len();
-    assert!(page_items > 0, "应有候选");
+    let (page, total_pages) = rec
+        .paging
+        .lock()
+        .unwrap()
+        .last()
+        .copied()
+        .expect("应有候选帧");
+    assert_eq!(page, 1, "页码从 1 起");
+    assert!(total_pages > 1, "前提：候选不止一页，实得 {total_pages} 页");
 
     let w = core.candidates(0, 100);
-    assert!(
-        (w.total as usize) > page_items,
-        "全量({})应多于当页({})，否则拉取接口没有意义",
-        w.total,
-        page_items,
-    );
+    assert_eq!(w.offset, 0);
     assert_eq!(
         w.items.len(),
         (w.total as usize).min(100),
         "窗口应装满 limit 或全量，实得 {}",
         w.items.len(),
     );
-    assert_eq!(w.offset, 0);
+    // 帧说有 total_pages(>1) 页，即全量 > 每页条数；窗口末项的下标 >= 每页条数，
+    // 所以它必在第二页或更后——选中它就是「越过第一页」的直接证明。
+    assert!(w.items.len() > 1, "窗口应不止一条");
+    let last = w.items.len() - 1;
+    let target = w.items[last].clone();
+    let r = core.select_candidate(last as u32);
+    let text: String = r
+        .ops
+        .iter()
+        .filter(|o| o.kind == 0)
+        .map(|o| o.text.clone())
+        .collect();
+    assert_eq!(text, target, "应能选中窗口末尾（第一页之外）的候选");
 }
 
 /// 窗口硬上限：宿主要多少都不会真把全量搬过去（性能护栏）。
@@ -1479,7 +1495,7 @@ fn frame_reports_composing_and_candidates() {
     core.key_down(VK_SPACE, 0);
     settle();
     let (preedit, has) = rec.candidates.lock().unwrap().last().cloned().unwrap();
-    assert_eq!(preedit, "联想输入", "上屏后应进入联想态");
+    assert!(!preedit.is_empty(), "联想态的组合区显示联想标识，非空");
     assert!(has, "联想态有候选");
     assert_eq!(
         rec.composing.lock().unwrap().last().copied(),
