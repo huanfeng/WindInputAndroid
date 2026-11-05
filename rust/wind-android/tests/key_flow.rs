@@ -8,8 +8,10 @@ use wind_android::{CandidateUpdate, InputStatus, UiEventListener, WindCore};
 
 #[derive(Default)]
 struct Recorder {
-    /// 每次候选回调的 (preedit, items)
-    candidates: Mutex<Vec<(String, Vec<String>)>>,
+    /// 每次候选回调的 (preedit, has_candidates)。候选文本不在帧里，要看文本用 [`items_now`]
+    candidates: Mutex<Vec<(String, bool)>>,
+    /// 每次候选回调的 composing 标志，与 `candidates` 一一对应
+    composing: Mutex<Vec<bool>>,
     hides: Mutex<usize>,
     status: Mutex<Vec<InputStatus>>,
     toasts: Mutex<Vec<String>>,
@@ -17,7 +19,11 @@ struct Recorder {
 
 impl UiEventListener for Recorder {
     fn on_candidates(&self, u: CandidateUpdate) {
-        self.candidates.lock().unwrap().push((u.preedit, u.items));
+        self.composing.lock().unwrap().push(u.composing);
+        self.candidates
+            .lock()
+            .unwrap()
+            .push((u.preedit, u.has_candidates));
     }
     fn on_hide_candidates(&self) {
         *self.hides.lock().unwrap() += 1;
@@ -29,6 +35,16 @@ impl UiEventListener for Recorder {
         self.toasts.lock().unwrap().push(text);
     }
 }
+
+/// 当前页候选文本，**此刻**从核心拉取（帧里不再带文本）。
+///
+/// 页大小见 [`PAGE_LEN`]：只取首页，与原先「当页帧里的 items」同范围。
+fn items_now(core: &WindCore) -> Vec<String> {
+    core.candidates(0, PAGE_LEN).items
+}
+
+/// 默认每页候选数（与原推送帧的当页候选条数一致）。
+const PAGE_LEN: u32 = 7;
 
 /// 出厂数据取**主仓的** `build_dev/data`（方案与词库的唯一真源，不在本仓复制一份）。
 ///
@@ -189,7 +205,7 @@ fn candidates_appear_on_every_round() {
         .lock()
         .unwrap()
         .iter()
-        .filter(|(_, items)| !items.is_empty())
+        .filter(|(_, has)| *has)
         .cloned()
         .collect();
     assert!(!got.is_empty(), "第二轮必须同样下发候选（设备实测缺失）");
@@ -258,20 +274,14 @@ fn digit_selects_candidate_when_composing() {
 /// `db9877f2-53f3-4e…`），按完整 36 字符 UUID 断言必然失败。
 #[test]
 fn system_phrase_and_cmdbar_reach_candidates() {
-    let Some((core, rec)) = setup("system_phrase_and_cmdbar_reach_candidates") else {
+    let Some((core, _rec)) = setup("system_phrase_and_cmdbar_reach_candidates") else {
         return;
     };
     for vk in [0x55u32, 0x55, 0x49, 0x44] {
         core.key_down(vk, 0);
     }
     settle();
-    let all: Vec<String> = rec
-        .candidates
-        .lock()
-        .unwrap()
-        .iter()
-        .flat_map(|(_, items)| items.clone())
-        .collect();
+    let all: Vec<String> = items_now(&core);
     let looks_like_uuid = |t: &String| {
         let head: String = t.chars().take(9).collect();
         head.len() == 9 && head.ends_with('-') && head[..8].chars().all(|c| c.is_ascii_hexdigit())
@@ -338,11 +348,12 @@ fn candidate_update_carries_preedit_and_paging() {
     core.key_down(VK_A, 0);
     settle();
     let got = rec.candidates.lock().unwrap().last().cloned();
-    let Some((preedit, items)) = got else {
+    let Some((preedit, has_candidates)) = got else {
         panic!("无候选回调")
     };
     assert_eq!(preedit, "aa", "编码栏正文应为当前编码缓冲");
-    assert!(!items.is_empty());
+    assert!(has_candidates);
+    assert!(!items_now(&core).is_empty());
 }
 
 /// 模式命令走得通，且状态经推送回报（K 侧不自记开关态的前提）。
@@ -383,7 +394,7 @@ fn diag_candidates_without_focus() {
         .lock()
         .unwrap()
         .iter()
-        .filter(|(_, items)| !items.is_empty())
+        .filter(|(_, has)| *has)
         .count();
     println!("无焦点时的候选帧数 = {n}");
     assert!(n > 0, "无焦点也应出候选 → 预热可提前到构造期");
@@ -433,7 +444,7 @@ fn switch_back_to_chinese_still_composes() {
         .lock()
         .unwrap()
         .iter()
-        .filter(|(_, items)| !items.is_empty())
+        .filter(|(_, has)| *has)
         .cloned()
         .collect();
     assert!(!got.is_empty(), "切回中文后应重新出候选");
@@ -513,8 +524,8 @@ fn diag_dump_key_results() {
         rec.candidates.lock().unwrap().len(),
         rec.hides.lock().unwrap()
     );
-    for (p, items) in rec.candidates.lock().unwrap().iter() {
-        println!("  preedit={p:?} items={:?}", &items[..items.len().min(5)]);
+    for (p, has) in rec.candidates.lock().unwrap().iter() {
+        println!("  preedit={p:?} has_candidates={has}");
     }
 }
 
@@ -663,19 +674,13 @@ fn shuangpin_layout_is_listable_and_settable() {
 /// 候选栏做了滚动也是空转、展开面板号称全部候选却只有一屏。
 #[test]
 fn candidate_window_reaches_beyond_current_page() {
-    let Some((core, rec)) = setup("candidate_window_reaches_beyond_current_page") else {
+    let Some((core, _rec)) = setup("candidate_window_reaches_beyond_current_page") else {
         return;
     };
     // 单码 a：五笔下重码极多，必然不止一页
     core.key_down(VK_A, 0);
     settle();
-    let page_items = rec
-        .candidates
-        .lock()
-        .unwrap()
-        .last()
-        .map(|(_, items)| items.len())
-        .unwrap_or(0);
+    let page_items = items_now(&core).len();
     assert!(page_items > 0, "应有候选");
 
     let w = core.candidates(0, 100);
@@ -785,15 +790,7 @@ fn english_schema_prefix_completion() {
         core.key_down(vk, 0); // b e a u
     }
     settle();
-    let items = rec
-        .candidates
-        .lock()
-        .unwrap()
-        .iter()
-        .rev()
-        .find(|(_, items)| !items.is_empty())
-        .map(|(_, items)| items.clone())
-        .unwrap_or_default();
+    let items = items_now(&core);
     eprintln!("beau 候选：{items:?}");
     assert_eq!(
         items.first().map(String::as_str),
@@ -852,8 +849,8 @@ fn english_schema_shifted_letter_composes() {
         .unwrap()
         .iter()
         .rev()
-        .find(|(_, items)| !items.is_empty())
-        .cloned()
+        .find(|(_, has)| *has)
+        .map(|(preedit, _)| (preedit.clone(), items_now(&core)))
         .unwrap_or_default();
     eprintln!("Hell 编码={:?} 候选={:?}", last.0, last.1);
     assert!(
@@ -967,13 +964,7 @@ fn user_word_add_list_type_remove() {
         core.key_down(vk, 0);
     }
     settle();
-    let typed: Vec<String> = rec
-        .candidates
-        .lock()
-        .unwrap()
-        .last()
-        .map(|(_, items)| items.clone())
-        .unwrap_or_default();
+    let typed: Vec<String> = items_now(&core);
     assert!(
         typed.iter().any(|t| t == text),
         "打 {code} 应出刚加的词，实得 {typed:?}"
@@ -995,13 +986,7 @@ fn user_word_add_list_type_remove() {
         core.key_down(vk, 0);
     }
     settle();
-    let typed: Vec<String> = rec
-        .candidates
-        .lock()
-        .unwrap()
-        .last()
-        .map(|(_, items)| items.clone())
-        .unwrap_or_default();
+    let typed: Vec<String> = items_now(&core);
     assert!(
         !typed.iter().any(|t| t == text),
         "删掉后打 {code} 不应再出这个词，实得 {typed:?}"
@@ -1132,7 +1117,7 @@ fn schema_dict_toggle_roundtrips() {
 /// 文件格式与电脑版同一份（主仓 dict_transfer_api），这里只验绑定层这一段接通。
 #[test]
 fn dict_export_clear_import_round_trip() {
-    let Some((core, rec, _env)) = setup_exclusive("dict_transfer") else {
+    let Some((core, _rec, _env)) = setup_exclusive("dict_transfer") else {
         return;
     };
     let schema = core
@@ -1175,13 +1160,7 @@ fn dict_export_clear_import_round_trip() {
         core.key_down(vk, 0);
     }
     settle();
-    let typed: Vec<String> = rec
-        .candidates
-        .lock()
-        .unwrap()
-        .last()
-        .map(|(_, items)| items.clone())
-        .unwrap_or_default();
+    let typed: Vec<String> = items_now(&core);
     assert!(
         typed.iter().any(|t| t == text),
         "导入后打 {code} 应立即出词，实得 {typed:?}"
@@ -1405,4 +1384,61 @@ fn shuangpin_leading_readings_display_pinyin_and_query_with_keys() {
         core.candidates(0, 30).items.iter().any(|t| t == "登封"),
         "选回默认读法恢复原候选"
     );
+}
+
+/// 帧里带语义字段：打字中 `composing=true`；上屏进联想后 `composing=false`，
+/// 但联想态仍有候选（`has_candidates=true`）。
+#[test]
+fn frame_reports_composing_and_candidates() {
+    let Some((core, rec)) = setup("frame_reports_composing_and_candidates") else {
+        return;
+    };
+    for vk in [0x57u32, 0x51, 0x56, 0x42] {
+        core.key_down(vk, 0); // w q v b
+    }
+    settle();
+    assert_eq!(
+        rec.composing.lock().unwrap().last().copied(),
+        Some(true),
+        "输入编码后应为 composing"
+    );
+    assert_eq!(
+        rec.candidates.lock().unwrap().last().map(|(_, has)| *has),
+        Some(true)
+    );
+
+    core.key_down(VK_SPACE, 0);
+    settle();
+    let (preedit, has) = rec.candidates.lock().unwrap().last().cloned().unwrap();
+    assert_eq!(preedit, "联想输入", "上屏后应进入联想态");
+    assert!(has, "联想态有候选");
+    assert_eq!(
+        rec.composing.lock().unwrap().last().copied(),
+        Some(false),
+        "联想态不是打字中"
+    );
+}
+
+/// 状态里带 `latin_input`：切英文方案后为真，切回中文方案为假。
+#[test]
+fn status_reports_latin_input() {
+    use wind_android::EngineCommand;
+    let Some((core, rec, _env)) = setup_exclusive("status_reports_latin_input") else {
+        return;
+    };
+    let schemas = core.schemas();
+    let Some(en) = schemas.iter().position(|s| s.id == "english") else {
+        eprintln!("跳过：未安装英文方案");
+        return;
+    };
+    let zh = schemas.iter().position(|s| s.id != "english").unwrap();
+    let last_latin = || rec.status.lock().unwrap().last().map(|s| s.latin_input);
+
+    core.run_command(EngineCommand::SelectSchema { index: en as u32 });
+    settle();
+    assert_eq!(last_latin(), Some(true), "英文方案下键按拉丁字母直出");
+
+    core.run_command(EngineCommand::SelectSchema { index: zh as u32 });
+    settle();
+    assert_eq!(last_latin(), Some(false), "切回中文方案后不再直出");
 }

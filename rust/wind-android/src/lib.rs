@@ -144,8 +144,10 @@ pub struct CandidateUpdate {
     pub preedit_caret: u32,
     /// 模式指示文本（五/拼/英/符…），编码栏左侧角标；空 = 不显示
     pub mode_label: String,
-    /// 当前页候选文本
-    pub items: Vec<String>,
+    /// 是否在「打字中」：有组合串且不是联想态
+    pub composing: bool,
+    /// 当前页是否有候选。候选文本不在帧里，需要时经 [`WindCore::candidates`] 拉取
+    pub has_candidates: bool,
     /// 键盘选中项（页内下标），空格上屏目标
     pub selected: u32,
     /// 当前页（1 起）
@@ -160,7 +162,8 @@ impl From<CandidateFrame> for CandidateUpdate {
             preedit: f.preedit,
             preedit_caret: f.preedit_caret as u32,
             mode_label: f.mode_label,
-            items: f.items,
+            composing: f.composing,
+            has_candidates: f.has_candidates,
             selected: f.selected as u32,
             page: f.page as u32,
             total_pages: f.total_pages as u32,
@@ -172,6 +175,8 @@ impl From<CandidateFrame> for CandidateUpdate {
 #[derive(Debug, uniffi::Record)]
 pub struct InputStatus {
     pub chinese_mode: bool,
+    /// 键是否按拉丁字母直出：英文方案、中文模式关闭、或不可输入（密码框等）
+    pub latin_input: bool,
     /// 方案短称：中文态取方案 icon_label（"五"/"拼"），英文态为 "英"/大写锁定 "A"
     pub icon_label: String,
     pub full_width: bool,
@@ -185,6 +190,7 @@ impl From<CoreStatus> for InputStatus {
     fn from(s: CoreStatus) -> Self {
         Self {
             chinese_mode: s.chinese_mode,
+            latin_input: s.latin_input,
             icon_label: s.icon_label,
             full_width: s.full_width,
             chinese_punct: s.chinese_punct,
