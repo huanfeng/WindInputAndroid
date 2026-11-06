@@ -19,6 +19,8 @@ rust/target/
 # OMC/会话运行时产物
 .omc/
 .remember/
+.superpowers/
+docs/superpowers/
 
 # 签名：debug 密钥随仓库分发（keystore/debug.keystore 故意不忽略）；release 密钥绝不进仓库
 keystore/*.jks

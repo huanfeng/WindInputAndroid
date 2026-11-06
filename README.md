@@ -21,7 +21,7 @@ app/                          单模块 APK（IME 服务 + 设置入口）
 │   ├── keyboard/             软键盘 UI（View + Canvas）
 │   ├── settings/             设置页（Compose + miuix）
 │   └── core/                 Rust 核心 Kotlin 门面（UniFFI 绑定落点）
-docs/                         架构文档与上游改造说明
+docs/                         架构文档、上游改造说明、会话层重构记录
 ```
 
 ## 构建
