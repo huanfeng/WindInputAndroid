@@ -1045,7 +1045,8 @@ code_hint_source = "auto"
 chinese = true
 english = true
 chinese_pairs = ["“”", "‘’", "（）", "【】", "《》"]
-english_pairs = ["\"\"", "''", "()", "[]", "{}"]
+# 英文配对表不放引号：撇号（don't）和收尾的双引号会被当成「再开一对」，变成 don't' / "hi""
+english_pairs = ["()", "[]", "{}"]
 # 跳出配对的按键，可多选。"right_symbol" = 右符号键本身（打 ） 跳出已插入的 （）），
 # 其余为键名 tab / enter / space / escape。列表里没有就是没有，不做隐式补偿。
 # 引号等对称配对永不参与右符号跳出（按键不带「开/闭」信息），只能靠 tab / enter 跳出。
