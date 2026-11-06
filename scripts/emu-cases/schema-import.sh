@@ -107,14 +107,26 @@ PY
     adb_q shell input keyevent BACK; sleep 1
 fi
 
-section "[55] 导入方案：覆盖自带方案要二次确认，可「恢复自带版本」；非方案包报失败"
-python3 - "$ROOT/app/src/main/assets/data/schemas/wubi86_pinyin.schema.toml" "$SI_TMP/override.wpkg" "$SI_TMP/notpkg.zip" <<'PY'
+section "[55] 导入方案：覆盖自带方案要二次确认、列表与显示名随之更新，「恢复自带版本」回到自带名"
+# 覆盖包 = APK 自带的 wubi86_pinyin 只改了显示名：能证明引擎缓存真的失效（同 id 覆盖不改 config.schema，
+# 只发 ReloadConfig 的话旧定义会一直生效，名字不会变）
+python3 - "$ROOT/app/src/main/assets/data/schemas" "$SI_TMP" <<'PY'
 import sys, zipfile
-src, out, bad = sys.argv[1:4]
-with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-    z.writestr("package.toml", '[package]\nformat_version = 2\ntitle = "覆盖测试"\n')
-    z.write(src, "wubi86_pinyin.schema.toml")
-with zipfile.ZipFile(bad, "w") as z:
+src, tmp = sys.argv[1], sys.argv[2]
+def pkg(out, files):
+    with zipfile.ZipFile(f"{tmp}/{out}", "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("package.toml", '[package]\nformat_version = 2\n')
+        for rel, data in files:
+            z.writestr(rel, data)
+t = open(f"{src}/wubi86_pinyin.schema.toml", encoding="utf-8").read()
+assert 'name = "五笔拼音"' in t
+pkg("override.wpkg", [("wubi86_pinyin.schema.toml", t.replace('name = "五笔拼音"', 'name = "覆盖版五笔拼音"', 1))])
+# 覆盖被自带混输引用的 pinyin，并带一份同路径的词库副本（遮住自带词库）
+p = open(f"{src}/pinyin.schema.toml", encoding="utf-8").read()
+assert 'name = "全拼"' in p
+d = open(f"{src}/pinyin/rime_frost.dict.yaml", "rb").read()
+pkg("override2.wpkg", [("pinyin.schema.toml", p.replace('name = "全拼"', 'name = "新全拼"', 1)), ("pinyin/rime_frost.dict.yaml", d)])
+with zipfile.ZipFile(f"{tmp}/notpkg.zip", "w") as z:
     z.writestr("readme.txt", "not a scheme package")
 PY
 adb_q shell run-as "$PKG" rm -f "$SI_USER_SCHEMAS/wubi86_pinyin.schema.toml"
@@ -134,6 +146,7 @@ tap_text "完成"
 sleep 1
 
 si_open_enabled_schemas
+check "覆盖后列表显示新名字（引擎缓存已失效）" "yes" "$(si_has_text 覆盖版五笔拼音)"
 check "覆盖了自带的显示「恢复自带版本」" "yes" "$(si_has_text '覆盖了自带方案 · 点此恢复自带版本')"
 tap_text "覆盖了自带方案 · 点此恢复自带版本"
 check "恢复前二次确认" "yes" "$(si_has_text 恢复自带版本)"
@@ -141,10 +154,39 @@ tap_text "恢复"
 sleep 2
 check "恢复后不再显示覆盖项" "no" "$(si_has_text '覆盖了自带方案 · 点此恢复自带版本')"
 check "恢复后用户层覆盖文件已删" "no" "$(si_user_file_exists wubi86_pinyin.schema.toml)"
-check "自带方案仍在列表里（回落到自带层）" "yes" "$(dump_xml | grep -q 'wubi86\|五笔拼音\|五笔' && echo yes || echo no)"
+check "恢复后列表回到自带名字" "yes" "$(si_has_text 五笔拼音)"
+check "恢复后新名字消失" "no" "$(si_has_text 覆盖版五笔拼音)"
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 
+section "[56] 导入方案：覆盖被自带混输引用的自带方案（pinyin）并遮住自带词库，可恢复"
+adb_q shell run-as "$PKG" sh -c "'rm -rf $SI_USER_SCHEMAS/pinyin $SI_USER_SCHEMAS/pinyin.schema.toml'"
+si_push "$SI_TMP/override2.wpkg" override2.wpkg
+si_view override2.wpkg
+check "预览：将覆盖自带方案 pinyin" "yes" "$(dump_xml | grep -q '将覆盖自带方案：pinyin' && echo yes || echo no)"
+check "预览：将遮住自带资源文件" "yes" "$(dump_xml | grep -q '将遮住自带资源文件 1 个' && echo yes || echo no)"
+tap_text "导入"
+check "遮住自带资源也要二次确认" "yes" "$(si_has_text 确认覆盖)"
+check "确认页写明遮住自带资源" "yes" "$(dump_xml | grep -q '将遮住应用自带的资源文件 1 个' && echo yes || echo no)"
+tap_text "覆盖"
+check "导入完成" "yes" "$(si_has_text 导入完成)"
+check "用户层有遮住自带词库的副本" "yes" "$(si_user_file_exists pinyin/rime_frost.dict.yaml)"
+tap_text "完成"
+sleep 1
+si_open_enabled_schemas
+check "覆盖 pinyin 后列表显示新名字" "yes" "$(si_has_text 新全拼)"
+tap_text "覆盖了自带方案 · 点此恢复自带版本"
+tap_text "恢复"
+sleep 3
+# 自带混输 wubi86_pinyin 引用 pinyin：此前共享保护会让恢复什么都删不掉
+check "恢复后列表回到自带名字「全拼」" "yes" "$(si_has_text 全拼)"
+check "恢复后新名字消失" "no" "$(si_has_text 新全拼)"
+check "恢复后方案覆盖文件已删" "no" "$(si_user_file_exists pinyin.schema.toml)"
+check "恢复后遮住自带词库的副本一并清掉" "no" "$(si_user_file_exists pinyin/rime_frost.dict.yaml)"
+adb_q shell input keyevent BACK; sleep 1
+adb_q shell input keyevent BACK; sleep 1
+
+section "[57] 导入方案：非方案包 zip 如实报失败"
 si_push "$SI_TMP/notpkg.zip" notpkg.zip
 si_view notpkg.zip
 check "非方案包 zip：如实报失败" "yes" "$(si_has_text 导入失败)"

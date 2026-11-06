@@ -43,6 +43,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -67,6 +68,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModelProvider
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.ImeSession
@@ -142,6 +144,8 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // 方案导入的缓存文件：上次进程被杀可能留下，只清早于十分钟的（不碰别处正在进行的导入）
+        Thread { SchemeImportFiles.clearStale(applicationContext) }.start()
         val dirs = (application as WindInputApp).dataDirs
         val userConfig = UserConfig(File(dirs.userDir, "config.toml"))
         val manifest = SettingsManifest.load(this)
@@ -788,10 +792,17 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
     if (st.schemas.isEmpty()) return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val importer = remember { SchemeImportController(context, scope, onChanged = { scope.launch { st.refresh() } }) }
+    // ViewModel：转屏不丢导入状态与缓存文件
+    val importer = remember { ViewModelProvider(context as ComponentActivity)[SchemeImportController::class.java] }
+    DisposableEffect(importer) {
+        importer.onChanged = { scope.launch { st.refresh() } }
+        onDispose { importer.onChanged = {} }
+    }
     // .wpkg 没有标准 MIME，和 .zip 一起放行：application/octet-stream 兜底
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) importer.begin(uri)
+        if (uri != null && !importer.begin(uri)) {
+            android.widget.Toast.makeText(context, "正在导入上一个方案包，请稍候", android.widget.Toast.LENGTH_SHORT).show()
+        }
     }
     SchemeImportDialogs(importer)
 

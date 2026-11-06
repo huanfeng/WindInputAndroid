@@ -1,6 +1,8 @@
 package com.windinput.ime.settings
 
+import android.app.Application
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -30,7 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import kotlinx.coroutines.CoroutineScope
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -86,10 +89,36 @@ internal object SchemeImportFiles {
         return ok
     }
 
-    /** 上次异常退出可能留下的缓存文件 */
-    fun clearStale(context: Context) {
-        cacheDir(context).listFiles()?.forEach { it.delete() }
+    /**
+     * 上次异常退出（进程被杀）可能留下的缓存文件。只清早于 [olderThanMs] 的：
+     * 设置页与文件关联页可能同时有一次导入在进行，不能把对方正在用的文件删了。
+     */
+    fun clearStale(context: Context, olderThanMs: Long = 10 * 60_000L) {
+        val now = System.currentTimeMillis()
+        cacheDir(context).listFiles()?.filter { now - it.lastModified() > olderThanMs }?.forEach { it.delete() }
     }
+}
+
+/**
+ * 方案导入 / 删除的全局互斥（设置页入口、文件关联 Activity、删除共用）。核心里也有一把锁串行化落盘，
+ * 这里是界面层的：进行中禁止再开始别的操作，并让列表置灰，而不是让第二个操作悄悄排队或被丢弃。
+ * 只在主线程读写。
+ */
+internal object SchemeBusy {
+    var busy by mutableStateOf(false)
+        private set
+
+    fun tryAcquire(): Boolean {
+        if (busy) return false
+        busy = true
+        return true
+    }
+
+    fun release() {
+        busy = false
+    }
+
+    const val MESSAGE = "正在进行另一个方案导入或删除，请稍候"
 }
 
 /** 导入流程的界面状态 */
@@ -105,7 +134,21 @@ internal sealed interface SchemeImportState {
         val replace: Boolean = false,
         /** 正在二次确认 */
         val confirming: Boolean = false,
-    ) : SchemeImportState
+    ) : SchemeImportState {
+        /**
+         * 这次导入实际会遮住自带方案的方案 id / 资源文件：用户层已有同名文件且没开「覆盖」时，
+         * 这些文件会被跳过，不算。
+         */
+        val effectiveOverrideSchemas: List<String>
+            get() = info.overridesBuiltin.filter { replace || "$it.schema.toml" !in info.conflicts }
+        val effectiveOverrideFiles: List<String>
+            get() = info.overridesBuiltinFiles.filter { replace || it !in info.conflicts }
+
+        /** 要不要二次确认：会覆盖用户已有文件，或遮住自带方案 / 资源 */
+        val needsConfirm: Boolean
+            get() = (replace && info.conflicts.isNotEmpty()) ||
+                effectiveOverrideSchemas.isNotEmpty() || effectiveOverrideFiles.isNotEmpty()
+    }
 
     data class Done(val result: SchemeImportInfo, val rows: List<InstalledSchemaInfo>) : SchemeImportState
 
@@ -114,28 +157,51 @@ internal sealed interface SchemeImportState {
 
 /**
  * 导入流程：选好的文件 → 预览 → 确认 → 结果。状态机在这里，界面只是读 [state]。
- * [onChanged] 在方案列表有变（导入成功、立即启用）时回调，宿主据此刷新自己的列表。
+ *
+ * 是 ViewModel：转屏 / 配置变更时状态与缓存文件不丢；Activity 真正结束时 [onCleared] 删缓存、放锁。
+ * 整个流程（从 [begin] 到回到 Idle）持有 [SchemeBusy]，期间不能再开始别的导入 / 删除。
+ * [onChanged] 在方案列表有变（导入成功、立即启用）时回调，由宿主界面设置。
  */
-internal class SchemeImportController(
-    private val context: Context,
-    private val scope: CoroutineScope,
-    private val onChanged: () -> Unit = {},
-) {
+internal class SchemeImportController(app: Application) : AndroidViewModel(app) {
+    private val context: Context get() = getApplication()
+
+    var onChanged: () -> Unit = {}
+
     var state by mutableStateOf<SchemeImportState>(SchemeImportState.Idle)
         private set
 
-    /** 开始一次导入：把 [uri]（SAF 文档或 content://）复制进缓存目录再预览 */
-    fun begin(uri: Uri) {
-        if (state !is SchemeImportState.Idle) return
+    /** 是否持有 [SchemeBusy]（只有成功 acquire 的实例才能放） */
+    private var held = false
+
+    /** 当前缓存文件；协程被取消时 state 来不及赋值，靠它兜底删除 */
+    private var pendingFile: File? = null
+
+    /**
+     * 开始一次导入：把 [uri]（SAF 文档或 content://）复制进缓存目录再预览。
+     * @return false = 没有开始（已有导入在进行），调用方应提示用户而不是静默丢弃
+     */
+    fun begin(uri: Uri): Boolean {
+        if (state !is SchemeImportState.Idle) return false
+        if (uri.scheme == "file" && !isDebuggable(context)) {
+            state = SchemeImportState.Failed("不支持这种来源（file://），请用「导入方案」按钮选择文件，或从文件管理器打开")
+            return true
+        }
+        if (!SchemeBusy.tryAcquire()) {
+            state = SchemeImportState.Failed(SchemeBusy.MESSAGE)
+            return true
+        }
+        held = true
         state = SchemeImportState.Working("正在读取方案包…")
-        scope.launch {
+        viewModelScope.launch {
             state = withContext(Dispatchers.IO) { copyAndPreview(uri) }
         }
+        return true
     }
 
     private fun copyAndPreview(uri: Uri): SchemeImportState {
-        SchemeImportFiles.clearStale(context)
         val file = File(SchemeImportFiles.cacheDir(context), "pkg-${System.nanoTime()}.wpkg")
+        pendingFile = file
+        var keep = false
         try {
             val copied = context.contentResolver.openInputStream(uri)?.use { SchemeImportFiles.copyLimited(it, file) }
                 ?: return SchemeImportState.Failed("无法读取所选文件")
@@ -144,13 +210,17 @@ internal class SchemeImportController(
             }
             val core = CoreAccess.obtainCore(context) ?: return SchemeImportState.Failed("输入法核心未就绪")
             val info = core.schemePreview(file.absolutePath)
+            keep = true
             return SchemeImportState.Preview(file, info)
         } catch (e: ConfigException) {
-            file.delete()
             return SchemeImportState.Failed(reasonOf(e))
         } catch (e: Exception) {
-            file.delete()
             return SchemeImportState.Failed("读取失败：${e.message ?: e}")
+        } finally {
+            if (!keep) {
+                file.delete()
+                if (pendingFile == file) pendingFile = null
+            }
         }
     }
 
@@ -159,11 +229,10 @@ internal class SchemeImportController(
         state = s.copy(replace = on)
     }
 
-    /** 点「导入」：会覆盖已有文件（含自带方案）时先进二次确认，否则直接导入 */
+    /** 点「导入」：会覆盖已有文件（含自带方案 / 自带资源）时先进二次确认，否则直接导入 */
     fun requestImport() {
         val s = state as? SchemeImportState.Preview ?: return
-        val overwrites = (s.replace && s.info.conflicts.isNotEmpty()) || s.info.overridesBuiltin.isNotEmpty()
-        if (overwrites && !s.confirming) state = s.copy(confirming = true) else doImport(s)
+        if (s.needsConfirm && !s.confirming) state = s.copy(confirming = true) else doImport(s)
     }
 
     fun cancelConfirm() {
@@ -178,7 +247,7 @@ internal class SchemeImportController(
 
     private fun doImport(s: SchemeImportState.Preview) {
         state = SchemeImportState.Working("正在导入…")
-        scope.launch {
+        viewModelScope.launch {
             state = withContext(Dispatchers.IO) {
                 try {
                     val core = CoreAccess.obtainCore(context) ?: return@withContext SchemeImportState.Failed("输入法核心未就绪")
@@ -191,16 +260,18 @@ internal class SchemeImportController(
                     SchemeImportState.Failed("导入失败：${e.message ?: e}")
                 } finally {
                     s.file.delete()
+                    if (pendingFile == s.file) pendingFile = null
                 }
             }
-            if (state is SchemeImportState.Done) onChanged()
+            // 成功与失败都刷新：核心在中途失败时磁盘也可能已变，列表要与实际一致
+            onChanged()
         }
     }
 
     /** 结果页「立即启用」 */
     fun enable(id: String) {
         val s = state as? SchemeImportState.Done ?: return
-        scope.launch {
+        viewModelScope.launch {
             val error = withContext(Dispatchers.IO) { setEnabled(context, id) }
             if (error != null) {
                 Toast.makeText(context, error, Toast.LENGTH_SHORT).show()
@@ -214,12 +285,29 @@ internal class SchemeImportController(
         }
     }
 
-    /** 取消 / 关闭：丢掉缓存文件，回到空闲 */
+    /** 取消 / 关闭：丢掉缓存文件，放锁，回到空闲 */
     fun dismiss() {
-        (state as? SchemeImportState.Preview)?.file?.delete()
+        pendingFile?.delete()
+        pendingFile = null
         state = SchemeImportState.Idle
+        releaseIfHeld()
+    }
+
+    override fun onCleared() {
+        pendingFile?.delete()
+        releaseIfHeld()
+    }
+
+    private fun releaseIfHeld() {
+        if (held) {
+            held = false
+            SchemeBusy.release()
+        }
     }
 }
+
+private fun isDebuggable(context: Context): Boolean =
+    context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
 
 private fun reasonOf(e: ConfigException): String =
     (e as? ConfigException.Rejected)?.reason ?: e.toString()
@@ -284,8 +372,11 @@ private fun PreviewPanel(s: SchemeImportState.Preview, c: SchemeImportController
             Text("已存在 ${info.conflicts.size} 个同名文件（默认跳过）")
             ToggleLine("覆盖已存在的文件", null, s.replace) { c.setReplace(it) }
         }
-        if (info.overridesBuiltin.isNotEmpty()) {
-            Warn("将覆盖自带方案：" + info.overridesBuiltin.joinToString("、") + "。之后可在方案设置里「恢复自带版本」")
+        if (s.effectiveOverrideSchemas.isNotEmpty()) {
+            Warn("将覆盖自带方案：" + s.effectiveOverrideSchemas.joinToString("、") + "。之后可在方案设置里「恢复自带版本」")
+        }
+        if (s.effectiveOverrideFiles.isNotEmpty()) {
+            Warn("将遮住自带资源文件 ${s.effectiveOverrideFiles.size} 个：" + brief(s.effectiveOverrideFiles) + "。删除或恢复自带版本时会一并清掉")
         }
         if (info.missing.isNotEmpty()) {
             Warn("缺少引用的资源：" + info.missing.joinToString("、") + "。装上后可能用不了")
@@ -307,9 +398,13 @@ private fun ConfirmPanel(s: SchemeImportState.Preview, c: SchemeImportController
             TextButton(text = "覆盖", onClick = c::confirmImport)
         },
     ) {
-        if (info.overridesBuiltin.isNotEmpty()) {
-            Warn("将覆盖应用自带的方案：" + info.overridesBuiltin.joinToString("、"))
+        if (s.effectiveOverrideSchemas.isNotEmpty()) {
+            Warn("将覆盖应用自带的方案：" + s.effectiveOverrideSchemas.joinToString("、"))
             Text("覆盖后会改用这个包里的版本，可随时在方案设置里「恢复自带版本」。")
+        }
+        if (s.effectiveOverrideFiles.isNotEmpty()) {
+            Warn("将遮住应用自带的资源文件 ${s.effectiveOverrideFiles.size} 个：" + brief(s.effectiveOverrideFiles))
+            Text("遮住后这些文件改用包里的版本；删除或恢复自带版本时会一并清掉。")
         }
         if (s.replace && info.conflicts.isNotEmpty()) {
             Spacer(Modifier.height(6.dp))
@@ -336,6 +431,10 @@ private fun DonePanel(s: SchemeImportState.Done, c: SchemeImportController) {
         }
     }
 }
+
+/** 文件清单只列前几个，其余写「等 N 个」 */
+private fun brief(items: List<String>, max: Int = 3): String =
+    if (items.size <= max) items.joinToString("、") else items.take(max).joinToString("、") + " 等"
 
 @Composable
 private fun Warn(text: String) {
@@ -382,8 +481,12 @@ internal fun UserSchemasCard(installed: List<InstalledSchemaInfo>, onChanged: ()
         for (s in mine) {
             NavRow(
                 title = s.name.ifEmpty { s.id },
-                summary = if (s.builtin) "覆盖了自带方案 · 点此恢复自带版本" else "用户导入 · 点此删除",
-            ) { target = s }
+                summary = when {
+                    SchemeBusy.busy -> "正在处理其它方案操作，请稍候"
+                    s.builtin -> "覆盖了自带方案 · 点此恢复自带版本"
+                    else -> "用户导入 · 点此删除"
+                },
+            ) { if (!SchemeBusy.busy) target = s }
         }
     }
     val t = target ?: return
@@ -398,9 +501,17 @@ internal fun UserSchemasCard(installed: List<InstalledSchemaInfo>, onChanged: ()
                 text = if (restore) "恢复" else "删除",
                 onClick = {
                     target = null
+                    if (!SchemeBusy.tryAcquire()) {
+                        Toast.makeText(context, SchemeBusy.MESSAGE, Toast.LENGTH_SHORT).show()
+                        return@TextButton
+                    }
                     scope.launch {
-                        val error = withContext(Dispatchers.IO) { deleteScheme(context, t.id) }
-                        Toast.makeText(context, error ?: if (restore) "已恢复自带版本" else "已删除", Toast.LENGTH_SHORT).show()
+                        val message = try {
+                            withContext(Dispatchers.IO) { deleteScheme(context, t.id, restore) }
+                        } finally {
+                            SchemeBusy.release()
+                        }
+                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                         onChanged()
                     }
                 },
@@ -414,13 +525,17 @@ internal fun UserSchemasCard(installed: List<InstalledSchemaInfo>, onChanged: ()
     }
 }
 
-/** 删除用户层方案；失败返回原因（后台线程调用） */
-private fun deleteScheme(context: Context, id: String): String? {
+/** 删除用户层方案；返回给用户看的结果文案（后台线程调用） */
+private fun deleteScheme(context: Context, id: String, restore: Boolean): String {
     val core = CoreAccess.obtainCore(context) ?: return "输入法核心未就绪"
     return try {
         val r = core.schemeDelete(id)
-        // 被其它方案引用（如混输方案用它当主方案）时核心会保留它的文件，什么都没删：不能报成功
-        if (r.schemaIds.isEmpty()) "「$id」仍被其它方案使用，未删除。请先删除依赖它的方案" else null
+        when {
+            // 被其它方案引用（如混输方案用它当主方案）时核心会保留它的文件，什么都没删：不能报成功
+            r.schemaIds.isEmpty() -> "「$id」仍被其它方案使用，未删除。请先删除依赖它的方案"
+            r.keptShared.isNotEmpty() -> "${if (restore) "已恢复" else "已删除"}，${r.keptShared.size} 个共享文件因被其它方案使用而保留"
+            else -> if (restore) "已恢复自带版本" else "已删除"
+        }
     } catch (e: ConfigException) {
         reasonOf(e)
     } catch (e: Exception) {
