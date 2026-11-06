@@ -601,6 +601,16 @@ title = "数字后智能标点"
 [[item]]
 page = "input"
 section = "字符与标点"
+key = "ui.android.touch_quick_input"
+source = "android"
+type = "toggle"
+title = "触摸键盘 ; 进快捷输入"
+summary = "关：手机键盘上的 ; 当标点输入，快捷输入用工具栏按钮；外接物理键盘不受影响"
+default = false
+
+[[item]]
+page = "input"
+section = "字符与标点"
 key = "input.symbol.smart_mode"
 source = "engine"
 type = "toggle"

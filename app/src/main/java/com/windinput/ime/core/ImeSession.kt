@@ -275,6 +275,9 @@ interface ImeSession {
 
     /** 英文词后是否自动补空格（设置项 ui.android.auto_space）；补不补由核心决定 */
     fun setAutoSpace(on: Boolean) = Unit
+
+    /** 触摸键盘的 `;` 是否进快捷输入（设置项 ui.android.touch_quick_input，默认关）；物理键盘不受影响 */
+    fun setTouchQuickTrigger(on: Boolean) = Unit
 }
 
 /**

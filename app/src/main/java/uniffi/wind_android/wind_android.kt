@@ -803,6 +803,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_touch_quick_trigger(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_shuangpin_layouts(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_stats_clear(
@@ -941,6 +943,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_schema_enabled(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(`ptr`: Long,`label`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_touch_quick_trigger(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_shuangpin_layouts(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1214,6 +1218,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled() != 59430) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_touch_quick_trigger() != 28094) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_shuangpin_layouts() != 61817) {
@@ -2418,6 +2425,11 @@ public interface WindCoreInterface {
     fun `setTooltipSectionEnabled`(`label`: kotlin.String, `on`: kotlin.Boolean)
     
     /**
+     * 触摸键盘的 `;` 是否进快捷输入（默认关：当普通标点）。物理键盘不受影响。
+     */
+    fun `setTouchQuickTrigger`(`on`: kotlin.Boolean)
+    
+    /**
      * 可选双拼布局。清单由核心扫描目录得出，**K 侧不要硬编码**——
      * 用户可以往 `schemas` 的 `shuangpin` 子目录里丢自己的布局文件，硬编码清单看不见它。
      */
@@ -3306,6 +3318,22 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         it,
         
         FfiConverterString.lower(`label`),
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 触摸键盘的 `;` 是否进快捷输入（默认关：当普通标点）。物理键盘不受影响。
+     */override fun `setTouchQuickTrigger`(`on`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_touch_quick_trigger(
+        it,
+        
         FfiConverterBoolean.lower(`on`),_status)
 }
     }

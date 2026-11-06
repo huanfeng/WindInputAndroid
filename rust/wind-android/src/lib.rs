@@ -467,6 +467,11 @@ impl WindCore {
         self.core.set_auto_space(on);
     }
 
+    /// 触摸键盘的 `;` 是否进快捷输入（默认关：当普通标点）。物理键盘不受影响。
+    pub fn set_touch_quick_trigger(&self, on: bool) {
+        self.core.set_touch_quick_trigger(on);
+    }
+
     /// 焦点获得（对应 onStartInput）。
     ///
     /// 词库预热在核心构造时就已启动（不在这里），所以本调用是廉价的。

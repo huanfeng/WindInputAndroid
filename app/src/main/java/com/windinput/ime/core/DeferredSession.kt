@@ -130,6 +130,7 @@ class DeferredSession(
                 session.listener = listener
                 session.setLearningSuspended(learningSuspended)
                 session.setAutoSpace(autoSpace)
+                session.setTouchQuickTrigger(touchQuickTrigger)
                 session.candidateComments = candidateComments
                 delegate = session
                 Log.i(TAG, "核心就绪，耗时 ${cost}ms")
@@ -212,5 +213,13 @@ class DeferredSession(
     override fun setAutoSpace(on: Boolean) {
         autoSpace = on
         call("setAutoSpace") { it.setAutoSpace(on) }
+    }
+
+    @Volatile
+    private var touchQuickTrigger = false
+
+    override fun setTouchQuickTrigger(on: Boolean) {
+        touchQuickTrigger = on
+        call("setTouchQuickTrigger") { it.setTouchQuickTrigger(on) }
     }
 }

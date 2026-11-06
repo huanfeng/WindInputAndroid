@@ -534,6 +534,7 @@ class WindInputImeService :
         inlinePreedit = userConfig.getBoolean("ui.android.inline_preedit", false)
         autoCapEnabled = userConfig.getBoolean("ui.android.auto_cap", true)
         session.setAutoSpace(userConfig.getBoolean("ui.android.auto_space", true))
+        session.setTouchQuickTrigger(userConfig.getBoolean("ui.android.touch_quick_input", false))
         selecting = false
         applyGaps()
         windowManager?.showKeyboard()
@@ -1468,7 +1469,8 @@ class WindInputImeService :
     private fun sendLeadKey(key: Char) {
         if (directInput) return
         if (composing) commitDirect("")
-        engineKey(KeyAction.Text(key), shifted = false)
+        // 工具栏按钮必须进模式：用 PHYSICAL 绕开「触摸 `;` 不是引导键」的开关
+        engineKey(KeyAction.Text(key), shifted = false, source = KeySource.PHYSICAL)
     }
 
     /**

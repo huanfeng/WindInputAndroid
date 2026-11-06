@@ -184,6 +184,10 @@ class RustSession(
         guard.run("setAutoSpace", Unit) { core.setAutoSpace(on) }
     }
 
+    override fun setTouchQuickTrigger(on: Boolean) {
+        guard.run("setTouchQuickTrigger", Unit) { core.setTouchQuickTrigger(on) }
+    }
+
     /**
      * 软键/物理键 → 核心 `press`：翻译 VK、英文自动空格、标点换位都在核心里，这里只执行返回的编辑指令。
      * 前置条件见 [ImeSession.keyPressed]：直出（密码框）时不得调用。
