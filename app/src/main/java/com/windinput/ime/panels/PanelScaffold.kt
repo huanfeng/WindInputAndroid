@@ -52,7 +52,7 @@ object PanelScaffold {
      *
      * @param onBack 返回键盘（左上角）
      * @param rightActions 顶栏右侧动作按钮（label → onClick）
-     * @param backspace 给了则 rightActions 里的「⌫」按钮接退格手势（连删 / 扩选 / 上滑），不再只响应点击
+     * @param backspace 给了则在顶栏右侧（rightActions 之后）加一枚退格按钮，接退格手势（连删 / 扩选 / 上滑）
      * @param rightView 顶栏右侧自定义控件（要随状态改字的按钮，如快捷面板的「编辑工具栏 / 完成」）
      */
     fun build(
@@ -97,11 +97,18 @@ object PanelScaffold {
         )
         for ((label, onClick) in rightActions) {
             header.addView(
-                headerButton(context, label, onClick).also {
-                    if (label == "⌫" && backspace != null) {
-                        BackspaceGesture(backspace, feedback = { KeyHaptics.tap(it) }).attach(it)
-                    }
-                },
+                headerButton(context, label, onClick = onClick),
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
+        backspace?.let { gesture ->
+            val btn = headerButton(context, "⌫", isBackspace = true) {}
+            BackspaceGesture(gesture, gesture::longPressDelayMs, feedback = { KeyHaptics.tap(btn) }).attach(btn)
+            header.addView(
+                btn,
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -139,7 +146,7 @@ object PanelScaffold {
             setOnClickListener { onBack() }
         }
 
-    fun headerButton(context: Context, label: String, onClick: () -> Unit): TextView =
+    fun headerButton(context: Context, label: String, isBackspace: Boolean = false, onClick: () -> Unit): TextView =
         TextView(context).apply {
             val density = context.resources.displayMetrics.density
             text = label
@@ -150,7 +157,7 @@ object PanelScaffold {
             setBackgroundColor(Color.TRANSPARENT)
             setOnClickListener { onClick() }
             // 退格与键盘上同一个矢量图标，不用字体里的 ⌫
-            if (label == "⌫") {
+            if (isBackspace) {
                 minWidth = (52 * density).toInt()
                 KeyIcons.applyBackspace(this, Palette.current.accent)
             }

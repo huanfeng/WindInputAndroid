@@ -67,7 +67,8 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
                 if (action == EditAction.TOGGLE_SELECT) selectButton = btn
                 if (action == EditAction.BACKSPACE) {
                     KeyIcons.applyBackspace(btn, Palette.current.text)
-                    BackspaceGesture(listener.editBackspaceGesture(), feedback = { KeyHaptics.tap(btn) }).attach(btn)
+                    val gesture = listener.editBackspaceGesture()
+                    BackspaceGesture(gesture, gesture::longPressDelayMs, feedback = { KeyHaptics.tap(btn) }).attach(btn)
                 }
                 // 方向键用矢量箭头，与键盘上其他功能图标同一套笔画（字体里的 ↑↓←→ 细且各机型不一）
                 ARROWS[action]?.let { GlyphDrawable.apply(btn, it, Palette.current.text) }

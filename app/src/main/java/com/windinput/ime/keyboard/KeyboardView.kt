@@ -236,11 +236,9 @@ class KeyboardView(context: Context) : View(context) {
     private val edgePadPx = 3.4f * density
     private val padTopPx = KeyboardDimens.PAD_TOP_DP * density
     private val keyRadiusPx = 8 * density
-    private val swipeThresholdPx = 40 * density
-    private val swipeActivatePx = 16 * density
-
-    /** 空格移光标/退格扩选的步进距离 */
-    private val cursorStepPx = 12 * density
+    private val swipeThresholdPx = KeyboardDimens.SWIPE_THRESHOLD_DP * density
+    private val swipeActivatePx = KeyboardDimens.SWIPE_ACTIVATE_DP * density
+    private val cursorStepPx = KeyboardDimens.CURSOR_STEP_DP * density
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -365,6 +363,7 @@ class KeyboardView(context: Context) : View(context) {
 
             override fun swipeEnabled() = backspaceSwipeEnabled
         },
+        longPressDelayMs = { longPressDelayMs.toLong() },
         feedback = { pressedKey?.let { feedback(it) } },
     )
 
@@ -422,6 +421,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     override fun onDetachedFromWindow() {
+        backspaceGesture.cancel()
         popupManager.dismissAll()
         handler.removeCallbacks(clearHighlight)
         highlightKey = null

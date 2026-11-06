@@ -97,6 +97,9 @@ class WindInputImeService :
     /** 设置里的「退格滑动手势」开关：键盘与各面板的退格键共用 */
     private var backspaceSwipeOn = true
 
+    /** 长按起始延迟（设置项 ui.android.long_press_delay）：键盘长按与各退格键连删共用 */
+    private var longPressDelayMs = 300
+
     /** 剪贴板建议条开关（设置项 ui.android.clip_suggestion） */
     private var clipSuggestionEnabled = true
 
@@ -513,10 +516,11 @@ class WindInputImeService :
         KeyHaptics.enabled = userConfig.getBoolean("ui.android.haptic", true)
         KeyHaptics.strength = userConfig.getInt("ui.android.haptic_strength", KeyHaptics.DEFAULT_STRENGTH)
         backspaceSwipeOn = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
+        longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)
         keyboardWindow?.keyboardView?.apply {
             soundEnabled = userConfig.getBoolean("ui.android.sound", false)
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
-            longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)
+            longPressDelayMs = this@WindInputImeService.longPressDelayMs
             spaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_space_cursor", true)
             spaceLongPressEnabled = userConfig.getString("ui.android.space_long_press", "none") != "none"
             backspaceSwipeEnabled = backspaceSwipeOn
@@ -1381,7 +1385,12 @@ class WindInputImeService :
 
     /** 面板里的退格键：单次删除沿用各面板原来的处理，滑动手势与键盘退格同一套宿主实现 */
     private fun panelBackspace(delete: () -> Unit) = object : BackspaceGesture.Listener {
-        override fun onDelete() = delete()
+        // 有编码（符号页保留条区，编码仍可见）时先交引擎退格，和键盘退格键一致；引擎不接再走面板自己的删除
+        override fun onDelete() {
+            if (composing && engineKey(KeyAction.Backspace, false)) return
+            delete()
+        }
+        override fun longPressDelayMs() = longPressDelayMs.toLong()
         override fun onSelect(count: Int) = onBackspaceSelect(count)
         override fun onSelectionDelete() = onBackspaceSwipeDelete()
         override fun onDeleteBeforeCursor() = onBackspaceDeleteBeforeCursor()

@@ -6,13 +6,18 @@ package com.windinput.ime.keyboard
  * 一次按压里每次移动都按**当前位置**重新判定模式，不抬手可在各模式间来回切换：
  * - 空闲：未滑动。抬手 = 单击（没触发连删、也没进过任何滑动时才补）。
  * - 扩选：左滑量 > [Config.activatePx]。每 [Config.stepPx] 多选一个字符（[Listener.onSelect]）。
- *   左滑量回到 activate 以内即退出，选区回到光标（onSelect(0)），之后可直接上滑。抬手 = 删选区。
- * - 气泡：上滑量 > activate 且大于横向位移（且不在扩选里）时弹出；上滑量回到 activate 以内收起。
+ *   左滑量回到 [Config.exitPx] 以内即退出，选区回到光标（onSelect(0)），之后可直接上滑。抬手 = 删选区。
+ * - 气泡：上滑量 > activate 且大于横向位移（且不在扩选里）时弹出；上滑量回到 exit 以内收起。
+ *   收起后须先回到水平原点附近（左移量 <= activate）才允许进入扩选，
+ *   否则「上滑 -> 左移 -> 下滑收起」会把残留的左移量误当成扩选。
  *   上滑量 > [Config.thresholdPx] 才算「选中」：手指偏左超过 [Config.leftPx] = 清空输入框，
  *   否则 = 删光标前全部；未过阈值抬手 = 反悔，什么都不删。
  *
- * 长按 [Config.longPressDelayMs] 后每 [Config.repeatIntervalMs] 连删一下（与主键盘出厂手感一致）。
- * 计时由宿主经 [Timer] 提供：到点调 [onTimer]。
+ * 进入用 activate / threshold，退出用更小的 exit / threshold - [Config.hysteresisPx]（滞回），
+ * 手指在阈值附近抖动不会反复切换。
+ *
+ * 长按 [down] 传入的延迟后每 [Config.repeatIntervalMs] 连删一下。延迟由宿主在按下时读设置
+ * （ui.android.long_press_delay），计时经 [Timer] 提供：到点调 [onTimer]。
  */
 class BackspaceGestureMachine(
     private val cfg: Config,
@@ -25,14 +30,19 @@ class BackspaceGestureMachine(
         val thresholdPx: Float,
         val stepPx: Float,
         val leftPx: Float,
-        val longPressDelayMs: Long = LONG_PRESS_DELAY_MS,
         val repeatIntervalMs: Long = REPEAT_INTERVAL_MS,
     ) {
+        /** 扩选 / 气泡的退出距离：进入距离的一半 */
+        val exitPx: Float get() = activatePx / 2
+
+        /** 选项阈值（BEFORE / ALL）的回差 */
+        val hysteresisPx: Float get() = thresholdPx / 10
+
         companion object {
             fun forDensity(density: Float) = Config(
-                activatePx = 16 * density,
-                thresholdPx = 40 * density,
-                stepPx = 12 * density,
+                activatePx = KeyboardDimens.SWIPE_ACTIVATE_DP * density,
+                thresholdPx = KeyboardDimens.SWIPE_THRESHOLD_DP * density,
+                stepPx = KeyboardDimens.CURSOR_STEP_DP * density,
                 leftPx = 28 * density,
             )
         }
@@ -53,6 +63,7 @@ class BackspaceGestureMachine(
     private var bubble = Bubble.HIDDEN
     private var consumed = false
     private var repeatFired = false
+    private var needsRecenter = false
     private var lastCount = 0
     private var downX = 0f
     private var downY = 0f
@@ -62,13 +73,13 @@ class BackspaceGestureMachine(
     /** 本次按压已不是一次单纯的点按（连删过 / 进过滑动）：宿主据此屏蔽别的手势 */
     val isEngaged: Boolean get() = pressed && (consumed || repeatFired || mode != Mode.IDLE)
 
-    fun down(x: Float, y: Float) {
+    fun down(x: Float, y: Float, longPressDelayMs: Long) {
         reset()
         pressed = true
         swipeOn = listener.swipeEnabled()
         downX = x
         downY = y
-        timer.schedule(cfg.longPressDelayMs)
+        timer.schedule(longPressDelayMs)
     }
 
     fun onTimer() {
@@ -82,8 +93,9 @@ class BackspaceGestureMachine(
         if (!pressed || !swipeOn) return
         val left = downX - x
         val up = downY - y
+        if (needsRecenter && left <= cfg.activatePx) needsRecenter = false
         if (mode == Mode.SELECT) {
-            if (left > cfg.activatePx) {
+            if (left > cfg.exitPx) {
                 select(left)
                 return
             }
@@ -91,18 +103,19 @@ class BackspaceGestureMachine(
             mode = Mode.IDLE
         }
         if (mode == Mode.BUBBLE) {
-            if (up > cfg.activatePx) {
+            if (up > cfg.exitPx) {
                 chooseBubble(left, up)
                 return
             }
             setBubble(Bubble.HIDDEN)
             mode = Mode.IDLE
+            needsRecenter = left > cfg.activatePx
         }
         if (up > cfg.activatePx && up > kotlin.math.abs(x - downX)) {
             engage()
             mode = Mode.BUBBLE
             chooseBubble(left, up)
-        } else if (left > cfg.activatePx) {
+        } else if (left > cfg.activatePx && !needsRecenter) {
             engage()
             mode = Mode.SELECT
             select(left)
@@ -148,10 +161,14 @@ class BackspaceGestureMachine(
     }
 
     private fun chooseBubble(left: Float, up: Float) {
+        val h = cfg.hysteresisPx
+        val chosen = bubble == Bubble.BEFORE || bubble == Bubble.ALL
+        val armed = up > (if (chosen) cfg.thresholdPx - h else cfg.thresholdPx)
+        val toAll = left > (if (bubble == Bubble.ALL) cfg.leftPx - h else cfg.leftPx)
         setBubble(
             when {
-                up <= cfg.thresholdPx -> Bubble.IDLE
-                left > cfg.leftPx -> Bubble.ALL
+                !armed -> Bubble.IDLE
+                toAll -> Bubble.ALL
                 else -> Bubble.BEFORE
             },
         )
@@ -174,11 +191,11 @@ class BackspaceGestureMachine(
         bubble = Bubble.HIDDEN
         consumed = false
         repeatFired = false
+        needsRecenter = false
         lastCount = 0
     }
 
     companion object {
-        const val LONG_PRESS_DELAY_MS = 300L
         const val REPEAT_INTERVAL_MS = 50L
     }
 }

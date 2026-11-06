@@ -110,6 +110,15 @@ object KeyboardDimens {
      */
     const val PAD_TOP_DP = 0f
 
+    /** 手势起算距离（dp）：滑过它才算「开始滑」（空格移光标、上滑副字符、退格手势共用） */
+    const val SWIPE_ACTIVATE_DP = 16f
+
+    /** 上滑「选中」阈值（dp）：副字符 / 退格气泡的选项都过了它才生效 */
+    const val SWIPE_THRESHOLD_DP = 40f
+
+    /** 空格移光标 / 退格扩选的步进距离（dp） */
+    const val CURSOR_STEP_DP = 12f
+
     /** 条区编码行高度（dp）；横屏收矮，见 [BarView] */
     var barPreeditDp: Float = 19f
 

@@ -12,6 +12,7 @@ import android.os.Looper
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.PopupWindow
 import com.windinput.ime.keyboard.BackspaceGestureMachine.Bubble
 
@@ -23,10 +24,12 @@ import com.windinput.ime.keyboard.BackspaceGestureMachine.Bubble
  * 坐标一律是 [anchor] 视图内的坐标。键盘（一个 View 里多个键）手动调 [down]/[move]/[up]/[cancel]，
  * 面板里的独立按钮用 [attach]。
  *
+ * @param longPressDelayMs 连删起始延迟，每次按下时读取（设置 ui.android.long_press_delay，键盘与面板同一来源）
  * @param feedback 连删每一下之前的反馈（震动 / 键音），由宿主决定
  */
 class BackspaceGesture(
     private val listener: Listener,
+    private val longPressDelayMs: () -> Long,
     private val style: Style? = null,
     private val feedback: (() -> Unit)? = null,
 ) {
@@ -48,6 +51,9 @@ class BackspaceGesture(
 
         /** 设置里的「退格滑动手势」开关；关了只剩单击 / 连删 */
         fun swipeEnabled(): Boolean = true
+
+        /** 连删起始延迟（毫秒）；面板宿主取设置里的同一项，键盘直接把值传给 [BackspaceGesture] */
+        fun longPressDelayMs(): Long = 300L
     }
 
     /** 气泡配色；默认取当前主题，面板可传入覆盖 */
@@ -103,7 +109,8 @@ class BackspaceGesture(
                 BackspaceGestureMachine.Config.forDensity(density), listener, timer, ::onBubble,
             )
         }
-        machine.down(x, y)
+        dismissBubble()
+        machine.down(x, y, longPressDelayMs())
         lastY = y
     }
 
@@ -113,33 +120,71 @@ class BackspaceGesture(
         if (!::machine.isInitialized) return
         lastY = y
         machine.move(x, y)
-        popup?.let { moveBubble(y) }
+        if (bubbleShown) moveBubble(y)
     }
 
     fun up() {
         if (::machine.isInitialized) machine.up()
+        dismissBubble()
     }
 
     fun cancel() {
         if (::machine.isInitialized) machine.cancel()
+        dismissBubble()
     }
 
-    /** 面板里的独立退格按钮：按下 / 抬起 / 取消接到本组件，按压态与按下震动在此处理 */
+    /**
+     * 面板里的独立退格按钮：按下 / 抬起 / 取消接到本组件，按压态与按下震动在此处理。
+     * 只跟踪按下的那一指（pointerId）；该指抬起即结束手势。IDLE 时抬手触点已拖出按钮范围
+     * （超过 touchSlop）按取消处理，和普通按钮一致。视图被摘下（面板切走）时取消手势并收起气泡。
+     */
     @SuppressLint("ClickableViewAccessibility")
     fun attach(button: View) {
+        val slop = ViewConfiguration.get(button.context).scaledTouchSlop
+        var pointerId = MotionEvent.INVALID_POINTER_ID
+
+        fun release(v: View, x: Float, y: Float) {
+            pointerId = MotionEvent.INVALID_POINTER_ID
+            v.isPressed = false
+            val outside = x < -slop || y < -slop || x > v.width + slop || y > v.height + slop
+            if (outside && !isEngaged) cancel() else up()
+        }
+
+        button.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+
+            override fun onViewDetachedFromWindow(v: View) {
+                pointerId = MotionEvent.INVALID_POINTER_ID
+                v.isPressed = false
+                cancel()
+            }
+        })
         button.setOnTouchListener { v, e ->
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
+                    pointerId = e.getPointerId(0)
                     v.isPressed = true
                     KeyHaptics.tap(v)
                     down(v, RectF(0f, 0f, v.width.toFloat(), v.height.toFloat()), e.x, e.y)
                 }
-                MotionEvent.ACTION_MOVE -> move(e.x, e.y)
+                MotionEvent.ACTION_MOVE -> {
+                    val i = e.findPointerIndex(pointerId)
+                    if (i >= 0) move(e.getX(i), e.getY(i))
+                }
+                MotionEvent.ACTION_POINTER_UP -> {
+                    val i = e.actionIndex
+                    if (pointerId != MotionEvent.INVALID_POINTER_ID && e.getPointerId(i) == pointerId) {
+                        release(v, e.getX(i), e.getY(i))
+                    }
+                }
                 MotionEvent.ACTION_UP -> {
-                    v.isPressed = false
-                    up()
+                    if (pointerId != MotionEvent.INVALID_POINTER_ID) {
+                        val i = e.findPointerIndex(pointerId).coerceAtLeast(0)
+                        release(v, e.getX(i), e.getY(i))
+                    }
                 }
                 MotionEvent.ACTION_CANCEL -> {
+                    pointerId = MotionEvent.INVALID_POINTER_ID
                     v.isPressed = false
                     cancel()
                 }
@@ -150,17 +195,24 @@ class BackspaceGesture(
 
     // ── 气泡 ─────────────────────────────────────────────────────
 
+    /** 气泡在手势期间只建一次，状态切换只改显隐 / 选中项；手势结束才 [dismissBubble] */
     private fun onBubble(state: Bubble) {
         val view = anchor ?: return
-        when (state) {
-            Bubble.HIDDEN -> dismissBubble()
-            else -> {
-                val first = popup == null
-                if (first) showBubble(view)
-                else if (state != Bubble.IDLE) KeyHaptics.tap(view)
-                bubbleView?.choice = state
-            }
+        if (state == Bubble.HIDDEN) {
+            hideBubble()
+            return
         }
+        val wasShown = bubbleShown
+        if (popup == null) showBubble(view)
+        bubbleView?.visibility = View.VISIBLE
+        bubbleShown = true
+        if (wasShown && state != Bubble.IDLE) KeyHaptics.tap(view)
+        bubbleView?.choice = state
+    }
+
+    private fun hideBubble() {
+        bubbleView?.visibility = View.INVISIBLE
+        bubbleShown = false
     }
 
     private fun showBubble(view: View) {
@@ -186,6 +238,7 @@ class BackspaceGesture(
         }
     }
 
+    private var bubbleShown = false
     private var bubbleX = 0
     private var bubbleW = 0
     private var bubbleH = 0
@@ -205,6 +258,7 @@ class BackspaceGesture(
         popup?.dismiss()
         popup = null
         bubbleView = null
+        bubbleShown = false
     }
 
     /**

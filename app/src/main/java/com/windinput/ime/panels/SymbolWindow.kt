@@ -4,8 +4,6 @@ import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
 import android.graphics.drawable.StateListDrawable
-import android.os.Handler
-import android.os.Looper
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -88,7 +86,6 @@ class SymbolWindow(
         if (!locked) listener.onSymbolBack()
     }
     private var locked = false
-    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreateView(context: Context): View {
         val density = context.resources.displayMetrics.density
@@ -177,7 +174,8 @@ class SymbolWindow(
             keyCell(context, "⌫", palette.keySpecial, palette.text).apply {
                 contentDescription = "symbol-backspace"
                 KeyIcons.applyBackspace(this, palette.text)
-                BackspaceGesture(listener.symbolBackspaceGesture(), feedback = { KeyHaptics.tap(this) })
+                val gesture = listener.symbolBackspaceGesture()
+                BackspaceGesture(gesture, gesture::longPressDelayMs, feedback = { KeyHaptics.tap(this) })
                     .attach(this)
             },
             LinearLayout.LayoutParams(sideWidth, rowHeight),
@@ -192,7 +190,6 @@ class SymbolWindow(
     }
 
     override fun onDetached() {
-        handler.removeCallbacksAndMessages(null)
         listener.onSymbolPageShown(false)
     }
 

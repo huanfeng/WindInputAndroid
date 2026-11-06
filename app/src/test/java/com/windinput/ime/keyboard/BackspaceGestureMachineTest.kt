@@ -34,7 +34,7 @@ class BackspaceGestureMachineTest {
     private val bubbles = mutableListOf<Bubble>()
     private val m = BackspaceGestureMachine(cfg, listener, timer) { bubbles += it }
 
-    private fun down() = m.down(100f, 100f)
+    private fun down() = m.down(100f, 100f, 300L)
 
     @Test fun 单击抬手删一个() {
         down(); m.up()
@@ -115,8 +115,57 @@ class BackspaceGestureMachineTest {
             override fun swipeEnabled() = false
         }
         val machine = BackspaceGestureMachine(cfg, off, timer) { bubbles += it }
-        machine.down(100f, 100f); machine.move(100f, 20f); machine.up()
+        machine.down(100f, 100f, 300L); machine.move(100f, 20f); machine.up()
         assertEquals(listOf("delete"), actions)
+    }
+
+    @Test fun 连删起始延迟取按下时传入的值() {
+        m.down(100f, 100f, 650L)
+        assertEquals(listOf(650L), delays)
+    }
+
+    @Test fun 上滑气泡下滑收起后残留左移不进扩选() {
+        down()
+        m.move(100f, 40f); m.move(60f, 40f); m.move(60f, 95f)
+        m.up()
+        assertEquals(emptyList<String>(), actions)
+    }
+
+    @Test fun 上滑气泡收起后回到水平原点再左滑可扩选() {
+        down()
+        m.move(100f, 40f); m.move(60f, 40f); m.move(60f, 95f)
+        m.move(100f, 95f)     // 回到水平原点：解除限制
+        m.move(60f, 95f)
+        m.up()
+        assertEquals(listOf("select:3", "selDel"), actions)
+    }
+
+    @Test fun 激活阈值附近抖动不反复触发扩选() {
+        down()
+        for (i in 0 until 4) { m.move(100f - 17f, 100f); m.move(100f - 15f, 100f) }
+        assertEquals(listOf("select:1"), actions)
+    }
+
+    @Test fun 激活阈值附近抖动气泡不反复切换() {
+        down()
+        for (i in 0 until 4) { m.move(100f, 100f - 17f); m.move(100f, 100f - 15f) }
+        assertEquals(listOf(Bubble.IDLE), bubbles)
+    }
+
+    @Test fun 选项阈值附近抖动不在IDLE与BEFORE间反复切换() {
+        down()
+        m.move(100f, 100f - 42f)
+        for (i in 0 until 4) { m.move(100f, 100f - 38f); m.move(100f, 100f - 42f) }
+        assertEquals(listOf(Bubble.BEFORE), bubbles)
+        m.move(100f, 100f - 34f)   // 低于回差下沿才退回 IDLE
+        assertEquals(listOf(Bubble.BEFORE, Bubble.IDLE), bubbles)
+    }
+
+    @Test fun 清空阈值附近抖动不在BEFORE与ALL间反复切换() {
+        down()
+        m.move(100f, 40f); m.move(100f - 30f, 40f)
+        for (i in 0 until 4) { m.move(100f - 26f, 40f); m.move(100f - 30f, 40f) }
+        assertEquals(listOf(Bubble.BEFORE, Bubble.ALL), bubbles)
     }
 
     @Test fun 滑动一旦开始就停掉连删计时() {

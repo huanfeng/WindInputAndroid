@@ -97,7 +97,6 @@ class EmojiWindow(
             title = "表情",
             onBack = listener::onBackToKeyboard,
             content = content,
-            rightActions = listOf("⌫" to listener::onEmojiBackspace),
             backspace = listener.emojiBackspaceGesture(),
         )
     }
