@@ -1,6 +1,7 @@
 # 手机端单个方案设置：规划
 
 > 2026-11-06。第一期：自定义行为、方案覆盖（码表）、辅助码 + 双拼布局、整句输入。
+> 状态：已实现（主仓 `wind-mobile` 门面 + FFI + 设置页详情页），e2e 用例 [58]–[61]（`scripts/emu-cases/schema-settings.sh`）。
 > 不做：切入热键、特殊模式（overlay）、PC「自定义行为」里的每页候选数 / 文字排列 / 字体 / 注释模板 / 自定义标点表。
 > PC 对照：`wind-setting/src/dialogs/schema_manager.rs`（节与 TAB）、`schema_codetable.rs`（码表覆盖项）；
 > 设计：主仓 `docs/design/schema-settings-vertical-tabs.md`、`schema-scoped-behavior.md`、`aux-code-schema-source.md`、
@@ -70,7 +71,11 @@ effective_codetable / followed_codetable / aux_code_source_options / shuangpin_l
 - 「启用的方案」每行：标题（方案名）+ 右侧「设置」图标按钮 + Switch（启用 / 停用，锁定规则不变）。点图标进详情页。
 - 路由加第三层 `Route.detail`（方案 id），走现有 `AnimatedContent` + 预测性返回；标题 = 方案名。
 - 详情页：信息头卡片 → 基本（双拼布局、扩展词库）→ 自定义行为 → 方案覆盖 → 辅助码 → 实验性功能 → 「全部恢复默认」。
-- 每项摘要写「跟随全局（值）」或「已自定义 · 默认：值」，已自定义的项可「恢复」（行内选项菜单里的「恢复默认」）。
+- 「跟随」的表达：**选回默认值即恢复**（删掉这一项的覆盖），不另设勾选框——手机上一行一个控件。
+  改过的项摘要写「已自定义 · 默认：值」。辅助码例外，同 PC 三态（跟随全局（值）/ 开 / 关），
+  显式选的开 / 关即使与全局相同也写实值。
+- 与 PC 的细微差别：PC 码表覆盖是「勾选 + 控件」，可以显式钉住一个与跟随值相同的值；手机上选回默认值就是跟随。
+- 「全部恢复默认」删的是 FFI 列出的全部键，含界面不显示的 `candidate.layout`（PC 写过的话也一并清掉）。
 
 ## 5. 与 PC 的差异与风险
 
