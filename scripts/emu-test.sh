@@ -1787,6 +1787,8 @@ reset_pad
 source "$ROOT/scripts/emu-cases/schema-import.sh"
 # 单个方案设置（[58]–[61]）
 source "$ROOT/scripts/emu-cases/schema-settings.sh"
+# 编辑工具栏（[62]–[64]）
+source "$ROOT/scripts/emu-cases/toolbar-edit.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"

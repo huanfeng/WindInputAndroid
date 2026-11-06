@@ -17,6 +17,9 @@
 - 纯逻辑（移除 / 加入 / 拖动中按指位算插入位）抽成可 JVM 单测的函数，`ToolbarItem.parse/format` 不变，配置键不变（`ui.android.toolbar_pins`）。
 - e2e：现有 [45] 等用例里凡依赖 ‹ › 或图钉的要跟着改；新增「拖动换位」「⊖ 移除」「＋ 加入」「满 5 个拒绝」用例。
 
+状态：已实现。纯逻辑在 `ToolbarPinEdit`（单测 `ToolbarPinEditTest`）；满 5 个时的提示写在编辑提示行里（不弹 Toast）。
+原有用例没有依赖 ‹ › / 图钉的，未改；新增 e2e [62] 拖动换位、[63] ⊖ 移除 / ＋ 加入、[64] 满 5 个拒绝 + 工具栏按新顺序摆（`scripts/emu-cases/toolbar-edit.sh`）。
+
 ## B. 九宫格左列符号栏重做（只做数字框）
 
 现状：`KeyboardView.drawSide/handleSideTouch` 手画一列，拖动无惯性，按下只换底色；符号写死在

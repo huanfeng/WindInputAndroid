@@ -1,9 +1,12 @@
 package com.windinput.ime.panels
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.GridLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -11,10 +14,12 @@ import android.widget.TextView
 import com.windinput.ime.core.EngineCmd
 import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
+import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.keyboard.PanelIcon
 import com.windinput.ime.keyboard.ToolbarItem
+import com.windinput.ime.keyboard.ToolbarPinEdit
 
 /**
  * 快捷功能面板：主流输入法「更多」页的形态——**方案一行 + 4 列图标格子**。
@@ -91,23 +96,26 @@ class QuickPanelWindow(
         const val MIN_TILE_HEIGHT_DP = 40
         const val EDIT_MIN_TILE_HEIGHT_DP = 54
 
-        /** 编辑工具栏时「当前顺序」行的高度（dp） */
-        const val ORDER_ROW_DP = 46
+        /** 编辑工具栏时顶部「工具栏预览」行的高度（dp） */
+        const val PREVIEW_ROW_DP = 50
+
+        const val EDIT_HINT = "按住拖动调顺序，点 ⊖ 移除，点 ＋ 加入"
     }
 
     private var schemaRow: LinearLayout? = null
 
     /**
-     * 编辑工具栏中：能常驻的格子右上角出图钉（实心 = 已常驻），点格子改为切换常驻，
-     * 不能常驻的格子（中文标点等开关）变淡、点了无效。顶栏右侧「编辑工具栏 / 完成」切换。
+     * 编辑工具栏中：顶部出工具栏预览（拖动换位、⊖ 移除）；能常驻的格子右上角出 ＋（未常驻）
+     * / ✓（已常驻），点格子改为加入 / 移除，不能常驻的格子（中文标点等开关）变淡、点了无效。
+     * 顶栏右侧「编辑工具栏 / 完成」切换。
      */
     private var editingPins = false
     private var editButton: TextView? = null
     private var editHint: TextView? = null
     private var tileGrid: GridLayout? = null
 
-    /** 编辑工具栏时的「当前顺序」行：每个常驻项带 ‹ › 两个移位钮 */
-    private var orderRow: LinearLayout? = null
+    /** 编辑工具栏时的工具栏预览：常驻项按工具栏顺序排成 [ToolbarItem.MAX_PINS] 个等宽槽 */
+    private var previewRow: LinearLayout? = null
     private var status: UiEvent.Status? = null
 
     override fun onCreateView(context: Context): View {
@@ -129,7 +137,7 @@ class QuickPanelWindow(
         )
 
         val hint = TextView(context).apply {
-            text = "点带图钉的格子选常驻按钮（最多 ${ToolbarItem.MAX_PINS} 个），用下面的箭头调顺序"
+            text = EDIT_HINT
             textSize = 12f
             setTextColor(Palette.current.hint)
             visibility = View.GONE
@@ -142,14 +150,18 @@ class QuickPanelWindow(
             },
         )
 
-        val order = LinearLayout(context).apply {
+        val preview = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             visibility = View.GONE
+            // 被拖的项放大浮起，别被行边裁掉
+            clipChildren = false
+            clipToPadding = false
         }
-        orderRow = order
+        previewRow = preview
+        column.clipChildren = false
         column.addView(
-            order,
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(ORDER_ROW_DP)).apply {
+            preview,
+            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(PREVIEW_ROW_DP)).apply {
                 bottomMargin = dp(8)
             },
         )
@@ -188,7 +200,15 @@ class QuickPanelWindow(
         editingPins = on
         editButton?.text = if (on) "完成" else "编辑工具栏"
         editHint?.visibility = if (on) View.VISIBLE else View.GONE
+        resetHint()
         rebuildTiles(context)
+    }
+
+    private fun resetHint() {
+        editHint?.apply {
+            text = EDIT_HINT
+            setTextColor(Palette.current.hint)
+        }
     }
 
     /** 离开面板就退出编辑：下次进来是正常的快捷面板 */
@@ -197,10 +217,23 @@ class QuickPanelWindow(
         if (editingPins) setEditing(ctx, false)
     }
 
+    /** 网格里点能常驻的格子：已常驻就移除，否则加入；满了不加，提示行改说原因 */
     private fun togglePin(context: Context, item: ToolbarItem) {
         val pins = listener.toolbarPins()
-        val next = if (item in pins) pins - item else (pins + item).take(ToolbarItem.MAX_PINS)
+        val next = if (item in pins) ToolbarPinEdit.remove(pins, item) else ToolbarPinEdit.add(pins, item)
+        if (next == null) {
+            editHint?.apply {
+                text = "工具栏最多 ${ToolbarItem.MAX_PINS} 个，先移除一个"
+                setTextColor(Palette.current.accentText)
+            }
+            return
+        }
+        applyPins(context, next)
+    }
+
+    private fun applyPins(context: Context, next: List<ToolbarItem>) {
         listener.onToolbarPinsChanged(next)
+        resetHint()
         rebuildTiles(context)
     }
 
@@ -257,20 +290,21 @@ class QuickPanelWindow(
     private fun rebuildTiles(context: Context) {
         val grid = tileGrid ?: return
         grid.removeAllViews()
-        rebuildOrder(context)
+        rebuildPreview(context)
         val st = status
         val tiles = mutableListOf<View>()
         val pins = listener.toolbarPins()
+        val full = pins.size >= ToolbarItem.MAX_PINS
 
         /**
          * [icon]：字（「，」「Ａ」这类本身就是字符的）或矢量图标 [PanelIcon.Glyph]。
-         * [pin]：这一格能常驻工具栏时对应的项（编辑工具栏时据此出图钉）
+         * [pin]：这一格能常驻工具栏时对应的项（编辑工具栏时据此出 ＋ / ✓）
          */
         fun add(icon: Any, label: String, selected: Boolean? = null, pin: ToolbarItem? = null, onClick: () -> Unit) {
             tiles += when {
-                !editingPins -> tile(context, icon, label, selected, null, onClick)
-                pin == null -> tile(context, icon, label, selected, null) {}.apply { alpha = 0.35f }
-                else -> tile(context, icon, label, selected, pin in pins) { togglePin(context, pin) }
+                !editingPins -> tile(context, icon, label, selected, onClick)
+                pin == null -> tile(context, icon, label, selected) {}.apply { alpha = 0.35f }
+                else -> pinBadged(context, tile(context, icon, label, selected) { togglePin(context, pin) }, pin, pin in pins, full)
             }
         }
         add("，", "中文标点", selected = st?.chinesePunct ?: true) {
@@ -313,65 +347,172 @@ class QuickPanelWindow(
         for (t in tiles) grid.addView(t, cell(context, heightPx))
     }
 
-    /** 当前顺序行：只在编辑工具栏时出现；常驻为空时给一句空态提示 */
-    private fun rebuildOrder(context: Context) {
-        val row = orderRow ?: return
+    /**
+     * 工具栏预览：只在编辑工具栏时出现。常驻项按工具栏上的顺序、用与工具栏同样的图标排成一行，
+     * 右上角 ⊖ 移除，按住左右拖动换位；不足 [ToolbarItem.MAX_PINS] 个补虚线空位，让每格宽度稳定。
+     */
+    private fun rebuildPreview(context: Context) {
+        val row = previewRow ?: return
         row.removeAllViews()
         row.visibility = if (editingPins) View.VISIBLE else View.GONE
         if (!editingPins) return
         val density = context.resources.displayMetrics.density
         val p = Palette.current
         val pins = listener.toolbarPins()
+        fun slot() = LinearLayout.LayoutParams(0, MATCH, 1f).apply { marginEnd = (6 * density).toInt() }
         if (pins.isEmpty()) {
             row.addView(
                 TextView(context).apply {
-                    text = "工具栏上还没有常驻按钮"
+                    text = "点下面带 ＋ 的功能加到工具栏"
                     textSize = 13f
-                    gravity = Gravity.CENTER_VERTICAL
+                    gravity = Gravity.CENTER
                     setTextColor(p.hint)
+                    background = dashedBox(density, p.hint)
                 },
-                LinearLayout.LayoutParams(MATCH, MATCH),
+                slot(),
             )
             return
         }
-        fun move(from: Int, to: Int) {
-            val next = pins.toMutableList()
-            next.add(to, next.removeAt(from))
-            listener.onToolbarPinsChanged(next)
-            rebuildOrder(context)
+        pins.forEachIndexed { i, item -> row.addView(previewCell(context, row, pins, i), slot()) }
+        repeat(ToolbarItem.MAX_PINS - pins.size) {
+            row.addView(View(context).apply { background = dashedBox(density, p.hint) }, slot())
         }
-        fun arrow(glyph: PanelIcon.Glyph, enabled: Boolean, onClick: () -> Unit) = PanelIcon(context).apply {
-            this.glyph = glyph
-            tint = if (enabled) p.text else p.hint
-            alpha = if (enabled) 1f else 0.3f
-            scale = 0.8f
-            decorative = true
-            if (enabled) setOnClickListener { onClick() }
+    }
+
+    private fun dashedBox(density: Float, color: Int) = GradientDrawable().apply {
+        cornerRadius = 10 * density
+        setColor(android.graphics.Color.TRANSPARENT)
+        setStroke((1.2f * density).toInt(), color, 4 * density, 3 * density)
+    }
+
+    /** 预览里的一个常驻项：图标与真工具栏（BarView.setPinned）一致，右上角 ⊖ */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun previewCell(context: Context, row: LinearLayout, pins: List<ToolbarItem>, index: Int): View {
+        val density = context.resources.displayMetrics.density
+        val p = Palette.current
+        val item = pins[index]
+        val icon: View = item.glyph?.let { g ->
+            PanelIcon(context).apply {
+                glyph = g
+                tint = p.icon
+                boxDp = BarView.TOOLBAR_ICON_BOX_DP
+                decorative = true
+            }
+        } ?: TextView(context).apply {
+            text = item.text
+            textSize = 17f
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(p.icon)
         }
-        pins.forEachIndexed { i, item ->
-            val cell = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER
-                background = GradientDrawable().apply {
-                    cornerRadius = 10 * density
-                    setColor(p.key)
+        val cell = FrameLayout(context).apply {
+            contentDescription = "工具栏·${item.label}"
+            background = GradientDrawable().apply {
+                cornerRadius = 10 * density
+                setColor(p.key)
+            }
+            addView(icon, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(
+                badge(context, "−", p.hint, p.surface, "移除 ${item.label}") {
+                    applyPins(context, ToolbarPinEdit.remove(listener.toolbarPins(), item))
+                },
+                badgeParams(density),
+            )
+        }
+        // 按下即拖：被拖项浮起跟手，其余项让位；抬手落位才保存。⊖ 自己可点、先吃掉触摸，不会触发拖动
+        var downX = 0f
+        var target = index
+        fun settle() {
+            for (j in 0 until row.childCount) {
+                row.getChildAt(j).animate().translationX(0f).scaleX(1f).scaleY(1f).alpha(1f).setDuration(120).start()
+            }
+            cell.translationZ = 0f
+        }
+        cell.setOnTouchListener { v, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = ev.rawX
+                    target = index
+                    // 外层 ScrollView 会把横竖拖动当成滚动抢走
+                    v.parent.requestDisallowInterceptTouchEvent(true)
+                    v.translationZ = 8 * density
+                    v.animate().scaleX(1.08f).scaleY(1.08f).alpha(0.92f).setDuration(80).start()
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    // 槽位间距：预览行恒有 MAX_PINS 个子视图（常驻 + 空位），取相邻两个的左边距差
+                    val pitch = (row.getChildAt(1)?.left ?: v.width).toFloat() - row.getChildAt(0).left
+                    val dx = ev.rawX - downX
+                    v.translationX = dx
+                    val next = ToolbarPinEdit.dropIndex(v.left + v.width / 2f + dx, pitch, pins.size)
+                    if (next != target) {
+                        target = next
+                        for (j in pins.indices) {
+                            if (j == index) continue
+                            row.getChildAt(j).animate()
+                                .translationX(ToolbarPinEdit.shiftOf(j, index, target) * pitch)
+                                .setDuration(120).start()
+                        }
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    v.parent.requestDisallowInterceptTouchEvent(false)
+                    if (target != index) {
+                        // 推迟到本次触摸分发之后再重建：当场 removeAllViews 会给正在分发的这一格补发 CANCEL
+                        val next = ToolbarPinEdit.move(pins, index, target)
+                        row.post { applyPins(context, next) }
+                    } else {
+                        settle()
+                    }
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    v.parent.requestDisallowInterceptTouchEvent(false)
+                    settle()
                 }
             }
-            val size = (20 * density).toInt()
-            cell.addView(arrow(PanelIcon.Glyph.ARROW_LEFT, i > 0) { move(i, i - 1) }, LinearLayout.LayoutParams(size + (8 * density).toInt(), MATCH))
-            cell.addView(
-                glyphOrBadge(context, item.glyph ?: item.text.orEmpty(), p.text, (22 * density).toInt()),
-                LinearLayout.LayoutParams((22 * density).toInt(), (22 * density).toInt()),
-            )
-            cell.addView(arrow(PanelIcon.Glyph.ARROW_RIGHT, i < pins.lastIndex) { move(i, i + 1) }, LinearLayout.LayoutParams(size + (8 * density).toInt(), MATCH))
-            row.addView(
-                cell,
-                LinearLayout.LayoutParams(0, MATCH, 1f).apply { marginEnd = (6 * density).toInt() },
-            )
+            true
         }
-        // 不足 MAX_PINS 个时补空位，让格子宽度稳定、不随个数拉伸
-        repeat(ToolbarItem.MAX_PINS - pins.size) {
-            row.addView(View(context), LinearLayout.LayoutParams(0, MATCH, 1f).apply { marginEnd = (6 * density).toInt() })
+        return cell
+    }
+
+    /** 格子 / 预览项右上角的小圆钮（⊖ ＋ ✓）：自己可点，读屏念 [desc]（e2e 也按它找） */
+    private fun badge(context: Context, mark: String, bg: Int, fg: Int, desc: String, onClick: () -> Unit) =
+        TextView(context).apply {
+            text = mark
+            textSize = 12f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            includeFontPadding = false
+            setTextColor(fg)
+            contentDescription = desc
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(bg)
+            }
+            setOnClickListener { onClick() }
+        }
+
+    private fun badgeParams(density: Float) =
+        FrameLayout.LayoutParams((18 * density).toInt(), (18 * density).toInt(), Gravity.TOP or Gravity.END).apply {
+            topMargin = (3 * density).toInt()
+            marginEnd = (3 * density).toInt()
+        }
+
+    /**
+     * 编辑工具栏时网格里能常驻的格子：右上角 ＋（未常驻）/ ✓（已常驻，点了移除）。
+     * 已满时 ＋ 变灰，点了仍走 [togglePin]，由它提示为什么加不进去。
+     */
+    private fun pinBadged(context: Context, body: View, item: ToolbarItem, pinned: Boolean, full: Boolean): View {
+        val density = context.resources.displayMetrics.density
+        val p = Palette.current
+        val mark = when {
+            pinned -> badge(context, "✓", p.accent, p.onAccent, "已加入 ${item.label}") { togglePin(context, item) }
+            else -> badge(context, "+", if (full) p.hint else p.accent, if (full) p.surface else p.onAccent, "加入 ${item.label}") {
+                togglePin(context, item)
+            }.apply { if (full) alpha = 0.5f }
+        }
+        return FrameLayout(context).apply {
+            addView(body, FrameLayout.LayoutParams(MATCH, MATCH))
+            addView(mark, badgeParams(density))
         }
     }
 
@@ -411,8 +552,8 @@ class QuickPanelWindow(
      */
     private fun tileHeightPx(context: Context, rows: Int): Int {
         val density = context.resources.displayMetrics.density
-        // 上下内边距 + 方案行及其下间距；编辑工具栏时再多出提示行和顺序行
-        val reserved = (8 + 8 + 38 + 10 + if (editingPins) ORDER_ROW_DP + 8 + 28 else 0) * density
+        // 上下内边距 + 方案行及其下间距；编辑工具栏时再多出提示行和预览行
+        val reserved = (8 + 8 + 38 + 10 + if (editingPins) PREVIEW_ROW_DP + 8 + 28 else 0) * density
         val perRow = (PanelScaffold.keyboardHeightPx(context) - reserved) / rows.coerceAtLeast(1) - 6 * density
         // 编辑工具栏时多了两行，一屏放不下就滚，不再往下压：压到 40dp 标签会被裁
         val min = if (editingPins) EDIT_MIN_TILE_HEIGHT_DP else MIN_TILE_HEIGHT_DP
@@ -436,13 +577,12 @@ class QuickPanelWindow(
         icon: Any,
         label: String,
         selected: Boolean?,
-        pinned: Boolean?,
         onClick: () -> Unit,
     ): View {
         val density = context.resources.displayMetrics.density
         val p = Palette.current
         val on = selected == true
-        val body = LinearLayout(context).apply {
+        return LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             background = GradientDrawable().apply {
@@ -464,24 +604,6 @@ class QuickPanelWindow(
                 },
             )
             setOnClickListener { onClick() }
-        }
-        if (pinned == null) return body
-        // 编辑工具栏：右上角图钉，实心 = 已常驻
-        val badge = (18 * density).toInt()
-        return android.widget.FrameLayout(context).apply {
-            addView(body, android.widget.FrameLayout.LayoutParams(MATCH, MATCH))
-            addView(
-                PanelIcon(context).apply {
-                    glyph = if (pinned) PanelIcon.Glyph.PIN else PanelIcon.Glyph.PIN_OUTLINE
-                    tint = if (pinned) p.accentText else p.hint
-                    scale = 0.9f
-                    decorative = true
-                },
-                android.widget.FrameLayout.LayoutParams(badge, badge, Gravity.TOP or Gravity.END).apply {
-                    topMargin = (3 * density).toInt()
-                    marginEnd = (3 * density).toInt()
-                },
-            )
         }
     }
 
