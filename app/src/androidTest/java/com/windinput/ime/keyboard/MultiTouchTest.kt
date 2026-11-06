@@ -29,6 +29,8 @@ class MultiTouchTest {
             override fun onCursorMove(delta: Int) = Unit
             override fun onBackspaceSelect(count: Int) = Unit
             override fun onBackspaceSwipeDelete() = Unit
+            override fun onBackspaceDeleteBeforeCursor() = Unit
+            override fun onBackspaceClearAll() = Unit
             override fun onKeyLongPress(action: KeyAction) = Unit
         }
         view.measure(

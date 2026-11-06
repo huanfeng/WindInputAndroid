@@ -1507,7 +1507,35 @@ check_match "横屏打字出汉字" "$CN" "$(wait_pad_match "$CN")"
 set_rotation 0
 reset_pad
 
-section "[48] 退格上滑清空输入框，编辑面板撤销找回、重做再清"
+# 退格键手势：从退格键中心按下，依次移到各点（相对中心的 dp 偏移，"x,y" 左负上负），再抬手。
+# 一条 adb shell 里连发 motionevent：点与点之间只隔几十毫秒，不会撞上 300ms 的长按连删。
+# 每个点发两次 MOVE：系统对批量 MOVE 做重采样外推（实测单发会冲过目标 ~50%），第二发同坐标把速度归零。
+bs_gesture() {
+    local cmd="input motionevent DOWN $bs_x $bs_y" p dx dy px py
+    for p in "$@"; do
+        dx="${p%,*}"; dy="${p#*,}"
+        px="$(awk -v x="$bs_x" -v d="$GEO_DENSITY" -v o="$dx" 'BEGIN{ printf "%d", x + o * d }')"
+        py="$(awk -v y="$bs_y" -v d="$GEO_DENSITY" -v o="$dy" 'BEGIN{ printf "%d", y + o * d }')"
+        cmd+="; input motionevent MOVE $px $py; sleep 0.04; input motionevent MOVE $px $py; sleep 0.04"
+    done
+    cmd+="; input motionevent UP $px $py"
+    adb_q shell "$cmd"
+    sleep 0.6
+}
+
+# 打三个汉字，光标左移一位（AB|C），收起联想
+three_chars_cursor_mid() {
+    reset_pad
+    tap_key a; tap_key a; tap_key SPACE
+    tap_key a; tap_key a; tap_key SPACE
+    tap_key a; tap_key a; tap_key SPACE
+    tap_edit; sleep 0.8
+    adb_q shell input keyevent KEYCODE_DPAD_LEFT; sleep 0.3
+    pad3="$(get_pad_text)"
+    read -r bs_x bs_y <<< "$(key_center BS)"
+}
+
+section "[48] 退格上滑正上方删光标前，编辑面板撤销找回、重做再删"
 reset_pad
 tap_key a; tap_key a; tap_key SPACE
 tap_key a; tap_key a; tap_key SPACE
@@ -1516,16 +1544,62 @@ before="$(get_pad_text)"
 read -r bs_x bs_y <<< "$(key_center BS)"
 adb_q shell input swipe "$bs_x" "$bs_y" "$bs_x" $(( bs_y - GEO_ROWPX * 2 )) 300
 sleep 0.6
-check "退格上滑清空输入框" "" "$(get_pad_text)"
+check "退格上滑删光标前（光标在末尾 = 全删）" "" "$(get_pad_text)"
 adb_q shell input tap "$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 26 * d }')" "$GEO_BARY"
 sleep 1
 tap_ime 文本编辑
 tap_ime 撤销
-check "撤销找回清空前的字" "$before" "$(get_pad_text)"
+check "撤销找回删掉的字" "$before" "$(get_pad_text)"
 tap_ime 重做
-check "重做再次清空" "" "$(get_pad_text)"
+check "重做再次删除" "" "$(get_pad_text)"
 adb_q shell input tap "$GEO_PANELBACKX" "$GEO_PANELHEADERY"   # 返回键盘
 sleep 1
+reset_pad
+
+section "[48a] 退格上滑正上方：只删光标前，光标后的内容保留"
+three_chars_cursor_mid
+check "光标在第 3 字前" "3" "${#pad3}"
+bs_gesture "0,-60"
+check "只剩光标后的第 3 字" "${pad3:2:1}" "$(get_pad_text)"
+reset_pad
+
+section "[48b] 退格上滑后左移：清空整个输入框"
+three_chars_cursor_mid
+bs_gesture "0,-60" "-45,-60"
+check "上滑 + 左移 = 全清（含光标后）" "" "$(get_pad_text)"
+reset_pad
+
+section "[48c] 退格上滑未过阈值抬手 = 反悔，不删"
+three_chars_cursor_mid
+bs_gesture "0,-22"
+check "未过阈值不删" "$pad3" "$(get_pad_text)"
+reset_pad
+
+section "[48d] 左滑扩选后滑回起点，不抬手一气呵成上滑删光标前"
+three_chars_cursor_mid
+bs_gesture "-40,0" "0,0"
+check "左滑后滑回起点抬手：不删任何东西" "$pad3" "$(get_pad_text)"
+bs_gesture "-40,0" "0,0" "0,-60"
+check "左滑 → 回起点 → 上滑：删光标前，光标后保留" "${pad3:2:1}" "$(get_pad_text)"
+reset_pad
+
+section "[48e] 左滑扩选抬手删选区；符号页退格同样支持上滑"
+three_chars_cursor_mid
+bs_gesture "-20,0"
+# 注入的 MOVE 经系统重采样后位移会比给定值大一截（实测 15%~50%），具体删几字不稳；
+# 精确的步进计数由 BackspaceGestureMachineTest 覆盖，这里只验：删了选区、光标后的字还在
+check_match "左滑扩选抬手：删掉光标前的字，光标后保留" '^式{1,2}$' "$(get_pad_text)"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+tap_key a; tap_key a; tap_key SPACE
+tap_edit; sleep 0.8
+adb_q shell input keyevent KEYCODE_DPAD_LEFT; sleep 0.3
+pad2="$(get_pad_text)"
+tap_key SYM; tap_cell 3 "${SYM_W[3]}" 0; sleep 0.6
+sym_bs_x=$(( GEO_W * 925 / 1000 )); sym_bottom_y=$(( GEO_KBBOTTOM - GEO_ROWPX / 2 ))
+adb_q shell input swipe "$sym_bs_x" "$sym_bottom_y" "$sym_bs_x" $(( sym_bottom_y - GEO_ROWPX * 2 )) 300
+sleep 0.6
+check "符号页退格上滑：只删光标前" "${pad2:1:1}" "$(get_pad_text)"
 reset_pad
 
 section "[51] 英文标签改成 A：中英键、英文补空格、联想态回车照常（判据是引擎的 latin_input，不是标签文字）"

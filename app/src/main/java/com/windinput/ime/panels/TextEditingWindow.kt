@@ -6,6 +6,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.windinput.ime.keyboard.BackspaceGesture
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.KeyIcons
@@ -26,6 +27,9 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
         fun isSelecting(): Boolean
 
         fun onBackToKeyboard()
+
+        /** 退格键的手势回调（单击 / 连删 / 扩选 / 上滑删光标前或清空） */
+        fun editBackspaceGesture(): BackspaceGesture.Listener
     }
 
     enum class EditAction {
@@ -61,7 +65,10 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
                     refreshSelectState()
                 }
                 if (action == EditAction.TOGGLE_SELECT) selectButton = btn
-                if (action == EditAction.BACKSPACE) KeyIcons.applyBackspace(btn, Palette.current.text)
+                if (action == EditAction.BACKSPACE) {
+                    KeyIcons.applyBackspace(btn, Palette.current.text)
+                    BackspaceGesture(listener.editBackspaceGesture(), feedback = { KeyHaptics.tap(btn) }).attach(btn)
+                }
                 // 方向键用矢量箭头，与键盘上其他功能图标同一套笔画（字体里的 ↑↓←→ 细且各机型不一）
                 ARROWS[action]?.let { GlyphDrawable.apply(btn, it, Palette.current.text) }
                 val gap = (3 * context.resources.displayMetrics.density).toInt()

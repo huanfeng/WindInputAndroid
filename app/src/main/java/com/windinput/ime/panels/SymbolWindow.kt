@@ -1,6 +1,5 @@
 package com.windinput.ime.panels
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
@@ -8,7 +7,6 @@ import android.graphics.drawable.StateListDrawable
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.HorizontalScrollView
@@ -22,6 +20,7 @@ import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.KeyIcons
 import com.windinput.ime.keyboard.KeyboardDimens
+import com.windinput.ime.keyboard.BackspaceGesture
 import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.keyboard.PanelIcon
 
@@ -48,6 +47,9 @@ class SymbolWindow(
     interface Listener {
         fun onSymbolSelected(symbol: String)
         fun onSymbolBackspace()
+
+        /** 退格键的手势回调（单击 / 连删 / 扩选 / 上滑删光标前或清空） */
+        fun symbolBackspaceGesture(): BackspaceGesture.Listener
         fun onSymbolBack()
 
         /** 锁定态（点完符号是否停在本页）：由宿主持久化，缺省不锁 */
@@ -71,10 +73,6 @@ class SymbolWindow(
             "， 。 ？ ！ 、 ： ； “ ” ‘ ’ （ ） 《 》 【 】 … — ～ · ￥ " +
                 "@ # % & * + - = / _ ~ ^ | \\ < > ( ) [ ] { } ' \" ` $"
             ).split(' ').filter { it.isNotEmpty() }
-
-        /** 退格按住连删：起始延迟与间隔，和键盘上的退格手感一致 */
-        const val REPEAT_START_MS = 400L
-        const val REPEAT_INTERVAL_MS = 50L
     }
 
     override val keepsBar: Boolean get() = true
@@ -179,7 +177,8 @@ class SymbolWindow(
             keyCell(context, "⌫", palette.keySpecial, palette.text).apply {
                 contentDescription = "symbol-backspace"
                 KeyIcons.applyBackspace(this, palette.text)
-                setOnTouchListener(backspaceRepeater())
+                BackspaceGesture(listener.symbolBackspaceGesture(), feedback = { KeyHaptics.tap(this) })
+                    .attach(this)
             },
             LinearLayout.LayoutParams(sideWidth, rowHeight),
         )
@@ -216,33 +215,6 @@ class SymbolWindow(
                     null
                 }
             }
-        }
-    }
-
-    /** 退格：点一下删一个，按住连删（与键盘上的退格一致） */
-    @SuppressLint("ClickableViewAccessibility")
-    private fun backspaceRepeater() = object : View.OnTouchListener {
-        private val repeat = object : Runnable {
-            override fun run() {
-                listener.onSymbolBackspace()
-                handler.postDelayed(this, REPEAT_INTERVAL_MS)
-            }
-        }
-
-        override fun onTouch(v: View, event: MotionEvent): Boolean {
-            when (event.actionMasked) {
-                MotionEvent.ACTION_DOWN -> {
-                    v.isPressed = true
-                    KeyHaptics.tap(v)
-                    listener.onSymbolBackspace()
-                    handler.postDelayed(repeat, REPEAT_START_MS)
-                }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                    v.isPressed = false
-                    handler.removeCallbacks(repeat)
-                }
-            }
-            return true
         }
     }
 

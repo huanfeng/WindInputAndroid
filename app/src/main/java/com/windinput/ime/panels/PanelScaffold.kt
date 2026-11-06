@@ -6,7 +6,9 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.windinput.ime.keyboard.BackspaceGesture
 import com.windinput.ime.keyboard.BarView
+import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.KeyIcons
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.Palette
@@ -50,6 +52,7 @@ object PanelScaffold {
      *
      * @param onBack 返回键盘（左上角）
      * @param rightActions 顶栏右侧动作按钮（label → onClick）
+     * @param backspace 给了则 rightActions 里的「⌫」按钮接退格手势（连删 / 扩选 / 上滑），不再只响应点击
      * @param rightView 顶栏右侧自定义控件（要随状态改字的按钮，如快捷面板的「编辑工具栏 / 完成」）
      */
     fun build(
@@ -59,6 +62,7 @@ object PanelScaffold {
         content: View,
         rightActions: List<Pair<String, () -> Unit>> = emptyList(),
         rightView: View? = null,
+        backspace: BackspaceGesture.Listener? = null,
     ): View {
         val density = context.resources.displayMetrics.density
         val root = LinearLayout(context).apply {
@@ -93,7 +97,11 @@ object PanelScaffold {
         )
         for ((label, onClick) in rightActions) {
             header.addView(
-                headerButton(context, label, onClick),
+                headerButton(context, label, onClick).also {
+                    if (label == "⌫" && backspace != null) {
+                        BackspaceGesture(backspace, feedback = { KeyHaptics.tap(it) }).attach(it)
+                    }
+                },
                 LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.MATCH_PARENT,

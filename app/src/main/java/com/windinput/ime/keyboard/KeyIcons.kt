@@ -70,6 +70,49 @@ object KeyIcons {
         canvas.drawLine(x(0.14f - d), y(d), x(0.14f + d), y(-d), paint)
     }
 
+    /** 删光标前全部：退格标签外框，里面「|←」（箭头撞向一竖，意为一路删到开头） */
+    fun drawDeleteBefore(canvas: Canvas, cx: Float, cy: Float, density: Float, paint: Paint, path: Path) {
+        val s = ICON_DP * density
+        fun x(u: Float) = cx + u * s
+        fun y(v: Float) = cy + v * s
+        path.reset()
+        path.moveTo(x(-0.62f), y(0f))
+        path.lineTo(x(-0.3f), y(-0.36f))
+        path.lineTo(x(0.58f), y(-0.36f))
+        path.lineTo(x(0.58f), y(0.36f))
+        path.lineTo(x(-0.3f), y(0.36f))
+        path.close()
+        paint.style = Paint.Style.STROKE
+        canvas.drawPath(path, paint)
+        canvas.drawLine(x(-0.14f), y(-0.15f), x(-0.14f), y(0.15f), paint)
+        canvas.drawLine(x(-0.04f), y(0f), x(0.4f), y(0f), paint)
+        canvas.drawLine(x(-0.04f), y(0f), x(0.08f), y(-0.11f), paint)
+        canvas.drawLine(x(-0.04f), y(0f), x(0.08f), y(0.11f), paint)
+    }
+
+    /** 清空整个输入框：垃圾桶（盖 + 提手 + 桶身两道竖纹） */
+    fun drawTrash(canvas: Canvas, cx: Float, cy: Float, density: Float, paint: Paint, path: Path) {
+        val s = ICON_DP * density
+        fun x(u: Float) = cx + u * s
+        fun y(v: Float) = cy + v * s
+        paint.style = Paint.Style.STROKE
+        canvas.drawLine(x(-0.4f), y(-0.28f), x(0.4f), y(-0.28f), paint)
+        path.reset()
+        path.moveTo(x(-0.12f), y(-0.28f))
+        path.lineTo(x(-0.12f), y(-0.42f))
+        path.lineTo(x(0.12f), y(-0.42f))
+        path.lineTo(x(0.12f), y(-0.28f))
+        canvas.drawPath(path, paint)
+        path.reset()
+        path.moveTo(x(-0.3f), y(-0.28f))
+        path.lineTo(x(-0.24f), y(0.44f))
+        path.lineTo(x(0.24f), y(0.44f))
+        path.lineTo(x(0.3f), y(-0.28f))
+        canvas.drawPath(path, paint)
+        canvas.drawLine(x(-0.09f), y(-0.12f), x(-0.09f), y(0.28f), paint)
+        canvas.drawLine(x(0.09f), y(-0.12f), x(0.09f), y(0.28f), paint)
+    }
+
     /** 面板里的退格按钮（TextView）：清掉字符，改由前景画矢量图标，居中于整个按钮 */
     fun applyBackspace(view: TextView, color: Int) {
         view.text = ""

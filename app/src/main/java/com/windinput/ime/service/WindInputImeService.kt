@@ -28,6 +28,7 @@ import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.core.suspendsLearning
+import com.windinput.ime.keyboard.BackspaceGesture
 import com.windinput.ime.keyboard.HardwareKeys
 import com.windinput.ime.keyboard.ToolbarItem
 import com.windinput.ime.keyboard.KeyHaptics
@@ -92,6 +93,9 @@ class WindInputImeService :
 
     /** 引擎侧是否有未上屏的编码（来自候选帧的 preedit 非空） */
     private var composing = false
+
+    /** 设置里的「退格滑动手势」开关：键盘与各面板的退格键共用 */
+    private var backspaceSwipeOn = true
 
     /** 剪贴板建议条开关（设置项 ui.android.clip_suggestion） */
     private var clipSuggestionEnabled = true
@@ -508,13 +512,14 @@ class WindInputImeService :
         KeyHaptics.init(this)
         KeyHaptics.enabled = userConfig.getBoolean("ui.android.haptic", true)
         KeyHaptics.strength = userConfig.getInt("ui.android.haptic_strength", KeyHaptics.DEFAULT_STRENGTH)
+        backspaceSwipeOn = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
         keyboardWindow?.keyboardView?.apply {
             soundEnabled = userConfig.getBoolean("ui.android.sound", false)
             previewEnabled = userConfig.getBoolean("ui.android.key_preview", false)
             longPressDelayMs = userConfig.getInt("ui.android.long_press_delay", 300)
             spaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_space_cursor", true)
             spaceLongPressEnabled = userConfig.getString("ui.android.space_long_press", "none") != "none"
-            backspaceSwipeEnabled = userConfig.getBoolean("ui.android.gesture_backspace_select", true)
+            backspaceSwipeEnabled = backspaceSwipeOn
             swipeSymbolsEnabled = userConfig.getBoolean("ui.android.gesture_swipe_symbols", true)
             showSwipeHints = userConfig.getBoolean("ui.android.show_swipe_hints", true)
             enterLabel = enterActionLabel(info)
@@ -1358,7 +1363,40 @@ class WindInputImeService :
     }
 
     /**
-     * 退格上滑抬手：有编码 → 清空编码；否则清空整个输入框。走宿主的文本删除，
+     * 退格上滑（正上方）抬手：有编码 → 放弃编码；否则删光标前的全部，光标后的内容保留。
+     * 有选区先删选区。同样包在批处理里，文本框撤销栈可整体找回
+     */
+    override fun onBackspaceDeleteBeforeCursor() {
+        if (composing) {
+            abandonComposition()
+            return
+        }
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        if (!ic.getSelectedText(0).isNullOrEmpty()) ic.commitText("", 1)
+        val before = ic.getTextBeforeCursor(CLEAR_ALL_MAX, 0)?.length ?: 0
+        if (before > 0) ic.deleteSurroundingText(before, 0)
+        ic.endBatchEdit()
+    }
+
+    /** 面板里的退格键：单次删除沿用各面板原来的处理，滑动手势与键盘退格同一套宿主实现 */
+    private fun panelBackspace(delete: () -> Unit) = object : BackspaceGesture.Listener {
+        override fun onDelete() = delete()
+        override fun onSelect(count: Int) = onBackspaceSelect(count)
+        override fun onSelectionDelete() = onBackspaceSwipeDelete()
+        override fun onDeleteBeforeCursor() = onBackspaceDeleteBeforeCursor()
+        override fun onClearAll() = onBackspaceClearAll()
+        override fun swipeEnabled() = backspaceSwipeOn
+    }
+
+    override fun symbolBackspaceGesture() = panelBackspace { onSymbolBackspace() }
+
+    override fun emojiBackspaceGesture() = panelBackspace { onEmojiBackspace() }
+
+    override fun editBackspaceGesture() = panelBackspace { sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL) }
+
+    /**
+     * 退格上滑后左移抬手：有编码 → 清空编码；否则清空整个输入框。走宿主的文本删除，
      * 误清了可以在编辑面板「撤销」找回（文本框自带的撤销栈）
      */
     override fun onBackspaceClearAll() {

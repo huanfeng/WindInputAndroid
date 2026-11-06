@@ -50,6 +50,8 @@ class A11yActionTest {
                 override fun onCursorMove(delta: Int) = Unit
                 override fun onBackspaceSelect(count: Int) = Unit
                 override fun onBackspaceSwipeDelete() = Unit
+                override fun onBackspaceDeleteBeforeCursor() = Unit
+                override fun onBackspaceClearAll() = Unit
                 override fun onKeyLongPress(action: KeyAction) = Unit
             }
             layOut(view, 1080, 2000)

@@ -41,7 +41,10 @@ class KeyboardView(context: Context) : View(context) {
         /** 退格滑动抬手：删除当前选区 */
         fun onBackspaceSwipeDelete()
 
-        /** 退格上滑过阈值后抬手：清空（有编码清编码，否则清空整个输入框） */
+        /** 退格上滑过阈值、正上方抬手：删光标前的全部（有编码清编码；光标后的内容保留） */
+        fun onBackspaceDeleteBeforeCursor()
+
+        /** 退格上滑后左移过阈值抬手：清空（有编码清编码，否则清空整个输入框） */
         fun onBackspaceClearAll()
 
         /** 功能键长按（空格 → 按设置切输入法 / 语音；中英键弹不出菜单时退到这里） */
@@ -337,28 +340,35 @@ class KeyboardView(context: Context) : View(context) {
     private var spaceSwipeActive = false
     private var lastStepX = 0f
 
-    /** 退格左滑扩选进行中 */
-    private var backspaceSwipeActive = false
-    private var lastBackspaceCount = 0
+    /** 退格键的全部手势（点按 / 连删 / 左滑扩选 / 上滑双选项）见 [BackspaceGesture] */
+    private val backspaceGesture = BackspaceGesture(
+        object : BackspaceGesture.Listener {
+            override fun onDelete() {
+                listener?.onKeyAction(KeyAction.Backspace, shifted || shiftLocked)
+            }
+
+            override fun onSelect(count: Int) {
+                listener?.onBackspaceSelect(count)
+            }
+
+            override fun onSelectionDelete() {
+                listener?.onBackspaceSwipeDelete()
+            }
+
+            override fun onDeleteBeforeCursor() {
+                listener?.onBackspaceDeleteBeforeCursor()
+            }
+
+            override fun onClearAll() {
+                listener?.onBackspaceClearAll()
+            }
+
+            override fun swipeEnabled() = backspaceSwipeEnabled
+        },
+        feedback = { pressedKey?.let { feedback(it) } },
+    )
 
     private val handler = Handler(Looper.getMainLooper())
-
-    private var repeating = false
-
-    /** 本次按压中连删已至少触发一次（抬手时不再补发单击） */
-    private var repeatFired = false
-
-    private val repeatRunnable = object : Runnable {
-        override fun run() {
-            val key = pressedKey ?: return
-            if (key.action == KeyAction.Backspace) {
-                repeatFired = true
-                listener?.onKeyAction(key.action, shifted)
-                repeatHaptic()
-                handler.postDelayed(this, 50)
-            }
-        }
-    }
 
     /** 长按已触发（抬手时不再补发单击） */
     private var longPressFired = false
@@ -736,8 +746,8 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun gestureInProgress(): Boolean =
-        popupManager.isPopupShown || swipeShown || spaceSwipeActive || backspaceSwipeActive ||
-            repeatFired || longPressFired
+        popupManager.isPopupShown || swipeShown || spaceSwipeActive || backspaceGesture.isEngaged ||
+            longPressFired
 
     private fun startPress(pointerId: Int, x: Float, y: Float) {
         activePointerId = pointerId
@@ -747,12 +757,9 @@ class KeyboardView(context: Context) : View(context) {
         swipeShown = false
         swipeArmed = false
         optionsAction = null
-        repeatFired = false
         longPressFired = false
         spaceSwipeActive = false
-        backspaceSwipeActive = false
         lastStepX = x
-        lastBackspaceCount = 0
         val bounds = findBounds(x, y)
         pressedKey = bounds?.key
         pressedRect = bounds?.rect
@@ -768,8 +775,7 @@ class KeyboardView(context: Context) : View(context) {
                 popupManager.showPreview(bounds.rect, displayLabel(key))
             }
             if (key.action == KeyAction.Backspace) {
-                repeating = true
-                handler.postDelayed(repeatRunnable, longPressDelayMs.toLong())
+                backspaceGesture.down(this, bounds.rect, x, y)
             }
             if (popupChars(key).isNotEmpty() || hasLongPressAction(key.action)) {
                 handler.postDelayed(longPressRunnable, longPressDelayMs.toLong())
@@ -810,42 +816,10 @@ class KeyboardView(context: Context) : View(context) {
             }
         }
 
-        // 退格上滑：清空。与字母键上滑同一套一体式气泡（上半「清空」、下半退格），
-        // 过阈值变强调色、抬手才执行，滑回来可反悔；一旦进了上滑就不再算左滑扩选
-        if (key.action == KeyAction.Backspace && backspaceSwipeEnabled && !backspaceSwipeActive) {
-            if (!swipeShown && dy > swipeActivatePx && dy > kotlin.math.abs(dx)) {
-                val rect = pressedRect ?: return
-                swipeShown = true
-                cancelTimers()
-                popupManager.showSwipeBubble(rect, "⌫", "清空", y)
-            }
-            if (swipeShown) {
-                popupManager.moveSwipeBubble(y)
-                val armed = dy > swipeThresholdPx
-                if (armed != swipeArmed) {
-                    swipeArmed = armed
-                    popupManager.setSwipeArmed(armed)
-                    if (armed) KeyHaptics.tap(this)
-                }
-                return
-            }
-        }
-
-        // 退格左滑：扩选删除（实时选中光标前 N 字符）
-        if (key.action == KeyAction.Backspace && backspaceSwipeEnabled) {
-            val dxLeft = downX - x
-            if (!backspaceSwipeActive && dxLeft > swipeActivatePx) {
-                backspaceSwipeActive = true
-                cancelTimers()
-            }
-            if (backspaceSwipeActive) {
-                val count = (dxLeft / cursorStepPx).toInt().coerceAtLeast(0)
-                if (count != lastBackspaceCount) {
-                    listener?.onBackspaceSelect(count)
-                    lastBackspaceCount = count
-                }
-                return
-            }
+        // 退格：点按 / 连删 / 左滑扩选 / 上滑双选项都在 BackspaceGesture 里
+        if (key.action == KeyAction.Backspace) {
+            backspaceGesture.move(x, y)
+            if (backspaceGesture.isEngaged) return
         }
 
         // 上滑副字符：往上一动就从键位长出一体式气泡（上半副字符、下半主字符），过阈值副字符
@@ -886,20 +860,19 @@ class KeyboardView(context: Context) : View(context) {
         }
         val key = pressedKey
         val swipeChar = if (swipeArmed) key?.swipeFor(englishMode) else null
-        val clearAll = swipeArmed && key?.action == KeyAction.Backspace
-        val swipeAbandoned = swipeShown && !swipeArmed && key?.action == KeyAction.Backspace
         val popupChoice = popupManager.popupSelectedIndex()
             ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
-        val skipTap = repeatFired || longPressFired // 连删/长按触发过则不补单击
+        val skipTap = longPressFired // 长按触发过则不补单击
         val wasSpaceSwipe = spaceSwipeActive
-        val wasBackspaceSwipe = backspaceSwipeActive
+        if (key?.action == KeyAction.Backspace) {
+            backspaceGesture.up()
+            cancelPress()
+            return
+        }
         cancelPress()
         when {
             swipeChar != null -> listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
-            clearAll -> listener?.onBackspaceClearAll()
-            swipeAbandoned -> Unit // 上滑出了气泡又退回来：反悔，不删
             wasSpaceSwipe -> Unit
-            wasBackspaceSwipe -> listener?.onBackspaceSwipeDelete()
             // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
             popupChoice != null && popupChoice.isUpperCase() ->
                 listener?.onKeyAction(KeyAction.Text(popupChoice.lowercaseChar()), shifted = true)
@@ -930,8 +903,6 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun cancelTimers() {
-        repeating = false
-        handler.removeCallbacks(repeatRunnable)
         handler.removeCallbacks(longPressRunnable)
     }
 
@@ -954,6 +925,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun cancelPress() {
+        backspaceGesture.cancel()
         cancelTimers()
         popupManager.dismissAll()
         clearPressed()

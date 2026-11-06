@@ -11,6 +11,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.windinput.ime.core.RecentStore
+import com.windinput.ime.keyboard.BackspaceGesture
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.GlyphDrawable
 import com.windinput.ime.keyboard.Palette
@@ -28,6 +29,9 @@ class EmojiWindow(
     interface Listener {
         fun onEmojiSelected(emoji: String)
         fun onEmojiBackspace()
+
+        /** 退格键的手势回调（单击 / 连删 / 扩选 / 上滑删光标前或清空） */
+        fun emojiBackspaceGesture(): BackspaceGesture.Listener
         fun onBackToKeyboard()
     }
 
@@ -94,6 +98,7 @@ class EmojiWindow(
             onBack = listener::onBackToKeyboard,
             content = content,
             rightActions = listOf("⌫" to listener::onEmojiBackspace),
+            backspace = listener.emojiBackspaceGesture(),
         )
     }
 
