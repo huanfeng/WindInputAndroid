@@ -1040,10 +1040,12 @@ candidate_layout = "follow"
 code_hint_source = "auto"
 
 [input.auto_pair]
-chinese = false
-english = false
-chinese_pairs = ["（）", "【】", "｛｝", "《》", "〈〉"]
-english_pairs = ["()", "[]", "{}", "<>"]
+# 移动端出厂默认开：字母层上滑直接出引号 / 括号，输入一个出一对、光标落在中间。
+# 配对表含引号“” ‘’（引号按交替态钉左后走配对）；英文去掉 <>，打小于号不该出一对。
+chinese = true
+english = true
+chinese_pairs = ["“”", "‘’", "（）", "【】", "《》"]
+english_pairs = ["\"\"", "''", "()", "[]", "{}"]
 # 跳出配对的按键，可多选。"right_symbol" = 右符号键本身（打 ） 跳出已插入的 （）），
 # 其余为键名 tab / enter / space / escape。列表里没有就是没有，不做隐式补偿。
 # 引号等对称配对永不参与右符号跳出（按键不带「开/闭」信息），只能靠 tab / enter 跳出。

@@ -28,6 +28,36 @@ class LayoutParserTest {
         assertEquals("", key.longPress)
     }
 
+    private fun bundledLetters(): Map<Char, KeyDef> =
+        LayoutParser.parse(File("src/main/assets/data/layouts/qwerty.toml").readText())
+            .flatten().filter { (it.action as? KeyAction.Text)?.char in 'a'..'z' }
+            .associateBy { (it.action as KeyAction.Text).char }
+
+    @Test
+    fun bundledLetterSwipesFollowAssignment() {
+        val keys = bundledLetters()
+        val zh = "asdfghjkl" + "zxcvbnm"
+        val zhSym = "~)(;:!?'\"" + "^_\\<>-/"
+        zh.forEachIndexed { i, c -> assertEquals("zh $c", zhSym[i], keys.getValue(c).swipeFor(english = false)) }
+        val enSym = mapOf('a' to '@', 's' to '#', 'd' to '(', 'f' to ')', 'z' to '&', 'x' to '*', 'c' to '+', 'n' to '/', 'm' to '~')
+        zh.forEachIndexed { i, c -> assertEquals("en $c", enSym[c] ?: zhSym[i], keys.getValue(c).swipeFor(english = true)) }
+    }
+
+    @Test
+    fun letterPopupIsUpperSymbolLowerWithSymbolInitial() {
+        val l = bundledLetters().getValue('l')
+        assertEquals("L\"l", l.popupChars(english = false))
+        assertEquals(1, l.popupInitialIndex(english = false))
+        val a = bundledLetters().getValue('a')
+        assertEquals("A@a", a.popupChars(english = true))
+        assertEquals("A~a", a.popupChars(english = false))
+        val q = LayoutParser.parse("[[rows]]\nkeys = \"q\"\nswipe = \"1\"")[0][0]
+        assertEquals("Q1q", q.popupChars(english = false))
+        val bare = LayoutParser.parse("[[rows]]\nkeys = \"q\"")[0][0]
+        assertEquals("qQ", bare.popupChars(english = false))
+        assertEquals(0, bare.popupInitialIndex(english = false))
+    }
+
     @Test
     fun symbolKeysUseSwipeAsLongPress() {
         val key = LayoutParser.parse("[[rows]]\nkeys = \",\"\nswipe = \".\"")[0][0]
@@ -65,6 +95,7 @@ class LayoutParserTest {
             assertEquals("$file row $i labels", builtin[i].map { it.label }, bundled[i].map { it.label })
             assertEquals("$file row $i weights", weights(builtin[i]), weights(bundled[i]))
             assertEquals("$file row $i swipe", builtin[i].map { it.swipeUp }, bundled[i].map { it.swipeUp })
+            assertEquals("$file row $i enSwipe", builtin[i].map { it.enSwipeUp }, bundled[i].map { it.enSwipeUp })
             assertEquals("$file row $i longPress", builtin[i].map { it.longPress }, bundled[i].map { it.longPress })
             assertEquals("$file row $i enText", builtin[i].map { it.enText }, bundled[i].map { it.enText })
             assertEquals("$file row $i rowSpan", builtin[i].map { it.rowSpan }, bundled[i].map { it.rowSpan })

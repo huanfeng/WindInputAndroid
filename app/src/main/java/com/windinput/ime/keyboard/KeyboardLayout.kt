@@ -72,6 +72,25 @@ data class KeyDef(
 
     /** 按当前模式取上滑字符 */
     fun swipeFor(english: Boolean): Char? = if (english && enSwipeUp != null) enSwipeUp else swipeUp
+
+    /** 小写字母键（含首行）：长按气泡是 [大写 | 符号 | 小写]，符号取当前模式的上滑字符 */
+    private fun isLetterPopupKey(): Boolean =
+        longPress.isEmpty() && (action as? KeyAction.Text)?.char in 'a'..'z'
+
+    /**
+     * 长按气泡字符集（每字符一项）。字母键是「大写、符号、小写」，没有上滑字符时退回「小写、大写」的旧样式；
+     * 其余键用布局里的 [longPress]。
+     */
+    fun popupChars(english: Boolean): String {
+        if (!isLetterPopupKey()) return longPress
+        val c = (action as KeyAction.Text).char
+        val sym = swipeFor(english) ?: return "$c${c.uppercaseChar()}"
+        return "${c.uppercaseChar()}$sym$c"
+    }
+
+    /** 气泡初始高亮项：字母键带符号时是中间的符号（长按不动抬手即出符号），其余是第 0 项 */
+    fun popupInitialIndex(english: Boolean): Int =
+        if (isLetterPopupKey() && swipeFor(english) != null) 1 else 0
 }
 
 enum class KeyboardLayer { LETTERS, SYMBOLS, NUMBER }
@@ -115,16 +134,17 @@ object KeyboardDimens {
 object KeyboardLayouts {
 
     /**
-     * 字符键批量展开。字母键的长按气泡由视图按「小写 / 大写」自动生成（主流做法），
-     * 这里只给非字母键挂上滑字符兼长按。
+     * 字符键批量展开。字母键的长按气泡由 [KeyDef.popupChars] 生成「大写 | 符号 | 小写」，
+     * 这里只给非字母键挂上滑字符兼长按。[enSwipes] 位置对齐，空格 = 英文模式同中文。
      */
-    private fun charKeys(chars: String, swipes: String = ""): List<KeyDef> =
+    private fun charKeys(chars: String, swipes: String = "", enSwipes: String = ""): List<KeyDef> =
         chars.mapIndexed { i, c ->
             val swipe = swipes.getOrNull(i)
             KeyDef(
                 c.toString(),
                 KeyAction.Text(c),
                 swipeUp = swipe,
+                enSwipeUp = enSwipes.getOrNull(i)?.takeIf { it != ' ' },
                 longPress = if (c.isLetter()) "" else swipe?.toString() ?: "",
             )
         }
@@ -150,10 +170,10 @@ object KeyboardLayouts {
     /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
     val qwerty: List<List<KeyDef>> = listOf(
         charKeys("qwertyuiop", "1234567890"),
-        listOf(halfSpacer) + charKeys("asdfghjkl", "~!@#%^&*?") + listOf(halfSpacer),
+        listOf(halfSpacer) + charKeys("asdfghjkl", "~)(;:!?'\"", "@#()") + listOf(halfSpacer),
         buildList {
             add(KeyDef("⇧", KeyAction.Shift, widthWeight = 1.5f, isSpecial = true))
-            addAll(charKeys("zxcvbnm", "()-_:;/"))
+            addAll(charKeys("zxcvbnm", "^_\\<>-/", "&*+  /~"))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
         lettersBottomRow,

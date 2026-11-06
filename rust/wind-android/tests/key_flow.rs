@@ -1619,3 +1619,68 @@ fn select_candidate_plain_skips_auto_space_in_english() {
         normal.ops
     );
 }
+
+/// 自动配对（出厂默认开，配对表含引号）：触摸按 `"` 一次出 “”，光标回退一格落在两者之间；
+/// 英文模式按 `(` 同理。配对表与 app/src/main/assets/data/config.toml 的出厂值保持一致。
+#[test]
+fn auto_pair_quotes_and_brackets_put_cursor_between() {
+    use wind_android::{EngineCommand, KeySource, PressKey};
+    let _guard = env_lock();
+    if !has_schemas() {
+        eprintln!("跳过：缺少 build_dev/data 方案");
+        return;
+    }
+    // 出厂值写进用户层（与 app/src/main/assets/data/config.toml 的 [input.auto_pair] 一致），再构造核心
+    let user_layer = isolated_user_layer();
+    std::fs::write(
+        user_layer.join("config.toml"),
+        "[input.auto_pair]\nchinese = true\nenglish = true\n\
+         chinese_pairs = [\"“”\", \"‘’\", \"（）\", \"【】\", \"《》\"]\n\
+         english_pairs = [\"\\\"\\\"\", \"''\", \"()\", \"[]\", \"{}\"]\n",
+    )
+    .unwrap();
+    let user_root = std::env::temp_dir().join("wind-android-test-auto_pair_quotes");
+    let _ = std::fs::remove_dir_all(&user_root);
+    let rec = Arc::new(Recorder::default());
+    let core = WindCore::new(
+        data_dir().to_string_lossy().into_owned(),
+        user_root.to_string_lossy().into_owned(),
+        "wubi86".into(),
+        rec.clone(),
+    );
+    core.focus_gained();
+    let ch = |c: char| PressKey::Char {
+        ch: c.to_string(),
+        shifted: false,
+    };
+    let committed = |r: &wind_android::KeyResult| -> String {
+        r.ops.iter().filter(|o| o.kind == 0).map(|o| o.text.as_str()).collect()
+    };
+    let back: i32 = -1;
+
+    let r = core.press(ch('"'), KeySource::Touch);
+    assert_eq!(committed(&r), "“”", "中文模式 \" 一次出一对: {:?}", r.ops);
+    assert!(r.ops.iter().any(|o| o.kind == 4 && o.delta == back), "光标回退一格: {:?}", r.ops);
+
+    let r = core.press(ch('\''), KeySource::Touch);
+    assert_eq!(committed(&r), "‘’", "中文模式 ' 一次出一对: {:?}", r.ops);
+    assert!(r.ops.iter().any(|o| o.kind == 4 && o.delta == back), "光标回退一格: {:?}", r.ops);
+
+    let r = core.press(ch('('), KeySource::Touch);
+    assert_eq!(committed(&r), "（）", "中文模式 ( 出全角一对: {:?}", r.ops);
+    assert!(r.ops.iter().any(|o| o.kind == 4 && o.delta == back), "光标回退一格: {:?}", r.ops);
+
+    // 英文模式（中英键切到英文方案）
+    let schemas = core.schemas();
+    let Some(en) = schemas.iter().position(|s| s.id == "english") else {
+        eprintln!("跳过英文部分：未安装英文方案");
+        return;
+    };
+    core.run_command(EngineCommand::SelectSchema { index: en as u32 });
+    settle();
+    for (c, pair) in [('(', "()"), ('"', "\"\"")] {
+        let r = core.press(ch(c), KeySource::Touch);
+        assert_eq!(committed(&r), pair, "英文模式 {c} 一次出一对: {:?}", r.ops);
+        assert!(r.ops.iter().any(|o| o.kind == 4 && o.delta == back), "光标回退一格: {:?}", r.ops);
+    }
+}

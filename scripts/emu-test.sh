@@ -636,6 +636,25 @@ reset_pad
 tap_key COMMA
 check "中文模式逗号是全角" "，" "$(get_pad_text)"
 
+section "[21b] 长按字母不动抬手出符号；右移选小写"
+# 中文模式 l 键的符号是 \" → 一次出一对“”（出厂默认开自动配对），光标在两个引号之间：
+# 再点逗号（出「，」）应落在引号中间。右移一格是小写 l。
+reset_pad
+shift_px="$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 25 * d }')"
+read -r lx ly <<< "$(key_center l)"
+adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
+adb_q shell input motionevent UP "$lx" "$ly"; sleep 0.6
+check "长按 l 不动抬手出“”" "“”" "$(get_pad_text)"
+tap_key COMMA
+check "光标在一对引号之间" "“，”" "$(get_pad_text)"
+reset_pad
+adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
+adb_q shell input motionevent MOVE $(( lx + shift_px )) "$ly"; sleep 0.2
+adb_q shell input motionevent UP $(( lx + shift_px )) "$ly"; sleep 0.6
+# 小写 l 是五笔编码（不是直接上屏），空格后出汉字即证明选中的是小写而不是符号 / 大写
+tap_key SPACE
+check_match "长按 l 右移选小写 l（成码出字）" "$CN" "$(get_pad_text)"
+
 section "[5] 候选点选"
 reset_pad
 tap_key a; tap_key a
@@ -860,15 +879,15 @@ tap_key SPACE
 check_match "左侧空白两次 = aa 出字" "$CN" "$(get_pad_text)"
 
 section "[21] 长按字母出大写"
-# 字母长按气泡是「小写 / 大写」，大写在右；按住不抬手右移一格再松开即选中大写。
+# 字母长按气泡是「大写 | 符号 | 小写」，初始高亮中间的符号；按住不抬手左移一格再松开即选中大写。
 # 用 motionevent 而不是 swipe：swipe 一按下就开始移动，气泡还没弹出手指已经划走了。
 reset_pad
 read -r ex ey <<< "$(key_center e)"
 shift_px="$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 25 * d }')"
 adb_q shell input motionevent DOWN "$ex" "$ey"; sleep 0.8
-adb_q shell input motionevent MOVE $(( ex + shift_px )) "$ey"; sleep 0.2
-adb_q shell input motionevent UP $(( ex + shift_px )) "$ey"; sleep 0.6
-check "长按 e 右移选中 E" "E" "$(get_pad_text)"
+adb_q shell input motionevent MOVE $(( ex - shift_px )) "$ey"; sleep 0.2
+adb_q shell input motionevent UP $(( ex - shift_px )) "$ey"; sleep 0.6
+check "长按 e 左移选中 E" "E" "$(get_pad_text)"
 
 section "[22] 有编码时切中英先上屏字母原文"
 reset_pad

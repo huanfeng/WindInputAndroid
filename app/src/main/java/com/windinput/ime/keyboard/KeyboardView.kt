@@ -370,7 +370,11 @@ class KeyboardView(context: Context) : View(context) {
         if (popup.isNotEmpty()) {
             popupManager.dismissPreview()
             // 气泡里显示中英形态，抬手时按**下标**映回布局里的 ASCII 字符再喂引擎
-            popupManager.showPopup(rect, popup.map { Punct.display(it, chinesePunct) })
+            popupManager.showPopup(
+                rect,
+                popup.map { Punct.display(it, chinesePunct) },
+                key.popupInitialIndex(englishMode),
+            )
             repeatHaptic()
         } else if (hasLongPressAction(key.action)) {
             // 功能键长按走独立回调（没有字符气泡可弹）。置位后抬手不补单击，
@@ -394,15 +398,8 @@ class KeyboardView(context: Context) : View(context) {
     private fun hasLongPressAction(action: KeyAction): Boolean =
         action == KeyAction.SwitchLang || (action == KeyAction.Space && spaceLongPressEnabled)
 
-    /**
-     * 长按气泡的字符集。字母键固定是「小写 / 大写」两个形态（豆包的做法）：上滑字符已经有
-     * 上滑这条路，长按再给一遍是重复；而单个大写字母在中文模式下原本要按两次 ⇧ 才打得出。
-     */
-    private fun popupChars(key: KeyDef): String {
-        if (key.longPress.isNotEmpty()) return key.longPress
-        val c = (key.action as? KeyAction.Text)?.char ?: return ""
-        return if (c in 'a'..'z') "$c${c.uppercaseChar()}" else ""
-    }
+    /** 长按气泡的字符集，字母键是「大写 | 符号 | 小写」，见 [KeyDef.popupChars] */
+    private fun popupChars(key: KeyDef): String = key.popupChars(englishMode)
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val width = MeasureSpec.getSize(widthMeasureSpec)

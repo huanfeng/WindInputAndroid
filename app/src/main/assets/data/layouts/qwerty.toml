@@ -5,7 +5,7 @@
 #   [[rows]]         每行一个；二选一：
 #     keys = "..."   简写：每字符展开为一个字符键
 #     swipe = "..."  简写行可选：位置对齐的上滑副字符（非字母键兼作长按气泡；
-#                    字母键的长按气泡固定是「小写 / 大写」）
+#                    字母键的长按气泡固定是「大写 | 上滑符号 | 小写」，不读 long_press）
 #     key  = [ {..} ] 显式键位数组，字段：
 #       spacer     占位空白的宽度权重（不绘制，触点归最近的键），如 { spacer = 0.5 }
 #       label      显示文本（text/chars 键可省略，缺省用字符本身）
@@ -32,7 +32,9 @@ name = "26 键"
 
 # 默认布局对照豆包（真机截图，2026-10-20）：首行上滑出数字、其余字母上滑出常用标点，
 # 角标默认显示；逗号、句号各占一键——中文里最常用的两个标点不该藏在长按或上滑里。
-# 标点一律写 ASCII，中英形态由模式决定：\ → 、  ^ → …  ` → ·  " → “”  ' → ‘’
+# 标点一律写 ASCII，中英形态由模式决定：\ → 、  ^ → …  _ → ——  < → 《  > → 》  " → “”  ' → ‘’
+# 上滑符号按常用程度排（不按键盘顺序）：引号“”在右手易达的 l、k；英文模式另有 @ # & * + 等（en_swipe_up）。
+# 上滑符号同时是长按气泡中间那一项，所以字母键写成显式键位数组而不是 swipe 简写。
 
 [[rows]]
 keys = "qwertyuiop"
@@ -42,14 +44,28 @@ swipe = "1234567890"
 # 第 2 行两侧各缩进半个键，键宽与第 1 行相同（大众布局）
 key = [
   { spacer = 0.5 },
-  { chars = "asdfghjkl", swipe = "~!@#%^&*?" },
+  { text = "a", swipe_up = "~", en_swipe_up = "@" },
+  { text = "s", swipe_up = ")", en_swipe_up = "#" },
+  { text = "d", swipe_up = "(", en_swipe_up = "(" },
+  { text = "f", swipe_up = ";", en_swipe_up = ")" },
+  { text = "g", swipe_up = ":" },
+  { text = "h", swipe_up = "!" },
+  { text = "j", swipe_up = "?" },
+  { text = "k", swipe_up = "'" },
+  { text = "l", swipe_up = "\"" },
   { spacer = 0.5 },
 ]
 
 [[rows]]
 key = [
   { label = "⇧", action = "shift", width = 1.5 },
-  { chars = "zxcvbnm", swipe = "()-_:;/" },
+  { text = "z", swipe_up = "^", en_swipe_up = "&" },
+  { text = "x", swipe_up = "_", en_swipe_up = "*" },
+  { text = "c", swipe_up = "\\", en_swipe_up = "+" },
+  { text = "v", swipe_up = "<" },
+  { text = "b", swipe_up = ">" },
+  { text = "n", swipe_up = "-", en_swipe_up = "/" },
+  { text = "m", swipe_up = "/", en_swipe_up = "~" },
   { label = "⌫", action = "backspace", width = 1.5 },
 ]
 

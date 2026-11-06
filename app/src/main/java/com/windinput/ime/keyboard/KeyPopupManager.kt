@@ -56,10 +56,13 @@ class KeyPopupManager(private val anchor: View) {
     private var popupLeft = 0
     private var itemWidthPx = 0
     private var selectedIndex = 0
+    private var popupInitial = 0
+    private var popupAnchorX = 0f
 
     val isPopupShown: Boolean get() = popup != null
 
-    fun showPopup(keyRect: RectF, chars: List<String>) {
+    /** [initial] 非 0 时气泡把该项摆在键中心正上方，选中也按手指相对键中心的横移算（边缘键被挤偏也不乱跳） */
+    fun showPopup(keyRect: RectF, chars: List<String>, initial: Int = 0) {
         dismissAll()
         if (chars.isEmpty()) return
         itemWidthPx = (44 * density).toInt()
@@ -78,8 +81,17 @@ class KeyPopupManager(private val anchor: View) {
         }
         row.background = bubbleBackground()
         val pos = positionAbove(keyRect, w, h + 2 * inset)
+        val start = initial.coerceIn(0, chars.size - 1)
+        if (start != 0) {
+            val loc = IntArray(2)
+            anchor.getLocationInWindow(loc)
+            pos[0] = (loc[0] + keyRect.centerX() - inset - itemWidthPx * (start + 0.5f)).toInt()
+                .coerceIn(loc[0], loc[0] + anchor.width - w)
+        }
         popupLeft = pos[0] + inset
-        selectedIndex = 0
+        popupInitial = start
+        popupAnchorX = keyRect.centerX()
+        selectedIndex = start
         highlight()
         popup = popupWindow(row, w, h + 2 * inset).also {
             it.showAtLocation(anchor, Gravity.NO_GRAVITY, pos[0], pos[1])
@@ -151,6 +163,9 @@ class KeyPopupManager(private val anchor: View) {
             val bottom = menuTop + menuRowH * popupItems.size
             if (y >= bottom) menuInitial
             else ((y - menuTop) / menuRowH).toInt().coerceIn(0, popupItems.size - 1)
+        } else if (popupInitial != 0) {
+            (popupInitial + Math.floorDiv((x - popupAnchorX + itemWidthPx / 2f).toInt(), itemWidthPx))
+                .coerceIn(0, popupItems.size - 1)
         } else {
             val loc = IntArray(2)
             anchor.getLocationInWindow(loc)
@@ -167,6 +182,7 @@ class KeyPopupManager(private val anchor: View) {
         popup = null
         popupItems = emptyList()
         menuRowH = 0
+        popupInitial = 0
     }
 
     // ── 上滑一体式气泡 ───────────────────────────────────────────
