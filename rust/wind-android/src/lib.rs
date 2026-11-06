@@ -410,6 +410,8 @@ impl MobileEventSink for ListenerSink {
 #[derive(uniffi::Object)]
 pub struct WindCore {
     core: Arc<MobileCore>,
+    /// 方案导入 / 删除串行化：两者都是「改磁盘 → 刷新列表 → 重载」，交错会让刷新读到半截状态
+    scheme_lock: std::sync::Mutex<()>,
 }
 
 impl WindCore {
@@ -422,9 +424,9 @@ impl WindCore {
         Ok((user, system))
     }
 
-    /// 方案包导入 / 删除落盘后：重扫已装方案，再重载配置让可选方案与引擎跟上。
-    fn after_scheme_change(&self) {
-        self.core.refresh_installed_schemas();
+    /// 方案包导入 / 删除落盘后：使涉及的方案缓存失效、重扫已装方案，再重载配置让可选方案与引擎跟上。
+    fn after_scheme_change(&self, ids: &[String]) {
+        self.core.on_schemes_changed(ids);
         self.core.run_command(MobileCommand::ReloadConfig);
     }
 }
@@ -449,7 +451,10 @@ impl WindCore {
             &schema,
             Arc::new(ListenerSink(listener)),
         );
-        Arc::new(Self { core })
+        Arc::new(Self {
+            core,
+            scheme_lock: std::sync::Mutex::new(()),
+        })
     }
 
     /// 按下键（vk = wind-keys VK 码，`modifiers` 为位掩码）。
@@ -748,22 +753,26 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
-    /// 导入方案包。`replace=false` 时已存在的文件跳过。成功后刷新已装方案并重载配置。
-    /// 包内 `config_patch.toml` 本版本不应用。
+    /// 导入方案包。`replace=false` 时已存在的文件跳过。成功后使引擎缓存失效、刷新已装方案并重载配置。
+    /// 包内 `config_patch.toml` 本版本不应用。导入与删除串行：同一时刻只跑一个。
     pub fn scheme_import(
         &self,
         path: String,
         replace: bool,
     ) -> Result<SchemeImportInfo, ConfigError> {
+        let _guard = self.scheme_lock.lock().unwrap_or_else(|e| e.into_inner());
         let (user, _) = self.scheme_dirs()?;
-        let r = scheme::import(Path::new(&path), &user, replace)
-            .map_err(|reason| ConfigError::Rejected { reason })?;
-        self.after_scheme_change();
-        Ok(r)
+        let r = scheme::import(Path::new(&path), &user, replace);
+        // 中途失败也要刷新：落盘是逐文件的，失败时磁盘可能已经变了一部分
+        let ids = r.as_ref().map(|i| i.schema_ids.clone()).unwrap_or_default();
+        self.after_scheme_change(&ids);
+        r.map_err(|reason| ConfigError::Rejected { reason })
     }
 
-    /// 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份）。共享文件保留，只读层永不删。
+    /// 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份——即「恢复自带版本」）。
+    /// 共享文件保留，只读层永不删；用户层文件在只读层有同路径副本的不受共享保护。
     pub fn scheme_delete(&self, id: String) -> Result<SchemeDeleteInfo, ConfigError> {
+        let _guard = self.scheme_lock.lock().unwrap_or_else(|e| e.into_inner());
         let (user, system) = self.scheme_dirs()?;
         let keep: Vec<String> = self
             .core
@@ -772,18 +781,13 @@ impl WindCore {
             .map(|s| s.id)
             .filter(|s| *s != id)
             .collect();
-        let r = scheme::delete(&id, &user, &system, &keep)
-            .map_err(|reason| ConfigError::Rejected { reason })?;
-        self.after_scheme_change();
-        Ok(r)
-    }
-
-    /// 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
-    /// 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
-    pub fn set_schema_enabled(&self, id: String, on: bool) -> Result<(), ConfigError> {
-        self.core
-            .set_schema_enabled(&id, on)
-            .map_err(|reason| ConfigError::Rejected { reason })
+        let r = scheme::delete(&id, &user, &system, &keep);
+        let mut ids = vec![id];
+        if let Ok(i) = &r {
+            ids.extend(i.schema_ids.iter().cloned());
+        }
+        self.after_scheme_change(&ids);
+        r.map_err(|reason| ConfigError::Rejected { reason })
     }
 
     /// 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。

@@ -36,7 +36,10 @@ fn wubi98_pkg(dir: &Path) -> Option<PathBuf> {
     let src = codetable_wubi98();
     if !src.join("wubi98.schema.toml").exists() {
         if std::env::var_os("CI").is_some() {
-            eprintln!("跳过：找不到 98 五笔样例 {}", src.display());
+            eprintln!(
+                "SKIPPED(依赖 98 五笔样例的用例未执行，不代表通过): 找不到 {}",
+                src.display()
+            );
             return None;
         }
         panic!(
@@ -249,7 +252,7 @@ fn rejects_oversized_unpack() {
     }
     zw.finish().unwrap();
     let e = scheme::preview(&path, &d.user, &d.system).unwrap_err();
-    assert!(e.contains("过大"), "{e}");
+    assert!(e.contains("上限"), "{e}");
     assert!(scheme::import(&path, &d.user, false).is_err());
     assert!(!d.user.join("mini.schema.toml").exists());
 }
@@ -282,14 +285,14 @@ fn delete_user_schema_keeps_shared_and_never_touches_system() {
     let Some(pkg) = wubi98_pkg(&d.work) else {
         return;
     };
-    // 系统层有一份同名自带方案，用户导入后覆盖它
-    let sys_file = d.system[0].join("wubi98.schema.toml");
-    std::fs::write(&sys_file, "[schema]\nid=\"wubi98\"\n").unwrap();
+    // 系统层有别的自带方案：删除时永不触碰（与 wubi98 无同路径关系，共享保护照常生效）
+    let sys_file = d.system[0].join("other.schema.toml");
+    std::fs::write(&sys_file, "[schema]\nid=\"other\"\n").unwrap();
     scheme::import(&pkg, &d.user, false).unwrap();
 
     assert_eq!(
         scheme::layers_of("wubi98", Some(&d.user), &d.system),
-        (true, true)
+        (true, false)
     );
     assert_eq!(
         scheme::layers_of("wubi98_pinyin", Some(&d.user), &d.system),
@@ -310,14 +313,14 @@ fn delete_user_schema_keeps_shared_and_never_touches_system() {
     assert!(d.user.join("wubi98.schema.toml").is_file());
     assert!(sys_file.is_file(), "系统层文件永不删");
 
-    // 没有其它方案引用后，删除生效；系统层仍在（回落自带）
+    // 没有其它方案引用后，删除生效；别的自带方案原样
     let r = scheme::delete("wubi98", &d.user, &d.system, &[]).unwrap();
     assert!(r.deleted.iter().any(|f| f == "wubi98.schema.toml"), "{r:?}");
     assert!(!d.user.join("wubi98.schema.toml").exists());
     assert!(sys_file.is_file());
     assert_eq!(
         scheme::layers_of("wubi98", Some(&d.user), &d.system),
-        (false, true)
+        (false, false)
     );
 }
 
@@ -339,4 +342,102 @@ fn delete_purely_user_schema_removes_its_files() {
     assert!(!d.user.join("wubi98.schema.toml").exists());
     assert!(!d.user.join("wubi98_pinyin.schema.toml").exists());
     assert!(!d.user.join("wubi98").exists(), "空目录一并清掉");
+}
+
+const SYS_PINYIN: &str = "[schema]\nid = \"pinyin\"\nname = \"全拼\"\n\n[engine]\ntype = \"pinyin\"\n\n[[dictionaries]]\npath = \"pinyin/main.dict.yaml\"\n";
+const SYS_MIX: &str = "[schema]\nid = \"sysmix\"\nname = \"自带混输\"\n\n[engine]\ntype = \"mixed\"\n\n[engine.mixed]\nprimary_schema = \"pinyin\"\nsecondary_schema = \"pinyin\"\n";
+
+/// 造一个「自带层」：pinyin（带词库 pinyin/main.dict.yaml）+ 引用它的自带混输 sysmix
+fn builtin_with_mix(system: &Path) {
+    std::fs::create_dir_all(system.join("pinyin")).unwrap();
+    std::fs::write(system.join("pinyin.schema.toml"), SYS_PINYIN).unwrap();
+    std::fs::write(system.join("sysmix.schema.toml"), SYS_MIX).unwrap();
+    std::fs::write(system.join("pinyin/main.dict.yaml"), "builtin dict").unwrap();
+}
+
+/// 包：覆盖 pinyin（改了名字）并带一份遮住自带词库的同路径资源
+fn override_pkg(work: &Path) -> PathBuf {
+    make_zip(
+        work,
+        "ov.wpkg",
+        &[
+            ("package.toml", b"[package]\nformat_version = 2\n"),
+            (
+                "pinyin.schema.toml",
+                SYS_PINYIN.replace("全拼", "新全拼").as_bytes(),
+            ),
+            ("pinyin/main.dict.yaml", b"user dict"),
+        ],
+    )
+}
+
+#[test]
+fn preview_lists_resource_files_that_shadow_builtin() {
+    let d = dirs();
+    builtin_with_mix(&d.system[0]);
+    let pkg = override_pkg(&d.work);
+    let p = scheme::preview(&pkg, &d.user, &d.system).unwrap();
+    assert_eq!(p.overrides_builtin, ["pinyin"]);
+    assert_eq!(
+        p.overrides_builtin_files,
+        ["pinyin/main.dict.yaml"],
+        "方案文件不在资源清单里重复列"
+    );
+}
+
+#[test]
+fn restore_overridden_builtin_referenced_by_builtin_mix() {
+    let d = dirs();
+    builtin_with_mix(&d.system[0]);
+    let pkg = override_pkg(&d.work);
+    scheme::import(&pkg, &d.user, false).unwrap();
+    assert_eq!(
+        scheme::layers_of("pinyin", Some(&d.user), &d.system),
+        (true, true)
+    );
+
+    // 自带混输 sysmix 引用 pinyin：此前共享保护会让「恢复」什么都删不掉
+    let keep = vec!["sysmix".to_string()];
+    let r = scheme::delete("pinyin", &d.user, &d.system, &keep).unwrap();
+    assert!(r.schema_ids.iter().any(|s| s == "pinyin"), "{r:?}");
+    assert!(!d.user.join("pinyin.schema.toml").exists());
+    assert!(
+        !d.user.join("pinyin/main.dict.yaml").exists(),
+        "遮住自带词库的副本一并清掉"
+    );
+    assert!(!d.user.join("pinyin").exists());
+    // 自带层原样
+    assert_eq!(
+        std::fs::read_to_string(d.system[0].join("pinyin/main.dict.yaml")).unwrap(),
+        "builtin dict"
+    );
+    assert_eq!(
+        scheme::layers_of("pinyin", Some(&d.user), &d.system),
+        (false, true)
+    );
+}
+
+#[test]
+fn rejects_declared_size_over_mobile_limit() {
+    let d = dirs();
+    // 声明 129 MiB：核心上限 256 MiB 放得过，手机端 128 MiB 要先挡
+    let path = d.work.join("big.zip");
+    let mut zw = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    let opts = zip::write::SimpleFileOptions::default();
+    zw.start_file("mini.schema.toml", opts).unwrap();
+    zw.write_all(MIN_SCHEMA.as_bytes()).unwrap();
+    zw.start_file("big.dict.yaml", opts).unwrap();
+    let chunk = vec![0u8; 1 << 20];
+    for _ in 0..129 {
+        zw.write_all(&chunk).unwrap();
+    }
+    zw.finish().unwrap();
+    let e = scheme::preview(&path, &d.user, &d.system).unwrap_err();
+    assert!(e.contains("手机端上限"), "{e}");
+    assert!(
+        scheme::import(&path, &d.user, false)
+            .unwrap_err()
+            .contains("手机端上限")
+    );
+    assert!(!d.user.join("mini.schema.toml").exists());
 }

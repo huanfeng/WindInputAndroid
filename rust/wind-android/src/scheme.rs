@@ -8,6 +8,10 @@
 //! - **覆盖自带方案**：包里的方案 id 在只读层（APK 自带）已有同名文件时，导入会在用户层
 //!   写一份同名文件盖住自带的（用户层优先）。预览里列在 `overrides_builtin`，界面要醒目写明并二次确认。
 //!
+//! - **手机端解压上限更低**：核心允许解压后 256MB，导入时整包先读入内存，手机上与输入法同进程，
+//!   内存紧张时可能被系统杀掉，所以在预览 / 导入前按声明大小先挡在 [`MAX_UNPACKED_BYTES`]。
+//!   （核心逐条目导入时会反复重开 zip 找条目，条目多时是 O(n²)；在主仓 wind-transfer 里，这里不碰。）
+//!
 //! 入参 / 出参的目录由 [`crate::WindCore`] 从核心取（见 `MobileCore::scheme_dirs`），
 //! 本模块不碰进程级状态，所以测试用临时目录即可，不必起引擎。
 
@@ -15,6 +19,9 @@ use std::path::{Path, PathBuf};
 
 use wind_mobile::wind_transfer::merge::Strategy;
 use wind_mobile::wind_transfer::scheme;
+
+/// 手机端方案包解压后总量上限（核心自己的上限是 256MB）。
+pub const MAX_UNPACKED_BYTES: u64 = 128 * 1024 * 1024;
 
 /// 预览结果：只读，不落盘。字符串列表里的路径都是 schemas 根相对路径。
 #[derive(Debug, Clone, uniffi::Record)]
@@ -35,6 +42,9 @@ pub struct SchemePreviewInfo {
     pub missing: Vec<String>,
     /// 包内方案 id 与 APK 自带方案同名：导入会覆盖自带方案（用户层优先），需二次确认
     pub overrides_builtin: Vec<String>,
+    /// 包内会写进用户层、且与只读层（APK 自带）**同路径**的资源文件（不含方案文件本身）：
+    /// 导入后它们会遮住自带词库，要醒目提示并二次确认；删除 / 恢复自带版本时一并清掉
+    pub overrides_builtin_files: Vec<String>,
     /// 包带 `config_patch.toml`：本版本不应用
     pub ignored_config_patch: bool,
 }
@@ -69,6 +79,7 @@ pub fn preview(
     user_dir: &Path,
     system_dirs: &[PathBuf],
 ) -> Result<SchemePreviewInfo, String> {
+    check_unpacked_size(package)?;
     let p = scheme::preview_import(package, user_dir).map_err(reason)?;
     let mut schema_ids: Vec<String> = p
         .will_add
@@ -84,6 +95,14 @@ pub fn preview(
         .filter(|id| in_dirs(id, system_dirs))
         .cloned()
         .collect();
+    let overrides_builtin_files = p
+        .will_add
+        .iter()
+        .chain(p.conflicts.iter())
+        .filter(|r| !(r.ends_with(".schema.toml") && !r.contains('/')))
+        .filter(|r| system_dirs.iter().any(|d| d.join(r).is_file()))
+        .cloned()
+        .collect();
     Ok(SchemePreviewInfo {
         title: p.meta.package.title,
         description: p.meta.package.description,
@@ -93,6 +112,7 @@ pub fn preview(
         system_refs: p.system_refs,
         missing: p.missing,
         overrides_builtin,
+        overrides_builtin_files,
         ignored_config_patch: p.config_patch.is_some(),
     })
 }
@@ -100,6 +120,7 @@ pub fn preview(
 /// 落盘。`replace=false` 即 Merge（已存在跳过）。先全部读入内存再逐文件 tmp+rename，
 /// 校验失败零落盘。
 pub fn import(package: &Path, user_dir: &Path, replace: bool) -> Result<SchemeImportInfo, String> {
+    check_unpacked_size(package)?;
     std::fs::create_dir_all(user_dir).map_err(|e| format!("无法创建用户方案目录: {e}"))?;
     let strategy = if replace {
         Strategy::Replace
@@ -115,7 +136,11 @@ pub fn import(package: &Path, user_dir: &Path, replace: bool) -> Result<SchemeIm
 }
 
 /// 删除用户层的方案文件及其私有资源。只读层文件永不删；`keep_ids` 里其它方案引用的文件保留。
-/// 对「覆盖了自带方案」的 id，效果即恢复自带版本（删掉用户层同名文件，回落到自带层）。
+///
+/// 例外：用户层文件在只读层有**同路径**副本时，不受共享保护——删掉用户副本后，别的方案引用的
+/// 仍是同一路径，只是回落到自带版本。没有这条例外，被自带混输方案引用的自带方案（如 `pinyin`
+/// 被 `wubi86_pinyin` 引用）一旦被覆盖就永远「恢复」不掉；包带来的遮住自带词库的资源文件同理。
+/// 对「覆盖了自带方案」的 id，效果即恢复自带版本。
 pub fn delete(
     id: &str,
     user_dir: &Path,
@@ -126,11 +151,64 @@ pub fn delete(
         return Err("没有可删除的用户方案".to_string());
     }
     let r = scheme::delete_package(id, user_dir, system_dirs, keep_ids).map_err(reason)?;
+    let mut deleted = r.deleted;
+    let mut schema_ids = r.schema_ids;
+    let mut kept_shared = Vec::new();
+    for rel in r.kept_shared {
+        if system_dirs.iter().any(|d| d.join(&rel).is_file()) {
+            std::fs::remove_file(user_dir.join(&rel))
+                .map_err(|e| format!("删除 {rel} 失败: {e}"))?;
+            if let Some(sid) = rel
+                .strip_suffix(".schema.toml")
+                .filter(|_| !rel.contains('/'))
+            {
+                schema_ids.push(sid.to_string());
+            }
+            prune_empty_dirs(user_dir, &rel);
+            deleted.push(rel);
+        } else {
+            kept_shared.push(rel);
+        }
+    }
     Ok(SchemeDeleteInfo {
-        deleted: r.deleted,
-        kept_shared: r.kept_shared,
-        schema_ids: r.schema_ids,
+        deleted,
+        kept_shared,
+        schema_ids,
     })
+}
+
+/// 自底向上清掉 `rel` 所在的空目录（止于 `user_dir`）。
+fn prune_empty_dirs(user_dir: &Path, rel: &str) {
+    let mut dir = user_dir.join(rel).parent().map(Path::to_path_buf);
+    while let Some(d) = dir {
+        if d == user_dir || std::fs::remove_dir(&d).is_err() {
+            break;
+        }
+        dir = d.parent().map(Path::to_path_buf);
+    }
+}
+
+/// 按 zip 中央目录里**声明**的大小挡掉超过手机端上限的包（撒谎的包由核心的逐条有界读取兜底）。
+fn check_unpacked_size(package: &Path) -> Result<(), String> {
+    let file = std::fs::File::open(package).map_err(|e| format!("无法打开方案包: {e}"))?;
+    // 打不开 zip 的错误留给核心给出统一的文案
+    let Ok(mut archive) = zip::ZipArchive::new(file) else {
+        return Ok(());
+    };
+    let mut declared = 0u64;
+    for i in 0..archive.len() {
+        if let Ok(f) = archive.by_index_raw(i) {
+            declared = declared.saturating_add(f.size());
+        }
+    }
+    if declared > MAX_UNPACKED_BYTES {
+        return Err(format!(
+            "方案包解压后约 {} MB，超过手机端上限 {} MB（导入时要整包读入内存，手机上与输入法同进程，内存紧张可能被系统杀掉）",
+            declared >> 20,
+            MAX_UNPACKED_BYTES >> 20
+        ));
+    }
+    Ok(())
 }
 
 /// 方案 id 在哪几层有文件：`(用户层, 只读层)`。设置页据此决定显示「删除」还是「恢复自带版本」。

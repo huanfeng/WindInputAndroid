@@ -805,8 +805,6 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
     ): Int
-    external fun uniffi_wind_android_checksum_method_windcore_set_schema_enabled(
-    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_touch_quick_trigger(
@@ -951,8 +949,6 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_preceding_text(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
-    ): Unit
-    external fun uniffi_wind_android_fn_method_windcore_set_schema_enabled(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(`ptr`: Long,`label`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1199,10 +1195,10 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_delete() != 15643) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_delete() != 44501) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_import() != 34731) {
+    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_import() != 64774) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_scheme_preview() != 35287) {
@@ -1233,9 +1229,6 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled() != 12394) {
-        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
-    }
-    if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_enabled() != 53133) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled() != 59430) {
@@ -2378,13 +2371,14 @@ public interface WindCoreInterface {
     fun `schemas`(): List<SchemaInfo>
     
     /**
-     * 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份）。共享文件保留，只读层永不删。
+     * 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份——即「恢复自带版本」）。
+     * 共享文件保留，只读层永不删；用户层文件在只读层有同路径副本的不受共享保护。
      */
     fun `schemeDelete`(`id`: kotlin.String): SchemeDeleteInfo
     
     /**
-     * 导入方案包。`replace=false` 时已存在的文件跳过。成功后刷新已装方案并重载配置。
-     * 包内 `config_patch.toml` 本版本不应用。
+     * 导入方案包。`replace=false` 时已存在的文件跳过。成功后使引擎缓存失效、刷新已装方案并重载配置。
+     * 包内 `config_patch.toml` 本版本不应用。导入与删除串行：同一时刻只跑一个。
      */
     fun `schemeImport`(`path`: kotlin.String, `replace`: kotlin.Boolean): SchemeImportInfo
     
@@ -2448,12 +2442,6 @@ public interface WindCoreInterface {
      * 开 / 关一个附加词库：落盘到方案覆盖并即时生效（已加载的引擎热切换或重建）。
      */
     fun `setSchemaDictEnabled`(`schemaId`: kotlin.String, `dictId`: kotlin.String, `on`: kotlin.Boolean)
-    
-    /**
-     * 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
-     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
-     */
-    fun `setSchemaEnabled`(`id`: kotlin.String, `on`: kotlin.Boolean)
     
     /**
      * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
@@ -3161,7 +3149,8 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
-     * 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份）。共享文件保留，只读层永不删。
+     * 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份——即「恢复自带版本」）。
+     * 共享文件保留，只读层永不删；用户层文件在只读层有同路径副本的不受共享保护。
      */
     @Throws(ConfigException::class)override fun `schemeDelete`(`id`: kotlin.String): SchemeDeleteInfo {
             return FfiConverterTypeSchemeDeleteInfo.lift(
@@ -3179,8 +3168,8 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
-     * 导入方案包。`replace=false` 时已存在的文件跳过。成功后刷新已装方案并重载配置。
-     * 包内 `config_patch.toml` 本版本不应用。
+     * 导入方案包。`replace=false` 时已存在的文件跳过。成功后使引擎缓存失效、刷新已装方案并重载配置。
+     * 包内 `config_patch.toml` 本版本不应用。导入与删除串行：同一时刻只跑一个。
      */
     @Throws(ConfigException::class)override fun `schemeImport`(`path`: kotlin.String, `replace`: kotlin.Boolean): SchemeImportInfo {
             return FfiConverterTypeSchemeImportInfo.lift(
@@ -3373,25 +3362,6 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterString.lower(`schemaId`),
         FfiConverterString.lower(`dictId`),
-        FfiConverterBoolean.lower(`on`),_status)
-}
-    }
-    
-    
-
-    
-    /**
-     * 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
-     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
-     */
-    @Throws(ConfigException::class)override fun `setSchemaEnabled`(`id`: kotlin.String, `on`: kotlin.Boolean)
-        = 
-    callWithHandle {
-    uniffiRustCallWithError(ConfigException) { _status ->
-    UniffiLib.uniffi_wind_android_fn_method_windcore_set_schema_enabled(
-        it,
-        
-        FfiConverterString.lower(`id`),
         FfiConverterBoolean.lower(`on`),_status)
 }
     }
@@ -4857,6 +4827,12 @@ data class SchemePreviewInfo (
     var `overridesBuiltin`: List<kotlin.String>
     , 
     /**
+     * 包内会写进用户层、且与只读层（APK 自带）**同路径**的资源文件（不含方案文件本身）：
+     * 导入后它们会遮住自带词库，要醒目提示并二次确认；删除 / 恢复自带版本时一并清掉
+     */
+    var `overridesBuiltinFiles`: List<kotlin.String>
+    , 
+    /**
      * 包带 `config_patch.toml`：本版本不应用
      */
     var `ignoredConfigPatch`: kotlin.Boolean
@@ -4884,6 +4860,7 @@ public object FfiConverterTypeSchemePreviewInfo: FfiConverterRustBuffer<SchemePr
             FfiConverterSequenceString.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
             FfiConverterBoolean.read(buf),
         )
     }
@@ -4897,6 +4874,7 @@ public object FfiConverterTypeSchemePreviewInfo: FfiConverterRustBuffer<SchemePr
             FfiConverterSequenceString.allocationSize(value.`systemRefs`) +
             FfiConverterSequenceString.allocationSize(value.`missing`) +
             FfiConverterSequenceString.allocationSize(value.`overridesBuiltin`) +
+            FfiConverterSequenceString.allocationSize(value.`overridesBuiltinFiles`) +
             FfiConverterBoolean.allocationSize(value.`ignoredConfigPatch`)
     )
 
@@ -4909,6 +4887,7 @@ public object FfiConverterTypeSchemePreviewInfo: FfiConverterRustBuffer<SchemePr
             FfiConverterSequenceString.write(value.`systemRefs`, buf)
             FfiConverterSequenceString.write(value.`missing`, buf)
             FfiConverterSequenceString.write(value.`overridesBuiltin`, buf)
+            FfiConverterSequenceString.write(value.`overridesBuiltinFiles`, buf)
             FfiConverterBoolean.write(value.`ignoredConfigPatch`, buf)
     }
 }

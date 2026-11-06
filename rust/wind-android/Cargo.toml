@@ -27,6 +27,9 @@ cli = ["uniffi/cli"]
 # 这个前提本来就存在——scripts/build-rust.ps1 一直是这么找主仓的。
 wind-mobile = { path = "../../../WindInput/wind_input/crates/wind-mobile" }
 uniffi = "0.32"
+# 只用来读 zip 中央目录里声明的解压后大小（手机端另设更低的上限，见 scheme::MAX_UNPACKED_BYTES）。
+# 与主仓 wind-transfer 同一版本、同一组 feature，已在依赖树里，不多编一份代码。
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 # Rust 日志 → logcat：没有它，引擎侧问题在设备上只能盲猜（walking skeleton
 # 首测就栽在这上面）。仅 Android 目标编译，桌面构建（跑测试、生成绑定）不受影响。
@@ -36,8 +39,6 @@ tracing-android = "0.2"
 
 [dev-dependencies]
 # 方案包测试在代码里现打 zip / 建临时目录，不往仓库塞二进制样例。
-# 与主仓 wind-transfer 同一版本与 feature（只开 deflate，不拉 C 库）。
-zip = { version = "2", default-features = false, features = ["deflate"] }
 tempfile = "3"
 
 [lints]
