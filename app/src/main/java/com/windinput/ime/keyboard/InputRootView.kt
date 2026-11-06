@@ -89,16 +89,49 @@ class InputRootView(context: Context) : LinearLayout(context) {
             val side = insets.getInsets(WindowInsets.Type.displayCutout() or WindowInsets.Type.navigationBars())
             if (paddingLeft != side.left || paddingRight != side.right) setPadding(side.left, 0, side.right, 0)
         }
+        removeCallbacks(applyLowered)
+        if (bottom < insetBottom && bottom <= 0) {
+            // 真机日志（小米 HyperOS）：键盘弹出的头一次派发会给出 0，紧接着又给回真值（56→0→56）。
+            // 照单全收的话避让先塌掉、手势条盖住最后一排，还把 0 写进持久化真值，下次首帧更没依据。
+            // 变小到 0 的报告先压一会儿，期间来了正常值就当没发生；真为 0（隐藏了导航栏）再落实
+            pendingLowered = bottom
+            postDelayed(applyLowered, LOWERED_SETTLE_MS)
+            return super.onApplyWindowInsets(insets)
+        }
+        commitInset(bottom)
+        return super.onApplyWindowInsets(insets)
+    }
+
+    private var pendingLowered = 0
+    private val applyLowered = Runnable {
+        // 落实前再读一次窗口当前的 insets：瞬时 0 之后若没有新的派发，真值只在这里能拿到
+        val now = if (Build.VERSION.SDK_INT >= 30) {
+            rootWindowInsets?.let {
+                maxOf(
+                    it.getInsets(WindowInsets.Type.navigationBars()).bottom,
+                    it.getInsets(WindowInsets.Type.systemGestures()).bottom,
+                )
+            } ?: 0
+        } else {
+            0
+        }
+        commitInset(maxOf(pendingLowered, now))
+    }
+
+    /** 落实一个避让高度：持久化真值、更新占位 */
+    private fun commitInset(bottom: Int) {
         if (bottom != savedInset(context, portrait)) saveInset(context, portrait, bottom)
         if (bottom != insetBottom) {
             android.util.Log.i("InputRootView", "导航避让首帧 $insetBottom（估值 $estimated）→ 实际 $bottom")
             insetBottom = bottom
             applySpacer()
         }
-        return super.onApplyWindowInsets(insets)
     }
 
     companion object {
+        /** 避让高度突然变成 0 时等多久再信：头一次派发的瞬时 0 通常几帧内就被真值覆盖 */
+        private const val LOWERED_SETTLE_MS = 400L
+
         /** 进程内记住上次的真值：API 26–29 没有 WindowMetrics，重建输入视图时用它 */
         private var lastInsetBottom = -1
 
