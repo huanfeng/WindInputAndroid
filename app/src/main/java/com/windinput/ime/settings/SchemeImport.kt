@@ -304,7 +304,7 @@ private fun ConfirmPanel(s: SchemeImportState.Preview, c: SchemeImportController
         onDismiss = c::cancelConfirm,
         buttons = {
             TextButton(text = "返回", onClick = c::cancelConfirm)
-            TextButton(text = "确认覆盖", onClick = c::confirmImport)
+            TextButton(text = "覆盖", onClick = c::confirmImport)
         },
     ) {
         if (info.overridesBuiltin.isNotEmpty()) {
@@ -418,8 +418,9 @@ internal fun UserSchemasCard(installed: List<InstalledSchemaInfo>, onChanged: ()
 private fun deleteScheme(context: Context, id: String): String? {
     val core = CoreAccess.obtainCore(context) ?: return "输入法核心未就绪"
     return try {
-        core.schemeDelete(id)
-        null
+        val r = core.schemeDelete(id)
+        // 被其它方案引用（如混输方案用它当主方案）时核心会保留它的文件，什么都没删：不能报成功
+        if (r.schemaIds.isEmpty()) "「$id」仍被其它方案使用，未删除。请先删除依赖它的方案" else null
     } catch (e: ConfigException) {
         reasonOf(e)
     } catch (e: Exception) {

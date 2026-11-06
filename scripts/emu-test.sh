@@ -1783,6 +1783,9 @@ tap_key LANG; sleep 3
 [[ -n "$(wait_chinese)" ]] || die "[53] 切不回中文"
 reset_pad
 
+# 方案包导入（[53b][54][55]）：用例在单独文件里，保持本文件不再膨胀
+source "$ROOT/scripts/emu-cases/schema-import.sh"
+
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
 if [[ -z "$SCHEMA_BEFORE" ]]; then
