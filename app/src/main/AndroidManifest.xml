@@ -46,5 +46,47 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 方案包文件关联：.wpkg / .zip 的 VIEW 与 SEND，进预览 / 导入（透明壳，界面同设置页「导入方案」）。
+             .wpkg 没有标准 MIME，靠 pathPattern 认；pathPattern 的 `.*` 不回溯，
+             文件名里带点（a.b.wpkg）时前一条匹配不上，所以多写几条 -->
+        <activity
+            android:name=".settings.SchemeImportActivity"
+            android:exported="true"
+            android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
+            android:excludeFromRecents="true"
+            android:label="导入方案"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.WindInput.Translucent">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+                <data android:host="*" />
+                <data android:mimeType="*/*" />
+                <data android:pathPattern=".*\\.wpkg" />
+                <data android:pathPattern=".*\\..*\\.wpkg" />
+                <data android:pathPattern=".*\\..*\\..*\\.wpkg" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="application/zip" />
+                <data android:mimeType="application/x-zip-compressed" />
+                <data android:mimeType="application/octet-stream" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>
