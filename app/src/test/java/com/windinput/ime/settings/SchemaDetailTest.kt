@@ -4,9 +4,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import uniffi.wind_android.InstalledSchemaInfo
 import uniffi.wind_android.SchemaSettingGroup
 import uniffi.wind_android.SchemaSettingItem
 import uniffi.wind_android.SchemaSettingKind
+import uniffi.wind_android.SchemaSettingsInfo
 import java.io.File
 
 class SchemaDetailTest {
@@ -84,6 +86,14 @@ class SchemaDetailTest {
         assertTrue(isShown(item("punct.mode", group = SchemaSettingGroup.BEHAVIOR), manifest))
         assertTrue(isShown(item("engine.codetable.top_code_commit"), manifest))
         assertTrue(isShown(item(KEY_SENTENCE, group = SchemaSettingGroup.EXPERIMENTAL), manifest))
+    }
+
+    @Test
+    fun infoSummaryJoinsFactsThenDescription() {
+        val s = SchemaSettingsInfo("wubi86", "五笔", "codetable", "1.0", "内置", "五笔86版输入方案", emptyList())
+        val builtin = InstalledSchemaInfo("wubi86", "五笔", true, false, false, true)
+        assertEquals("码表 · 应用自带 · 版本 1.0 · 作者 内置\n五笔86版输入方案", infoSummary(s, builtin))
+        assertEquals("码表", infoSummary(s.copy(version = "", author = "", description = ""), null))
     }
 
     @Test

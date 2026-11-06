@@ -201,14 +201,11 @@ private fun loadSchemaDetail(context: android.content.Context, schemaId: String)
     }
 }
 
+/** 方案信息：一行名字，下面一行「类型 · 来源 · 版本 · 作者」，再下面是方案说明 */
 @Composable
 private fun SchemaInfoCard(s: SchemaSettingsInfo, installed: InstalledSchemaInfo?) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        BasicComponent(title = s.name.ifEmpty { s.id }, summary = s.description.ifEmpty { null })
-        BasicComponent(title = "类型", summary = engineTypeLabel(s.engineType))
-        installed?.let { BasicComponent(title = "来源", summary = sourceLabel(it.user, it.builtin)) }
-        if (s.version.isNotEmpty()) BasicComponent(title = "版本", summary = s.version)
-        if (s.author.isNotEmpty()) BasicComponent(title = "作者", summary = s.author)
+        BasicComponent(title = s.name.ifEmpty { s.id }, summary = infoSummary(s, installed))
     }
 }
 
@@ -312,6 +309,16 @@ internal fun auxWrite(item: SchemaSettingItem, index: Int): SchemaWrite? = when 
     1 -> SchemaWrite.Set(item.key, "true")
     2 -> SchemaWrite.Set(item.key, "false")
     else -> null
+}
+
+internal fun infoSummary(s: SchemaSettingsInfo, installed: InstalledSchemaInfo?): String {
+    val facts = listOfNotNull(
+        engineTypeLabel(s.engineType),
+        installed?.let { sourceLabel(it.user, it.builtin) },
+        s.version.takeIf { it.isNotEmpty() }?.let { "版本 $it" },
+        s.author.takeIf { it.isNotEmpty() }?.let { "作者 $it" },
+    ).joinToString(" · ")
+    return listOf(facts, s.description).filter { it.isNotEmpty() }.joinToString("\n")
 }
 
 internal fun engineTypeLabel(t: String): String = when (t) {
