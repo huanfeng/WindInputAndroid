@@ -655,6 +655,47 @@ adb_q shell input motionevent UP $(( lx + shift_px )) "$ly"; sleep 0.6
 tap_key SPACE
 check_match "长按 l 右移选小写 l（成码出字）" "$CN" "$(get_pad_text)"
 
+section "[21c] 边缘键 q / p 长按气泡被屏幕夹住，三个选项仍都够得着"
+# q 在最左、p 在最右，气泡不能对着键中心，被夹在屏幕边；选项按气泡真实位置命中。
+# q 的气泡左沿贴屏幕：大写格在键右侧约 20dp 处、小写格在约 92dp 处；p 镜像（大写在左 92dp，小写紧贴右边）。
+longpress_to() {   # key dx_dp：长按 key 不抬手，横移 dx_dp 再抬手
+    local k="$1" dx="$2" kx ky mx
+    read -r kx ky <<< "$(key_center "$k")"
+    mx=$(( kx + $(awk -v d="$GEO_DENSITY" -v dx="$dx" 'BEGIN{ printf "%d", dx * d }') ))
+    adb_q shell input motionevent DOWN "$kx" "$ky"; sleep 0.8
+    if [ "$dx" != "0" ]; then
+        adb_q shell input motionevent MOVE "$mx" "$ky"; sleep 0.2
+    fi
+    adb_q shell input motionevent UP "$mx" "$ky"; sleep 0.6
+}
+reset_pad
+longpress_to q 20
+check "长按 q 右移 20dp 选中大写 Q（q 在最左，气泡夹偏）" "Q" "$(get_pad_text)"
+reset_pad
+longpress_to q 0
+check "长按 q 不动抬手出符号 1" "1" "$(get_pad_text)"
+reset_pad
+longpress_to q 92
+tap_key SPACE
+check_match "长按 q 右移到第三格选小写 q（成码出字）" "$CN" "$(get_pad_text)"
+reset_pad
+longpress_to p -92
+check "长按 p 左移到第一格选中大写 P" "P" "$(get_pad_text)"
+reset_pad
+longpress_to p 0
+check "长按 p 不动抬手出符号 0" "0" "$(get_pad_text)"
+reset_pad
+longpress_to p 10
+tap_key SPACE
+check_match "长按 p 右移 10dp 选小写 p（p 在最右，小写格紧贴屏幕边；成码出字）" "$CN" "$(get_pad_text)"
+
+section "[21d] 单次 Shift 下长按气泡选符号：选完复位，下一字母不再大写"
+reset_pad
+tap_key SHIFT
+longpress_to e 0
+tap_key e; tap_key SPACE
+check_match "符号 3 之后 e 是小写（成码出字），不是大写 E" '^3[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
+
 section "[5] 候选点选"
 reset_pad
 tap_key a; tap_key a

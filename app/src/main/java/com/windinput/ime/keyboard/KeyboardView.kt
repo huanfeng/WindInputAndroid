@@ -874,10 +874,14 @@ class KeyboardView(context: Context) : View(context) {
             swipeChar != null -> listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
             wasSpaceSwipe -> Unit
             // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
-            popupChoice != null && popupChoice.isUpperCase() ->
+            popupChoice != null && popupChoice.isUpperCase() -> {
                 listener?.onKeyAction(KeyAction.Text(popupChoice.lowercaseChar()), shifted = true)
-            popupChoice != null ->
+                resetSingleShift(key)
+            }
+            popupChoice != null -> {
                 listener?.onKeyAction(KeyAction.Text(popupChoice), shifted = false)
+                resetSingleShift(key)
+            }
             key != null && !skipTap -> handleKey(key)
         }
     }
@@ -1110,13 +1114,17 @@ class KeyboardView(context: Context) : View(context) {
                     ?.let { KeyAction.Text(it) }
                     ?: key.action
                 listener?.onKeyAction(action, shifted || shiftLocked)
-                // 单次 Shift：出字后自动复位（锁定态保持）
-                if (shifted && !shiftLocked && key.action is KeyAction.Text) {
-                    shifted = false
-                    autoShifted = false
-                    invalidate()
-                }
+                resetSingleShift(key)
             }
+        }
+    }
+
+    /** 单次 Shift：出字后自动复位（锁定态保持）；长按气泡选字与点按同一规则 */
+    private fun resetSingleShift(key: KeyDef?) {
+        if (shifted && !shiftLocked && key?.action is KeyAction.Text) {
+            shifted = false
+            autoShifted = false
+            invalidate()
         }
     }
 }

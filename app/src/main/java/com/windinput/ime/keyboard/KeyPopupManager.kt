@@ -24,6 +24,9 @@ class KeyPopupManager(private val anchor: View) {
         /** 气泡内容四周的留白（dp）：选中项的圆角底画在留白里面，不顶出气泡的圆角 */
         const val BUBBLE_INSET_DP = 3f
 
+        /** 气泡被屏幕夹偏时，手指移过这么远才改按真实位置选（dp） */
+        const val POPUP_MOVE_SLOP_DP = 8f
+
         /** 气泡外圈圆角（dp）；选中项底的圆角 = 它减去留白，两道圆弧同心 */
         const val BUBBLE_RADIUS_DP = 14f
     }
@@ -58,6 +61,8 @@ class KeyPopupManager(private val anchor: View) {
     private var selectedIndex = 0
     private var popupInitial = 0
     private var popupAnchorX = 0f
+    private var popupClamped = false
+    private var popupMoved = false
 
     val isPopupShown: Boolean get() = popup != null
 
@@ -85,11 +90,15 @@ class KeyPopupManager(private val anchor: View) {
         if (start != 0) {
             val loc = IntArray(2)
             anchor.getLocationInWindow(loc)
-            pos[0] = (loc[0] + keyRect.centerX() - inset - itemWidthPx * (start + 0.5f)).toInt()
-                .coerceIn(loc[0], loc[0] + anchor.width - w)
+            val want = (loc[0] + keyRect.centerX() - inset - itemWidthPx * (start + 0.5f)).toInt()
+            pos[0] = want.coerceIn(loc[0], loc[0] + anchor.width - w)
+            // q / p 一类边缘键：气泡被屏幕夹偏，不再对着键中心，改按各格的真实位置命中，
+            // 否则够不着靠边那一侧的选项
+            popupClamped = pos[0] != want
         }
         popupLeft = pos[0] + inset
         popupInitial = start
+        popupMoved = false
         popupAnchorX = keyRect.centerX()
         selectedIndex = start
         highlight()
@@ -163,6 +172,16 @@ class KeyPopupManager(private val anchor: View) {
             val bottom = menuTop + menuRowH * popupItems.size
             if (y >= bottom) menuInitial
             else ((y - menuTop) / menuRowH).toInt().coerceIn(0, popupItems.size - 1)
+        } else if (popupInitial != 0 && popupClamped) {
+            // 手指先离开按下点一小段才开始按真实位置选，免得刚长按出气泡、指尖微颤就跳项
+            if (!popupMoved && kotlin.math.abs(x - popupAnchorX) < POPUP_MOVE_SLOP_DP * density) {
+                popupInitial
+            } else {
+                popupMoved = true
+                val loc = IntArray(2)
+                anchor.getLocationInWindow(loc)
+                ((x + loc[0] - popupLeft) / itemWidthPx).toInt().coerceIn(0, popupItems.size - 1)
+            }
         } else if (popupInitial != 0) {
             (popupInitial + Math.floorDiv((x - popupAnchorX + itemWidthPx / 2f).toInt(), itemWidthPx))
                 .coerceIn(0, popupItems.size - 1)
@@ -183,6 +202,7 @@ class KeyPopupManager(private val anchor: View) {
         popupItems = emptyList()
         menuRowH = 0
         popupInitial = 0
+        popupClamped = false
     }
 
     // ── 上滑一体式气泡 ───────────────────────────────────────────
