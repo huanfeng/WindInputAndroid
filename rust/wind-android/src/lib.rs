@@ -790,6 +790,14 @@ impl WindCore {
         r.map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
+    /// 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+    pub fn set_schema_enabled(&self, id: String, on: bool) -> Result<(), ConfigError> {
+        self.core
+            .set_schema_enabled(&id, on)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     /// 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。
     pub fn tooltip_sections(&self) -> Vec<TooltipSectionStateInfo> {
         self.core

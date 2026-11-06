@@ -805,6 +805,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_schema_enabled(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_touch_quick_trigger(
@@ -949,6 +951,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_preceding_text(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_schema_enabled(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(`ptr`: Long,`label`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1229,6 +1233,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled() != 12394) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_enabled() != 53133) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled() != 59430) {
@@ -2444,6 +2451,12 @@ public interface WindCoreInterface {
     fun `setSchemaDictEnabled`(`schemaId`: kotlin.String, `dictId`: kotlin.String, `on`: kotlin.Boolean)
     
     /**
+     * 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    fun `setSchemaEnabled`(`id`: kotlin.String, `on`: kotlin.Boolean)
+    
+    /**
      * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
      * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
      */
@@ -3362,6 +3375,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterString.lower(`schemaId`),
         FfiConverterString.lower(`dictId`),
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    @Throws(ConfigException::class)override fun `setSchemaEnabled`(`id`: kotlin.String, `on`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_schema_enabled(
+        it,
+        
+        FfiConverterString.lower(`id`),
         FfiConverterBoolean.lower(`on`),_status)
 }
     }
