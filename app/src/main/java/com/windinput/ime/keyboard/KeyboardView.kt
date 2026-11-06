@@ -871,7 +871,10 @@ class KeyboardView(context: Context) : View(context) {
         }
         cancelPress()
         when {
-            swipeChar != null -> listener?.onKeyAction(symbolAction(swipeChar), shifted = false)
+            swipeChar != null -> {
+                listener?.onKeyAction(symbolAction(swipeChar), shifted = false)
+                resetSingleShift(key)
+            }
             wasSpaceSwipe -> Unit
             // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
             popupChoice != null && popupChoice.isUpperCase() -> {
@@ -890,8 +893,7 @@ class KeyboardView(context: Context) : View(context) {
      * 上滑 / 长按气泡选中的符号转动作：ASCII 走引擎（标点转换、配对）；非 ASCII 字面字符
      * （中文模式 j 的右引号 ”）引擎翻不出 VK，用 [KeyAction.Commit] 直接上屏（有编码时先顶首选）。
      */
-    private fun symbolAction(c: Char): KeyAction =
-        if (c.code < 0x80) KeyAction.Text(c) else KeyAction.Commit(c.toString())
+    private fun symbolAction(c: Char): KeyAction = symbolActionFor(c, chinesePunct)
 
     /** 按下反馈：震动 + 按键音，各自受开关控制 */
     private fun feedback(key: KeyDef) {
@@ -1134,4 +1136,14 @@ class KeyboardView(context: Context) : View(context) {
             invalidate()
         }
     }
+}
+
+/**
+ * 上滑 / 长按气泡符号 → 动作。ASCII 走引擎；非 ASCII 字面字符引擎翻不出 VK，直接上屏。
+ * 中文标点关闭时，字面的全角引号退回半角 `"`（与同一排 h 键经引擎出半角保持对称）。
+ */
+internal fun symbolActionFor(c: Char, chinesePunct: Boolean): KeyAction = when {
+    c.code < 0x80 -> KeyAction.Text(c)
+    c == '”' || c == '“' -> if (chinesePunct) KeyAction.Commit(c.toString()) else KeyAction.Text('"')
+    else -> KeyAction.Commit(c.toString())
 }
