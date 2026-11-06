@@ -1561,7 +1561,8 @@ reset_pad
 tap_key LANG; sleep 4
 tap_key h; tap_key i; tap_key SPACE
 check "补空格后" "hi " "$(get_pad_text)"
-adb_q shell input keyevent KEYCODE_DPAD_LEFT; sleep 0.8
+# 不等 onUpdateSelection 的异步报告：核心靠按键前的同步读取判断空格还在不在
+adb_q shell input keyevent KEYCODE_DPAD_LEFT
 tap_key PERIOD
 check "挪光标后句点：原地插入，不吃字母" "hi. " "$(get_pad_text)"
 tap_key LANG; sleep 3

@@ -310,6 +310,9 @@ class WindInputImeService :
         /** 光标前文报几个字给核心：联想的下一词表只看 4 个字，留些余量 */
         const val PRECEDING_CHARS = 32
 
+        /** 与核心 `wind-mobile` 的 AUTO_SPACE_PUNCT 一致：这几个标点会触发空格换位 */
+        private const val AUTO_SPACE_PUNCT = ".,?!;:"
+
         /** 切方案超过这么久还没完才提示「词库准备中」 */
         const val SWITCH_HINT_DELAY_MS = 300L
 
@@ -910,6 +913,10 @@ class WindInputImeService :
         // 联想态（没有编码、候选条上是联想）按空格：出厂同豆包、微信，收起联想、出空格，不选联想词；
         // 设置里打开「空格选首个联想」则上屏首个联想。都由核心按 `mobile.association.space_commits`
         // 处置，这里不分支。
+        //
+        // 句末标点可能触发「自动补的空格挪到标点后」：核心靠光标前文判断空格还在不在。
+        // onUpdateSelection 的异步报告在挪光标后可能还没到，这里同步读一次，不留窗口。
+        if (action is KeyAction.Text && latinInput && !composing && action.char in AUTO_SPACE_PUNCT) reportPrecedingText()
         return session.keyPressed(action, shifted, source)
     }
 
