@@ -1,0 +1,82 @@
+# 手机端单个方案设置：规划
+
+> 2026-11-06。第一期：自定义行为、方案覆盖（码表）、辅助码 + 双拼布局、整句输入。
+> 不做：切入热键、特殊模式（overlay）、PC「自定义行为」里的每页候选数 / 文字排列 / 字体 / 注释模板 / 自定义标点表。
+> PC 对照：`wind-setting/src/dialogs/schema_manager.rs`（节与 TAB）、`schema_codetable.rs`（码表覆盖项）；
+> 设计：主仓 `docs/design/schema-settings-vertical-tabs.md`、`schema-scoped-behavior.md`、`aux-code-schema-source.md`、
+> `docs/redesign/schema-config-layering.md`。
+
+## 1. 数据落点（与 PC 同一份文件、同一套键）
+
+全部写方案覆盖层 `<用户配置目录>/schema_overrides/{id}.toml`，由核心 `read_schema` 深合并到方案文件之上。
+键与方案文件段名完全相同，PC 设置页写出的文件手机能读、反之亦然。
+
+| 值 | 来源 |
+|---|---|
+| 当前生效值 | 合并后方案（`schema_merged`）；码表项取 `effective_codetable`（含全局基线折叠）；辅助码取合并值，缺省回落全局 `schema.pinyin.aux_code.enabled` |
+| 恢复后的值（「默认」） | 不含覆盖层的方案（`schema_base`）；码表项取 `followed_codetable` |
+| 是否已覆盖 | 覆盖层（`get_schema_override`）里有没有这个键——只能问覆盖层，合并值分不出是方案作者写的还是用户写的（同 PC `codetableOverride`） |
+
+写入规则（与 PC `schema.saveConfig` 的 `json_diff(方案文件, 新值)` 等价）：新值**等于方案文件里的原始值**时删键，否则写键；
+「恢复」= 删键；「全部恢复默认」= 删本页管理的全部键。覆盖层里的其它内容（`dictionaries` 扩展词库开关、`key_actions` 等）
+读改写时原样保留——**不**用 PC 的 `schema.resetConfig`（它整文件删除，会把扩展词库开关一起清掉）。
+覆盖表删空时删文件。写后 `write_schema_override` / `delete_schema_override` 使该方案引擎失效（混输成员由核心扇出），
+再 `refresh_schema_derived_config`（同 PC saveConfig），最后宿主发 `ReloadConfig`。
+
+## 2. 分组 × 键 × 类型 × 方案类型显隐
+
+| 分组（详情页卡片） | 键（覆盖层路径） | 类型 | 全拼 | 双拼 | 码表 | 混输 | 英文 |
+|---|---|---|---|---|---|---|---|
+| 基本 | 方案信息头（名称 / 类型 / 来源 / 版本 / 作者 / 说明） | 只读 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 基本 | `engine.pinyin.shuangpin.layout` | 选择（布局 id，清单由核心扫目录） | | ✓ | | | |
+| 基本 | 扩展词库（现有 `schema_dicts` / `set_schema_dict_enabled`） | 开关 | 有则显示 | 同 | 同 | 同 | 同 |
+| 自定义行为 | `punct.mode` | 选择 follow / chinese / english | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 自定义行为 | `candidate.layout` | 选择 follow / vertical / horizontal | FFI 有，**界面不显示**（见 §5） | | | | |
+| 自定义行为 | `phrases.enabled` | 开关 | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 方案覆盖 | `engine.codetable.{auto_commit_at_full, clear_on_empty_max, top_code_commit, punct_commit, show_code_hint, single_char, english_merge.enable, frequency.enabled}` | 开关 | | | ✓ | | |
+| 方案覆盖 | `engine.codetable.{auto_commit_min_len, short_code_yield_level}` | 整数（界面按清单选项） | | | ✓ | | |
+| 方案覆盖 | `engine.codetable.frequency.strategy` | 选择 top / step / position | | | ✓ | | |
+| 辅助码 | `engine.aux_code.enabled` | 三态（跟随全局 / 开 / 关） | 声明的辅助码表**可用**时 | 同 | | | |
+| 实验性功能 | `engine.codetable.sentence_input` | 开关 | | | ✓ | | |
+
+- 类型判据：核心 `resolve_engine_type`（english / mixed / pinyin / codetable），拼音再看 `engine.pinyin.scheme == "shuangpin"`。
+- 码表覆盖项 = PC 可覆盖集合（`SPEC_BEHAVIOR_FIELDS` + `frequency.*` + `english_merge.*`）∩ 手机设置清单「码表」节已有的项；
+  标题与选项文字**取设置清单**（`settings_manifest.toml` 的 `schema.codetable.*`），Rust 只给值，不重复一份文案。
+  `auto_phrase.*` 核心 `CodeTableSpec` 没有方案级段，不列（同 PC `visible_keys`）。
+- 整句输入只给码表方案（PC `sentence_input_seed`：混输配着拼音子引擎，开了不生效）。
+- 辅助码：PC 判据是 `files` 非空；手机加一条「声明的来源至少一个已装」（`aux_code_source_options`）。出厂 APK 不带
+  `stroke` 方案和 `aux_code/` 码表，按 PC 判据会给一个开了没反应的开关。
+
+## 3. FFI（`rust/wind-android`，经 `wind-mobile` 门面）
+
+| 接口 | 作用 |
+|---|---|
+| `schema_settings(id) -> SchemaSettingsInfo` | 信息头 + 按方案类型筛好的设置项：`key / group / kind / value / default_value / overridden / options` |
+| `set_schema_setting(id, key, value)` | 写一项（值一律字符串，按 `kind` 解析、校验选项）；等于方案文件原值即删键 |
+| `reset_schema_setting(id, key)` | 删一项覆盖 |
+| `reset_schema_settings(id)` | 删本页管理的全部键（保留扩展词库开关等） |
+
+写口先过只读模式检查（同 `set_schema_dict_enabled`），与扩展词库开关共用一把锁（两者都读改写同一个覆盖文件）。
+写完 `ReloadConfig`。不在 `schema_settings` 列表里的键（类型不符、未知键）拒绝。
+
+主仓改动只在 **`wind-mobile`**（新增 `schema_settings` 模块 + 门面方法），只调 `EngineManager` 现成的
+`schema_base / schema_merged / get_schema_override / write_schema_override / delete_schema_override /
+effective_codetable / followed_codetable / aux_code_source_options / shuangpin_layouts` 与
+`Coordinator::refresh_schema_derived_config`。PC 不依赖 `wind-mobile`，**无 PC 影响**。
+（PC 的 `schema.getConfig/saveConfig` 在 `wind-webdata`，那个 crate 刻意不进 Android 依赖闭包，故不经它。）
+
+## 4. 界面
+
+- 「启用的方案」每行：标题（方案名）+ 右侧「设置」图标按钮 + Switch（启用 / 停用，锁定规则不变）。点图标进详情页。
+- 路由加第三层 `Route.detail`（方案 id），走现有 `AnimatedContent` + 预测性返回；标题 = 方案名。
+- 详情页：信息头卡片 → 基本（双拼布局、扩展词库）→ 自定义行为 → 方案覆盖 → 辅助码 → 实验性功能 → 「全部恢复默认」。
+- 每项摘要写「跟随全局（值）」或「已自定义 · 默认：值」，已自定义的项可「恢复」（行内选项菜单里的「恢复默认」）。
+
+## 5. 与 PC 的差异与风险
+
+- **候选排列不在手机上显示**：手机候选条没有横 / 竖排之分，核心的布局意图在移动端没有消费者；按 PC 设计稿
+  「开了没反应的开关比不给更糟」，FFI 保留（数据与 PC 对等、Rust 测试覆盖），界面不列。
+- 标点态：PC 与核心一致——改的若是**当前**方案，切走再切回（代际变化）才生效；这是核心语义（手动切换胜出本代际），手机不改。
+- 码表覆盖 PC 有 ~20 项，手机只做清单里已有的 11 项；其余（精确匹配、通配、z 键……）全局页手机也没有，暂不列。
+- 方案文件被用户方案包替换后，覆盖层里的旧键仍按新方案文件深合并——与 PC 相同。
+- 风险：读改写与 PC 设置页不会并发（手机端只有本进程写）；与扩展词库开关的并发由同一把锁兜住。
