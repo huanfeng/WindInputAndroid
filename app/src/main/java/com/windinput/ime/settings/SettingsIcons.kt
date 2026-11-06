@@ -101,6 +101,9 @@ object SettingsIcons {
     val licenses: ImageVector get() = MiuixIcons.Share
     val fallback: ImageVector get() = MiuixIcons.Settings
 
+    /** 「启用的方案」每行进方案详情页的按钮 */
+    val schemaSettings: ImageVector get() = MiuixIcons.Settings
+
     fun page(name: String?): ImageVector = name?.let(byName::get) ?: fallback
 
     fun section(name: String): ImageVector = bySection[name] ?: fallback

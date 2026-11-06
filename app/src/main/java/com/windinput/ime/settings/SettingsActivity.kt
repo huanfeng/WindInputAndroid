@@ -207,16 +207,26 @@ enum class ImeSetup {
 }
 
 /**
- * 导航位置：首页（[page] 为 null）→ 一级页 → 二级页（[sub]）。最多两层，用两个字符串
- * 存住即可（转屏、进程回收后 rememberSaveable 能恢复），不必上导航库。
+ * 导航位置：首页（[page] 为 null）→ 一级页 → 二级页（[sub]）→ 详情页（[detail]，目前只有
+ * 「启用的方案」里某个方案的设置页，值是方案 id）。最多三层，用三个字符串存住即可（转屏、
+ * 进程回收后 rememberSaveable 能恢复），不必上导航库。
  */
-private data class Route(val page: String? = null, val sub: String? = null) {
-    val depth: Int get() = if (page == null) 0 else if (sub == null) 1 else 2
+private data class Route(val page: String? = null, val sub: String? = null, val detail: String? = null) {
+    val depth: Int get() = when {
+        page == null -> 0
+        sub == null -> 1
+        detail == null -> 2
+        else -> 3
+    }
 
-    fun up(): Route = if (sub != null) copy(sub = null) else Route()
+    fun up(): Route = when {
+        detail != null -> copy(detail = null)
+        sub != null -> copy(sub = null)
+        else -> Route()
+    }
 
     /** 存页面状态用的键（SaveableStateHolder 要求可放进 Bundle） */
-    val key: String get() = "$page/$sub"
+    val key: String get() = "$page/$sub/$detail"
 }
 
 /** 词库页的二级页（不来自清单，代码画）；名字即路由，DictSection 的入口用同一份 */
@@ -301,16 +311,23 @@ private fun SettingsApp(
     var values by remember { mutableStateOf(SettingsValues(userConfig, null)) }
     var routePage by rememberSaveable { mutableStateOf<String?>(null) }
     var routeSub by rememberSaveable { mutableStateOf<String?>(null) }
-    val route = Route(routePage, routeSub)
+    var routeDetail by rememberSaveable { mutableStateOf<String?>(null) }
+    val route = Route(routePage, routeSub, routeDetail)
+    // 详情页标题（方案名）：进页前由入口填上，页内读到核心的方案名后再校正；转屏丢了就先显示 id
+    val detailTitles = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
     // 每一层的可保存状态（滚动位置、标题栏收起、搜索词…）按路由存住：进下一级再返回，
     // 上一级停在离开时的位置，而不是回到顶上
     val stateHolder = rememberSaveableStateHolder()
     fun go(r: Route) {
-        // 退出的那一层不再留状态：下次进来从顶上开始，只有「还在栈里」的上级保持原位
-        if (r.depth < route.depth) stateHolder.removeState(route.key)
-        if (r.depth == 0 && route.depth == 2) stateHolder.removeState(route.up().key)
+        // 退出的各层不再留状态：下次进来从顶上开始，只有「还在栈里」的上级保持原位
+        var popped = route
+        while (popped.depth > r.depth) {
+            stateHolder.removeState(popped.key)
+            popped = popped.up()
+        }
         routePage = r.page
         routeSub = r.sub
+        routeDetail = r.detail
     }
 
     // 核心构造在后台线程（首次约 1 秒）。未就绪时键盘项照常可改，引擎项先不显示
@@ -407,14 +424,18 @@ private fun SettingsApp(
         stateHolder.SaveableStateProvider(r.key) {
         Screen(
             route = r,
-            title = screenTitle(manifest, r),
+            title = r.detail?.let { detailTitles[it] ?: it } ?: screenTitle(manifest, r),
             onBack = if (r.depth > 0) ({ go(r.up()) }) else null,
         ) {
             val page = manifest.pages.firstOrNull { it.id == r.page }
             when {
                 page == null -> HomeScreen(setup, manifest, values, schemaState, versionName, actions) { go(Route(it)) }
                 r.sub == null -> PageScreen(manifest, page, values, session, schemaState, versionName) { go(r.copy(sub = it)) }
-                else -> SubScreen(manifest, page, r.sub, values, session, schemaState)
+                r.detail != null -> SchemaDetailSection(r.detail, manifest) { detailTitles[r.detail] = it }
+                else -> SubScreen(manifest, page, r.sub, values, session, schemaState) { id, name ->
+                    detailTitles[id] = name
+                    go(r.copy(detail = id))
+                }
             }
         }
         }
@@ -668,9 +689,10 @@ private fun SubScreen(
     values: SettingsValues,
     session: ImeSession?,
     schemaState: SchemaState?,
+    onOpenSchema: (id: String, name: String) -> Unit,
 ) {
     when {
-        page.id == "schema" && sub == SUB_ENABLED_SCHEMAS -> schemaState?.let { EnabledSchemasSection(it) }
+        page.id == "schema" && sub == SUB_ENABLED_SCHEMAS -> schemaState?.let { EnabledSchemasSection(it, onOpenSchema) }
         page.id == "dict" && sub == DICT_WORDS -> DictWords(session)
         page.id == "dict" && sub == DICT_ADD -> DictAdd(session)
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
@@ -849,9 +871,11 @@ private fun android.content.Context.findComponentActivity(): ComponentActivity? 
  * 移动端默认装了的全部可用；这里关掉的写进用户层（核心每次重载都按它重算，此前重载会读回
  * 出厂的「五笔 + 五笔拼音」，拼音、双拼就从列表里没了）。英文是中英键切换的目标，关不掉；
  * 最后一个中文方案也关不掉——原因由核心给，Toast 报出来。
+ *
+ * 每行开关左边一个设置图标，点进该方案的详情页（[SchemaDetailSection]）；停用的方案也能设置。
  */
 @Composable
-private fun EnabledSchemasSection(st: SchemaState) {
+private fun EnabledSchemasSection(st: SchemaState, onOpenSchema: (id: String, name: String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var installed by remember { mutableStateOf<List<uniffi.wind_android.InstalledSchemaInfo>>(emptyList()) }
@@ -866,29 +890,36 @@ private fun EnabledSchemasSection(st: SchemaState) {
     SectionTitle("启用")
     Card(modifier = Modifier.fillMaxWidth()) {
         for (s in installed) {
-            ToggleLine(
-                title = s.name.ifEmpty { s.id },
-                summary = if (s.locked) "中英键切换要用，不能关" else null,
+            val label = s.name.ifEmpty { s.id }
+            SwitchPreference(
                 checked = s.enabled,
-            ) { on ->
-                scope.launch {
-                    val error = withContext(Dispatchers.IO) {
-                        val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
-                        try {
-                            core.setSchemaEnabled(s.id, on)
-                            core.runCommand(uniffi.wind_android.EngineCommand.ReloadConfig)
-                            null
-                        } catch (e: uniffi.wind_android.ConfigException) {
-                            (e as? uniffi.wind_android.ConfigException.Rejected)?.reason ?: e.toString()
-                        } catch (e: Exception) {
-                            "操作失败：${e.message ?: e}"
-                        }
+                title = label,
+                summary = if (s.locked) "中英键切换要用，不能关" else null,
+                endActions = {
+                    IconButton(onClick = { onOpenSchema(s.id, label) }) {
+                        Icon(SettingsIcons.schemaSettings, contentDescription = "「$label」的设置")
                     }
-                    if (error != null) android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_SHORT).show()
-                    reload++
-                    st.refresh()
-                }
-            }
+                },
+                onCheckedChange = { on ->
+                    scope.launch {
+                        val error = withContext(Dispatchers.IO) {
+                            val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
+                            try {
+                                core.setSchemaEnabled(s.id, on)
+                                core.runCommand(uniffi.wind_android.EngineCommand.ReloadConfig)
+                                null
+                            } catch (e: uniffi.wind_android.ConfigException) {
+                                (e as? uniffi.wind_android.ConfigException.Rejected)?.reason ?: e.toString()
+                            } catch (e: Exception) {
+                                "操作失败：${e.message ?: e}"
+                            }
+                        }
+                        if (error != null) android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_SHORT).show()
+                        reload++
+                        st.refresh()
+                    }
+                },
+            )
         }
     }
 }
