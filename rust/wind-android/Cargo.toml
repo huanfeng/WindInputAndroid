@@ -34,5 +34,11 @@ uniffi = "0.32"
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "env-filter"] }
 tracing-android = "0.2"
 
+[dev-dependencies]
+# 方案包测试在代码里现打 zip / 建临时目录，不往仓库塞二进制样例。
+# 与主仓 wind-transfer 同一版本与 feature（只开 deflate，不拉 C 库）。
+zip = { version = "2", default-features = false, features = ["deflate"] }
+tempfile = "3"
+
 [lints]
 workspace = true

@@ -21,14 +21,18 @@
 //!
 //! 详见 `wind_mobile` 的模块文档——通道语义与踩过的坑都记在那里，这里不复述。
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use wind_mobile::{
     CandidateFrame, CandidateWindow as CoreCandidateWindow, EditOp as CoreEditOp,
     InputStatus as CoreStatus, KeyOutcome, KeySource as CoreKeySource, LayoutEntry, MobileCommand,
-    MobileCore, MobileEventSink, PressKey as CorePressKey, SchemaEntry, TextSegment as CoreTextSegment,
+    MobileCore, MobileEventSink, PressKey as CorePressKey, SchemaEntry,
+    TextSegment as CoreTextSegment,
 };
+
+pub mod scheme;
+pub use scheme::{SchemeDeleteInfo, SchemeImportInfo, SchemePreviewInfo};
 
 uniffi::setup_scaffolding!();
 
@@ -408,6 +412,23 @@ pub struct WindCore {
     core: Arc<MobileCore>,
 }
 
+impl WindCore {
+    /// `(用户层 schemas, 只读层 schemas 列表)`
+    fn scheme_dirs(&self) -> Result<(PathBuf, Vec<PathBuf>), ConfigError> {
+        let (user, system) = self.core.scheme_dirs();
+        let user = user.ok_or_else(|| ConfigError::Rejected {
+            reason: "取不到用户数据目录".to_string(),
+        })?;
+        Ok((user, system))
+    }
+
+    /// 方案包导入 / 删除落盘后：重扫已装方案，再重载配置让可选方案与引擎跟上。
+    fn after_scheme_change(&self) {
+        self.core.refresh_installed_schemas();
+        self.core.run_command(MobileCommand::ReloadConfig);
+    }
+}
+
 #[uniffi::export]
 impl WindCore {
     /// 构造核心。
@@ -702,16 +723,59 @@ impl WindCore {
 
     /// 全部已装方案（含没启用的）及启用状态（设置页「启用的方案」）。
     pub fn installed_schemas(&self) -> Vec<InstalledSchemaInfo> {
+        let (user_dir, system_dirs) = self.core.scheme_dirs();
         self.core
             .installed_schemas()
             .into_iter()
-            .map(|s| InstalledSchemaInfo {
-                id: s.id,
-                name: s.name,
-                enabled: s.enabled,
-                locked: s.locked,
+            .map(|s| {
+                let (user, builtin) = scheme::layers_of(&s.id, user_dir.as_deref(), &system_dirs);
+                InstalledSchemaInfo {
+                    id: s.id,
+                    name: s.name,
+                    enabled: s.enabled,
+                    locked: s.locked,
+                    user,
+                    builtin,
+                }
             })
             .collect()
+    }
+
+    /// 预览一个方案包（只读，不落盘）。`path` 是应用私有目录里的文件，不是 `content://`。
+    pub fn scheme_preview(&self, path: String) -> Result<SchemePreviewInfo, ConfigError> {
+        let (user, system) = self.scheme_dirs()?;
+        scheme::preview(Path::new(&path), &user, &system)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 导入方案包。`replace=false` 时已存在的文件跳过。成功后刷新已装方案并重载配置。
+    /// 包内 `config_patch.toml` 本版本不应用。
+    pub fn scheme_import(
+        &self,
+        path: String,
+        replace: bool,
+    ) -> Result<SchemeImportInfo, ConfigError> {
+        let (user, _) = self.scheme_dirs()?;
+        let r = scheme::import(Path::new(&path), &user, replace)
+            .map_err(|reason| ConfigError::Rejected { reason })?;
+        self.after_scheme_change();
+        Ok(r)
+    }
+
+    /// 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份）。共享文件保留，只读层永不删。
+    pub fn scheme_delete(&self, id: String) -> Result<SchemeDeleteInfo, ConfigError> {
+        let (user, system) = self.scheme_dirs()?;
+        let keep: Vec<String> = self
+            .core
+            .installed_schemas()
+            .into_iter()
+            .map(|s| s.id)
+            .filter(|s| *s != id)
+            .collect();
+        let r = scheme::delete(&id, &user, &system, &keep)
+            .map_err(|reason| ConfigError::Rejected { reason })?;
+        self.after_scheme_change();
+        Ok(r)
     }
 
     /// 启用 / 停用一个已装方案。英文与最后一个中文方案关不掉（Rejected 里写原因）。
@@ -1125,6 +1189,11 @@ pub struct InstalledSchemaInfo {
     pub name: String,
     pub enabled: bool,
     pub locked: bool,
+    /// 用户层有同名方案文件（用户导入的，或覆盖了自带方案的）：可删除 / 恢复自带版本
+    pub user: bool,
+    /// APK 自带层也有同名方案：`user && builtin` = 覆盖了自带（显示「恢复自带版本」），
+    /// `!user && builtin` = 纯自带（不给删除）
+    pub builtin: bool,
 }
 
 /// 候选提示的一段：`label` 是段名原文（开关时回传），`title` 是给人看的名字。

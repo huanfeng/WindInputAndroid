@@ -781,6 +781,12 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_scheme_delete(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_scheme_import(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_scheme_preview(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_select_candidate_plain(
@@ -921,6 +927,12 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_schema_dicts(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_scheme_delete(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_scheme_import(`ptr`: Long,`path`: RustBuffer.ByValue,`replace`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_scheme_preview(`ptr`: Long,`path`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_select_candidate(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1185,6 +1197,15 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_delete() != 15643) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_import() != 34731) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_preview() != 35287) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_select_candidate() != 14719) {
@@ -2357,6 +2378,22 @@ public interface WindCoreInterface {
     fun `schemas`(): List<SchemaInfo>
     
     /**
+     * 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份）。共享文件保留，只读层永不删。
+     */
+    fun `schemeDelete`(`id`: kotlin.String): SchemeDeleteInfo
+    
+    /**
+     * 导入方案包。`replace=false` 时已存在的文件跳过。成功后刷新已装方案并重载配置。
+     * 包内 `config_patch.toml` 本版本不应用。
+     */
+    fun `schemeImport`(`path`: kotlin.String, `replace`: kotlin.Boolean): SchemeImportInfo
+    
+    /**
+     * 预览一个方案包（只读，不落盘）。`path` 是应用私有目录里的文件，不是 `content://`。
+     */
+    fun `schemePreview`(`path`: kotlin.String): SchemePreviewInfo
+    
+    /**
      * 按**绝对下标**选词，返回编辑指令流（与 [`Self::key_down`] 同一种形状）。
      *
      * `index` 是全量候选里的绝对下标，不是页内的——取自 [`Self::candidates`] 拉到的
@@ -3116,6 +3153,62 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     UniffiLib.uniffi_wind_android_fn_method_windcore_schemas(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 删除用户层方案（用户自己导入的，或覆盖了自带方案的那份）。共享文件保留，只读层永不删。
+     */
+    @Throws(ConfigException::class)override fun `schemeDelete`(`id`: kotlin.String): SchemeDeleteInfo {
+            return FfiConverterTypeSchemeDeleteInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_scheme_delete(
+        it,
+        
+        FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 导入方案包。`replace=false` 时已存在的文件跳过。成功后刷新已装方案并重载配置。
+     * 包内 `config_patch.toml` 本版本不应用。
+     */
+    @Throws(ConfigException::class)override fun `schemeImport`(`path`: kotlin.String, `replace`: kotlin.Boolean): SchemeImportInfo {
+            return FfiConverterTypeSchemeImportInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_scheme_import(
+        it,
+        
+        FfiConverterString.lower(`path`),
+        FfiConverterBoolean.lower(`replace`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 预览一个方案包（只读，不落盘）。`path` 是应用私有目录里的文件，不是 `content://`。
+     */
+    @Throws(ConfigException::class)override fun `schemePreview`(`path`: kotlin.String): SchemePreviewInfo {
+            return FfiConverterTypeSchemePreviewInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_scheme_preview(
+        it,
+        
+        FfiConverterString.lower(`path`),_status)
 }
     }
     )
@@ -4224,6 +4317,17 @@ data class InstalledSchemaInfo (
     var `enabled`: kotlin.Boolean
     , 
     var `locked`: kotlin.Boolean
+    , 
+    /**
+     * 用户层有同名方案文件（用户导入的，或覆盖了自带方案的）：可删除 / 恢复自带版本
+     */
+    var `user`: kotlin.Boolean
+    , 
+    /**
+     * APK 自带层也有同名方案：`user && builtin` = 覆盖了自带（显示「恢复自带版本」），
+     * `!user && builtin` = 纯自带（不给删除）
+     */
+    var `builtin`: kotlin.Boolean
     
 ){
     
@@ -4244,6 +4348,8 @@ public object FfiConverterTypeInstalledSchemaInfo: FfiConverterRustBuffer<Instal
             FfiConverterString.read(buf),
             FfiConverterBoolean.read(buf),
             FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterBoolean.read(buf),
         )
     }
 
@@ -4251,7 +4357,9 @@ public object FfiConverterTypeInstalledSchemaInfo: FfiConverterRustBuffer<Instal
             FfiConverterString.allocationSize(value.`id`) +
             FfiConverterString.allocationSize(value.`name`) +
             FfiConverterBoolean.allocationSize(value.`enabled`) +
-            FfiConverterBoolean.allocationSize(value.`locked`)
+            FfiConverterBoolean.allocationSize(value.`locked`) +
+            FfiConverterBoolean.allocationSize(value.`user`) +
+            FfiConverterBoolean.allocationSize(value.`builtin`)
     )
 
     override fun write(value: InstalledSchemaInfo, buf: ByteBuffer) {
@@ -4259,6 +4367,8 @@ public object FfiConverterTypeInstalledSchemaInfo: FfiConverterRustBuffer<Instal
             FfiConverterString.write(value.`name`, buf)
             FfiConverterBoolean.write(value.`enabled`, buf)
             FfiConverterBoolean.write(value.`locked`, buf)
+            FfiConverterBoolean.write(value.`user`, buf)
+            FfiConverterBoolean.write(value.`builtin`, buf)
     }
 }
 
@@ -4593,6 +4703,213 @@ public object FfiConverterTypeSchemaInfo: FfiConverterRustBuffer<SchemaInfo> {
             FfiConverterString.write(value.`name`, buf)
             FfiConverterString.write(value.`iconLabel`, buf)
             FfiConverterBoolean.write(value.`active`, buf)
+    }
+}
+
+
+
+/**
+ * 删除结果。
+ */
+data class SchemeDeleteInfo (
+    var `deleted`: List<kotlin.String>
+    , 
+    /**
+     * 被其它方案共享而保留的文件
+     */
+    var `keptShared`: List<kotlin.String>
+    , 
+    var `schemaIds`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemeDeleteInfo: FfiConverterRustBuffer<SchemeDeleteInfo> {
+    override fun read(buf: ByteBuffer): SchemeDeleteInfo {
+        return SchemeDeleteInfo(
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemeDeleteInfo) = (
+            FfiConverterSequenceString.allocationSize(value.`deleted`) +
+            FfiConverterSequenceString.allocationSize(value.`keptShared`) +
+            FfiConverterSequenceString.allocationSize(value.`schemaIds`)
+    )
+
+    override fun write(value: SchemeDeleteInfo, buf: ByteBuffer) {
+            FfiConverterSequenceString.write(value.`deleted`, buf)
+            FfiConverterSequenceString.write(value.`keptShared`, buf)
+            FfiConverterSequenceString.write(value.`schemaIds`, buf)
+    }
+}
+
+
+
+/**
+ * 导入结果。
+ */
+data class SchemeImportInfo (
+    /**
+     * 实际写入的文件
+     */
+    var `imported`: List<kotlin.String>
+    , 
+    /**
+     * 因已存在而跳过的文件（`replace=false`）
+     */
+    var `conflicts`: List<kotlin.String>
+    , 
+    /**
+     * 包内的方案 id（用于结果页「立即启用」）
+     */
+    var `schemaIds`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemeImportInfo: FfiConverterRustBuffer<SchemeImportInfo> {
+    override fun read(buf: ByteBuffer): SchemeImportInfo {
+        return SchemeImportInfo(
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemeImportInfo) = (
+            FfiConverterSequenceString.allocationSize(value.`imported`) +
+            FfiConverterSequenceString.allocationSize(value.`conflicts`) +
+            FfiConverterSequenceString.allocationSize(value.`schemaIds`)
+    )
+
+    override fun write(value: SchemeImportInfo, buf: ByteBuffer) {
+            FfiConverterSequenceString.write(value.`imported`, buf)
+            FfiConverterSequenceString.write(value.`conflicts`, buf)
+            FfiConverterSequenceString.write(value.`schemaIds`, buf)
+    }
+}
+
+
+
+/**
+ * 预览结果：只读，不落盘。字符串列表里的路径都是 schemas 根相对路径。
+ */
+data class SchemePreviewInfo (
+    /**
+     * 包标题（`package.toml` 的 `title`，缺省空串）。分发者提供的任意文本，只能当纯文本渲染
+     */
+    var `title`: kotlin.String
+    , 
+    /**
+     * 包说明（多行纯文本，缺省空串）
+     */
+    var `description`: kotlin.String
+    , 
+    /**
+     * 包内的方案 id（根下 `*.schema.toml`）
+     */
+    var `schemaIds`: List<kotlin.String>
+    , 
+    /**
+     * 将新增的文件
+     */
+    var `willAdd`: List<kotlin.String>
+    , 
+    /**
+     * 用户层已有同名文件的条目（`replace=false` 时跳过，`true` 时覆盖）
+     */
+    var `conflicts`: List<kotlin.String>
+    , 
+    /**
+     * 引用的系统（APK 自带）资源——包里没带，运行时取自带的
+     */
+    var `systemRefs`: List<kotlin.String>
+    , 
+    /**
+     * 缺失的引用：装上也可能用不了，界面要醒目提示
+     */
+    var `missing`: List<kotlin.String>
+    , 
+    /**
+     * 包内方案 id 与 APK 自带方案同名：导入会覆盖自带方案（用户层优先），需二次确认
+     */
+    var `overridesBuiltin`: List<kotlin.String>
+    , 
+    /**
+     * 包带 `config_patch.toml`：本版本不应用
+     */
+    var `ignoredConfigPatch`: kotlin.Boolean
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemePreviewInfo: FfiConverterRustBuffer<SchemePreviewInfo> {
+    override fun read(buf: ByteBuffer): SchemePreviewInfo {
+        return SchemePreviewInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterBoolean.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemePreviewInfo) = (
+            FfiConverterString.allocationSize(value.`title`) +
+            FfiConverterString.allocationSize(value.`description`) +
+            FfiConverterSequenceString.allocationSize(value.`schemaIds`) +
+            FfiConverterSequenceString.allocationSize(value.`willAdd`) +
+            FfiConverterSequenceString.allocationSize(value.`conflicts`) +
+            FfiConverterSequenceString.allocationSize(value.`systemRefs`) +
+            FfiConverterSequenceString.allocationSize(value.`missing`) +
+            FfiConverterSequenceString.allocationSize(value.`overridesBuiltin`) +
+            FfiConverterBoolean.allocationSize(value.`ignoredConfigPatch`)
+    )
+
+    override fun write(value: SchemePreviewInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`title`, buf)
+            FfiConverterString.write(value.`description`, buf)
+            FfiConverterSequenceString.write(value.`schemaIds`, buf)
+            FfiConverterSequenceString.write(value.`willAdd`, buf)
+            FfiConverterSequenceString.write(value.`conflicts`, buf)
+            FfiConverterSequenceString.write(value.`systemRefs`, buf)
+            FfiConverterSequenceString.write(value.`missing`, buf)
+            FfiConverterSequenceString.write(value.`overridesBuiltin`, buf)
+            FfiConverterBoolean.write(value.`ignoredConfigPatch`, buf)
     }
 }
 
