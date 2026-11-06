@@ -179,10 +179,10 @@ object KeyboardLayouts {
     /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
     val qwerty: List<List<KeyDef>> = listOf(
         charKeys("qwertyuiop", "1234567890"),
-        listOf(halfSpacer) + charKeys("asdfghjkl", "~)(;:!?'\"", "@#()") + listOf(halfSpacer),
+        listOf(halfSpacer) + charKeys("asdfghjkl", "~!@#%\"”*?", "     '&  ") + listOf(halfSpacer),
         buildList {
             add(KeyDef("⇧", KeyAction.Shift, widthWeight = 1.5f, isSpecial = true))
-            addAll(charKeys("zxcvbnm", "^_\\<>-/", "&*+  /~"))
+            addAll(charKeys("zxcvbnm", "()-_:;\\", "      /"))
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
         lettersBottomRow,

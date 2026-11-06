@@ -37,20 +37,24 @@ class LayoutParserTest {
     fun bundledLetterSwipesFollowAssignment() {
         val keys = bundledLetters()
         val zh = "asdfghjkl" + "zxcvbnm"
-        val zhSym = "~)(;:!?'\"" + "^_\\<>-/"
+        // 小米输入法截图（2026-10-24）；中文 h“ j” m、，英文仅 h' j& m/ 三处不同
+        val zhSym = "~!@#%\"”*?" + "()-_:;\\"
         zh.forEachIndexed { i, c -> assertEquals("zh $c", zhSym[i], keys.getValue(c).swipeFor(english = false)) }
-        val enSym = mapOf('a' to '@', 's' to '#', 'd' to '(', 'f' to ')', 'z' to '&', 'x' to '*', 'c' to '+', 'n' to '/', 'm' to '~')
+        val enSym = mapOf('h' to '\'', 'j' to '&', 'm' to '/')
         zh.forEachIndexed { i, c -> assertEquals("en $c", enSym[c] ?: zhSym[i], keys.getValue(c).swipeFor(english = true)) }
     }
 
     @Test
     fun letterPopupIsUpperSymbolLowerWithSymbolInitial() {
         val l = bundledLetters().getValue('l')
-        assertEquals("L\"l", l.popupChars(english = false))
+        assertEquals("L?l", l.popupChars(english = false))
         assertEquals(1, l.popupInitialIndex(english = false))
         val a = bundledLetters().getValue('a')
-        assertEquals("A@a", a.popupChars(english = true))
+        assertEquals("A~a", a.popupChars(english = true))
         assertEquals("A~a", a.popupChars(english = false))
+        val j = bundledLetters().getValue('j')
+        assertEquals("J”j", j.popupChars(english = false))
+        assertEquals("J&j", j.popupChars(english = true))
         val q = LayoutParser.parse("[[rows]]\nkeys = \"q\"\nswipe = \"1\"")[0][0]
         assertEquals("Q1q", q.popupChars(english = false))
         val bare = LayoutParser.parse("[[rows]]\nkeys = \"q\"")[0][0]

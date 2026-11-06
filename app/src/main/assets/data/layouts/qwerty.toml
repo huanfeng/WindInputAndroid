@@ -30,10 +30,12 @@
 id = "qwerty"
 name = "26 键"
 
-# 默认布局对照豆包（真机截图，2026-10-20）：首行上滑出数字、其余字母上滑出常用标点，
-# 角标默认显示；逗号、句号各占一键——中文里最常用的两个标点不该藏在长按或上滑里。
-# 标点一律写 ASCII，中英形态由模式决定：\ → 、  ^ → …  _ → ——  < → 《  > → 》  " → “”  ' → ‘’
-# 上滑符号按常用程度排（不按键盘顺序）：引号“”在右手易达的 l、k；英文模式另有 @ # & * + 等（en_swipe_up）。
+# 默认符号照小米输入法（真机截图，2026-10-24）：首行上滑出数字，其余字母上滑出常用标点，
+# 角标默认显示；逗号、句号各占一键。
+# 标点写 ASCII，中英形态由模式决定：\ → 、  ^ → …  _ → ——  < → 《  > → 》  " → “”  ( → （
+# 例外：j 在中文模式上滑出单个右引号 ”（小米的 h“ j” 成对分居两键），它不是 ASCII，
+# 写字面字符，按键盘视图的规则绕过引擎直接上屏（先顶首选）；英文模式 j 是 &。
+# 英文模式只有三处与中文不同：h 为 '（不能是引号，英文配对表不含引号，否则 don't 会坏）、j 为 &、m 为 /。
 # 上滑符号同时是长按气泡中间那一项，所以字母键写成显式键位数组而不是 swipe 简写。
 
 [[rows]]
@@ -44,28 +46,28 @@ swipe = "1234567890"
 # 第 2 行两侧各缩进半个键，键宽与第 1 行相同（大众布局）
 key = [
   { spacer = 0.5 },
-  { text = "a", swipe_up = "~", en_swipe_up = "@" },
-  { text = "s", swipe_up = ")", en_swipe_up = "#" },
-  { text = "d", swipe_up = "(", en_swipe_up = "(" },
-  { text = "f", swipe_up = ";", en_swipe_up = ")" },
-  { text = "g", swipe_up = ":" },
-  { text = "h", swipe_up = "!" },
-  { text = "j", swipe_up = "?" },
-  { text = "k", swipe_up = "'" },
-  { text = "l", swipe_up = "\"" },
+  { text = "a", swipe_up = "~" },
+  { text = "s", swipe_up = "!" },
+  { text = "d", swipe_up = "@" },
+  { text = "f", swipe_up = "#" },
+  { text = "g", swipe_up = "%" },
+  { text = "h", swipe_up = "\"", en_swipe_up = "'" },
+  { text = "j", swipe_up = "”", en_swipe_up = "&" },
+  { text = "k", swipe_up = "*" },
+  { text = "l", swipe_up = "?" },
   { spacer = 0.5 },
 ]
 
 [[rows]]
 key = [
   { label = "⇧", action = "shift", width = 1.5 },
-  { text = "z", swipe_up = "^", en_swipe_up = "&" },
-  { text = "x", swipe_up = "_", en_swipe_up = "*" },
-  { text = "c", swipe_up = "\\", en_swipe_up = "+" },
-  { text = "v", swipe_up = "<" },
-  { text = "b", swipe_up = ">" },
-  { text = "n", swipe_up = "-", en_swipe_up = "/" },
-  { text = "m", swipe_up = "/", en_swipe_up = "~" },
+  { text = "z", swipe_up = "(" },
+  { text = "x", swipe_up = ")" },
+  { text = "c", swipe_up = "-" },
+  { text = "v", swipe_up = "_" },
+  { text = "b", swipe_up = ":" },
+  { text = "n", swipe_up = ";" },
+  { text = "m", swipe_up = "\\", en_swipe_up = "/" },
   { label = "⌫", action = "backspace", width = 1.5 },
 ]
 

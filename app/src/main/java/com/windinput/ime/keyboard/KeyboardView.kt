@@ -871,7 +871,7 @@ class KeyboardView(context: Context) : View(context) {
         }
         cancelPress()
         when {
-            swipeChar != null -> listener?.onKeyAction(KeyAction.Text(swipeChar), shifted = false)
+            swipeChar != null -> listener?.onKeyAction(symbolAction(swipeChar), shifted = false)
             wasSpaceSwipe -> Unit
             // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
             popupChoice != null && popupChoice.isUpperCase() -> {
@@ -879,12 +879,19 @@ class KeyboardView(context: Context) : View(context) {
                 resetSingleShift(key)
             }
             popupChoice != null -> {
-                listener?.onKeyAction(KeyAction.Text(popupChoice), shifted = false)
+                listener?.onKeyAction(symbolAction(popupChoice), shifted = false)
                 resetSingleShift(key)
             }
             key != null && !skipTap -> handleKey(key)
         }
     }
+
+    /**
+     * 上滑 / 长按气泡选中的符号转动作：ASCII 走引擎（标点转换、配对）；非 ASCII 字面字符
+     * （中文模式 j 的右引号 ”）引擎翻不出 VK，用 [KeyAction.Commit] 直接上屏（有编码时先顶首选）。
+     */
+    private fun symbolAction(c: Char): KeyAction =
+        if (c.code < 0x80) KeyAction.Text(c) else KeyAction.Commit(c.toString())
 
     /** 按下反馈：震动 + 按键音，各自受开关控制 */
     private fun feedback(key: KeyDef) {

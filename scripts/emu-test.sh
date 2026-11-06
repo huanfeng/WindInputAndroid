@@ -637,23 +637,23 @@ tap_key COMMA
 check "中文模式逗号是全角" "，" "$(get_pad_text)"
 
 section "[21b] 长按字母不动抬手出符号；右移选小写"
-# 中文模式 l 键的符号是 \" → 一次出一对“”（出厂默认开自动配对），光标在两个引号之间：
-# 再点逗号（出「，」）应落在引号中间。右移一格是小写 l。
+# 中文模式 h 键的符号是 \" → 一次出一对“”（出厂默认开自动配对），光标在两个引号之间：
+# 再点逗号（出「，」）应落在引号中间。右移一格是小写 h。
 reset_pad
 shift_px="$(awk -v d="$GEO_DENSITY" 'BEGIN{ printf "%d", 25 * d }')"
-read -r lx ly <<< "$(key_center l)"
+read -r lx ly <<< "$(key_center h)"
 adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
 adb_q shell input motionevent UP "$lx" "$ly"; sleep 0.6
-check "长按 l 不动抬手出“”" "“”" "$(get_pad_text)"
+check "长按 h 不动抬手出“”" "“”" "$(get_pad_text)"
 tap_key COMMA
 check "光标在一对引号之间" "“，”" "$(get_pad_text)"
 reset_pad
 adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
 adb_q shell input motionevent MOVE $(( lx + shift_px )) "$ly"; sleep 0.2
 adb_q shell input motionevent UP $(( lx + shift_px )) "$ly"; sleep 0.6
-# 小写 l 是五笔编码（不是直接上屏），空格后出汉字即证明选中的是小写而不是符号 / 大写
+# 小写 h 是五笔编码（不是直接上屏），空格后出汉字即证明选中的是小写而不是符号 / 大写
 tap_key SPACE
-check_match "长按 l 右移选小写 l（成码出字）" "$CN" "$(get_pad_text)"
+check_match "长按 h 右移选小写 h（成码出字）" "$CN" "$(get_pad_text)"
 
 section "[21c] 边缘键 q / p 长按气泡被屏幕夹住，三个选项仍都够得着"
 # q 在最左、p 在最右，气泡不能对着键中心，被夹在屏幕边；选项按气泡真实位置命中。
@@ -695,6 +695,55 @@ tap_key SHIFT
 longpress_to e 0
 tap_key e; tap_key SPACE
 check_match "符号 3 之后 e 是小写（成码出字），不是大写 E" '^3[\x{4e00}-\x{9fa5}]$' "$(get_pad_text)"
+
+section "[21e] 字母层默认符号（小米输入法）：中文 h“ j” m、，英文 h' j& m/"
+# 上滑副字符；j 的右引号 ” 不是 ASCII（引擎翻不出键码），走原样上屏，有编码时先顶首选。
+swipe_sym() {   # key：从键中心上滑 1.5 行，等气泡抬手出字
+    local kx ky
+    read -r kx ky <<< "$(key_center "$1")"
+    adb_q shell input swipe "$kx" "$ky" "$kx" $(( ky - GEO_ROWPX * 3 / 2 )) 250
+    sleep 0.8
+}
+reset_pad
+swipe_sym m
+check "中文 m 上滑是顿号" "、" "$(get_pad_text)"
+reset_pad
+swipe_sym j
+check "中文 j 上滑是单个右引号" "”" "$(get_pad_text)"
+reset_pad
+swipe_sym h
+check "中文 h 上滑自动配对出“”" "“”" "$(get_pad_text)"
+tap_key COMMA
+check "左引号配对后光标在两引号之间" "“，”" "$(get_pad_text)"
+reset_pad
+swipe_sym g
+check "g 上滑是 %" "%" "$(get_pad_text)"
+reset_pad
+swipe_sym k
+check "k 上滑是 *" "*" "$(get_pad_text)"
+reset_pad
+tap_key a; tap_key a
+swipe_sym j
+check_match "有编码时 j 上滑：首选上屏再接 ”" '^[\x{4e00}-\x{9fa5}]”$' "$(get_pad_text)"
+reset_pad
+read -r jx jy <<< "$(key_center j)"
+adb_q shell input motionevent DOWN "$jx" "$jy"; sleep 0.8
+adb_q shell input motionevent UP "$jx" "$jy"; sleep 0.6
+check "长按 j 不动抬手出 ”" "”" "$(get_pad_text)"
+# 英文方案：h 是撇号（不触发配对），j 是 &，m 是 /
+reset_pad; tap_key LANG; sleep 4
+[[ -n "$(wait_english)" ]] || die "英文方案未就绪"
+swipe_sym h
+check "英文 h 上滑是撇号且不配对" "'" "$(get_pad_text)"
+reset_pad
+swipe_sym j
+check "英文 j 上滑是 &" "&" "$(get_pad_text)"
+reset_pad
+swipe_sym m
+check "英文 m 上滑是 /" "/" "$(get_pad_text)"
+reset_pad; tap_key LANG; sleep 4
+[[ -n "$(wait_chinese)" ]] || die "收尾切回中文失败"
+reset_pad
 
 section "[5] 候选点选"
 reset_pad
