@@ -52,8 +52,17 @@ class SchemeImportActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         val uri = sourceUri(intent) ?: return
-        if (!controller.begin(uri)) {
-            Toast.makeText(this, "正在导入上一个方案包，请先完成或取消", Toast.LENGTH_LONG).show()
+        when (controller.state) {
+            // 上一个已经出结果：先收掉，再处理新文件
+            is SchemeImportState.Done, is SchemeImportState.Failed -> {
+                controller.dismiss()
+                controller.begin(uri)
+            }
+            is SchemeImportState.Idle -> controller.begin(uri)
+            is SchemeImportState.Working ->
+                Toast.makeText(this, "正在处理上一个方案包，请稍候再试", Toast.LENGTH_LONG).show()
+            is SchemeImportState.Preview ->
+                Toast.makeText(this, "请先对上一个方案包选择「导入」或「取消」", Toast.LENGTH_LONG).show()
         }
     }
 

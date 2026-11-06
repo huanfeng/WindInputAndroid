@@ -793,7 +793,8 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // ViewModel：转屏不丢导入状态与缓存文件
-    val importer = remember { ViewModelProvider(context as ComponentActivity)[SchemeImportController::class.java] }
+    val owner = remember(context) { context.findComponentActivity() } ?: return
+    val importer = remember(owner) { ViewModelProvider(owner)[SchemeImportController::class.java] }
     DisposableEffect(importer) {
         importer.onChanged = { scope.launch { st.refresh() } }
         onDispose { importer.onChanged = {} }
@@ -830,6 +831,16 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
             icon = SettingsIcons.import,
         ) { picker.launch(arrayOf("application/zip", "application/octet-stream")) }
     }
+}
+
+/** 沿 ContextWrapper 链找宿主 Activity；Compose 的 LocalContext 在某些包装下不是 Activity 本身 */
+private fun android.content.Context.findComponentActivity(): ComponentActivity? {
+    var c: android.content.Context? = this
+    while (c is android.content.ContextWrapper) {
+        if (c is ComponentActivity) return c
+        c = c.baseContext
+    }
+    return null
 }
 
 /**

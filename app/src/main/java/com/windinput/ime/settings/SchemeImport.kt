@@ -62,6 +62,17 @@ internal object SchemeImportFiles {
      */
     const val MAX_PACKAGE_BYTES = 128L * 1024 * 1024
 
+    /** 正在使用的缓存文件名（进程内登记）；[clearStale] 不碰它们 */
+    private val inUse: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    fun markInUse(file: File) {
+        inUse.add(file.name)
+    }
+
+    fun release(file: File) {
+        inUse.remove(file.name)
+    }
+
     fun cacheDir(context: Context): File = File(context.cacheDir, "scheme-import").apply { mkdirs() }
 
     /**
@@ -95,7 +106,9 @@ internal object SchemeImportFiles {
      */
     fun clearStale(context: Context, olderThanMs: Long = 10 * 60_000L) {
         val now = System.currentTimeMillis()
-        cacheDir(context).listFiles()?.filter { now - it.lastModified() > olderThanMs }?.forEach { it.delete() }
+        cacheDir(context).listFiles()
+            ?.filter { it.name !in inUse && now - it.lastModified() > olderThanMs }
+            ?.forEach { it.delete() }
     }
 }
 
@@ -174,7 +187,12 @@ internal class SchemeImportController(app: Application) : AndroidViewModel(app) 
     private var held = false
 
     /** 当前缓存文件；协程被取消时 state 来不及赋值，靠它兜底删除 */
+    @Volatile
     private var pendingFile: File? = null
+
+    /** ViewModel 已被清理；后台复制与之赛跑时，晚到的缓存文件由复制线程自己删 */
+    @Volatile
+    private var cleared = false
 
     /**
      * 开始一次导入：把 [uri]（SAF 文档或 content://）复制进缓存目录再预览。
@@ -194,6 +212,7 @@ internal class SchemeImportController(app: Application) : AndroidViewModel(app) 
         state = SchemeImportState.Working("正在读取方案包…")
         viewModelScope.launch {
             state = withContext(Dispatchers.IO) { copyAndPreview(uri) }
+            releaseIfTerminal()
         }
         return true
     }
@@ -201,6 +220,7 @@ internal class SchemeImportController(app: Application) : AndroidViewModel(app) 
     private fun copyAndPreview(uri: Uri): SchemeImportState {
         val file = File(SchemeImportFiles.cacheDir(context), "pkg-${System.nanoTime()}.wpkg")
         pendingFile = file
+        SchemeImportFiles.markInUse(file)
         var keep = false
         try {
             val copied = context.contentResolver.openInputStream(uri)?.use { SchemeImportFiles.copyLimited(it, file) }
@@ -210,7 +230,7 @@ internal class SchemeImportController(app: Application) : AndroidViewModel(app) 
             }
             val core = CoreAccess.obtainCore(context) ?: return SchemeImportState.Failed("输入法核心未就绪")
             val info = core.schemePreview(file.absolutePath)
-            keep = true
+            keep = !cleared
             return SchemeImportState.Preview(file, info)
         } catch (e: ConfigException) {
             return SchemeImportState.Failed(reasonOf(e))
@@ -219,6 +239,7 @@ internal class SchemeImportController(app: Application) : AndroidViewModel(app) 
         } finally {
             if (!keep) {
                 file.delete()
+                SchemeImportFiles.release(file)
                 if (pendingFile == file) pendingFile = null
             }
         }
@@ -260,9 +281,12 @@ internal class SchemeImportController(app: Application) : AndroidViewModel(app) 
                     SchemeImportState.Failed("导入失败：${e.message ?: e}")
                 } finally {
                     s.file.delete()
+                    SchemeImportFiles.release(s.file)
                     if (pendingFile == s.file) pendingFile = null
                 }
             }
+            // 进入结果页就放锁：之后的「立即启用」不写方案文件，不必再挡住别的导入 / 删除
+            releaseIfTerminal()
             // 成功与失败都刷新：核心在中途失败时磁盘也可能已变，列表要与实际一致
             onChanged()
         }
@@ -287,15 +311,27 @@ internal class SchemeImportController(app: Application) : AndroidViewModel(app) 
 
     /** 取消 / 关闭：丢掉缓存文件，放锁，回到空闲 */
     fun dismiss() {
-        pendingFile?.delete()
+        pendingFile?.let {
+            it.delete()
+            SchemeImportFiles.release(it)
+        }
         pendingFile = null
         state = SchemeImportState.Idle
         releaseIfHeld()
     }
 
     override fun onCleared() {
-        pendingFile?.delete()
+        cleared = true
+        pendingFile?.let {
+            it.delete()
+            SchemeImportFiles.release(it)
+        }
         releaseIfHeld()
+    }
+
+    /** 进入 Done / Failed：不再有文件在处理，放锁 */
+    private fun releaseIfTerminal() {
+        if (state is SchemeImportState.Done || state is SchemeImportState.Failed) releaseIfHeld()
     }
 
     private fun releaseIfHeld() {
@@ -533,8 +569,14 @@ private fun deleteScheme(context: Context, id: String, restore: Boolean): String
         when {
             // 被其它方案引用（如混输方案用它当主方案）时核心会保留它的文件，什么都没删：不能报成功
             r.schemaIds.isEmpty() -> "「$id」仍被其它方案使用，未删除。请先删除依赖它的方案"
-            r.keptShared.isNotEmpty() -> "${if (restore) "已恢复" else "已删除"}，${r.keptShared.size} 个共享文件因被其它方案使用而保留"
-            else -> if (restore) "已恢复自带版本" else "已删除"
+            else -> {
+                val head = if (restore) "已恢复自带版本" else "已删除"
+                val notes = buildList {
+                    if (r.restoredBuiltin.isNotEmpty()) add("同时恢复了 ${r.restoredBuiltin.size} 个被遮住的自带文件")
+                    if (r.keptShared.isNotEmpty()) add("${r.keptShared.size} 个共享文件因被其它方案使用而保留")
+                }
+                if (notes.isEmpty()) head else head + "，" + notes.joinToString("；")
+            }
         }
     } catch (e: ConfigException) {
         reasonOf(e)

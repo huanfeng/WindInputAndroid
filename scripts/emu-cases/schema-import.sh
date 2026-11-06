@@ -126,6 +126,8 @@ p = open(f"{src}/pinyin.schema.toml", encoding="utf-8").read()
 assert 'name = "全拼"' in p
 d = open(f"{src}/pinyin/rime_frost.dict.yaml", "rb").read()
 pkg("override2.wpkg", [("pinyin.schema.toml", p.replace('name = "全拼"', 'name = "新全拼"', 1)), ("pinyin/rime_frost.dict.yaml", d)])
+mix = '[schema]\nid = "mymix"\nname = "我的混输"\n\n[engine]\ntype = "mixed"\n\n[engine.mixed]\nprimary_schema = "pinyin"\nsecondary_schema = "pinyin"\n'
+pkg("mymix.wpkg", [("mymix.schema.toml", mix)])
 with zipfile.ZipFile(f"{tmp}/notpkg.zip", "w") as z:
     z.writestr("readme.txt", "not a scheme package")
 PY
@@ -175,6 +177,24 @@ tap_text "完成"
 sleep 1
 si_open_enabled_schemas
 check "覆盖 pinyin 后列表显示新名字" "yes" "$(si_has_text 新全拼)"
+# 再导入引用 pinyin 的用户混输，然后删掉它：用户刻意做的 pinyin 覆盖不能被连带恢复
+adb_q shell input keyevent BACK; sleep 1
+adb_q shell input keyevent BACK; sleep 1
+adb_q shell run-as "$PKG" rm -f "$SI_USER_SCHEMAS/mymix.schema.toml"
+si_push "$SI_TMP/mymix.wpkg" mymix.wpkg
+si_view mymix.wpkg
+tap_text "导入"
+check "用户混输导入完成" "yes" "$(si_has_text 导入完成)"
+tap_text "完成"
+sleep 1
+si_open_enabled_schemas
+tap_text "我的混输"
+tap_text "删除"
+sleep 2
+check "删用户混输后混输已清掉" "no" "$(si_user_file_exists mymix.schema.toml)"
+check "删用户混输后 pinyin 覆盖仍在" "yes" "$(si_user_file_exists pinyin.schema.toml)"
+check "删用户混输后遮住自带词库的副本仍在" "yes" "$(si_user_file_exists pinyin/rime_frost.dict.yaml)"
+check "删用户混输后列表仍显示新全拼" "yes" "$(si_has_text 新全拼)"
 tap_text "覆盖了自带方案 · 点此恢复自带版本"
 tap_text "恢复"
 sleep 3
