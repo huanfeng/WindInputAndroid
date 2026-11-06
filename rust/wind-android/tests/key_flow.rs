@@ -1129,6 +1129,96 @@ fn schema_dict_toggle_roundtrips() {
     ));
 }
 
+/// 单个方案的设置：FFI 投影接通（分组 / 形态 / 值 / 覆盖态），写、恢复、全部恢复、拒绝非法写。
+///
+/// 用 `stroke`（笔画码表）：本文件别的测试不碰它，共享用户层上写它的覆盖不会串到别处。
+/// 覆盖合并、显隐、打字生效的细节在主仓 `wind-mobile` 的 `schema_settings` 用例里验。
+/// 写口末尾会重载配置，整段放进 8MB 栈的线程（理由见 [`reload_config`]）。
+#[test]
+fn schema_settings_roundtrip() {
+    let Some((core, _rec, _env)) = setup_exclusive("schema_settings") else {
+        return;
+    };
+    std::thread::Builder::new()
+        .stack_size(8 << 20)
+        .spawn(move || schema_settings_roundtrip_body(&core))
+        .expect("起测试线程")
+        .join()
+        .expect("方案设置往返应通过");
+}
+
+fn schema_settings_roundtrip_body(core: &WindCore) {
+    use wind_android::{ConfigError, SchemaSettingGroup, SchemaSettingKind};
+    let id = || "stroke".to_string();
+    let item = |c: &WindCore, key: &str| {
+        c.schema_settings(id())
+            .unwrap()
+            .items
+            .into_iter()
+            .find(|i| i.key == key)
+            .unwrap_or_else(|| panic!("缺 {key}"))
+    };
+    let _ = core.reset_schema_settings(id());
+    let s = core.schema_settings(id()).unwrap();
+    assert_eq!(
+        (s.name.as_str(), s.engine_type.as_str()),
+        ("笔画", "codetable")
+    );
+    let punct = item(core, "punct.mode");
+    assert_eq!(punct.group, SchemaSettingGroup::Behavior);
+    assert_eq!(punct.kind, SchemaSettingKind::Choice);
+    assert_eq!(punct.options, ["follow", "chinese", "english"]);
+    let top = item(core, "engine.codetable.top_code_commit");
+    assert_eq!(
+        (top.group, top.kind),
+        (SchemaSettingGroup::CodeTable, SchemaSettingKind::Bool)
+    );
+    assert_eq!(
+        item(core, "engine.codetable.sentence_input").group,
+        SchemaSettingGroup::Experimental
+    );
+
+    core.set_schema_setting(id(), "punct.mode".into(), "english".into())
+        .unwrap();
+    let flipped = (top.value != "true").to_string();
+    core.set_schema_setting(id(), top.key.clone(), flipped.clone())
+        .unwrap();
+    let p = item(core, "punct.mode");
+    assert_eq!((p.value.as_str(), p.overridden), ("english", true));
+    let t = item(core, &top.key);
+    assert_eq!(
+        (t.value.clone(), t.overridden, t.default_value.clone()),
+        (flipped, true, top.default_value)
+    );
+
+    core.reset_schema_setting(id(), "punct.mode".into())
+        .unwrap();
+    assert!(!item(core, "punct.mode").overridden);
+    core.reset_schema_settings(id()).unwrap();
+    assert!(
+        core.schema_settings(id())
+            .unwrap()
+            .items
+            .iter()
+            .all(|i| !i.overridden)
+    );
+
+    for (key, value) in [
+        ("punct.mode", "latin"),
+        ("engine.aux_code.enabled", "true"),
+        ("schema.name", "x"),
+    ] {
+        assert!(
+            matches!(
+                core.set_schema_setting(id(), key.into(), value.into()),
+                Err(ConfigError::Rejected { .. })
+            ),
+            "{key} = {value} 应被拒"
+        );
+    }
+    assert!(core.schema_settings("no_such".into()).is_err());
+}
+
 /// 词库备份往返：加词 → 导出（.wdict，头部带引擎类型）→ 清空 → 导入 → 列表与按键都回来。
 /// 文件格式与电脑版同一份（主仓 dict_transfer_api），这里只验绑定层这一段接通。
 #[test]

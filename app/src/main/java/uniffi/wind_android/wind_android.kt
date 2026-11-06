@@ -775,9 +775,15 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_press(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_reset_schema_setting(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_reset_schema_settings(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_run_command(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schema_dicts(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_schema_settings(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
     ): Int
@@ -806,6 +812,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_enabled(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_schema_setting(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled(
     ): Int
@@ -922,9 +930,15 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_wind_android_fn_method_windcore_press(`ptr`: Long,`key`: RustBuffer.ByValue,`source`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_reset_schema_setting(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`key`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_reset_schema_settings(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_wind_android_fn_method_windcore_run_command(`ptr`: Long,`cmd`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_schema_dicts(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_schema_settings(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -953,6 +967,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_schema_enabled(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_schema_setting(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`key`: RustBuffer.ByValue,`value`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_tooltip_section_enabled(`ptr`: Long,`label`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1190,10 +1206,19 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_press() != 61301) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_reset_schema_setting() != 3569) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_reset_schema_settings() != 51599) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_run_command() != 36173) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_schema_dicts() != 30261) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_schema_settings() != 27536) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_schemas() != 23756) {
@@ -1236,6 +1261,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_enabled() != 53133) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_setting() != 26762) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_tooltip_section_enabled() != 59430) {
@@ -2361,6 +2389,16 @@ public interface WindCoreInterface {
     fun `press`(`key`: PressKey, `source`: KeySource): KeyResult
     
     /**
+     * 恢复一项：删掉覆盖层的这个键，回到方案文件 / 全局的值。
+     */
+    fun `resetSchemaSetting`(`schemaId`: kotlin.String, `key`: kotlin.String)
+    
+    /**
+     * 全部恢复默认：删掉详情页管理的全部键。扩展词库开关等覆盖层里的其它内容保留。
+     */
+    fun `resetSchemaSettings`(`schemaId`: kotlin.String)
+    
+    /**
      * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
      * ——同一个变化也可能由按键或焦点事件引发，只留推送一条路，K 侧才不会有两份真值。
      */
@@ -2370,6 +2408,12 @@ public interface WindCoreInterface {
      * 方案的附加词库（拼音细胞词库、五笔 Emoji / 行政区域…）及当前开关；不含主库。
      */
     fun `schemaDicts`(`schemaId`: kotlin.String): List<SchemaDictItem>
+    
+    /**
+     * 方案信息头与按方案类型筛好的设置项（自定义行为 / 码表覆盖 / 辅助码 / 整句输入 / 双拼布局）。
+     * 未知方案 → Rejected。数据落点与 PC 同一份 `schema_overrides/{id}.toml`。
+     */
+    fun `schemaSettings`(`schemaId`: kotlin.String): SchemaSettingsInfo
     
     /**
      * 可选方案列表。下标即 [`EngineCommand::SelectSchema`] 的 `index`
@@ -2455,6 +2499,12 @@ public interface WindCoreInterface {
      * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
      */
     fun `setSchemaEnabled`(`id`: kotlin.String, `on`: kotlin.Boolean)
+    
+    /**
+     * 写一项方案设置（值一律字符串：`"true"` / `"3"` / `"english"`），等于方案文件原值即删键。
+     * 写完使该方案引擎失效并重载配置。只接受 [`Self::schema_settings`] 列出的键。
+     */
+    fun `setSchemaSetting`(`schemaId`: kotlin.String, `key`: kotlin.String, `value`: kotlin.String)
     
     /**
      * 打开 / 关闭一段候选提示（`label` 取 [`Self::tooltip_sections`] 给的原文）。
@@ -3111,6 +3161,41 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 恢复一项：删掉覆盖层的这个键，回到方案文件 / 全局的值。
+     */
+    @Throws(ConfigException::class)override fun `resetSchemaSetting`(`schemaId`: kotlin.String, `key`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_reset_schema_setting(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterString.lower(`key`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 全部恢复默认：删掉详情页管理的全部键。扩展词库开关等覆盖层里的其它内容保留。
+     */
+    @Throws(ConfigException::class)override fun `resetSchemaSettings`(`schemaId`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_reset_schema_settings(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),_status)
+}
+    }
+    
+    
+
+    
+    /**
      * 下达引擎命令。状态变化经 [`UiEventListener::on_status`] 异步回报，不在此处同步返回
      * ——同一个变化也可能由按键或焦点事件引发，只留推送一条路，K 侧才不会有两份真值。
      */override fun `runCommand`(`cmd`: EngineCommand)
@@ -3134,6 +3219,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     callWithHandle {
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_method_windcore_schema_dicts(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 方案信息头与按方案类型筛好的设置项（自定义行为 / 码表覆盖 / 辅助码 / 整句输入 / 双拼布局）。
+     * 未知方案 → Rejected。数据落点与 PC 同一份 `schema_overrides/{id}.toml`。
+     */
+    @Throws(ConfigException::class)override fun `schemaSettings`(`schemaId`: kotlin.String): SchemaSettingsInfo {
+            return FfiConverterTypeSchemaSettingsInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_schema_settings(
         it,
         
         FfiConverterString.lower(`schemaId`),_status)
@@ -3395,6 +3499,26 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterString.lower(`id`),
         FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 写一项方案设置（值一律字符串：`"true"` / `"3"` / `"english"`），等于方案文件原值即删键。
+     * 写完使该方案引擎失效并重载配置。只接受 [`Self::schema_settings`] 列出的键。
+     */
+    @Throws(ConfigException::class)override fun `setSchemaSetting`(`schemaId`: kotlin.String, `key`: kotlin.String, `value`: kotlin.String)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_schema_setting(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterString.lower(`key`),
+        FfiConverterString.lower(`value`),_status)
 }
     }
     
@@ -4711,6 +4835,150 @@ public object FfiConverterTypeSchemaInfo: FfiConverterRustBuffer<SchemaInfo> {
 
 
 /**
+ * 一项方案设置（[`wind_mobile::SchemaSetting`] 的投影）。
+ */
+data class SchemaSettingItem (
+    /**
+     * 覆盖层点分路径，原样回传给 [`WindCore::set_schema_setting`]
+     */
+    var `key`: kotlin.String
+    , 
+    var `group`: SchemaSettingGroup
+    , 
+    var `kind`: SchemaSettingKind
+    , 
+    /**
+     * 当前生效值
+     */
+    var `value`: kotlin.String
+    , 
+    /**
+     * 恢复后的值（方案文件 ⊕ 全局基线）
+     */
+    var `defaultValue`: kotlin.String
+    , 
+    /**
+     * 用户覆盖层里有这个键
+     */
+    var `overridden`: kotlin.Boolean
+    , 
+    var `options`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemaSettingItem: FfiConverterRustBuffer<SchemaSettingItem> {
+    override fun read(buf: ByteBuffer): SchemaSettingItem {
+        return SchemaSettingItem(
+            FfiConverterString.read(buf),
+            FfiConverterTypeSchemaSettingGroup.read(buf),
+            FfiConverterTypeSchemaSettingKind.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemaSettingItem) = (
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterTypeSchemaSettingGroup.allocationSize(value.`group`) +
+            FfiConverterTypeSchemaSettingKind.allocationSize(value.`kind`) +
+            FfiConverterString.allocationSize(value.`value`) +
+            FfiConverterString.allocationSize(value.`defaultValue`) +
+            FfiConverterBoolean.allocationSize(value.`overridden`) +
+            FfiConverterSequenceString.allocationSize(value.`options`)
+    )
+
+    override fun write(value: SchemaSettingItem, buf: ByteBuffer) {
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterTypeSchemaSettingGroup.write(value.`group`, buf)
+            FfiConverterTypeSchemaSettingKind.write(value.`kind`, buf)
+            FfiConverterString.write(value.`value`, buf)
+            FfiConverterString.write(value.`defaultValue`, buf)
+            FfiConverterBoolean.write(value.`overridden`, buf)
+            FfiConverterSequenceString.write(value.`options`, buf)
+    }
+}
+
+
+
+/**
+ * 方案信息头 + 设置项。`engine_type` ∈ pinyin / shuangpin / codetable / mixed / english。
+ */
+data class SchemaSettingsInfo (
+    var `id`: kotlin.String
+    , 
+    var `name`: kotlin.String
+    , 
+    var `engineType`: kotlin.String
+    , 
+    var `version`: kotlin.String
+    , 
+    var `author`: kotlin.String
+    , 
+    var `description`: kotlin.String
+    , 
+    var `items`: List<SchemaSettingItem>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemaSettingsInfo: FfiConverterRustBuffer<SchemaSettingsInfo> {
+    override fun read(buf: ByteBuffer): SchemaSettingsInfo {
+        return SchemaSettingsInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceTypeSchemaSettingItem.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemaSettingsInfo) = (
+            FfiConverterString.allocationSize(value.`id`) +
+            FfiConverterString.allocationSize(value.`name`) +
+            FfiConverterString.allocationSize(value.`engineType`) +
+            FfiConverterString.allocationSize(value.`version`) +
+            FfiConverterString.allocationSize(value.`author`) +
+            FfiConverterString.allocationSize(value.`description`) +
+            FfiConverterSequenceTypeSchemaSettingItem.allocationSize(value.`items`)
+    )
+
+    override fun write(value: SchemaSettingsInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`id`, buf)
+            FfiConverterString.write(value.`name`, buf)
+            FfiConverterString.write(value.`engineType`, buf)
+            FfiConverterString.write(value.`version`, buf)
+            FfiConverterString.write(value.`author`, buf)
+            FfiConverterString.write(value.`description`, buf)
+            FfiConverterSequenceTypeSchemaSettingItem.write(value.`items`, buf)
+    }
+}
+
+
+
+/**
  * 删除结果。
  */
 data class SchemeDeleteInfo (
@@ -5777,6 +6045,102 @@ public object FfiConverterTypePressKey : FfiConverterRustBuffer<PressKey>{
 
 
 
+/**
+ * 方案设置项归哪张卡片（对应 PC 方案设置对话框的 TAB）。
+ */
+
+enum class SchemaSettingGroup {
+    
+    /**
+     * 方案参数（双拼布局）
+     */
+    BASIC,
+    /**
+     * 自定义行为：标点态 / 候选排列 / 是否加载短语
+     */
+    BEHAVIOR,
+    /**
+     * 方案覆盖：码表全局配置的方案级覆盖
+     */
+    CODE_TABLE,
+    /**
+     * 辅助码：本方案是否启用
+     */
+    AUX_CODE,
+    /**
+     * 实验性功能：整句输入
+     */
+    EXPERIMENTAL;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemaSettingGroup: FfiConverterRustBuffer<SchemaSettingGroup> {
+    override fun read(buf: ByteBuffer) = try {
+        SchemaSettingGroup.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: SchemaSettingGroup) = 4UL
+
+    override fun write(value: SchemaSettingGroup, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
+/**
+ * 方案设置项的值形态；值在 FFI 上一律是字符串。
+ */
+
+enum class SchemaSettingKind {
+    
+    BOOL,
+    INT,
+    /**
+     * 取值在 `options` 里
+     */
+    CHOICE;
+
+    
+
+
+    companion object
+}
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemaSettingKind: FfiConverterRustBuffer<SchemaSettingKind> {
+    override fun read(buf: ByteBuffer) = try {
+        SchemaSettingKind.values()[buf.getInt() - 1]
+    } catch (e: IndexOutOfBoundsException) {
+        throw RuntimeException("invalid enum value, something is very wrong!!", e)
+    }
+
+    override fun allocationSize(value: SchemaSettingKind) = 4UL
+
+    override fun write(value: SchemaSettingKind, buf: ByteBuffer) {
+        buf.putInt(value.ordinal + 1)
+    }
+}
+
+
+
+
+
 
 /**
  * @suppress
@@ -6259,6 +6623,34 @@ public object FfiConverterSequenceTypeSchemaInfo: FfiConverterRustBuffer<List<Sc
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeSchemaInfo.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSchemaSettingItem: FfiConverterRustBuffer<List<SchemaSettingItem>> {
+    override fun read(buf: ByteBuffer): List<SchemaSettingItem> {
+        val len = buf.getInt()
+        return List<SchemaSettingItem>(len) {
+            FfiConverterTypeSchemaSettingItem.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SchemaSettingItem>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSchemaSettingItem.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SchemaSettingItem>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSchemaSettingItem.write(it, buf)
         }
     }
 }

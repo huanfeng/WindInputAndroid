@@ -412,6 +412,9 @@ pub struct WindCore {
     core: Arc<MobileCore>,
     /// 方案导入 / 删除串行化：两者都是「改磁盘 → 刷新列表 → 重载」，交错会让刷新读到半截状态
     scheme_lock: std::sync::Mutex<()>,
+    /// 方案覆盖文件（`schema_overrides/{id}.toml`）的读改写串行化：扩展词库开关与方案设置
+    /// 写的是同一个文件，两个写入并行时后写的会把先写的落盘结果盖掉
+    override_lock: std::sync::Mutex<()>,
 }
 
 impl WindCore {
@@ -448,6 +451,19 @@ impl WindCore {
         }
     }
 
+    /// 方案设置的写口：与扩展词库开关共用覆盖文件锁；成功后重载配置（引擎已由核心失效）。
+    fn write_schema_settings(
+        &self,
+        write: impl FnOnce(&MobileCore) -> Result<(), String>,
+    ) -> Result<(), ConfigError> {
+        {
+            let _guard = self.override_lock.lock().unwrap_or_else(|e| e.into_inner());
+            write(&self.core).map_err(|reason| ConfigError::Rejected { reason })?;
+        }
+        self.core.run_command(MobileCommand::ReloadConfig);
+        Ok(())
+    }
+
     /// 方案包导入 / 删除落盘后：使涉及的方案缓存失效、重扫已装方案，再重载配置让可选方案与引擎跟上。
     fn after_scheme_change(&self, ids: &[String]) {
         self.core.on_schemes_changed(ids);
@@ -478,6 +494,7 @@ impl WindCore {
         Arc::new(Self {
             core,
             scheme_lock: std::sync::Mutex::new(()),
+            override_lock: std::sync::Mutex::new(()),
         })
     }
 
@@ -723,9 +740,42 @@ impl WindCore {
         dict_id: String,
         on: bool,
     ) -> Result<(), ConfigError> {
+        let _guard = self.override_lock.lock().unwrap_or_else(|e| e.into_inner());
         self.core
             .set_schema_dict_enabled(&schema_id, &dict_id, on)
             .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    // ── 设置页：单个方案的设置（方案详情页） ───────────────────────────
+
+    /// 方案信息头与按方案类型筛好的设置项（自定义行为 / 码表覆盖 / 辅助码 / 整句输入 / 双拼布局）。
+    /// 未知方案 → Rejected。数据落点与 PC 同一份 `schema_overrides/{id}.toml`。
+    pub fn schema_settings(&self, schema_id: String) -> Result<SchemaSettingsInfo, ConfigError> {
+        self.core
+            .schema_settings(&schema_id)
+            .map(SchemaSettingsInfo::from)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 写一项方案设置（值一律字符串：`"true"` / `"3"` / `"english"`），等于方案文件原值即删键。
+    /// 写完使该方案引擎失效并重载配置。只接受 [`Self::schema_settings`] 列出的键。
+    pub fn set_schema_setting(
+        &self,
+        schema_id: String,
+        key: String,
+        value: String,
+    ) -> Result<(), ConfigError> {
+        self.write_schema_settings(|core| core.set_schema_setting(&schema_id, &key, Some(&value)))
+    }
+
+    /// 恢复一项：删掉覆盖层的这个键，回到方案文件 / 全局的值。
+    pub fn reset_schema_setting(&self, schema_id: String, key: String) -> Result<(), ConfigError> {
+        self.write_schema_settings(|core| core.set_schema_setting(&schema_id, &key, None))
+    }
+
+    /// 全部恢复默认：删掉详情页管理的全部键。扩展词库开关等覆盖层里的其它内容保留。
+    pub fn reset_schema_settings(&self, schema_id: String) -> Result<(), ConfigError> {
+        self.write_schema_settings(|core| core.reset_schema_settings(&schema_id))
     }
 
     /// emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
@@ -1265,4 +1315,93 @@ pub struct SchemaDictItem {
     pub label: String,
     pub description: String,
     pub enabled: bool,
+}
+
+/// 方案设置项归哪张卡片（对应 PC 方案设置对话框的 TAB）。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SchemaSettingGroup {
+    /// 方案参数（双拼布局）
+    Basic,
+    /// 自定义行为：标点态 / 候选排列 / 是否加载短语
+    Behavior,
+    /// 方案覆盖：码表全局配置的方案级覆盖
+    CodeTable,
+    /// 辅助码：本方案是否启用
+    AuxCode,
+    /// 实验性功能：整句输入
+    Experimental,
+}
+
+/// 方案设置项的值形态；值在 FFI 上一律是字符串。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SchemaSettingKind {
+    Bool,
+    Int,
+    /// 取值在 `options` 里
+    Choice,
+}
+
+/// 一项方案设置（[`wind_mobile::SchemaSetting`] 的投影）。
+#[derive(Debug, uniffi::Record)]
+pub struct SchemaSettingItem {
+    /// 覆盖层点分路径，原样回传给 [`WindCore::set_schema_setting`]
+    pub key: String,
+    pub group: SchemaSettingGroup,
+    pub kind: SchemaSettingKind,
+    /// 当前生效值
+    pub value: String,
+    /// 恢复后的值（方案文件 ⊕ 全局基线）
+    pub default_value: String,
+    /// 用户覆盖层里有这个键
+    pub overridden: bool,
+    pub options: Vec<String>,
+}
+
+/// 方案信息头 + 设置项。`engine_type` ∈ pinyin / shuangpin / codetable / mixed / english。
+#[derive(Debug, uniffi::Record)]
+pub struct SchemaSettingsInfo {
+    pub id: String,
+    pub name: String,
+    pub engine_type: String,
+    pub version: String,
+    pub author: String,
+    pub description: String,
+    pub items: Vec<SchemaSettingItem>,
+}
+
+impl From<wind_mobile::SchemaSettings> for SchemaSettingsInfo {
+    fn from(s: wind_mobile::SchemaSettings) -> Self {
+        use wind_mobile::{SchemaSettingGroup as G, SchemaSettingKind as K};
+        Self {
+            id: s.id,
+            name: s.name,
+            engine_type: s.engine_type,
+            version: s.version,
+            author: s.author,
+            description: s.description,
+            items: s
+                .items
+                .into_iter()
+                .map(|i| SchemaSettingItem {
+                    key: i.key,
+                    group: match i.group {
+                        G::Basic => SchemaSettingGroup::Basic,
+                        G::Behavior => SchemaSettingGroup::Behavior,
+                        G::CodeTable => SchemaSettingGroup::CodeTable,
+                        G::AuxCode => SchemaSettingGroup::AuxCode,
+                        G::Experimental => SchemaSettingGroup::Experimental,
+                    },
+                    kind: match i.kind {
+                        K::Bool => SchemaSettingKind::Bool,
+                        K::Int => SchemaSettingKind::Int,
+                        K::Choice => SchemaSettingKind::Choice,
+                    },
+                    value: i.value,
+                    default_value: i.default_value,
+                    overridden: i.overridden,
+                    options: i.options,
+                })
+                .collect(),
+        }
+    }
 }
