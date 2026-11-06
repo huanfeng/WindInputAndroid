@@ -43,9 +43,11 @@ cargo ndk "${ndk_args[@]}"
 rm -f "$jni_libs"/*/libredb-*.so
 
 # 2. host 构建 + 生成 Kotlin 绑定（从 host .so 读元数据）
+#    --no-format：本机装了 ktlint 时 bindgen 会自动格式化，CI 上没有 ktlint，
+#    产物整份对不上，CI 的「绑定未漂移」检查就会失败。固定不格式化，两边才一致。
 cargo build -p wind-android
 cargo run -p wind-android --features cli --bin uniffi-bindgen -- \
     generate --library target/debug/libwind_android.so \
-    --language kotlin --out-dir "$java_dir"
+    --language kotlin --out-dir "$java_dir" --no-format
 
 echo "OK: .so → app/src/main/jniLibs/, bindings → app/src/main/java/uniffi/"

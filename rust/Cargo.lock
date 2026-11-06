@@ -1375,6 +1375,7 @@ dependencies = [
  "tracing",
  "uuid",
  "wind-config",
+ "wind-quick-input",
 ]
 
 [[package]]

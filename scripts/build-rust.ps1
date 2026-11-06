@@ -48,7 +48,7 @@ try {
     $bindgenArgs = @(
         "run", "-p", "wind-android", "--features", "cli", "--bin", "uniffi-bindgen", "--",
         "generate", "--library", "target/debug/wind_android.dll",
-        "--language", "kotlin", "--out-dir", $javaDir
+        "--language", "kotlin", "--out-dir", $javaDir, "--no-format"  # 与 build-rust.sh 同：不随本机 ktlint 格式化
     )
     cargo @bindgenArgs
     if ($LASTEXITCODE -ne 0) { throw "bindgen 失败" }
