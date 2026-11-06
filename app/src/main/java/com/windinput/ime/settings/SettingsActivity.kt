@@ -12,6 +12,8 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.SeekableTransitionState
+import androidx.compose.animation.core.TargetBasedAnimation
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.rememberTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInHorizontally
@@ -49,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -338,8 +341,24 @@ private fun SettingsApp(
         try {
             events.collect { transitionState.seekTo(it.progress, target) }
         } catch (e: CancellationException) {
-            // 手势放弃：本协程已取消，回弹动画另起一个
-            appScope.launch { transitionState.animateTo(route, tween(200, easing = LinearOutSlowInEasing)) }
+            // 手势放弃：本协程已取消，回弹另起一个。不能 animateTo(route)：那是把过渡反过来
+            // （上一级 → 当前页），被放弃的那次 seek 会作为「初始值动画」沿原方向接着跑完一整段
+            // 线性时长，当前页先被带出去一截再拉回来（「回弹到位后又往回弹一点」）。
+            // 系统（API 34+）在 onBackCancelled 前已把进度弹回 0，这里通常只剩 snapTo；
+            // 仍有残余进度时沿同一方向 seek 回 0。途中路由被点走（targetState 变了）就不再插手
+            appScope.launch {
+                val back = TargetBasedAnimation(
+                    tween(200, easing = LinearOutSlowInEasing), Float.VectorConverter, transitionState.fraction, 0f,
+                )
+                val start = withFrameNanos { it }
+                var t = 0L
+                while (!back.isFinishedFromNanos(t)) {
+                    t = withFrameNanos { it } - start
+                    if (transitionState.targetState != target) return@launch
+                    transitionState.seekTo(back.getValueFromNanos(t), target)
+                }
+                if (transitionState.targetState == target) transitionState.snapTo(route)
+            }
             throw e
         }
         // 先在这里把过渡放完、再改路由（官方示例的顺序）：反过来的话路由一变，过渡按新的
