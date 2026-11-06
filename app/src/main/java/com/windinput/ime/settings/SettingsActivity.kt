@@ -5,6 +5,8 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.PredictiveBackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
@@ -784,6 +786,14 @@ private fun ItemRow(item: SettingItem, values: SettingsValues) {
 private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
     val st = state ?: return
     if (st.schemas.isEmpty()) return
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val importer = remember { SchemeImportController(context, scope, onChanged = { scope.launch { st.refresh() } }) }
+    // .wpkg 没有标准 MIME，和 .zip 一起放行：application/octet-stream 兜底
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) importer.begin(uri)
+    }
+    SchemeImportDialogs(importer)
 
     // 标题固定：切换中的提示只写在那一行里，且慢了才写（见 SchemaState.slowSwitching）
     SmallTitle("输入方案")
@@ -803,6 +813,11 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
             summary = "已启用 ${st.schemas.size} 个方案",
             icon = SettingsIcons.section(SUB_ENABLED_SCHEMAS),
         ) { onOpenSub(SUB_ENABLED_SCHEMAS) }
+        NavRow(
+            title = "导入方案",
+            summary = "安装电脑版或文档站分发的方案包（.wpkg / .zip）",
+            icon = SettingsIcons.import,
+        ) { picker.launch(arrayOf("application/zip", "application/octet-stream")) }
     }
 }
 
@@ -825,6 +840,8 @@ private fun EnabledSchemasSection(st: SchemaState) {
         }
     }
     if (installed.isEmpty()) return
+    UserSchemasCard(installed, onChanged = { reload++; scope.launch { st.refresh() } })
+    SectionTitle("启用")
     Card(modifier = Modifier.fillMaxWidth()) {
         for (s in installed) {
             ToggleLine(
