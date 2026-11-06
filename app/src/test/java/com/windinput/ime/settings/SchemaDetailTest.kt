@@ -104,4 +104,17 @@ class SchemaDetailTest {
         assertEquals("用户导入（覆盖了自带版本）", sourceLabel(user = true, builtin = true))
         assertEquals("用户导入", sourceLabel(user = true, builtin = false))
     }
+
+    @Test
+    fun choiceEntriesAppendsUnknownValueInsteadOfShowingFirst() {
+        val labels = linkedMapOf("0" to "关闭", "2" to "二码", "3" to "三码")
+        val known = item("engine.codetable.auto_commit_min_len", SchemaSettingKind.INT, value = "2")
+        assertEquals(listOf("0", "2", "3") to listOf("关闭", "二码", "三码"), choiceEntries(known, labels))
+        val odd = item("engine.codetable.auto_commit_min_len", SchemaSettingKind.INT, value = "6")
+        val (values, names) = choiceEntries(odd, labels)
+        assertEquals(3, values.indexOf("6"))
+        assertEquals("6（自定义）", names[3])
+        val gone = item(KEY_SHUANGPIN_LAYOUT, SchemaSettingKind.CHOICE, value = "old", options = listOf("xiaohe", "ziranma"))
+        assertEquals(listOf("xiaohe", "ziranma", "old"), choiceEntries(gone, emptyMap()).first)
+    }
 }

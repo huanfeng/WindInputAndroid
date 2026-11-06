@@ -24,6 +24,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -50,6 +52,7 @@ import uniffi.wind_android.SchemaSettingsInfo
 internal fun SchemaDetailSection(schemaId: String, manifest: SettingsManifestData, onLoaded: (String) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val writeOrder = remember { Mutex() }
     var info by remember { mutableStateOf<SchemaSettingsInfo?>(null) }
     var installed by remember { mutableStateOf<InstalledSchemaInfo?>(null) }
     var layoutNames by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -76,7 +79,8 @@ internal fun SchemaDetailSection(schemaId: String, manifest: SettingsManifestDat
     /** 写一项 / 恢复一项 / 全部恢复：后台写盘（核心随即重载），完后重读一遍真值 */
     fun write(action: SchemaWrite) {
         scope.launch {
-            val failure = withContext(Dispatchers.IO) {
+            // 串行：快速连点同一项时，后点的必须后落盘（锁只保证互斥，不保证先后）
+            val failure = writeOrder.withLock { withContext(Dispatchers.IO) {
                 val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
                 try {
                     when (action) {
@@ -90,7 +94,7 @@ internal fun SchemaDetailSection(schemaId: String, manifest: SettingsManifestDat
                 } catch (e: Exception) {
                     "操作失败：${e.message ?: e}"
                 }
-            }
+            } }
             if (failure != null) Toast.makeText(context, failure, Toast.LENGTH_SHORT).show()
             reload++
         }
@@ -150,7 +154,8 @@ internal fun SchemaDetailSection(schemaId: String, manifest: SettingsManifestDat
 
     // 全部恢复默认：只清本页的项，扩展词库开关不动（核心按键删）
     var confirm by remember { mutableStateOf(false) }
-    val changed = s.items.count { it.overridden && isShown(it, manifest) }
+    // 计数口径 = 实际会删的范围：含界面不列的 candidate.layout（PC 写过时也能在这里清掉）
+    val changed = s.items.count { it.overridden }
     Card(modifier = Modifier.fillMaxWidth()) {
         NavRow(
             title = "全部恢复默认",
@@ -227,14 +232,29 @@ private fun ChoiceSettingRow(
     onWrite: (SchemaWrite) -> Unit,
 ) {
     // 整数项（码表「自动上屏最短码长」「出简让全」）核心不给值域：用清单选项
-    val values = item.options.ifEmpty { labels.keys.toList() }
+    val (values, names) = choiceEntries(item, labels)
+    val selected = values.indexOf(item.value)
     WindowDropdownPreference(
-        items = values.map { labels[it] ?: it },
-        selectedIndex = values.indexOf(item.value).coerceAtLeast(0),
+        items = names,
+        selectedIndex = selected,
         title = title,
         summary = rowSummary(summary, item, labels),
-        onSelectedIndexChange = { i -> values.getOrNull(i)?.let { onWrite(writeFor(item, it)) } },
+        // 点回当前项不写：否则 PC 钉住、恰等于默认值的覆盖会被当成「选回默认」删掉
+        onSelectedIndexChange = { i ->
+            if (i != selected) values.getOrNull(i)?.let { onWrite(writeFor(item, it)) }
+        },
     )
+}
+
+/**
+ * 下拉的值与文字。当前值不在值域里（PC / 手改写了清单外的整数、双拼布局已删）时追加一项
+ * 「原值（自定义）」，不然下拉会静默显示成第一项，与实际值对不上。
+ */
+internal fun choiceEntries(item: SchemaSettingItem, labels: Map<String, String>): Pair<List<String>, List<String>> {
+    val base = item.options.ifEmpty { labels.keys.toList() }
+    val values = if (item.value in base) base else base + item.value
+    val names = values.map { v -> labels[v] ?: if (v in base) v else "$v（自定义）" }
+    return values to names
 }
 
 /** 辅助码三态：跟随全局（显示全局当前值）/ 开 / 关，同 PC 方案设置的「本方案启用辅助码」 */
@@ -245,7 +265,7 @@ private fun AuxSettingRow(item: SchemaSettingItem, onWrite: (SchemaWrite) -> Uni
         selectedIndex = auxIndex(item),
         title = "本方案启用辅助码",
         summary = "打出候选后按触发键，用字形码进一步筛选",
-        onSelectedIndexChange = { i -> auxWrite(item, i)?.let(onWrite) },
+        onSelectedIndexChange = { i -> if (i != auxIndex(item)) auxWrite(item, i)?.let(onWrite) },
     )
 }
 
@@ -262,7 +282,7 @@ internal const val KEY_SENTENCE = "engine.codetable.sentence_input"
  * 没有消费者，开了没反应（核心照样给这一项，数据与 PC 对等）。
  */
 internal val BEHAVIOR_ROWS = linkedMapOf(
-    "punct.mode" to ("标点" to "切到本方案时用中文还是英文标点"),
+    "punct.mode" to ("标点" to "切到本方案时用中文还是英文标点；正在使用的方案要切走再切回才生效"),
     "phrases.enabled" to ("加载命令短语" to "关掉后本方案不出短语候选（如 date、tel 这类码）"),
 )
 
