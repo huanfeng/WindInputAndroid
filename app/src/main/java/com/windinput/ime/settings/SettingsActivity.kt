@@ -335,8 +335,14 @@ private fun SettingsApp(
     //   加载出来）总时长被重算，进度随之重排，快到位的页面又往回跳一截再滑进来
     //   （「点进下一级会再弹一下」）。进度单调了，位置就只会往前走。
     val transitionState = remember { SeekableTransitionState(route) }
-    LaunchedEffect(route) { transitionState.animateTo(route, tween(300, easing = FastOutSlowInEasing)) }
+    // 放弃手势后的收尾协程：新手势、路由变化时先取消它，免得两边抢同一个 transitionState
+    val cancelBackJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
+    LaunchedEffect(route) {
+        cancelBackJob[0]?.cancel()
+        transitionState.animateTo(route, tween(300, easing = FastOutSlowInEasing))
+    }
     PredictiveBackHandler(enabled = route.depth > 0) { events ->
+        cancelBackJob[0]?.cancel()
         val target = route.up()
         try {
             events.collect { transitionState.seekTo(it.progress, target) }
@@ -346,9 +352,15 @@ private fun SettingsApp(
             // 线性时长，当前页先被带出去一截再拉回来（「回弹到位后又往回弹一点」）。
             // 系统（API 34+）在 onBackCancelled 前已把进度弹回 0，这里通常只剩 snapTo；
             // 仍有残余进度时沿同一方向 seek 回 0。途中路由被点走（targetState 变了）就不再插手
-            appScope.launch {
+            val from = transitionState.fraction
+            cancelBackJob[0] = appScope.launch {
+                if (from < 0.001f) {
+                    // 系统已把进度弹回 0：页面就在原位，直接落定，不空跑 200ms
+                    if (transitionState.targetState == target) transitionState.snapTo(route)
+                    return@launch
+                }
                 val back = TargetBasedAnimation(
-                    tween(200, easing = LinearOutSlowInEasing), Float.VectorConverter, transitionState.fraction, 0f,
+                    tween(200, easing = LinearOutSlowInEasing), Float.VectorConverter, from, 0f,
                 )
                 val start = withFrameNanos { it }
                 var t = 0L
