@@ -4721,6 +4721,12 @@ data class SchemeDeleteInfo (
      */
     var `keptShared`: List<kotlin.String>
     , 
+    /**
+     * 因只读层有同路径副本而删掉的用户层文件（被遮住的自带方案 / 资源因此恢复可见），
+     * 不含被删方案自己的方案文件。界面据此提示「同时恢复了 N 个自带文件」
+     */
+    var `restoredBuiltin`: List<kotlin.String>
+    , 
     var `schemaIds`: List<kotlin.String>
     
 ){
@@ -4741,18 +4747,21 @@ public object FfiConverterTypeSchemeDeleteInfo: FfiConverterRustBuffer<SchemeDel
             FfiConverterSequenceString.read(buf),
             FfiConverterSequenceString.read(buf),
             FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
         )
     }
 
     override fun allocationSize(value: SchemeDeleteInfo) = (
             FfiConverterSequenceString.allocationSize(value.`deleted`) +
             FfiConverterSequenceString.allocationSize(value.`keptShared`) +
+            FfiConverterSequenceString.allocationSize(value.`restoredBuiltin`) +
             FfiConverterSequenceString.allocationSize(value.`schemaIds`)
     )
 
     override fun write(value: SchemeDeleteInfo, buf: ByteBuffer) {
             FfiConverterSequenceString.write(value.`deleted`, buf)
             FfiConverterSequenceString.write(value.`keptShared`, buf)
+            FfiConverterSequenceString.write(value.`restoredBuiltin`, buf)
             FfiConverterSequenceString.write(value.`schemaIds`, buf)
     }
 }

@@ -424,6 +424,30 @@ impl WindCore {
         Ok((user, system))
     }
 
+    fn all_schema_ids(&self) -> Vec<String> {
+        self.core
+            .installed_schemas()
+            .into_iter()
+            .map(|s| s.id)
+            .collect()
+    }
+
+    /// 这次改动要使哪些方案的引擎缓存失效：方案文件换了，就是这些方案（混输成员由核心扇出）；
+    /// 只要动了方案文件以外的资源（词库、拆字表……），引用它的是哪些方案要解析各方案才知道，
+    /// 保守起见对所有已装方案失效——这是低频操作，重建在下次使用时才发生。
+    fn affected_schemes(&self, schema_ids: &[String], files: &[String]) -> Vec<String> {
+        let only_schema_files = files
+            .iter()
+            .all(|f| !f.contains('/') && f.ends_with(".schema.toml"));
+        if only_schema_files {
+            schema_ids.to_vec()
+        } else {
+            let mut all = self.all_schema_ids();
+            all.extend(schema_ids.iter().cloned());
+            all
+        }
+    }
+
     /// 方案包导入 / 删除落盘后：使涉及的方案缓存失效、重扫已装方案，再重载配置让可选方案与引擎跟上。
     fn after_scheme_change(&self, ids: &[String]) {
         self.core.on_schemes_changed(ids);
@@ -763,8 +787,12 @@ impl WindCore {
         let _guard = self.scheme_lock.lock().unwrap_or_else(|e| e.into_inner());
         let (user, _) = self.scheme_dirs()?;
         let r = scheme::import(Path::new(&path), &user, replace);
-        // 中途失败也要刷新：落盘是逐文件的，失败时磁盘可能已经变了一部分
-        let ids = r.as_ref().map(|i| i.schema_ids.clone()).unwrap_or_default();
+        // 中途失败也要刷新：落盘是逐文件的，失败时磁盘可能已经变了一部分，无从得知是哪些方案
+        // 受影响，保守起见全部失效
+        let ids = match &r {
+            Ok(i) => self.affected_schemes(&i.schema_ids, &i.imported),
+            Err(_) => self.all_schema_ids(),
+        };
         self.after_scheme_change(&ids);
         r.map_err(|reason| ConfigError::Rejected { reason })
     }
@@ -782,10 +810,14 @@ impl WindCore {
             .filter(|s| *s != id)
             .collect();
         let r = scheme::delete(&id, &user, &system, &keep);
-        let mut ids = vec![id];
-        if let Ok(i) = &r {
-            ids.extend(i.schema_ids.iter().cloned());
-        }
+        let ids = match &r {
+            Ok(i) => {
+                let mut changed = i.schema_ids.clone();
+                changed.push(id);
+                self.affected_schemes(&changed, &i.deleted)
+            }
+            Err(_) => self.all_schema_ids(),
+        };
         self.after_scheme_change(&ids);
         r.map_err(|reason| ConfigError::Rejected { reason })
     }

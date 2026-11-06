@@ -441,3 +441,142 @@ fn rejects_declared_size_over_mobile_limit() {
     );
     assert!(!d.user.join("mini.schema.toml").exists());
 }
+
+const USER_MIX: &str = "[schema]\nid = \"mymix\"\nname = \"我的混输\"\n\n[engine]\ntype = \"mixed\"\n\n[engine.mixed]\nprimary_schema = \"pinyin\"\nsecondary_schema = \"pinyin\"\n";
+const USER_OTHER: &str = "[schema]\nid = \"other\"\nname = \"别的\"\n\n[engine]\ntype = \"pinyin\"\n\n[[dictionaries]]\npath = \"pinyin/main.dict.yaml\"\n";
+
+fn pkg_of(work: &Path, name: &str, schema: &str, body: &str) -> PathBuf {
+    make_zip(
+        work,
+        name,
+        &[
+            ("package.toml", b"[package]\nformat_version = 2\n"),
+            (schema, body.as_bytes()),
+        ],
+    )
+}
+
+/// 回归：用户先覆盖了 pinyin，再导入引用它的用户混输；删掉混输不能把 pinyin 覆盖悄悄恢复掉
+#[test]
+fn deleting_user_mix_keeps_user_override_of_member() {
+    let d = dirs();
+    builtin_with_mix(&d.system[0]);
+    scheme::import(&override_pkg(&d.work), &d.user, false).unwrap();
+    let mix = pkg_of(&d.work, "mix.wpkg", "mymix.schema.toml", USER_MIX);
+    scheme::import(&mix, &d.user, false).unwrap();
+
+    let keep = vec!["pinyin".to_string(), "sysmix".to_string()];
+    let r = scheme::delete("mymix", &d.user, &d.system, &keep).unwrap();
+    assert!(r.schema_ids.iter().any(|s| s == "mymix"), "{r:?}");
+    assert!(r.restored_builtin.is_empty(), "不得连带恢复别的: {r:?}");
+    assert!(!d.user.join("mymix.schema.toml").exists());
+    assert!(
+        d.user.join("pinyin.schema.toml").is_file(),
+        "pinyin 覆盖必须仍在"
+    );
+    assert!(d.user.join("pinyin/main.dict.yaml").is_file());
+    assert_eq!(
+        scheme::layers_of("pinyin", Some(&d.user), &d.system),
+        (true, true)
+    );
+}
+
+/// 回归：覆盖了 pinyin 后导入引用同一词库路径的用户方案；删它不能删掉 pinyin 覆盖依赖的词库
+#[test]
+fn deleting_other_user_scheme_keeps_shadow_dict_used_by_override() {
+    let d = dirs();
+    builtin_with_mix(&d.system[0]);
+    scheme::import(&override_pkg(&d.work), &d.user, false).unwrap();
+    let other = pkg_of(&d.work, "other.wpkg", "other.schema.toml", USER_OTHER);
+    scheme::import(&other, &d.user, false).unwrap();
+
+    let keep = vec!["pinyin".to_string(), "sysmix".to_string()];
+    let r = scheme::delete("other", &d.user, &d.system, &keep).unwrap();
+    assert!(r.restored_builtin.is_empty(), "{r:?}");
+    assert!(
+        r.kept_shared.iter().any(|f| f == "pinyin/main.dict.yaml"),
+        "{r:?}"
+    );
+    assert!(
+        d.user.join("pinyin/main.dict.yaml").is_file(),
+        "覆盖依赖的词库必须仍在"
+    );
+    assert!(d.user.join("pinyin.schema.toml").is_file());
+}
+
+/// 已覆盖 pinyin 且有用户混输引用它：直接「恢复」pinyin 被用户混输挡住，如实什么都没删
+#[test]
+fn restore_is_blocked_while_a_user_scheme_still_uses_it() {
+    let d = dirs();
+    builtin_with_mix(&d.system[0]);
+    scheme::import(&override_pkg(&d.work), &d.user, false).unwrap();
+    let mix = pkg_of(&d.work, "mix.wpkg", "mymix.schema.toml", USER_MIX);
+    scheme::import(&mix, &d.user, false).unwrap();
+    let keep = vec!["mymix".to_string(), "sysmix".to_string()];
+    let r = scheme::delete("pinyin", &d.user, &d.system, &keep).unwrap();
+    assert!(r.schema_ids.is_empty(), "{r:?}");
+    assert!(d.user.join("pinyin.schema.toml").is_file());
+}
+
+/// 删除顺带恢复了别的被遮住的自带文件时，要在返回里体现
+#[test]
+fn delete_reports_builtin_files_restored_as_side_effect() {
+    let d = dirs();
+    builtin_with_mix(&d.system[0]);
+    // 一个用户方案带了一份遮住自带词库的同路径副本，自己引用它；pinyin 本身没被覆盖
+    let pkg = make_zip(
+        &d.work,
+        "shadow.wpkg",
+        &[
+            ("package.toml", b"[package]\nformat_version = 2\n"),
+            ("other.schema.toml", USER_OTHER.as_bytes()),
+            ("pinyin/main.dict.yaml", b"user dict"),
+        ],
+    );
+    scheme::import(&pkg, &d.user, false).unwrap();
+    let keep = vec!["pinyin".to_string(), "sysmix".to_string()];
+    let r = scheme::delete("other", &d.user, &d.system, &keep).unwrap();
+    assert_eq!(r.restored_builtin, ["pinyin/main.dict.yaml"], "{r:?}");
+    assert!(!d.user.join("pinyin/main.dict.yaml").exists());
+}
+
+/// 归档声明的大小被伪造（声明很小、实际 129 MiB）：不能靠声明绕过手机端上限
+#[test]
+fn rejects_forged_declared_size() {
+    let d = dirs();
+    let path = d.work.join("forged.zip");
+    let mut zw = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+    let opts = zip::write::SimpleFileOptions::default();
+    zw.start_file("mini.schema.toml", opts).unwrap();
+    zw.write_all(MIN_SCHEMA.as_bytes()).unwrap();
+    zw.start_file("big.dict.yaml", opts).unwrap();
+    let chunk = vec![0u8; 1 << 20];
+    for _ in 0..129 {
+        zw.write_all(&chunk).unwrap();
+    }
+    zw.finish().unwrap();
+    // 把该条目在本地头与中央目录里的「未压缩大小」改成 100
+    let mut bytes = std::fs::read(&path).unwrap();
+    let name = b"big.dict.yaml";
+    let mut patched = 0;
+    for i in 0..bytes.len().saturating_sub(46) {
+        let local = bytes[i..].starts_with(b"PK\x03\x04") && bytes[i + 30..].starts_with(name);
+        let central = bytes[i..].starts_with(b"PK\x01\x02") && bytes[i + 46..].starts_with(name);
+        let off = if local {
+            i + 22
+        } else if central {
+            i + 24
+        } else {
+            continue;
+        };
+        bytes[off..off + 4].copy_from_slice(&100u32.to_le_bytes());
+        patched += 1;
+    }
+    assert_eq!(patched, 2, "本地头与中央目录各改一处");
+    std::fs::write(&path, bytes).unwrap();
+
+    // 声明只有 100 字节：预览的声明预检放行，导入的实际读取界必须挡住
+    let e = scheme::import(&path, &d.user, false).unwrap_err();
+    assert!(e.contains("超过上限") || e.contains("过大"), "{e}");
+    assert!(!d.user.join("mini.schema.toml").exists(), "零落盘");
+}
