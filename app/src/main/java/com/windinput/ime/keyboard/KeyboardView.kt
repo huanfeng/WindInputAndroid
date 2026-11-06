@@ -8,7 +8,9 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.MotionEvent
+import android.view.VelocityTracker
 import android.view.View
+import android.widget.OverScroller
 
 /**
  * 软键盘主视图：自定义 View + Canvas 绘制（渲染路线见 docs/architecture.md §3.6）。
@@ -24,6 +26,9 @@ class KeyboardView(context: Context) : View(context) {
 
         /** 按下高亮的最小可见时长；约 4 帧，短于此人眼捕捉不到 */
         const val MIN_HIGHLIGHT_MS = 70L
+
+        /** 左列各格的无障碍节点 id 起点（键的 id 是键位下标，远小于它） */
+        const val SIDE_A11Y_BASE = 10_000
 
         /** 键帽高度（dp）；行高减去它就是上下两行之间的间隙（60 − 51 = 9dp ≈ 24px） */
         const val KEY_HEIGHT_DP = 51f
@@ -58,6 +63,9 @@ class KeyboardView(context: Context) : View(context) {
 
         /** 菜单抬手：[index] 是手指停住的那项；停在初始项或没滑进菜单为 null（作罢） */
         fun onLongPressOption(action: KeyAction, index: Int?) = Unit
+
+        /** 点了九宫格左列最底下的「自定义」格（见 [sideCustomize]） */
+        fun onSideCustomize() = Unit
     }
 
     /** 长按菜单的内容：[selected] 为初始选中（通常是当前状态，如当前方案） */
@@ -188,9 +196,25 @@ class KeyboardView(context: Context) : View(context) {
         set(value) {
             if (field == value) return
             field = value
-            sideScroll = 0f
-            invalidate()
+            resetSideScroll()
         }
+
+    /** 左列最底下是否带一格「自定义」（齿轮，点开设置页；数字框带，电话框不带） */
+    var sideCustomize = false
+        set(value) {
+            if (field == value) return
+            field = value
+            resetSideScroll()
+        }
+
+    /** 左列回到顶上、停住滑行（换列表时自动调；Service 在换输入框时也调，不留上一个框的滚动位置） */
+    fun resetSideScroll() {
+        sideScroller.forceFinished(true)
+        sideScroll = 0f
+        sideHighlight = -1
+        if (a11yAttached) a11y.invalidateRoot()
+        invalidate()
+    }
 
     /** 空格上的灰色小字：当前方案名。空串 = 不画 */
     var spaceLabel = ""
@@ -271,6 +295,25 @@ class KeyboardView(context: Context) : View(context) {
     private var sideDragging = false
     private var sideLastY = 0f
     private var sidePressed = -1
+
+    /** 左列的格数：符号 + 末尾的「自定义」格 */
+    private val sideCount get() = sideSymbols.size + if (sideCustomize) 1 else 0
+
+    /** 左列的惯性滑行：抬手按速度 fling，[computeScroll] 逐帧推进；不越界、不回弹 */
+    private val sideScroller = OverScroller(context)
+    private var sideVelocity: VelocityTracker? = null
+    private val viewConfig = android.view.ViewConfiguration.get(context)
+    private val minFlingPx = viewConfig.scaledMinimumFlingVelocity
+    private val maxFlingPx = viewConfig.scaledMaximumFlingVelocity
+
+    /** 左列**绘制用**的按下格，同按键的 [highlightKey]：抬手后至少亮 [MIN_HIGHLIGHT_MS] */
+    private var sideHighlight = -1
+    private var sideHighlightAt = 0L
+    private val clearSideHighlight = Runnable {
+        sideHighlight = -1
+        invalidate()
+    }
+    private val glyphPainter = GlyphPainter()
     private val touchSlopPx = android.view.ViewConfiguration.get(context).scaledTouchSlop
     private var pressedKey: KeyDef? = null
     private var pressedRect: RectF? = null
@@ -424,6 +467,12 @@ class KeyboardView(context: Context) : View(context) {
         backspaceGesture.cancel()
         popupManager.dismissAll()
         handler.removeCallbacks(clearHighlight)
+        handler.removeCallbacks(clearSideHighlight)
+        sideScroller.forceFinished(true)
+        sideVelocity?.recycle()
+        sideVelocity = null
+        sideTouch = false
+        sideHighlight = -1
         highlightKey = null
         highlightFrames = 0
         super.onDetachedFromWindow()
@@ -479,45 +528,88 @@ class KeyboardView(context: Context) : View(context) {
     private val maxSideScroll: Float
         get() {
             val rect = sideRect ?: return 0f
-            return (sideSymbols.size * sideItemHeightPx - rect.height()).coerceAtLeast(0f)
+            return (sideCount * sideItemHeightPx - rect.height()).coerceAtLeast(0f)
         }
 
     private fun sideIndexAt(y: Float): Int {
         val rect = sideRect ?: return -1
         val i = ((y - rect.top + sideScroll) / sideItemHeightPx).toInt()
-        return if (i in sideSymbols.indices) i else -1
+        return if (i in 0 until sideCount) i else -1
     }
 
-    /** 左列符号：一整条功能键底色，里面一格一个符号，超出部分上下滚动 */
+    /** 第 [i] 格（滚动后）的位置 */
+    private fun sideCell(rect: RectF, i: Int): RectF {
+        val top = rect.top + i * sideItemHeightPx - sideScroll
+        return RectF(rect.left, top, rect.right, top + sideItemHeightPx)
+    }
+
+    /**
+     * 左列符号：一整条功能键底色，里面一格一个符号、格间细分隔线，超出部分上下滚动；
+     * 最底下可带一格「自定义」（齿轮）。按下的格画成与按键同圆角的浮起块（按键按下色）。
+     */
     private fun drawSide(canvas: Canvas) {
         val rect = sideRect ?: return
-        if (sideSymbols.isEmpty()) return
+        if (sideCount == 0) return
         keyPaint.color = keySpecialColor
         canvas.drawRoundRect(rect, keyRadiusPx, keyRadiusPx, keyPaint)
         canvas.save()
         canvas.clipRect(rect)
         textPaint.textSize = 18 * density
         textPaint.color = textColor
-        sideSymbols.forEachIndexed { i, sym ->
-            val top = rect.top + i * sideItemHeightPx - sideScroll
-            if (top + sideItemHeightPx < rect.top || top > rect.bottom) return@forEachIndexed
-            val cell = RectF(rect.left, top, rect.right, top + sideItemHeightPx)
-            if (i == sidePressed) {
-                keyPaint.color = keyPressedColor
-                canvas.drawRect(cell, keyPaint)
+        val lineInset = rect.width() * 0.2f
+        val inset = 3 * density
+        for (i in 0 until sideCount) {
+            val cell = sideCell(rect, i)
+            if (cell.bottom < rect.top || cell.top > rect.bottom) continue
+            if (i > 0 && i != sideHighlight && i - 1 != sideHighlight) {
+                keyPaint.color = palette.separator
+                canvas.drawRect(cell.left + lineInset, cell.top - density / 2, cell.right - lineInset, cell.top + density / 2, keyPaint)
             }
-            drawCentered(canvas, sym, cell, textPaint)
+            if (i == sideHighlight) {
+                keyPaint.color = keyPressedColor
+                canvas.drawRoundRect(
+                    cell.left + inset, cell.top + inset, cell.right - inset, cell.bottom - inset,
+                    keyRadiusPx, keyRadiusPx, keyPaint,
+                )
+            }
+            val sym = sideSymbols.getOrNull(i)
+            if (sym != null) {
+                drawCentered(canvas, sym, cell, textPaint)
+            } else {
+                glyphPainter.draw(canvas, PanelIcon.Glyph.SETTINGS, cell.centerX(), cell.centerY(), 20 * density, palette.icon)
+            }
         }
         canvas.restore()
     }
 
-    /** 左列的触摸：竖向拖动是滚动，没拖动就抬手是点选 */
+    /** 左列按下：先停住滑行（这一下只是「停」，不算点选），否则记下按的是哪格 */
+    private fun startSideTouch(event: MotionEvent) {
+        val stoppedFling = !sideScroller.isFinished
+        sideScroller.forceFinished(true)
+        sideTouch = true
+        sideDragging = false
+        downY = event.y
+        sideLastY = event.y
+        sideVelocity?.recycle()
+        sideVelocity = VelocityTracker.obtain().also { it.addMovement(event) }
+        sidePressed = if (stoppedFling) -1 else sideIndexAt(event.y)
+        handler.removeCallbacks(clearSideHighlight)
+        sideHighlight = sidePressed
+        sideHighlightAt = android.os.SystemClock.uptimeMillis()
+        KeyHaptics.tap(this)
+        invalidate()
+    }
+
+    /** 左列的触摸：竖向拖动是滚动（抬手按速度惯性滑行），没拖动就抬手是点选 */
     private fun handleSideTouch(event: MotionEvent) {
+        sideVelocity?.addMovement(event)
         when (event.actionMasked) {
             MotionEvent.ACTION_MOVE -> {
                 if (!sideDragging && kotlin.math.abs(event.y - downY) > touchSlopPx) {
                     sideDragging = true
                     sidePressed = -1
+                    sideHighlight = -1
+                    sideLastY = event.y
                 }
                 if (sideDragging) {
                     sideScroll = (sideScroll - (event.y - sideLastY)).coerceIn(0f, maxSideScroll)
@@ -527,18 +619,52 @@ class KeyboardView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_UP -> {
                 val index = sidePressed
-                sideTouch = false
-                sidePressed = -1
-                invalidate()
-                if (!sideDragging && index >= 0) {
-                    listener?.onKeyAction(KeyAction.Commit(sideSymbols[index]), shifted = false)
-                }
+                if (sideDragging) fling()
+                endSideTouch()
+                if (index >= 0) clickSide(index)
             }
-            MotionEvent.ACTION_CANCEL -> {
-                sideTouch = false
-                sidePressed = -1
-                invalidate()
-            }
+            MotionEvent.ACTION_CANCEL -> endSideTouch()
+        }
+    }
+
+    private fun fling() {
+        val tracker = sideVelocity ?: return
+        tracker.computeCurrentVelocity(1000, maxFlingPx.toFloat())
+        val vy = tracker.yVelocity
+        if (kotlin.math.abs(vy) < minFlingPx) return
+        sideScroller.fling(0, sideScroll.toInt(), 0, -vy.toInt(), 0, 0, 0, maxSideScroll.toInt())
+        postInvalidateOnAnimation()
+    }
+
+    /** 收尾按压；按下格的高亮补足最短可见时长再清 */
+    private fun endSideTouch() {
+        sideTouch = false
+        sidePressed = -1
+        sideVelocity?.recycle()
+        sideVelocity = null
+        if (sideHighlight >= 0) {
+            val left = MIN_HIGHLIGHT_MS - (android.os.SystemClock.uptimeMillis() - sideHighlightAt)
+            if (left > 0) handler.postDelayed(clearSideHighlight, left) else sideHighlight = -1
+        }
+        if (sideScroller.isFinished && a11yAttached) a11y.invalidateRoot()
+        invalidate()
+    }
+
+    /** 左列第 [index] 格被点（手指或读屏）：符号原样上屏，「自定义」格开设置页 */
+    private fun clickSide(index: Int) {
+        val sym = sideSymbols.getOrNull(index)
+        if (sym != null) {
+            listener?.onKeyAction(KeyAction.Commit(sym), shifted = false)
+        } else if (sideCustomize && index == sideSymbols.size) {
+            listener?.onSideCustomize()
+        }
+    }
+
+    override fun computeScroll() {
+        if (sideScroller.computeScrollOffset()) {
+            sideScroll = sideScroller.currY.toFloat().coerceIn(0f, maxSideScroll)
+            postInvalidateOnAnimation()
+            if (sideScroller.isFinished && a11yAttached) a11y.invalidateRoot()
         }
     }
 
@@ -700,14 +826,8 @@ class KeyboardView(context: Context) : View(context) {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 val side = sideRect
-                if (side != null && sideSymbols.isNotEmpty() && side.contains(event.x, event.y)) {
-                    sideTouch = true
-                    sideDragging = false
-                    downY = event.y
-                    sideLastY = event.y
-                    sidePressed = sideIndexAt(event.y)
-                    KeyHaptics.tap(this)
-                    invalidate()
+                if (side != null && sideCount > 0 && side.contains(event.x, event.y)) {
+                    startSideTouch(event)
                     return true
                 }
                 startPress(event.getPointerId(0), event.x, event.y)
@@ -720,7 +840,7 @@ class KeyboardView(context: Context) : View(context) {
                 // 落在左侧符号列：那里不是键（占位空白），按键位找会命中同行最近的数字键、打错字。
                 // 侧列滚动只认单指，这根手指忽略
                 val side = sideRect
-                if (side != null && sideSymbols.isNotEmpty() && side.contains(event.getX(i), event.getY(i))) {
+                if (side != null && sideCount > 0 && side.contains(event.getX(i), event.getY(i))) {
                     activePointerId = MotionEvent.INVALID_POINTER_ID
                     return true
                 }
@@ -1012,15 +1132,31 @@ class KeyboardView(context: Context) : View(context) {
     // 键是 Canvas 画的，系统看不见：每个键报成一个虚拟节点（读屏念键名、双击即按），
     // uiautomator 也因此能按文字找到键。按下走 [handleKey]，与手指点按同一条路。
 
+    // 左列各格也报成节点（id 从 [SIDE_A11Y_BASE] 起，只报露在列里的格）：符号念「左列·符号」，
+    // 齿轮格念「自定义」
     private val a11y = object : androidx.customview.widget.ExploreByTouchHelper(this) {
-        override fun getVirtualViewAt(x: Float, y: Float): Int =
-            keyBounds.indexOfFirst { it.rect.contains(x, y) }.takeIf { it >= 0 } ?: INVALID_ID
+        override fun getVirtualViewAt(x: Float, y: Float): Int {
+            val side = sideRect
+            if (side != null && side.contains(x, y)) {
+                return sideIndexAt(y).takeIf { it >= 0 }?.let { SIDE_A11Y_BASE + it } ?: INVALID_ID
+            }
+            return keyBounds.indexOfFirst { it.rect.contains(x, y) }.takeIf { it >= 0 } ?: INVALID_ID
+        }
 
         override fun getVisibleVirtualViews(ids: MutableList<Int>) {
             keyBounds.indices.forEach(ids::add)
+            val side = sideRect ?: return
+            for (i in 0 until sideCount) {
+                val cell = sideCell(side, i)
+                if (cell.bottom > side.top && cell.top < side.bottom) ids += SIDE_A11Y_BASE + i
+            }
         }
 
         override fun onPopulateNodeForVirtualView(id: Int, node: androidx.core.view.accessibility.AccessibilityNodeInfoCompat) {
+            if (id >= SIDE_A11Y_BASE) {
+                populateSideNode(id - SIDE_A11Y_BASE, node)
+                return
+            }
             val kb = keyBounds.getOrNull(id)
             if (kb == null) {
                 // 键位刚重排、旧 id 失效：给个空壳，ExploreByTouchHelper 要求边界非空
@@ -1039,6 +1175,11 @@ class KeyboardView(context: Context) : View(context) {
 
         override fun onPerformActionForVirtualView(id: Int, action: Int, arguments: android.os.Bundle?): Boolean {
             if (action != androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_CLICK) return false
+            if (id >= SIDE_A11Y_BASE) {
+                if (id - SIDE_A11Y_BASE !in 0 until sideCount) return false
+                clickSide(id - SIDE_A11Y_BASE)
+                return true
+            }
             val key = keyBounds.getOrNull(id)?.key ?: return false
             handleKey(key)
             invalidate()
@@ -1050,6 +1191,29 @@ class KeyboardView(context: Context) : View(context) {
     init {
         androidx.core.view.ViewCompat.setAccessibilityDelegate(this, a11y)
         a11yAttached = true
+    }
+
+    private fun populateSideNode(i: Int, node: androidx.core.view.accessibility.AccessibilityNodeInfoCompat) {
+        val side = sideRect
+        val label = when {
+            i in sideSymbols.indices -> "左列·${sideSymbols[i]}"
+            sideCustomize && i == sideSymbols.size -> "自定义"
+            else -> null
+        }
+        if (side == null || label == null) {
+            node.contentDescription = ""
+            node.setBoundsInParent(android.graphics.Rect(0, 0, 1, 1))
+            return
+        }
+        // 滚到一半露出的格按露出的部分报，不越出左列
+        val cell = sideCell(side, i)
+        cell.intersect(side)
+        node.className = android.widget.Button::class.java.name
+        node.contentDescription = label
+        val r = android.graphics.Rect()
+        cell.roundOut(r)
+        node.setBoundsInParent(r)
+        node.addAction(androidx.core.view.accessibility.AccessibilityNodeInfoCompat.ACTION_CLICK)
     }
 
     override fun dispatchHoverEvent(event: MotionEvent): Boolean =

@@ -97,6 +97,7 @@ class UserConfig(private val file: File) {
 
     private fun serialize(value: Any): String = when (value) {
         is Boolean, is Long, is Int, is Double -> value.toString()
-        else -> "\"" + value.toString().replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        // 基本字符串里不能有裸换行（数字键盘左列符号表按换行分隔），转成 \n
+        else -> "\"" + value.toString().replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n") + "\""
     }
 }

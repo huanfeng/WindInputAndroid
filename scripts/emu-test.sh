@@ -538,8 +538,9 @@ SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF "$COMMENT_OFF")"
 with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段就补一段
     # 用户自己写过的 candidate_comment 先去掉：留着就是重复键（TOML 错误、取值看解析器心情）
     local body
-    # one_hand 同理剥掉：[43] 中途断掉留下单手模式的话，后面按全宽几何点键的用例全会点偏
-    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand)[[:space:]]*=')"
+    # one_hand 同理剥掉：[43] 中途断掉留下单手模式的话，后面按全宽几何点键的用例全会点偏；
+    # number_side_symbols 同理：[65]–[67] 中途断掉留下改过的左列，[24] 按出厂列表点「*」就点错
+    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand|number_side_symbols)[[:space:]]*=')"
     # 段头允许带空白与行尾注释（`[ui.android]  # 键盘`）；认不出就会再补一段，TOML 里是重复段
     if printf '%s\n' "$body" | grep -qE '^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$'; then
         printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" \
@@ -1789,6 +1790,8 @@ source "$ROOT/scripts/emu-cases/schema-import.sh"
 source "$ROOT/scripts/emu-cases/schema-settings.sh"
 # 编辑工具栏（[62]–[64]）
 source "$ROOT/scripts/emu-cases/toolbar-edit.sh"
+# 九宫格左列符号（[65]–[67]）
+source "$ROOT/scripts/emu-cases/numpad-side.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"

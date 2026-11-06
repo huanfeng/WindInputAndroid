@@ -117,6 +117,17 @@ import java.io.File
  */
 class SettingsActivity : ComponentActivity() {
 
+    companion object {
+        /** 直接打开某一页（输入法里的入口用，如九宫格左列的「自定义」）：一级页 id */
+        const val EXTRA_PAGE = "page"
+
+        /** 同上：一级页下的二级页名（可缺） */
+        const val EXTRA_SUB = "sub"
+
+        /** 「键盘布局」页的 id（设置清单） */
+        const val PAGE_KEYBOARD = "keyboard"
+    }
+
     /**
      * 输入法启用 / 当前状态。回到本页时重查：去系统设置启用后按返回是 onResume，
      * 而「切换输入法」弹的是系统对话框，本页不 pause、只失焦——两处都要查。
@@ -163,6 +174,7 @@ class SettingsActivity : ComponentActivity() {
                     manifest = manifest,
                     userConfig = userConfig,
                     versionName = versionName,
+                    initialRoute = Route(intent.getStringExtra(EXTRA_PAGE), intent.getStringExtra(EXTRA_SUB)),
                     actions = SettingsActions(
                         enableIme = { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) },
                         // 国内系统把「切换输入法」藏得很深（导航栏没有键盘图标，要进好几层设置），
@@ -238,11 +250,15 @@ internal const val DICT_STATS = "词库统计"
 /** 方案页里代码画的二级页 */
 internal const val SUB_ENABLED_SCHEMAS = "启用的方案"
 
+/** 键盘布局页里代码画的二级页：数字框九宫格左列的符号 */
+internal const val SUB_NUMPAD_SYMBOLS = "数字键盘符号"
+
 /** 方案设置里的「双拼」组：清单项之外，代码在组页顶上画布局列表 */
 private const val SECTION_SHUANGPIN = "双拼"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
-internal val RESERVED_SUBPAGES = setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS)
+internal val RESERVED_SUBPAGES =
+    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -304,13 +320,15 @@ private fun SettingsApp(
     manifest: SettingsManifestData,
     userConfig: UserConfig,
     versionName: String,
+    initialRoute: Route,
     actions: SettingsActions,
 ) {
     val context = LocalContext.current
     var session by remember { mutableStateOf<ImeSession?>(null) }
     var values by remember { mutableStateOf(SettingsValues(userConfig, null)) }
-    var routePage by rememberSaveable { mutableStateOf<String?>(null) }
-    var routeSub by rememberSaveable { mutableStateOf<String?>(null) }
+    // 起始路由来自 intent（输入法里直达某页）；只在首次创建时用，转屏 / 重建后按保存的走
+    var routePage by rememberSaveable { mutableStateOf(initialRoute.page) }
+    var routeSub by rememberSaveable { mutableStateOf(initialRoute.sub) }
     var routeDetail by rememberSaveable { mutableStateOf<String?>(null) }
     val route = Route(routePage, routeSub, routeDetail)
     // 详情页标题（方案名）：进页前由入口填上，页内读到核心的方案名后再校正；转屏丢了就先显示 id
@@ -643,6 +661,7 @@ private fun PageScreen(
         for ((name, items) in sections) SettingsCard(name, items, values)
         // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
         if (page.id == "ui") TooltipSectionsSection()
+        if (page.id == SettingsActivity.PAGE_KEYBOARD) NumpadSymbolsEntry { onOpenSub(SUB_NUMPAD_SYMBOLS) }
     }
 }
 
@@ -697,6 +716,7 @@ private fun SubScreen(
         page.id == "dict" && sub == DICT_ADD -> DictAdd(session)
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
         page.id == "dict" && sub == DICT_STATS -> DictStatsSection(session)
+        page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_NUMPAD_SYMBOLS -> NumpadSymbolsSection()
         else -> {
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()

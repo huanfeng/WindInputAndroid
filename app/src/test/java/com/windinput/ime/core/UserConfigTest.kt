@@ -35,6 +35,17 @@ class UserConfigTest {
         assertEquals(31, b.getInt("ui.android.n", 0))
     }
 
+    /** 值里有换行（数字键盘左列符号表按 \n 分隔）：写出的文件仍是合法 TOML，读回原样 */
+    @Test
+    fun multiLineStringIsWrittenAsValidToml() {
+        val f = tempFile()
+        val value = "+\n\"\n\\\n,"
+        UserConfig(f).put("ui.android.number_side_symbols", value)
+        val parsed = org.tomlj.Toml.parse(f.readText())
+        assertEquals(emptyList<Any>(), parsed.errors())
+        assertEquals(value, parsed.getString("ui.android.number_side_symbols"))
+    }
+
     /** 进程外改了文件（测试脚本 run-as 直接写）：按修改时间 / 大小发现、重新解析 */
     @Test
     fun externalEditIsPickedUp() {

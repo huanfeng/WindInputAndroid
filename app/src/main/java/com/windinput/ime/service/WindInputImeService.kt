@@ -46,6 +46,7 @@ import com.windinput.ime.keyboard.IconSet
 import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
+import com.windinput.ime.keyboard.NumberSideSymbols
 import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.panels.ClipboardWindow
 import com.windinput.ime.panels.EmojiWindow
@@ -56,6 +57,7 @@ import com.windinput.ime.panels.ExpandedCandidatesWindow
 import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
 import com.windinput.ime.settings.SettingsActivity
+import com.windinput.ime.settings.SUB_NUMPAD_SYMBOLS
 import java.io.File
 
 /**
@@ -341,10 +343,9 @@ class WindInputImeService :
         val NON_CODETABLE_SCHEMAS = setOf("pinyin", "shuangpin", "english")
 
         /**
-         * 九宫格数字键盘左列的符号（可上下滚动）。数字框放算式和常见分隔符；
-         * 电话框放拨号会用到的 `* # +` 和分隔用的 `- ( )`，`,` `;` 是拨号里的暂停 / 等待。
+         * 电话框九宫格左列的符号（可上下滚动，固定不可配）：拨号会用到的 `* # +` 和分隔用的 `- ( )`，
+         * `,` `;` 是拨号里的暂停 / 等待。数字框的那一列用户可配，见 [NumberSideSymbols]。
          */
-        val NUMBER_SIDE_SYMBOLS = listOf("+", "-", "*", "/", "%", "=", ",", ":", "@", "#", "(", ")")
         val PHONE_SIDE_SYMBOLS = listOf("*", "#", "+", "-", "(", ")", ",", ";")
 
         /**
@@ -734,7 +735,14 @@ class WindInputImeService :
             clazz == InputType.TYPE_CLASS_DATETIME
         keyboardWindow?.keyboardView?.let { kv ->
             kv.setLayer(if (numericScene) KeyboardLayer.NUMBER else KeyboardLayer.LETTERS)
-            kv.sideSymbols = if (clazz == InputType.TYPE_CLASS_PHONE) PHONE_SIDE_SYMBOLS else NUMBER_SIDE_SYMBOLS
+            val phone = clazz == InputType.TYPE_CLASS_PHONE
+            kv.sideSymbols = if (phone) {
+                PHONE_SIDE_SYMBOLS
+            } else {
+                NumberSideSymbols.parse(userConfig.readAll()[NumberSideSymbols.CONFIG_KEY] as? String)
+            }
+            kv.sideCustomize = !phone
+            kv.resetSideScroll()
         }
     }
 
@@ -1466,6 +1474,9 @@ class WindInputImeService :
 
     override fun onOpenSettings() = openSettings()
 
+    override fun onSideCustomize() =
+        openSettings(SettingsActivity.PAGE_KEYBOARD, SUB_NUMPAD_SYMBOLS)
+
     // ── 工具栏常驻按钮（快捷面板「编辑工具栏」里挑）──────────────────
 
     override fun toolbarPins(): List<ToolbarItem> =
@@ -1597,13 +1608,19 @@ class WindInputImeService :
      *
      * `NEW_TASK` 是必须的：输入法服务不是 Activity，没有任务栈可挂；
      * 同时收起键盘，否则设置页起来后键盘悬在上面挡住内容。
+     * 给了 [page] / [sub] 就直接进那一页：另加 `CLEAR_TASK` 新开一个设置页，已开着的设置页
+     * 停在别处时也落到这一页（路由只在创建时从 intent 读）。
      */
-    private fun openSettings() {
+    private fun openSettings(page: String? = null, sub: String? = null) {
         requestHideSelf(0)
-        startActivity(
-            android.content.Intent(this, SettingsActivity::class.java)
-                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
+        val intent = android.content.Intent(this, SettingsActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (page != null) {
+            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
+                .putExtra(SettingsActivity.EXTRA_PAGE, page)
+                .putExtra(SettingsActivity.EXTRA_SUB, sub)
+        }
+        startActivity(intent)
     }
 
     override fun onToggleExpanded() {
