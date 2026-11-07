@@ -180,7 +180,6 @@ class WindInputImeService :
                     // 就绪时若已在输入，补一次焦点，否则引擎收不到当前会话
                     if (currentInputConnection != null) ready.focusGained()
                     barView?.setPreparing(false)
-                    adoptSystemSubtypeOnReady()
                     refreshSchemaKeys()
                     // 第一次弹键盘时核心多半还没起来，方案卡片等到这里再弹
                     if (isInputViewShown) maybeShowFirstRunPicker()
@@ -352,9 +351,6 @@ class WindInputImeService :
          */
         const val DEFAULT_CHINESE_SCHEMA_ID = "pinyin"
         const val KEY_LAST_CHINESE = "last_chinese_schema"
-
-        /** 上次同步给系统的子类型对应的方案（ime_state prefs），见 adoptSystemSubtypeOnReady */
-        const val KEY_SUBTYPE_SYNCED = "subtype_synced_schema"
 
         /** 按系统切换器切方案后最多等引擎报到位多久（首次切到拼音要现编词库，模拟器上近 5 秒） */
         const val AWAIT_SCHEMA_MAX_MS = 15_000L
@@ -1282,7 +1278,6 @@ class WindInputImeService :
             awaitingSchema = null
         }
         schemaSubtypes.sync(schemas, currentId)
-        currentId?.let { statePrefs.edit().putString(KEY_SUBTYPE_SYNCED, it).apply() }
     }
 
     /** 切到系统子类型对应的方案；已是当前方案或没这个方案时不动。@return 是否发了切换 */
@@ -1296,17 +1291,9 @@ class WindInputImeService :
         return true
     }
 
-    /**
-     * 核心就绪时看一眼系统当前子类型：与上次同步的不同，说明进程不在时用户在系统切换器里
-     * 换过（从别的输入法直接切到「清风输入法 · 五笔」），按用户的选择来。
-     * 从没同步过（首装、测试脚本删了 ime_state）时不动，以引擎记住的方案为准。
-     */
-    private fun adoptSystemSubtypeOnReady() {
-        val synced = statePrefs.getString(KEY_SUBTYPE_SYNCED, null) ?: return
-        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        val sys = SchemaSubtypes.schemaOf(imm.currentInputMethodSubtype?.extraValue) ?: return
-        if (sys != synced) pendingSystemSchema = sys
-    }
+    // 进程冷启动时**不**按系统当前子类型改方案，以引擎记住的为准、再同步给系统：
+    // 系统在切回本输入法（`ime set`、别的输入法切过来）时按它自己的子类型历史挑一个，
+    // 不一定是用户刚选的——实测按它来会把五笔无端切成英文。只认会话里的回调。
 
     override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype) {
         super.onCurrentInputMethodSubtypeChanged(newSubtype)
