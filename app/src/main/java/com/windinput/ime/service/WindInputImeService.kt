@@ -180,6 +180,7 @@ class WindInputImeService :
                     // 就绪时若已在输入，补一次焦点，否则引擎收不到当前会话
                     if (currentInputConnection != null) ready.focusGained()
                     barView?.setPreparing(false)
+                    adoptSystemSubtypeOnReady()
                     refreshSchemaKeys()
                     // 第一次弹键盘时核心多半还没起来，方案卡片等到这里再弹
                     if (isInputViewShown) maybeShowFirstRunPicker()
@@ -351,6 +352,12 @@ class WindInputImeService :
          */
         const val DEFAULT_CHINESE_SCHEMA_ID = "pinyin"
         const val KEY_LAST_CHINESE = "last_chinese_schema"
+
+        /** 上次同步给系统的子类型对应的方案（ime_state prefs），见 adoptSystemSubtypeOnReady */
+        const val KEY_SUBTYPE_SYNCED = "subtype_synced_schema"
+
+        /** 按系统切换器切方案后最多等引擎报到位多久（首次切到拼音要现编词库，模拟器上近 5 秒） */
+        const val AWAIT_SCHEMA_MAX_MS = 15_000L
 
         /** 首次使用的方案卡片弹过没有（ime_onboarding prefs） */
         const val KEY_FIRST_PICK_SHOWN = "first_pick_shown"
@@ -778,10 +785,12 @@ class WindInputImeService :
      * 空格上一直是空的。
      */
     private fun refreshSchemaKeys() {
-        val active = session.schemas().firstOrNull { it.active }
+        val schemas = session.schemas()
+        val active = schemas.firstOrNull { it.active }
         // 切到英文方案时，方案列表先变、模式短称后到：只看短称的话中间那一下空格上写的是
         // 英文方案自己的名字（「清风英文」），随即又变「英文」——看着就是闪一下
         val english = latinInput || active?.id == ENGLISH_SCHEMA_ID
+        syncSubtypes(schemas, if (english && schemas.any { it.id == ENGLISH_SCHEMA_ID }) ENGLISH_SCHEMA_ID else active?.id)
         // ⚠ 别写成 keyboardView.apply { modeLabel = modeLabel }：块内的 modeLabel
         // 解析成视图自己的属性，等于自赋值，英文模式永远进不去
         keyboardWindow?.keyboardView?.let { kv ->
@@ -1240,6 +1249,76 @@ class WindInputImeService :
         active?.let { statePrefs.edit().putString(KEY_LAST_CHINESE, it.id).apply() }
         val english = schemas.firstOrNull { it.id == ENGLISH_SCHEMA_ID }
         session.runCommand(english?.let { EngineCmd.SelectSchema(it.index) } ?: EngineCmd.English)
+    }
+
+    // ── 系统输入法列表里的当前方案（子类型）────────────────────────
+
+    private val schemaSubtypes by lazy { SchemaSubtypes(this) }
+
+    /** 用户在系统切换器里选了方案、但核心还没就绪：就绪后再切 */
+    private var pendingSystemSchema: String? = null
+
+    /**
+     * 已按系统切换器里的选择发了切方案、引擎还没报到位：期间推来的状态还是旧方案，
+     * 不能拿它去同步系统（会把用户刚选的子类型又改回去）
+     */
+    private var awaitingSchema: String? = null
+    private var awaitingSince = 0L
+
+    /**
+     * 方案变了就同步系统当前子类型（[SchemaSubtypes]）。系统那边先被用户改过、还没切过来的，
+     * 先按用户的选择切方案，切完的状态推送会再走到这里同步。
+     */
+    private fun syncSubtypes(schemas: List<SchemaEntry>, currentId: String?) {
+        if (schemas.isEmpty()) return
+        pendingSystemSchema?.let { wanted ->
+            pendingSystemSchema = null
+            if (applySystemSchema(schemas, wanted)) return
+        }
+        awaitingSchema?.let { wanted ->
+            // 引擎拒绝了这次切换（或首次编词库太久）也不能一直不同步：等够了就放弃
+            val stale = SystemClock.uptimeMillis() - awaitingSince > AWAIT_SCHEMA_MAX_MS
+            if (currentId != wanted && !stale) return
+            awaitingSchema = null
+        }
+        schemaSubtypes.sync(schemas, currentId)
+        currentId?.let { statePrefs.edit().putString(KEY_SUBTYPE_SYNCED, it).apply() }
+    }
+
+    /** 切到系统子类型对应的方案；已是当前方案或没这个方案时不动。@return 是否发了切换 */
+    private fun applySystemSchema(schemas: List<SchemaEntry>, id: String): Boolean {
+        val current = schemas.getOrNull(currentSchemaIndex(schemas))
+        if (current?.id == id) return false
+        val target = schemas.firstOrNull { it.id == id } ?: return false
+        awaitingSchema = id
+        awaitingSince = SystemClock.uptimeMillis()
+        selectSchemaFromKey(schemas, target)
+        return true
+    }
+
+    /**
+     * 核心就绪时看一眼系统当前子类型：与上次同步的不同，说明进程不在时用户在系统切换器里
+     * 换过（从别的输入法直接切到「清风输入法 · 五笔」），按用户的选择来。
+     * 从没同步过（首装、测试脚本删了 ime_state）时不动，以引擎记住的方案为准。
+     */
+    private fun adoptSystemSubtypeOnReady() {
+        val synced = statePrefs.getString(KEY_SUBTYPE_SYNCED, null) ?: return
+        val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        val sys = SchemaSubtypes.schemaOf(imm.currentInputMethodSubtype?.extraValue) ?: return
+        if (sys != synced) pendingSystemSchema = sys
+    }
+
+    override fun onCurrentInputMethodSubtypeChanged(newSubtype: InputMethodSubtype) {
+        super.onCurrentInputMethodSubtypeChanged(newSubtype)
+        // 自己同步过去的那次回调：方案本来就是它，不再切（防回环）
+        if (schemaSubtypes.consumeSelfSwitch(newSubtype)) return
+        val id = SchemaSubtypes.schemaOf(newSubtype.extraValue) ?: return
+        val schemas = session.schemas()
+        if (schemas.isEmpty()) {
+            pendingSystemSchema = id
+            return
+        }
+        applySystemSchema(schemas, id)
     }
 
     /** 键盘自己的小状态（不属于引擎配置的那种），如中英切换前的中文方案 */
