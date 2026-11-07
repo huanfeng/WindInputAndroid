@@ -509,8 +509,9 @@ source = "engine"
 type = "toggle"
 title = "生成大小写变形候选"
 
-# 英文卡里手机才有的三项（键盘侧实现）。引擎的 schema.english.commit_space 不放进来：
-# 键盘已经自己补空格（还会把空格挪到句末标点后面），两边都开就是两个空格。
+# 英文卡里手机才有的三项（键盘侧开关）。引擎的 schema.english.commit_space 不放进来：
+# 触摸键盘的补空格由核心触摸层做（wind-mobile touch.rs，还会把空格挪到句末标点后面），
+# 开关就是下面的 ui.android.auto_space（Service 经 setAutoSpace 下发）；两边都开就是两个空格。
 [[item]]
 page = "schema"
 section = "英文"

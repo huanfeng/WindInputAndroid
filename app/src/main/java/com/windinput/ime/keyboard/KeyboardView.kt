@@ -101,7 +101,7 @@ class KeyboardView(context: Context) : View(context) {
     var spaceSwipeEnabled = true
 
     /** 长按空格有没有动作（设置项 ui.android.space_long_press ≠ none）；做什么由 Service 决定 */
-    var spaceLongPressEnabled = true
+    var spaceLongPressEnabled = false
     var backspaceSwipeEnabled = true
     var swipeSymbolsEnabled = true
 

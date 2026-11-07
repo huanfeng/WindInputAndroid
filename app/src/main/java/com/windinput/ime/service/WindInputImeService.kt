@@ -109,7 +109,10 @@ class WindInputImeService :
     /** 剪贴板建议条开关（设置项 ui.android.clip_suggestion） */
     private var clipSuggestionEnabled = true
 
-    /** 英文自动大写开关（设置项 ui.android.auto_cap；自动补空格由核心负责，见 setAutoSpace） */
+    /**
+     * 英文自动大写开关（设置项 ui.android.auto_cap）。自动补空格不在这里：由核心触摸层补
+     * （wind-mobile touch.rs），开关 ui.android.auto_space 经 setAutoSpace 下发
+     */
     private var autoCapEnabled = true
 
     private lateinit var layoutRepository: LayoutRepository
