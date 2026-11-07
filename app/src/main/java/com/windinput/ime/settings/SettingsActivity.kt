@@ -253,12 +253,15 @@ internal const val SUB_ENABLED_SCHEMAS = "启用的方案"
 /** 键盘布局页里代码画的二级页：数字框九宫格左列的符号 */
 internal const val SUB_NUMPAD_SYMBOLS = "数字键盘符号"
 
+/** 关于页里代码画的二级页 */
+internal const val SUB_PRIVACY = "隐私政策"
+
 /** 方案设置里的「双拼」组：清单项之外，代码在组页顶上画布局列表 */
 private const val SECTION_SHUANGPIN = "双拼"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
 internal val RESERVED_SUBPAGES =
-    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS)
+    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS, SUB_PRIVACY)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -636,7 +639,7 @@ private fun PageScreen(
         "schema" -> SchemaSection(schemaState, onOpenSub)
         "stats" -> StatsSection()
         "dict" -> DictOverview(session, onOpen = onOpenSub)
-        "about" -> AboutSection(versionName)
+        "about" -> AboutSection(versionName, onOpenSub)
     }
     @Suppress("UNUSED_EXPRESSION") values.version // 开关变了，依赖它的项跟着显示 / 隐藏
     val sections = visibleSections(manifest, page.id, values)
@@ -717,6 +720,7 @@ private fun SubScreen(
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
         page.id == "dict" && sub == DICT_STATS -> DictStatsSection(session)
         page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_NUMPAD_SYMBOLS -> NumpadSymbolsSection()
+        page.id == "about" && sub == SUB_PRIVACY -> PrivacySection()
         else -> {
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
@@ -969,7 +973,7 @@ private const val EMOJI_SECTION = "Emoji/OpenCC"
 // ── 关于 ─────────────────────────────────────────────────────────
 
 @Composable
-private fun AboutSection(versionName: String) {
+private fun AboutSection(versionName: String, onOpenSub: (String) -> Unit) {
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
         BasicComponent(
@@ -977,6 +981,9 @@ private fun AboutSection(versionName: String) {
             summary = "版本 $versionName",
             startAction = { WindInputLogo(Modifier.padding(end = 14.dp).size(40.dp)) },
         )
+        NavRow(SUB_PRIVACY, "不联网，输入与词库只存在本机；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
+            onOpenSub(SUB_PRIVACY)
+        }
         NavRow(
             if (showLicenses) "开源许可 ▴" else "开源许可 ▾",
             "随包分发的词库数据与程序库的来源和许可证",

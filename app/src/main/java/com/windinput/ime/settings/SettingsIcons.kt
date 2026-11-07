@@ -18,6 +18,7 @@ import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.icon.extended.Layers
 import top.yukonga.miuix.kmp.icon.extended.Link
 import top.yukonga.miuix.kmp.icon.extended.ListView
+import top.yukonga.miuix.kmp.icon.extended.Lock
 import top.yukonga.miuix.kmp.icon.extended.Merge
 import top.yukonga.miuix.kmp.icon.extended.Messages
 import top.yukonga.miuix.kmp.icon.extended.Months
@@ -26,6 +27,9 @@ import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.icon.extended.Paste
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Replace
+import top.yukonga.miuix.kmp.icon.extended.Report
+import top.yukonga.miuix.kmp.icon.extended.Reset
+import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Share
 import top.yukonga.miuix.kmp.icon.extended.Tasks
@@ -99,6 +103,13 @@ object SettingsIcons {
     val backup: ImageVector get() = MiuixIcons.Backup
     val import: ImageVector get() = MiuixIcons.Import
     val licenses: ImageVector get() = MiuixIcons.Share
+
+    // 「关于」与「高级」里代码画的行
+    val privacy: ImageVector get() = MiuixIcons.Lock
+    val website: ImageVector get() = MiuixIcons.Link
+    val feedback: ImageVector get() = MiuixIcons.Report
+    val diagnostics: ImageVector get() = MiuixIcons.Send
+    val reset: ImageVector get() = MiuixIcons.Reset
     val fallback: ImageVector get() = MiuixIcons.Settings
 
     /** 「启用的方案」每行进方案详情页的按钮 */

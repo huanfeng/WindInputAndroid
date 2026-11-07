@@ -1,0 +1,82 @@
+package com.windinput.ime.settings
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+/** 官网首页（文档站 WindInputDocs 部署在这里）。站上还没有单独的隐私政策页，先链首页 */
+internal const val WEBSITE_URL = "https://windinput.com"
+
+/**
+ * 隐私政策（纯文本）。每一条都要与代码事实一致，改功能时一起改：
+ * - 不联网：清单只申请了 VIBRATE，没有 INTERNET（PrivacyPolicyTest 核对 AndroidManifest）；
+ * - 备份范围：见 res/xml/backup_rules.xml、data_extraction_rules.xml；
+ * - 诊断信息的内容：见 [Diagnostics]。
+ */
+internal val PRIVACY_POLICY: List<Pair<String, String>> = listOf(
+    "不联网" to
+        "清风输入法没有申请网络权限，程序本身无法连接互联网：不上传你输入的任何内容，" +
+        "没有云输入、云同步、广告或统计上报。\n" +
+        "「关于」里的「反馈问题」「官网」会交给浏览器打开网页，「分享诊断信息」由你在系统分享面板里选择发给谁，" +
+        "这些都由你主动发起，经由别的应用完成。",
+    "启用时的系统提示" to
+        "在系统里启用任何第三方输入法时，系统都会提示「此输入法可能会收集您输入的所有文字，包括密码和信用卡号等个人数据」。" +
+        "这是系统对所有输入法的统一提示：输入法确实能看到你打的每一个字，所以要选信得过的。" +
+        "清风输入法看到的文字只用于在本机出候选、学习词频，不会离开你的手机。" +
+        "密码框与应用要求不学习的输入框里，不记词频、不造词、不计统计。",
+    "数据只存本地" to
+        "以下数据保存在本应用的私有目录里，其他应用读不到：\n" +
+        "· 设置（键盘与输入设置）\n" +
+        "· 个人词库：你造的词、调整过的词频、自己添加的词条与命令短语\n" +
+        "· 输入统计（每天打了多少字，不记内容）\n" +
+        "· 剪贴板历史：复制过的文字，未置顶的最多保留 50 条；系统标记为敏感的内容（如密码管理器复制的密码）不记\n" +
+        "· 崩溃记录：程序出错时的调用栈，不含你输入的文字",
+    "系统备份" to
+        "如果你在系统里开了备份（如 Google 备份或手机厂商的换机 / 云备份），设置与个人词库会随系统备份，" +
+        "换机后可以恢复。剪贴板历史、崩溃记录、日志与可重建的缓存不进备份。",
+    "权限用途" to
+        "· 振动：按键振动反馈（强度可在设置里调，也可关闭）\n" +
+        "· 输入法服务：系统要求输入法声明的绑定权限，只有系统能连接它\n" +
+        "清风输入法不申请麦克风、通讯录、位置、存储等权限。语音输入是把你转到系统里另装的语音输入法，" +
+        "本应用不录音。导入方案、导入导出词库时读写的文件，都由你在系统文件选择器里逐次选定，或由你从别的应用打开 / 分享过来。",
+    "日志" to
+        "程序日志写进系统日志（logcat），出厂只记警告与错误，不含输入的文字。" +
+        "「高级 → 调试」里把级别调到「调试」「跟踪」时会记下输入内容，只供排查问题，用完请改回。",
+    "删除数据" to
+        "· 剪贴板历史：剪贴板面板里逐条删除或清空\n" +
+        "· 输入统计：统计页清空\n" +
+        "· 个人词：词库页删除或清空\n" +
+        "· 全部数据：系统设置 → 应用 → 清风输入法 → 存储 → 清除数据；卸载本应用也会删除全部数据",
+)
+
+@Composable
+internal fun PrivacySection() {
+    val context = LocalContext.current
+    for ((title, body) in PRIVACY_POLICY) {
+        SectionTitle(title)
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = body,
+                modifier = Modifier.padding(16.dp),
+                fontSize = 14.sp,
+                lineHeight = 22.sp,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+            )
+        }
+    }
+    SectionTitle("更多")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow("清风输入法官网", WEBSITE_URL, icon = SettingsIcons.website) {
+            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(WEBSITE_URL))) }
+        }
+    }
+}
