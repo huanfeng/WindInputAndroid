@@ -35,6 +35,11 @@ class SettingsValues(
     var version by mutableIntStateOf(0)
         private set
 
+    /** 绕过 [set] 改了配置文件之后（恢复默认设置）让界面重读 */
+    fun touch() {
+        version++
+    }
+
     @Volatile
     private var engine: Map<String, Any> = emptyMap()
 

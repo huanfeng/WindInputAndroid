@@ -665,6 +665,7 @@ private fun PageScreen(
         // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
         if (page.id == "ui") TooltipSectionsSection()
         if (page.id == SettingsActivity.PAGE_KEYBOARD) NumpadSymbolsEntry { onOpenSub(SUB_NUMPAD_SYMBOLS) }
+        if (page.id == "advanced") ResetSection(values)
     }
 }
 

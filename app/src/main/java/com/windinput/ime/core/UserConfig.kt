@@ -73,6 +73,20 @@ class UserConfig(private val file: File) {
         cache[file.path] = Snapshot(file.lastModified(), file.length(), all)
     }
 
+    /**
+     * 删掉满足 [predicate] 的键（「恢复键盘设置」用），返回删了几个；一个都没删就不动文件。
+     */
+    fun removeIf(predicate: (String) -> Boolean): Int = synchronized(cache) {
+        val all = readAll()
+        val kept = all.filterKeys { !predicate(it) }
+        val removed = all.size - kept.size
+        if (removed > 0) {
+            write(kept)
+            cache[file.path] = Snapshot(file.lastModified(), file.length(), kept)
+        }
+        removed
+    }
+
     private fun write(values: Map<String, Any>) {
         // 按节分组：a.b.c=v → [a.b] 下的 c = v；无点键归根节
         val sections = sortedMapOf<String, MutableList<Pair<String, Any>>>()
