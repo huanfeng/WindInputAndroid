@@ -2,7 +2,6 @@ package com.windinput.ime.panels
 
 import android.content.Context
 import android.graphics.Typeface
-import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -10,6 +9,7 @@ import com.windinput.ime.keyboard.BackspaceGesture
 import com.windinput.ime.keyboard.InputWindow
 import com.windinput.ime.keyboard.KeyHaptics
 import com.windinput.ime.keyboard.KeyIcons
+import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.GlyphDrawable
 import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.keyboard.PanelIcon
@@ -47,7 +47,13 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
     )
 
     override fun onCreateView(context: Context): View {
-        val grid = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val density = context.resources.displayMetrics.density
+        val grid = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            // 左右留白同主键盘；键缝由键帽格子自己的内缩画出（同符号页）
+            val edge = (KeyboardDimens.EDGE_PAD_DP * density).toInt()
+            setPadding(edge, 0, edge, 0)
+        }
 
         // 4×3 网格 + 底行撤销 / 重做（各占半行）：文本按钮，功能标注见各 label
         val rows = listOf(
@@ -59,7 +65,9 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
         for (row in rows) {
             val rowView = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
             for ((label, action) in row) {
-                val btn = cellButton(context, label) {
+                // 方向键与「选择」是主键（字母键底色），其余操作用功能键底色，同主键盘的分法
+                val primary = action in ARROWS || action == EditAction.TOGGLE_SELECT
+                val btn = cellButton(context, label, primary) {
                     KeyHaptics.tap(it)
                     listener.onEditAction(action)
                     refreshSelectState()
@@ -72,12 +80,7 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
                 }
                 // 方向键用矢量箭头，与键盘上其他功能图标同一套笔画（字体里的 ↑↓←→ 细且各机型不一）
                 ARROWS[action]?.let { GlyphDrawable.apply(btn, it, Palette.current.text) }
-                val gap = (3 * context.resources.displayMetrics.density).toInt()
-                rowView.addView(
-                    btn,
-                    LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-                        .apply { setMargins(gap, gap, gap, gap) },
-                )
+                rowView.addView(btn, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
             }
             grid.addView(
                 rowView,
@@ -103,14 +106,12 @@ class TextEditingWindow(private val listener: Listener) : InputWindow() {
         }
     }
 
-    private fun cellButton(context: Context, label: String, onClick: (View) -> Unit): TextView =
-        TextView(context).apply {
-            val density = context.resources.displayMetrics.density
-            text = label
-            gravity = Gravity.CENTER
+    /** 键帽样式的按钮（圆角、键缝、按下色同主键盘与符号页） */
+    private fun cellButton(context: Context, label: String, primary: Boolean, onClick: (View) -> Unit): TextView {
+        val p = Palette.current
+        return keyCell(context, label, if (primary) p.key else p.keySpecial, p.text).apply {
             textSize = 16f
-            setTextColor(Palette.current.text)
-            setBackgroundColor(Palette.current.key)
             setOnClickListener(onClick)
         }
+    }
 }

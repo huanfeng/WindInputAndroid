@@ -261,9 +261,9 @@ class SymbolWindow(
 
 /**
  * 键帽样式的格子：圆角键面 + 键缝 + 按下高亮，与 KeyboardView 画出来的键一致
- * （圆角、横纵键缝都取 [KeyboardDimens] 同一组数）。
+ * （圆角、横纵键缝都取 [KeyboardDimens] 同一组数）。符号页与编辑面板共用。
  */
-private fun keyCell(context: Context, label: String, face: Int, textColor: Int): TextView {
+internal fun keyCell(context: Context, label: String, face: Int, textColor: Int): TextView {
     val density = context.resources.displayMetrics.density
     val gapH = (KeyboardDimens.KEY_GAP_DP * density).toInt()
     val gapV = KeyboardDimens.keyGapVPx(density).toInt()
