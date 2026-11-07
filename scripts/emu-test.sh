@@ -21,21 +21,49 @@
 # 键盘按键是 Canvas 自绘的，uiautomator 看不到按键节点，只能按坐标点击；
 # 坐标由布局比例算出（与 KeyboardLayouts / KeyboardDimens 一致），布局改了要同步这里。
 #
-# 用法：scripts/emu-test.sh [-s emulator-5554] [--skip-install]
+# 用法：scripts/emu-test.sh [-s emulator-5554] [--skip-install] [--only 24,48c,58-61] [--list]
+#   --only  只跑选中的分组（快速验证用；发版前或空闲时再跑整套）。写法见 scripts/emu-snapshot.awk：
+#           「24」= 第 24 组及子组 24a…，「48c」= 只要 48c，「58-61」= 数字部分在区间内的各组。
+#           [0] 前置与 [14] 收尾恒跑。分组之间若有依赖（前一组留下的状态），要把前一组一并选上。
+#   --list  列出全部分组编号与标题后退出
+# 每次运行先把本脚本与 emu-cases/*.sh 拼成一份快照再执行：运行中改脚本不会把这一轮读乱。
 set -uo pipefail
 
 SERIAL="${ANDROID_SERIAL:-emulator-5554}"
 SKIP_INSTALL=0
+ONLY=""
+LIST=0
+ORIG_ARGS=("$@")
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -s|--serial) SERIAL="$2"; shift 2 ;;
         --skip-install) SKIP_INSTALL=1; shift ;;
-        -h|--help) sed -n '1,30p' "$0"; exit 0 ;;
+        --only) ONLY="$2"; shift 2 ;;
+        --list) LIST=1; shift ;;
+        -h|--help) sed -n '1,29p' "$0"; exit 0 ;;
         *) echo "未知参数: $1" >&2; exit 2 ;;
     esac
 done
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="${EMU_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+
+# 运行快照：内联 emu-cases/*.sh、按 --only 过滤，再执行快照（bash 边跑边读脚本文件，
+# 直接跑原文件时别人中途改它，这一轮就会在莫名其妙的地方崩）
+if [[ -z "${EMU_SNAPSHOT:-}" ]]; then
+    if (( LIST )); then
+        awk -v root="$ROOT" -v only="" -f "$ROOT/scripts/emu-snapshot.awk" "$ROOT/scripts/emu-test.sh" \
+            | grep -oE '^section "\[[0-9]+[a-z]*\][^"]*' | sed 's/^section "//'
+        exit 0
+    fi
+    snap_dir="$(mktemp -d "${TMPDIR:-/tmp}/emu-test.XXXXXX")"
+    awk -v root="$ROOT" -v only="$ONLY" -f "$ROOT/scripts/emu-snapshot.awk" "$ROOT/scripts/emu-test.sh" \
+        > "$snap_dir/emu-test.sh" || { echo "生成运行快照失败" >&2; exit 1; }
+    [[ -n "$ONLY" ]] && echo "只跑：$(grep -oE '^section "\[[0-9]+[a-z]*\]' "$snap_dir/emu-test.sh" | sed 's/^section "//' | paste -sd' ' -)"
+    EMU_SNAPSHOT=1 EMU_ROOT="$ROOT" exec bash "$snap_dir/emu-test.sh" "${ORIG_ARGS[@]}"
+fi
+# 快照里：文件已被 bash 打开，删掉目录不影响本次运行
+snap_self="$(dirname "$0")"
+[[ "$(basename "$snap_self")" == emu-test.?????? ]] && rm -rf "$snap_self"
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/sdk}}"
 ADB="${ADB:-$SDK/platform-tools/adb}"
 [[ -x "$ADB" ]] || ADB="$(command -v adb)" || { echo "找不到 adb" >&2; exit 1; }
