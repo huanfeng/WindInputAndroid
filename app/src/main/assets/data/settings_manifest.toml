@@ -643,7 +643,7 @@ key = "ui.android.touch_quick_input"
 source = "android"
 type = "toggle"
 title = "触摸键盘 ; 进快捷输入"
-summary = "关：手机键盘上的 ; 当标点输入，快捷输入用工具栏按钮；外接物理键盘不受影响"
+summary = "开着时，没有编码时按触摸键盘上的 ; 进入快捷输入（同电脑版）；关着时 ; 当标点输入，快捷输入用工具栏的闪电按钮。外接物理键盘不受影响"
 default = false
 
 [[item]]
