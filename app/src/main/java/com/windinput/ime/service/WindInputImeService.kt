@@ -1402,7 +1402,7 @@ class WindInputImeService :
         }
     }
 
-    /** 从中英键（卡片或长按菜单）选中一个方案 */
+    /** 从中英键（卡片或长按菜单）或键盘选择面板选中一个方案 */
     private fun selectSchemaFromKey(schemas: List<SchemaEntry>, target: SchemaEntry) {
         if (target.id != ENGLISH_SCHEMA_ID) {
             statePrefs.edit().putString(KEY_LAST_CHINESE, target.id).apply()
@@ -1649,9 +1649,9 @@ class WindInputImeService :
 
     // ── 键盘选择面板 ─────────────────────────────────────────────
 
-    override fun onKeyboardSelectNumberPad() {
-        windowManager?.showKeyboard()
-        keyboardWindow?.keyboardView?.setLayer(KeyboardLayer.NUMBER, returnTo = KeyboardLayer.LETTERS)
+    override fun onKeyboardSelectSchema(index: Int) {
+        val schemas = session.schemas()
+        schemas.firstOrNull { it.index == index }?.let { selectSchemaFromKey(schemas, it) }
     }
 
     override fun onKeyboardManage() = openSettings("schema", SUB_ENABLED_SCHEMAS)

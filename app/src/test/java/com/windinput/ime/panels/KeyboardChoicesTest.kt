@@ -18,13 +18,20 @@ class KeyboardChoicesTest {
         entry(3, "english", "清风英文"),
     )
 
+    /** 真实顺序：方案按文件名排序，english 排在中文方案中间 */
+    private val sortedByFile = listOf(
+        entry(0, "english", "清风英文"),
+        entry(1, "pinyin", "全拼"),
+        entry(2, "wubi86", "五笔", active = true),
+    )
+
     @Test
     fun knownTypesGetKeyboardLabels() {
         assertEquals("全键盘拼音", KeyboardChoices.labelOf("pinyin", "全拼"))
         assertEquals("双拼键盘", KeyboardChoices.labelOf("shuangpin", "双拼"))
         assertEquals("五笔键盘", KeyboardChoices.labelOf("wubi86", "五笔"))
         assertEquals("五笔拼音键盘", KeyboardChoices.labelOf("wubi86_pinyin", "五笔拼音"))
-        assertEquals("英文键盘", KeyboardChoices.labelOf("english", "清风英文"))
+        assertEquals("清风英文", KeyboardChoices.labelOf("english", "清风英文"))
     }
 
     @Test
@@ -43,9 +50,30 @@ class KeyboardChoicesTest {
     }
 
     @Test
-    fun buildOrdersChineseSchemasThenEnglishNumberPadManage() {
+    fun buildOrdersChineseSchemasThenEnglishSchemaDirectEnglishManage() {
         val labels = KeyboardChoices.build(schemas, chineseMode = true).map { it.label }
-        assertEquals(listOf("全键盘拼音", "双拼键盘", "五笔键盘", "英文键盘", "数字九宫", "键盘管理"), labels)
+        assertEquals(listOf("全键盘拼音", "双拼键盘", "五笔键盘", "清风英文", "英文直输", "键盘管理"), labels)
+    }
+
+    @Test
+    fun englishSchemaGoesAfterChineseSchemasWhateverItsIndex() {
+        val choices = KeyboardChoices.build(sortedByFile, chineseMode = true)
+        assertEquals(listOf("全键盘拼音", "五笔键盘", "清风英文", "英文直输", "键盘管理"), choices.map { it.label })
+        assertEquals(Action.Schema(0), choices[2].action)
+    }
+
+    @Test
+    fun englishSchemaAndDirectEnglishHaveDistinctBadges() {
+        val badges = KeyboardChoices.build(schemas, chineseMode = true).associate { it.label to it.badge }
+        assertEquals("英", badges["清风英文"])
+        assertEquals("A", badges["英文直输"])
+    }
+
+    @Test
+    fun activeEnglishSchemaHighlightsEnglishSchemaNotDirectEnglish() {
+        val withEnglishActive = schemas.map { it.copy(active = it.id == "english") }
+        val selected = KeyboardChoices.build(withEnglishActive, chineseMode = true).filter { it.selected }.map { it.label }
+        assertEquals(listOf("清风英文"), selected)
     }
 
     @Test
@@ -55,24 +83,24 @@ class KeyboardChoicesTest {
     }
 
     @Test
-    fun englishModeHighlightsEnglishOnly() {
+    fun englishModeHighlightsDirectEnglishOnly() {
         val selected = KeyboardChoices.build(schemas, chineseMode = false).filter { it.selected }.map { it.label }
-        assertEquals(listOf("英文键盘"), selected)
+        assertEquals(listOf("英文直输"), selected)
     }
 
     @Test
     fun actionsCarrySchemaIndexAndSpecialEntries() {
         val actions = KeyboardChoices.build(schemas, chineseMode = true).map { it.action }
         assertEquals(
-            listOf(Action.Schema(0), Action.Schema(1), Action.Schema(2), Action.English, Action.NumberPad, Action.Manage),
+            listOf(Action.Schema(0), Action.Schema(1), Action.Schema(2), Action.Schema(3), Action.English, Action.Manage),
             actions,
         )
     }
 
     @Test
-    fun englishTileShownEvenWithoutEnglishSchema() {
+    fun directEnglishShownEvenWithoutEnglishSchema() {
         val choices = KeyboardChoices.build(listOf(entry(0, "wubi86", "五笔", active = true)), chineseMode = true)
-        assertEquals(listOf("五笔键盘", "英文键盘", "数字九宫", "键盘管理"), choices.map { it.label })
+        assertEquals(listOf("五笔键盘", "英文直输", "键盘管理"), choices.map { it.label })
     }
 
     @Test

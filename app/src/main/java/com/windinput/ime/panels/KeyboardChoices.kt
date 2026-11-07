@@ -6,7 +6,8 @@ import com.windinput.ime.core.SchemaEntry
  * 「键盘选择」面板的格子列表（纯逻辑，不碰 View，JVM 单测覆盖）。
  *
  * 照微信「键盘选择」：每个启用的方案一格（方框字徽章 + 「全键盘拼音」「五笔键盘」这类标签），
- * 英文一格，再加「数字九宫」与最后的「键盘管理」。
+ * 英文方案（清风英文，带补全候选）也是普通方案格；再加「英文直输」（引擎的英文模式：字母直出、
+ * 无候选）与最后的「键盘管理」。
  */
 object KeyboardChoices {
 
@@ -17,11 +18,8 @@ object KeyboardChoices {
         /** 切到第 [index] 个方案（[SchemaEntry.index]） */
         data class Schema(val index: Int) : Action()
 
-        /** 英文：走引擎的英文命令（与中英键同一语义），不按方案下标切 */
+        /** 英文直输：走引擎的英文命令（系统英文模式，字母直出、无候选），不按方案下标切 */
         data object English : Action()
-
-        /** 切到九宫数字层 */
-        data object NumberPad : Action()
 
         /** 打开设置里的「启用的方案」页 */
         data object Manage : Action()
@@ -33,14 +31,17 @@ object KeyboardChoices {
      */
     data class Choice(val badge: String?, val label: String, val selected: Boolean, val action: Action)
 
-    const val NUMBER_PAD_LABEL = "数字九宫"
+    /** 英文直输格：徽章用「A」，与英文方案的「英」区分 */
+    const val DIRECT_ENGLISH_BADGE = "A"
+    const val DIRECT_ENGLISH_LABEL = "英文直输"
     const val MANAGE_LABEL = "键盘管理"
 
     /** 方案 → 格子标签：认得出类型的按类型起名，认不出的用方案名 */
     fun labelOf(id: String, name: String): String = when (typeOf(id)) {
         Type.PINYIN -> "全键盘拼音"
         Type.SHUANGPIN -> "双拼键盘"
-        Type.ENGLISH -> "英文键盘"
+        // 英文方案用方案名（清风英文），与「英文直输」那格分得开
+        Type.ENGLISH -> displayName(id, name)
         // 五笔类各方案名字不同（五笔、五笔拼音、五笔98…），保留名字再补「键盘」
         Type.WUBI -> displayName(id, name) + "键盘"
         Type.OTHER -> displayName(id, name)
@@ -55,24 +56,19 @@ object KeyboardChoices {
     }
 
     /**
-     * 格子列表：中文方案按方案列表的顺序 → 英文 → 数字九宫 → 键盘管理。
+     * 格子列表：中文方案按方案列表的顺序 → 英文方案 → 英文直输 → 键盘管理。
      *
-     * 选中态与引擎一致：英文模式（[chineseMode] 为 false，含密码框强制英文）高亮英文，
-     * 否则高亮当前方案。英文方案本身不单列：「英文键盘」这一格就是它的入口。
+     * 选中态与引擎一致：英文模式（[chineseMode] 为 false，含密码框强制英文）高亮「英文直输」，
+     * 否则高亮当前方案（英文方案也算方案：`SelectSchema` 会把 chineseMode 设回 true）。
      */
     fun build(schemas: List<SchemaEntry>, chineseMode: Boolean): List<Choice> {
         val out = mutableListOf<Choice>()
-        for (s in schemas.filter { it.id != ENGLISH_SCHEMA_ID }) {
+        // 英文方案排在中文方案之后：方案按文件名排序，english 会夹在中间
+        val ordered = schemas.filter { it.id != ENGLISH_SCHEMA_ID } + schemas.filter { it.id == ENGLISH_SCHEMA_ID }
+        for (s in ordered) {
             out += Choice(badgeOf(s.id, s.name), labelOf(s.id, s.name), chineseMode && s.active, Action.Schema(s.index))
         }
-        val english = schemas.firstOrNull { it.id == ENGLISH_SCHEMA_ID }
-        out += Choice(
-            badgeOf(ENGLISH_SCHEMA_ID, english?.name.orEmpty()),
-            labelOf(ENGLISH_SCHEMA_ID, english?.name.orEmpty()),
-            !chineseMode,
-            Action.English,
-        )
-        out += Choice("9", NUMBER_PAD_LABEL, false, Action.NumberPad)
+        out += Choice(DIRECT_ENGLISH_BADGE, DIRECT_ENGLISH_LABEL, !chineseMode, Action.English)
         out += Choice(null, MANAGE_LABEL, false, Action.Manage)
         return out
     }

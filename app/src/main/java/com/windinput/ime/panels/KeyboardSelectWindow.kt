@@ -17,8 +17,8 @@ import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.keyboard.PanelIcon
 
 /**
- * 键盘选择面板（照微信「键盘选择」）：每个启用的方案一格、英文一格，再加「数字九宫」和
- * 最后的「键盘管理」（设置里的「启用的方案」页）。点方案格切过去并回到键盘。
+ * 键盘选择面板（照微信「键盘选择」）：每个启用的方案一格（含英文方案）、「英文直输」一格，
+ * 最后是「键盘管理」（设置里的「启用的方案」页）。点方案格切过去并回到键盘。
  *
  * 格子列表与标签由 [KeyboardChoices] 生成；选中态（当前方案）来自引擎推送的 [UiEvent.Status]，
  * 与快捷面板同一做法，本地不记一份。
@@ -35,8 +35,8 @@ class KeyboardSelectWindow(
 
         fun onBackToKeyboard()
 
-        /** 切到九宫数字层并回到键盘 */
-        fun onKeyboardSelectNumberPad()
+        /** 切到第 [index] 个方案（与中英键选方案同一路径：记下切走前的中文方案，中英键才切得回来） */
+        fun onKeyboardSelectSchema(index: Int)
 
         /** 打开设置里的「启用的方案」页 */
         fun onKeyboardManage()
@@ -106,14 +106,13 @@ class KeyboardSelectWindow(
     private fun onChoice(action: KeyboardChoices.Action) {
         when (action) {
             is KeyboardChoices.Action.Schema -> {
-                listener.onQuickCommand(EngineCmd.SelectSchema(action.index))
+                listener.onKeyboardSelectSchema(action.index)
                 listener.onBackToKeyboard()
             }
             KeyboardChoices.Action.English -> {
                 listener.onQuickCommand(EngineCmd.English)
                 listener.onBackToKeyboard()
             }
-            KeyboardChoices.Action.NumberPad -> listener.onKeyboardSelectNumberPad()
             KeyboardChoices.Action.Manage -> listener.onKeyboardManage()
         }
     }
