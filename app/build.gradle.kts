@@ -23,8 +23,8 @@ android {
         applicationId = "com.windinput.ime"
         minSdk = 26
         targetSdk = 36
-        versionCode = 85
-        versionName = "0.3.0-dev.82"
+        versionCode = 86
+        versionName = "0.5.0"
         // 仪器测试（androidTest）：自绘控件的无障碍动作等要在真实 Android 运行时里验
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
