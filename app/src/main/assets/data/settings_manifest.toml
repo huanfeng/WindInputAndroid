@@ -1162,7 +1162,7 @@ source = "android"
 type = "select"
 title = "「123」键先进哪一页"
 summary = "全键盘数字页带常用符号，九宫数字页适合只输数字；数字框、电话框始终直接进九宫"
-default = "full"
+default = "pad9"
 options = [
   { value = "full", label = "全键盘数字" },
   { value = "pad9", label = "九宫数字" },

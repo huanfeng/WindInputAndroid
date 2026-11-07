@@ -1123,8 +1123,8 @@ class KeyboardView(context: Context) : View(context) {
         reloadLayout()
     }
 
-    /** 字母层的 123 键先进九宫数字页（设置项 ui.android.number_page = pad9），默认先进全键盘数字 */
-    var numberPad9 = false
+    /** 字母层的 123 键先进九宫数字页（设置项 ui.android.number_page，默认 pad9；设成 full 先进全键盘数字） */
+    var numberPad9 = true
 
     /** 设置里改了布局相关项（底行排法、数字页默认）：按当前设置重取键位 */
     fun refreshLayout() = reloadLayout()

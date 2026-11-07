@@ -530,23 +530,27 @@ fi
 # 中途断掉留下的这一行下次开跑时先剥掉，SUITE_KB_ORIG 拿到的就是用户自己的配置
 KB_CFG=files/user/config.toml
 COMMENT_OFF='candidate_comment = false # emu-test'
+# 「123」默认先进九宫数字（ui.android.number_page = pad9），而整套用例写的是「123 先进全键盘数字页、
+# 再点「符号」位进九宫」的按法：同样带标记钉成 full，跑完写回
+NUMBER_FULL_CFG='number_page = "full" # emu-test'
 write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"; }
 SUITE_KB_RAW="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null)"
 SUITE_KB_EXISTED=1
 [[ "$SUITE_KB_RAW" == *"No such file"* ]] && { SUITE_KB_EXISTED=0; SUITE_KB_RAW=""; }
-SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF "$COMMENT_OFF")"
+SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF -e "$COMMENT_OFF" -e "$NUMBER_FULL_CFG")"
 with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段就补一段
     # 用户自己写过的 candidate_comment 先去掉：留着就是重复键（TOML 错误、取值看解析器心情）
     local body
     # one_hand 同理剥掉：[43] 中途断掉留下单手模式的话，后面按全宽几何点键的用例全会点偏；
     # number_side_symbols 同理：[65]–[67] 中途断掉留下改过的左列，[24] 按出厂列表点「*」就点错
-    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand|number_side_symbols)[[:space:]]*=')"
+    # number_page 同理：用户设成什么都先剥掉，统一钉成 full（见 NUMBER_FULL_CFG）
+    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand|number_side_symbols|number_page)[[:space:]]*=')"
     # 段头允许带空白与行尾注释（`[ui.android]  # 键盘`）；认不出就会再补一段，TOML 里是重复段
     if printf '%s\n' "$body" | grep -qE '^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$'; then
-        printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" \
-            '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print line }'
+        printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" -v num="$NUMBER_FULL_CFG" \
+            '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print line; print num }'
     else
-        printf '%s\n\n[ui.android]\n%s\n' "$body" "$COMMENT_OFF"
+        printf '%s\n\n[ui.android]\n%s\n%s\n' "$body" "$COMMENT_OFF" "$NUMBER_FULL_CFG"
     fi
 }
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"

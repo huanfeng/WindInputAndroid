@@ -268,7 +268,7 @@ class WindInputImeService :
                 LayoutTweaks.apply(
                     layoutRepository.rows(layer), layer,
                     bottomRow = userConfig.getString("ui.android.bottom_row", LayoutTweaks.BOTTOM_SPLIT),
-                    numberPage = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_FULL),
+                    numberPage = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_PAD9),
                 )
             },
         )
@@ -539,7 +539,7 @@ class WindInputImeService :
         barView?.showPageNo = userConfig.getBoolean("ui.android.candidate_page_no", false)
         barView?.iconChip = userConfig.getBoolean("ui.android.toolbar_icon_chip", false)
         keyboardWindow?.keyboardView?.let {
-            it.numberPad9 = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_FULL) == LayoutTweaks.NUMBER_PAD9
+            it.numberPad9 = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_PAD9) == LayoutTweaks.NUMBER_PAD9
             it.refreshLayout()
         }
         // 输入视图可能刚重建（配色变了），无痕标记跟着重设
