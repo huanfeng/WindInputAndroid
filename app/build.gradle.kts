@@ -109,6 +109,10 @@ kotlin {
 // 不声明为输入的话只改资源时 Gradle 判定测试 up-to-date、跳过不跑，缺文件也照样「通过」
 tasks.withType<Test>().configureEach {
     inputs.dir("src/main/assets").withPathSensitivity(PathSensitivity.RELATIVE)
+    // FactoryConfigSyncTest 对照主仓出厂配置：主仓改了也要重跑（单独 clone 本仓时没有，不声明）
+    rootProject.file("../WindInput/data/config.toml").takeIf { it.isFile }?.let {
+        inputs.file(it).withPathSensitivity(PathSensitivity.NONE)
+    }
 }
 
 dependencies {
