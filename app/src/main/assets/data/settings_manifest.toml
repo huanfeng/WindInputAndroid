@@ -227,6 +227,16 @@ source = "engine"
 type = "toggle"
 title = "智能组词"
 
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.sentence_uses_user_words"
+source = "engine"
+type = "toggle"
+title = "组词时使用自造词"
+summary = "智能组词时把你造过的词也算进去。关闭时整句只用系统词库，自造的词打整句时不认"
+enabled_when = "schema.pinyin.use_smart_compose"
+
 # 整句语法模型写移动端覆盖键 mobile.grammar.enabled（手机默认开，电脑版出厂关，各管各的）
 [[item]]
 page = "schema"
@@ -1079,6 +1089,16 @@ key = "stats.enabled"
 source = "engine"
 type = "toggle"
 title = "启用输入统计"
+
+[[item]]
+page = "stats"
+section = "统计设置"
+key = "stats.track_english"
+source = "engine"
+type = "toggle"
+title = "统计英文输入"
+summary = "是否统计英文模式下的输入"
+enabled_when = "stats.enabled"
 
 # ═══ 键盘布局 ═══════════════════════════════════════════════════
 
