@@ -32,6 +32,13 @@ class RustSession(
         // wind-keys VK 码（SSOT 在主仓 wind-keys/keymap.rs）
         private const val VK_ESCAPE = 0x1Bu
 
+        /**
+         * 日志级别为调试 / 跟踪时才为 true：逐键日志带上屏文字，只在用户主动调高级别时记
+         * （见 [LogLevel]）
+         */
+        @Volatile
+        private var verboseLog = false
+
         /** 进程内唯一核心（见 [getOrCreate]） */
         @Volatile
         private var instance: RustSession? = null
@@ -65,7 +72,11 @@ class RustSession(
         private fun create(dataDir: File, rustRoot: File): RustSession? {
             return try {
                 rustRoot.mkdirs()
-                uniffi.wind_android.initLogging("info,wind_coordinator=debug")
+                // 级别跟随设置项 debug.log_level（出厂 warn：核心 debug 日志里有用户文字）。
+                // 订阅器每个进程只装一次，改设置后要等进程重启
+                val level = LogLevel.read(rustRoot, dataDir)
+                verboseLog = LogLevel.verbose(level)
+                uniffi.wind_android.initLogging(level)
                 // 泵线程在构造期即可能回调（构造期下发），经可空引用避免竞态
                 var sessionRef: RustSession? = null
                 val core = WindCore(
@@ -293,11 +304,14 @@ class RustSession(
         if (costUs > FRAME_BUDGET_US) {
             Log.w(TAG, "$label 阻塞主线程 ${costUs}µs（超一帧）")
         }
-        Log.d(
-            TAG,
-            "$label ${costUs}µs -> consumed=${result.consumed} " +
-                "ops=" + result.ops.joinToString { "k${it.kind}:'${it.text}'" },
-        )
+        // ops 里是上屏文字：只在用户把日志调到调试级别时记（Log.d 在正式包里照样输出）
+        if (verboseLog) {
+            Log.d(
+                TAG,
+                "$label ${costUs}µs -> consumed=${result.consumed} " +
+                    "ops=" + result.ops.joinToString { "k${it.kind}:'${it.text}'" },
+            )
+        }
         if (result.ops.isNotEmpty()) {
             listener?.invoke(UiEvent.Edits(result.ops.map(::toEditOp)))
         }

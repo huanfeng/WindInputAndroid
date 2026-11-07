@@ -1776,7 +1776,8 @@ speed_factor = 0.85
 
 [debug]
 # trace / debug / info / warn / error。注意 info 及以下级别不得含用户输入内容与候选词。
-log_level = "info"
+# 安卓有意不同（电脑版 info）：日志进系统 logcat、任何有调试权限的人都读得到，出厂只记警告以上
+log_level = "warn"
 # 单个日志文件大小上限（MB），超出即滚动。
 log_max_size_mb = 10
 # 保留的旧日志文件数上限（不含主文件）。服务每次启动都会滚动一次，

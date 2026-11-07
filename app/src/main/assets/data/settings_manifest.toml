@@ -1329,6 +1329,7 @@ key = "debug.log_level"
 source = "engine"
 type = "select"
 title = "输入法服务日志级别"
+summary = "写进系统日志（logcat）的详细程度，出厂为「警告」。「调试」「跟踪」会记下输入的文字，排查完请改回。改后要重启输入法进程才生效（在系统应用信息里强行停止，或重启手机）"
 options = [
   { value = "off", label = "关闭" },
   { value = "error", label = "错误" },
