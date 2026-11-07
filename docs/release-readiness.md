@@ -155,28 +155,29 @@
 
 ## 4. 首发前待办清单（按优先级）
 
-1. **正式包日志降级**：`RustSession.kt:68` 的过滤串在正式包里改成 `warn`；或者把 `debug.log_level` 接到 `initLogging`，同时修掉"设置项没人读"的问题。
-2. **`TestPadActivity` 移出正式包**：挪到 `src/debug/AndroidManifest.xml`，或改成 `exported=false`。
-3. **备份排除规则**：加 `dataExtractionRules` / `fullBackupContent`，至少排除 `clipboard.json`；个人词库是否允许云备份要做个决定。
-4. **隐私政策**：「关于」页加隐私政策（不联网、数据只存在本地）和权限说明。
-5. **出厂兜底方案改成拼音**：`RustSession.kt:74`、`Service:346`、`assets/data/config.toml` 里的 `schema.active` 一起改。同时确认首次选择卡不会在用户没看到时就记成已弹。
-6. **同步安卓 `assets/data/config.toml`**：和主仓 `data/config.toml` 对齐，删掉废弃键，并加对照测试，防止再次滞后。
-7. **补反馈渠道**：「关于」页加反馈入口（issue 链接）和"分享诊断日志"；Kotlin 侧加未捕获异常记录。
-8. **恢复默认设置**：做两档，键盘设置和引擎设置分别恢复，词库不动。
+1. **正式包日志降级**：`RustSession.kt:68` 的过滤串在正式包里改成 `warn`；或者把 `debug.log_level` 接到 `initLogging`，同时修掉"设置项没人读"的问题。 ✅ 已做（a81f89c）
+2. **`TestPadActivity` 移出正式包**：挪到 `src/debug/AndroidManifest.xml`，或改成 `exported=false`。 ✅ 已做（74d7d7f）
+3. **备份排除规则**：加 `dataExtractionRules` / `fullBackupContent`，至少排除 `clipboard.json`；个人词库是否允许云备份要做个决定。 ✅ 已做（4fbad42）
+4. **隐私政策**：「关于」页加隐私政策（不联网、数据只存在本地）和权限说明。 ✅ 已做（070ec61）
+5. **出厂兜底方案改成拼音**：`RustSession.kt:74`、`Service:346`、`assets/data/config.toml` 里的 `schema.active` 一起改。同时确认首次选择卡不会在用户没看到时就记成已弹。 ✅ 已做（adcddc3）
+6. **同步安卓 `assets/data/config.toml`**：和主仓 `data/config.toml` 对齐，删掉废弃键，并加对照测试，防止再次滞后。 ✅ 已做（fc7eaf7）
+7. **补反馈渠道**：「关于」页加反馈入口（issue 链接）和"分享诊断日志"；Kotlin 侧加未捕获异常记录。 ✅ 已做（f25764d）
+8. **恢复默认设置**：做两档，键盘设置和引擎设置分别恢复，词库不动。 ✅ 已做（1cb9499）
 9. **真机定三个默认值**：中英文自动配对开还是关，以及软键盘上怎么跳出配对；竖屏行高 60dp 是否偏高；按键气泡默认开还是关。
-10. **清单补 `stats.track_english` 和 `schema.pinyin.sentence_uses_user_words`**：都只差一行清单。
-11. **统一自动补空格的注释**：确认归键盘还是归核心，改掉 manifest 第 512 行和 `Service:112` 之间的矛盾。
-12. **`KeyboardView.kt:104` 初值改成 `false`**：和 manifest 保持一致。
+10. **清单补 `stats.track_english` 和 `schema.pinyin.sentence_uses_user_words`**：都只差一行清单。 ✅ 已做（ed20d96）
+11. **统一自动补空格的注释**：确认归键盘还是归核心，改掉 manifest 第 512 行和 `Service:112` 之间的矛盾。 ✅ 已做（a0ac6f2）
+12. **`KeyboardView.kt:104` 初值改成 `false`**：和 manifest 保持一致。 ✅ 已做（a0ac6f2）
 13. **定正式版本号和签名密钥**：`versionName` 去掉 `-dev`，`versionCode` 照规则 +1，确认 release 用的是长期密钥。
 14. **跑一轮横屏和大屏冒烟**：行高、边距、单手、展开候选面板。
 15. **决定 Emoji 候选和拼音英文候选手机上是否默认开**：要开就走 `mobile.*` 覆盖键，按 `MobileConfig` 的规则登记。
 16. **写一页设置导出和导入的方案**：首发可以不做，但要在文档里说明换机只能带词库。
+17. **系统输入法列表显示当前方案**：每个启用的方案注册一个子类型，与当前方案双向同步。 ✅ 已做（ee46659、b51e286）
 
 ### 需要拍板的问题
-- [ ] 出厂兜底方案改成拼音，还是保留五笔加一个更强的首启引导？（五笔是电脑版用户的默认）
-- [ ] 个人词库要不要进 Android 系统备份？（隐私和便利的取舍）
-- [ ] 正式包里 `debug.log_level` 是删掉，还是接成真正生效的设置？
+- [x] 出厂兜底方案改成拼音，还是保留五笔加一个更强的首启引导？→ 改拼音，首次卡片仍可选五笔
+- [x] 个人词库要不要进 Android 系统备份？→ 设置与个人词库进，剪贴板历史、缓存、日志不进
+- [x] 正式包里 `debug.log_level` 是删掉，还是接成真正生效的设置？→ 接成真设置，安卓出厂 warn
 - [ ] 中文引号和括号自动配对，手机首发开还是关？
-- [ ] 隐私政策放在 App 里，还是放官网再链接过去？
+- [x] 隐私政策放在 App 里，还是放官网再链接过去？→ App 内二级页 + 链官网首页（官网还缺单独的隐私政策页）
 
 附：电脑版缺失键全量列表见 `（全量缺失键列表未入库，可按需重新生成）`。
