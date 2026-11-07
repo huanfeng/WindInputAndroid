@@ -156,7 +156,7 @@
 ## 4. 首发前待办清单（按优先级）
 
 1. **正式包日志降级**：`RustSession.kt:68` 的过滤串在正式包里改成 `warn`；或者把 `debug.log_level` 接到 `initLogging`，同时修掉"设置项没人读"的问题。 ✅ 已做（a81f89c）
-2. **`TestPadActivity` 移出正式包**：挪到 `src/debug/AndroidManifest.xml`，或改成 `exported=false`。 ✅ 已做（74d7d7f）
+2. **`TestPadActivity` 移出正式包**：挪到 `src/debug/AndroidManifest.xml`，或改成 `exported=false`。 ⏭ 不做：用户决定测试台保持导出、日志照旧（e2e 依赖），74d7d7f 已撤回（00750a3）；隐私政策里写明了「试一试」会记日志（81433bd）
 3. **备份排除规则**：加 `dataExtractionRules` / `fullBackupContent`，至少排除 `clipboard.json`；个人词库是否允许云备份要做个决定。 ✅ 已做（4fbad42）
 4. **隐私政策**：「关于」页加隐私政策（不联网、数据只存在本地）和权限说明。 ✅ 已做（070ec61）
 5. **出厂兜底方案改成拼音**：`RustSession.kt:74`、`Service:346`、`assets/data/config.toml` 里的 `schema.active` 一起改。同时确认首次选择卡不会在用户没看到时就记成已弹。 ✅ 已做（adcddc3）
