@@ -4,9 +4,12 @@
     <!-- 按键振动强度可调：系统 performHapticFeedback 的强度定死，要自己调振动器（KeyHaptics） -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- 系统备份：设置与个人词库进备份，剪贴板历史、出厂数据、缓存不进（见 res/xml/backup_rules.xml） -->
     <application
         android:name=".WindInputApp"
         android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
