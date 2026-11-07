@@ -259,9 +259,7 @@ class TestPadActivity : ComponentActivity() {
         /** 与 scripts/emu-test.sh 的 get_pad_text 约定：`text=` 后接内容，反斜杠与换行转义 */
         private const val LOG_TAG = "WindTestPad"
 
-        /** 输入框原文进 logcat：只在 debug 包（e2e 用）里记，正式包里「试一试」打的字不留痕 */
         private fun logText(text: String) {
-            if (!com.windinput.ime.BuildConfig.DEBUG) return
             android.util.Log.i(LOG_TAG, "text=" + text.replace("\\", "\\\\").replace("\n", "\\n"))
         }
     }
