@@ -1075,6 +1075,12 @@ tap_cell 3 "$NUM_W" 1; tap_cell 3 "${SYM_W[3]}" 1
 restart_pad
 tap_text "数字"
 tap_edit; sleep 1
+# 等键盘真换成九宫格（左列符号节点出现）再按坐标点：此前固定 sleep 1，键盘还在弹出 / 还是
+# 全键盘时第一下就落空或点到别的格，历史上偶发实得 '' '0' '8' '20'
+for ((pad_try = 0; pad_try < 8; pad_try++)); do
+    ime_xml | grep -q 'content-desc="左列·' && break
+    sleep 0.5
+done
 tap_cell 1 "$NUM_W" 2; tap_cell 3 "$NUM_W" 2
 check "数字框直接是九宫格" "50" "$(get_pad_text)"
 # 场景复位：点回「普通」（场景是分段，不必重启进程——重启会连输入法一起杀掉、核心冷启动）

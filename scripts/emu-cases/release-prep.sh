@@ -1,8 +1,22 @@
-# 发版前加固的 e2e 用例（被 emu-test.sh source，依赖它的 check / check_match / section / has_text /
-# tap_text / dump_xml / back_to_pad / reset_pad / restart_pad / wait_chinese / write_kb_cfg /
+# 发版前加固的 e2e 用例（被 emu-test.sh source，依赖它的 check / check_match / section /
+# tap_text / dump_xml / reset_pad / restart_pad / wait_chinese / write_kb_cfg /
 # with_comment_off / ks_open / tap_ime / adb_ / adb_q 等）：
 # 隐私政策页、分享诊断信息、恢复键盘设置、系统输入法子类型随方案变化。
 
+# has_text / back_to_pad 定义在别的用例分组里，--only 只跑本文件时那些分组被滤掉、函数不存在，
+# 这里用自己的一份（放在第一个 section 之前，快照总会保留）
+rp_has_text() {   # 当前界面有没有这段文字（等界面稳定，最多约 4 秒）
+    local try
+    for ((try = 0; try < 6; try++)); do
+        dump_xml | grep -q " text=\"$1\"" && { echo yes; return; }
+        sleep 0.7
+    done
+    echo no
+}
+rp_back_to_pad() {   # 从设置回测试台（设置在前台时普通的 am start 拉不回来）
+    adb_q shell am start -f 0x10008000 -n "$PKG/.settings.TestPadActivity"
+    sleep 1
+}
 rp_settings() {   # 新开一个设置页并直达某一页（NEW_TASK | CLEAR_TASK，路由只在创建时读）
     adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SettingsActivity" -e page "$1"
     sleep 2.5
@@ -25,27 +39,30 @@ rp_cur_sub() { adb_ shell dumpsys input_method | grep -m1 'mCurrentSubtype=' | s
 section "[76] 关于：隐私政策页可打开，写明不联网与数据删除方式"
 rp_settings about
 tap_text 隐私政策
-check "隐私政策页：不联网" "yes" "$(has_text 不联网)"
-check "隐私政策页：启用时的系统提示" "yes" "$(has_text 启用时的系统提示)"
-back_to_pad
+check "隐私政策页：不联网" "yes" "$(rp_has_text 不联网)"
+check "隐私政策页：启用时的系统提示" "yes" "$(rp_has_text 启用时的系统提示)"
+rp_back_to_pad
 
 section "[77] 关于：分享诊断信息弹出系统分享面板"
 rp_settings about
 tap_text 分享诊断信息
 # 先在后台读日志、拼文本，再弹面板：慢的时候要好几秒，轮询而不是睡固定时长
 rp_chooser() {
-    local i
+    # 先整段读进变量再匹配：脚本开着 pipefail，`dumpsys | grep -m1 | grep -q` 里 grep -m1 提前关管道，
+    # 上游吃 SIGPIPE，整条管道就算失败——面板明明出来了也判 no
+    local i focus
     for ((i = 0; i < 10; i++)); do
-        adb_ shell dumpsys window | grep -m1 mCurrentFocus | grep -qiE 'chooser|intentresolver|resolver' && { echo yes; return; }
+        focus="$(adb_ shell dumpsys window | grep mCurrentFocus | head -1)" || true
+        [[ "$focus" =~ [Cc]hooser|intentresolver|[Rr]esolver ]] && { echo yes; return; }
         sleep 1
     done
-    adb_ shell dumpsys window | grep -m1 mCurrentFocus >&2
+    echo "$focus" >&2
     echo no
 }
 check "弹出了系统分享面板" "yes" "$(rp_chooser)"
 adb_q shell input keyevent BACK
 sleep 1
-back_to_pad
+rp_back_to_pad
 
 section "[78] 高级：恢复键盘设置清掉 ui.android.*（点两下确认），词库与输入设置不动"
 # 基线配置 + 一项改过的键盘设置；恢复后 [ui.android] 里一项都不剩
