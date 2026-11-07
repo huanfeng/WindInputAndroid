@@ -7,7 +7,7 @@ package com.windinput.ime.keyboard
  * 再点一下（真机反馈）。常驻哪几个由用户在快捷面板的「编辑工具栏」里挑，存成 [id] 的列表
  * （设置项 ui.android.toolbar_pins）。
  *
- * @param glyph 矢量图标；为 null 时用 [text]（「拼」「;」这类本身就是字的入口）
+ * @param glyph 矢量图标；为 null 时用 [text]（「拼」这类本身就是字的入口）
  */
 enum class ToolbarItem(
     val id: String,
@@ -29,9 +29,10 @@ enum class ToolbarItem(
     /**
      * 临时拼音 / 快捷输入：电脑上是空码时按 ` / ; 进入，手机上这两个字符藏在上滑里没人找得到。
      * 点它等于替用户按一下引导键（引擎侧行为与电脑一致）。
+     * 快捷输入不用「;」当图标：引导键是什么用户看不出含义（真机反馈），换成闪电。
      */
     TEMP_PINYIN("temp_pinyin", "临时拼音", null, "拼"),
-    QUICK_INPUT("quick_input", "快捷输入", null, ";"),
+    QUICK_INPUT("quick_input", "快捷输入", PanelIcon.Glyph.QUICK_INPUT),
     ;
 
     companion object {

@@ -80,6 +80,9 @@ class PanelIcon(context: Context) : View(context) {
 
         /** 未锁定（挂锁，锁梁打开） */
         UNLOCK,
+
+        /** 快捷输入（闪电）：计算、日期、金额大写、重复上屏都是「一键出结果」 */
+        QUICK_INPUT,
         ;
 
         /**
@@ -209,6 +212,7 @@ class PanelIcon(context: Context) : View(context) {
             Glyph.ARROW_DOWN to "下",
             Glyph.ARROW_LEFT to "左",
             Glyph.ARROW_RIGHT to "右",
+            Glyph.QUICK_INPUT to "快捷输入",
         )
     }
 }

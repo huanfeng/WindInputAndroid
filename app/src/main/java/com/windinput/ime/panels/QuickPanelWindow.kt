@@ -287,7 +287,7 @@ class QuickPanelWindow(
         if (listener.tempPinyinAvailable()) {
             add("拼", "临时拼音", pin = ToolbarItem.TEMP_PINYIN) { listener.onToolbarItemFromPanel(ToolbarItem.TEMP_PINYIN) }
         }
-        add(";", "快捷输入", pin = ToolbarItem.QUICK_INPUT) { listener.onToolbarItemFromPanel(ToolbarItem.QUICK_INPUT) }
+        add(PanelIcon.Glyph.QUICK_INPUT, "快捷输入", pin = ToolbarItem.QUICK_INPUT) { listener.onToolbarItemFromPanel(ToolbarItem.QUICK_INPUT) }
         add(PanelIcon.Glyph.KEYBOARD, "键盘", pin = ToolbarItem.KEYBOARD) { listener.onOpenPanel(Target.KEYBOARD_SELECT) }
         add(PanelIcon.Glyph.EMOJI, "表情", pin = ToolbarItem.EMOJI) { listener.onOpenPanel(Target.EMOJI) }
         add(PanelIcon.Glyph.CLIPBOARD, "剪贴板", pin = ToolbarItem.CLIPBOARD) { listener.onOpenPanel(Target.CLIPBOARD) }
