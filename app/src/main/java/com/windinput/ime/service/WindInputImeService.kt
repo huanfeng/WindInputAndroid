@@ -345,8 +345,11 @@ class WindInputImeService :
         const val SWITCH_IME_LABEL = "切换输入法"
         const val ACTION_SWITCH_IME = "switch_ime"
 
-        /** 英文切回中文时，找不到切走前的方案（首次安装就在英文里）就回出厂默认方案 */
-        const val DEFAULT_CHINESE_SCHEMA_ID = "wubi86"
+        /**
+         * 英文切回中文时，找不到切走前的方案（首次安装就在英文里）就回出厂默认方案。
+         * 与 RustSession 的首装兜底、出厂 config.toml 的 schema.active 一致：手机用户绝大多数打全拼
+         */
+        const val DEFAULT_CHINESE_SCHEMA_ID = "pinyin"
         const val KEY_LAST_CHINESE = "last_chinese_schema"
 
         /** 首次使用的方案卡片弹过没有（ime_onboarding prefs） */
@@ -1268,19 +1271,17 @@ class WindInputImeService :
 
     /**
      * 首次使用：第一次在普通文本框里弹出键盘时，先弹方案卡片让用户选（豆包、微信首次都先问
-     * 键盘类型）。出厂默认是五笔，拼音用户不知道能换，第一句就打不出来。
+     * 键盘类型）。出厂默认是全拼，五笔、双拼用户在这里一眼就能换。
      *
-     * 只弹一次（弹出即记下，不管选没选）：关掉就当默认够用，之后随时长按中英键再换。
+     * 只弹一次（真弹出来了才记下，不管选没选）：关掉就当默认够用，之后随时长按中英键再换。
      * 标记单独一个 prefs 文件——ime_state 在测试脚本里会被整个删掉重置方案，不能连带它。
      * 核心还没起来时不弹（拿不到方案列表），就绪回调里会再试一次。
+     *
+     * 此前「记过上次中文方案 = 升级上来的老用户」也直接记成已弹：新用户在密码框 / 网址框里
+     * 先按了一下中英键就会记下上次方案，之后卡片永远不出——没看到就算弹过。去掉了。
      */
     private fun maybeShowFirstRunPicker() {
         if (onboardingPrefs.getBoolean(KEY_FIRST_PICK_SHOWN, false)) return
-        // 升级上来的老用户早就用着了（切过中英 / 方案就会记下上次中文方案）：不算首次
-        if (statePrefs.contains(KEY_LAST_CHINESE)) {
-            onboardingPrefs.edit().putBoolean(KEY_FIRST_PICK_SHOWN, true).apply()
-            return
-        }
         val info = currentInputEditorInfo ?: return
         val cls = info.inputType and android.text.InputType.TYPE_MASK_CLASS
         if (cls != android.text.InputType.TYPE_CLASS_TEXT || suspendsLearning(info.inputType, 0)) return

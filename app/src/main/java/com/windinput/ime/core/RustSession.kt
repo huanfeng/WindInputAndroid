@@ -82,7 +82,8 @@ class RustSession(
                 val core = WindCore(
                     dataDir.absolutePath,
                     rustRoot.absolutePath,
-                    "wubi86",
+                    // 首装兜底方案：全拼（手机用户绝大多数打拼音；五笔用户在首次方案卡片里换）
+                    "pinyin",
                     object : UiEventListener {
                         override fun onCandidates(update: uniffi.wind_android.CandidateUpdate) {
                             sessionRef?.post(

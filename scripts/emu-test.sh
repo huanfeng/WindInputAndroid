@@ -459,15 +459,16 @@ init_geometry
 # 照样 PASS（不过是换了个中文方案，断言只看「是不是汉字」），污染留给**下一次**运行，
 # 现象是「昨天好好的今天全挂」。故把「跑完方案没变」单列成一条不变量来守。
 get_active_schema() {
-    # 用户层没有 active 行 = 用的是出厂默认 wubi86：核心写配置时会把「等于出厂默认」的键
-    # 从用户层删掉，切回五笔后这一行就消失了，不能当成「读不到」。
+    # 用户层没有 active 行 = 用的是出厂默认 pinyin：核心写配置时会把「等于出厂默认」的键
+    # 从用户层删掉，切回全拼后这一行就消失了，不能当成「读不到」。
+    # 行尾注释（`# emu-test` 标记）剥掉再比：核心改写这一行时不一定保留注释。
     # 非 debug 包没有 run-as → 空（读不到）
     local cfg
     cfg="$(adb_ shell run-as "$PKG" cat files/rust/config/WindInput/config.toml)" || return
     printf '%s\n' "$cfg" | grep -q 'run-as:' && return
     local line
-    line="$(printf '%s\n' "$cfg" | grep -m1 '^active = ' | sed 's/[[:space:]]*$//')"
-    printf '%s' "${line:-active = \"wubi86\"}"
+    line="$(printf '%s\n' "$cfg" | grep -m1 '^active = ' | sed 's/[[:space:]]*#.*$//; s/[[:space:]]*$//')"
+    printf '%s' "${line:-active = \"pinyin\"}"
 }
 CORE_CFG=files/rust/config/WindInput/config.toml
 WUBI_SHADOW=files/rust/data/wubi86/shadow.dict.yaml
@@ -484,13 +485,36 @@ strip_section() {   # 文本 段名
         !skip     { print }'
 }
 
-# 用例全按五笔写（aa → 式）。上一次运行若中途断掉（模拟器掉线、被中断），活跃方案可能
-# 停在拼音或英文——它是持久化的，下一次所有用例连环失败，看着像功能坏了（实际遇到过：
-# 拼音残留，aa 出「啊啊」）。开跑前钉回 wubi86，连同中英键记住的「上次中文方案」一起。
-schema_now="$(get_active_schema)"
-if [[ -n "$schema_now" && "$schema_now" != 'active = "wubi86"' ]]; then
-    echo "${Y:-}残留方案 [$schema_now]，改回 wubi86 后重启${N:-}"
-    adb_q shell "run-as $PKG sed -i 's/^active = .*/active = \"wubi86\"/' files/rust/config/WindInput/config.toml"
+# 用例全按五笔写（aa → 式），而出厂默认方案是全拼。开跑前把核心用户层的 schema.active
+# 显式钉成 wubi86（带 `# emu-test` 标记），跑完写回原值（原来没有这一行就删掉，回到出厂全拼）。
+# 上一次运行若中途断掉，留下的带标记行说明原值是「没有这一行」。方案是持久化的，不钉的话
+# 残留的拼音 / 英文会让下一次所有用例连环失败（实际遇到过：拼音残留，aa 出「啊啊」）。
+# 连同中英键记住的「上次中文方案」一起清掉。
+WUBI_PIN='active = "wubi86" # emu-test'
+set_core_active() {   # 参数：完整的 active 行；空 = 删掉这一行（回到出厂默认）
+    local cfg body
+    cfg="$(read_core_cfg)"
+    [[ "$cfg" == *"No such file"* ]] && cfg=""
+    # 只动 [schema] 段里的 active：别的段（如 [schema.pinyin]）没有这个键，但也不碰
+    body="$(printf '%s\n' "$cfg" | awk '
+        /^\[/ { in_schema = ($0 ~ /^\[schema\][[:space:]]*(#.*)?$/) }
+        !(in_schema && /^active[[:space:]]*=/) { print }')"
+    if [[ -n "$1" ]]; then
+        if printf '%s\n' "$body" | grep -qE '^\[schema\][[:space:]]*(#.*)?$'; then
+            body="$(printf '%s\n' "$body" | awk -v line="$1" '{ print } /^\[schema\][[:space:]]*(#.*)?$/ { print line }')"
+        else
+            body="$(printf '[schema]\n%s\n\n%s\n' "$1" "$body")"
+        fi
+    fi
+    write_core_cfg "$body"
+}
+SUITE_ACTIVE_ORIG="$(read_core_cfg | awk '
+    /^\[/ { in_schema = ($0 ~ /^\[schema\][[:space:]]*(#.*)?$/) }
+    in_schema && /^active[[:space:]]*=/ { print; exit }')"
+[[ "$SUITE_ACTIVE_ORIG" == *"# emu-test"* ]] && SUITE_ACTIVE_ORIG=""
+if [[ "$(get_active_schema)" != 'active = "wubi86"' ]]; then
+    echo "${Y:-}活跃方案不是五笔，钉成 wubi86（跑完写回）后重启${N:-}"
+    set_core_active "$WUBI_PIN"
     adb_q shell run-as "$PKG" rm -f shared_prefs/ime_state.xml
     restart_pad
 fi
@@ -557,6 +581,8 @@ write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
 # [44] 会临时关掉「使用实体键盘时显示虚拟键盘」，中途断掉也要恢复，否则后面的用例看不到键盘
 SHOW_IME_WITH_HARD_KB="$(adb_ shell settings get secure show_ime_with_hard_keyboard)"
 restore_suite_kb() {   # 原来没有这个文件就删掉，不写回一个空文件
+    # 活跃方案写回开跑前的样子（见 WUBI_PIN）
+    set_core_active "$SUITE_ACTIVE_ORIG"
     [[ "$SHOW_IME_WITH_HARD_KB" =~ ^[01]$ ]] &&
         adb_q shell settings put secure show_ime_with_hard_keyboard "$SHOW_IME_WITH_HARD_KB"
     if (( SUITE_KB_EXISTED )); then
