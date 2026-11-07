@@ -117,6 +117,38 @@ qi_num 1
 check_match "首选上屏 + 1" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 qi_letters
 
+section "[87] 设置「输入 → 快捷输入 → 小数保留位数」拖到 2：快捷输入里 1/3 上屏 0.33"
+# 引擎项写进核心用户层（CORE_CFG）并即时 ReloadConfig；用例前后备份 / 写回整份核心配置
+qi_core_orig="$(read_core_cfg)"
+write_kb_cfg "$(qi_cfg 'touch_quick_input = true # emu-test')"
+restart_pad
+adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SettingsActivity"
+sleep 2
+tap_text "输入"
+tap_text "快捷输入"
+sleep 0.8
+qi_seek="$(dump_xml | sed 's/<node/\n<node/g' | grep -F 'class="android.widget.SeekBar"' | head -1)"
+[[ "$qi_seek" =~ bounds=\"\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]\" ]] || die "快捷输入页找不到小数位数滑块"
+# 0–6 七档：从最右（出厂 6）拖到 2/6 处
+qi_y=$(( (BASH_REMATCH[2] + BASH_REMATCH[4]) / 2 ))
+adb_q shell input swipe $(( BASH_REMATCH[3] - 20 )) "$qi_y" \
+    $(( BASH_REMATCH[1] + (BASH_REMATCH[3] - BASH_REMATCH[1]) * 2 / 6 )) "$qi_y" 600
+sleep 1.2
+check_match "写进核心配置 decimal_places = 2" '^decimal_places = 2$' \
+    "$(read_core_cfg | grep -E '^decimal_places' | head -1)"
+# 回测试台（back_to_pad 定义在 [46]，--only 时不在）：NEW_TASK | CLEAR_TASK，不杀进程，核心照旧
+adb_q shell am start -f 0x10008000 -n "$PKG/.settings.TestPadActivity"
+sleep 1
+reset_pad
+tap_key w; tap_key q; tap_key v; tap_key b; tap_key SPACE; sleep 0.4
+qi_swipe n
+tap_key SYM; sleep 0.4
+tap_cell 0 "${SYM_W[0]}" 0; tap_cell 1 "${SYM_W[1]}" 1; tap_cell 0 "${SYM_W[0]}" 2   # 1 / 3
+tap_cell 3 "${SYM_W[3]}" 3; sleep 0.5                                                # 空格
+check "1/3 按两位小数上屏" "你好0.33" "$(get_pad_text)"
+tap_cell 3 "${SYM_W[3]}" 1
+write_core_cfg "$qi_core_orig"
+
 # 写回整套用例的基线配置
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
 restart_pad

@@ -612,16 +612,6 @@ title = "数字后智能标点"
 [[item]]
 page = "input"
 section = "字符与标点"
-key = "ui.android.touch_quick_input"
-source = "android"
-type = "toggle"
-title = "触摸键盘 ; 进快捷输入"
-summary = "关：手机键盘上的 ; 当标点输入，快捷输入用工具栏按钮；外接物理键盘不受影响"
-default = false
-
-[[item]]
-page = "input"
-section = "字符与标点"
 key = "input.symbol.smart_mode"
 source = "engine"
 type = "toggle"
@@ -642,6 +632,30 @@ key = "input.auto_pair.english"
 source = "engine"
 type = "toggle"
 title = "英文标点自动配对"
+
+# 快捷输入（日期 / 计算 / 拼音 / 英文融合）：电脑版另有触发键多选、候选来源、候选窗布局、自由输入等
+# schema.mix_modes 里的结构化项，手机端不列；触发键在手机上只有「; 进不进」这一个开关。
+# 快捷输入历史在手机上没有入口启用（候选来源不列），历史条数上限也就不列
+[[item]]
+page = "input"
+section = "快捷输入"
+key = "ui.android.touch_quick_input"
+source = "android"
+type = "toggle"
+title = "触摸键盘 ; 进快捷输入"
+summary = "关：手机键盘上的 ; 当标点输入，快捷输入用工具栏按钮；外接物理键盘不受影响"
+default = false
+
+[[item]]
+page = "input"
+section = "快捷输入"
+key = "schema.quick_input.decimal_places"
+source = "engine"
+type = "int"
+title = "小数保留位数"
+summary = "计算结果最多保留的小数位数（0 表示取整）"
+min = 0
+max = 6
 
 # 联想写移动端覆盖键 mobile.association.*（手机默认智能 + 持续，与电脑版的取值各管各的）
 [[item]]
