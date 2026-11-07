@@ -1792,6 +1792,8 @@ source "$ROOT/scripts/emu-cases/schema-settings.sh"
 source "$ROOT/scripts/emu-cases/toolbar-edit.sh"
 # 九宫格左列符号（[65]–[67]）
 source "$ROOT/scripts/emu-cases/numpad-side.sh"
+# 退格下滑恢复刚删的内容（[68]–[68d]）
+source "$ROOT/scripts/emu-cases/backspace-undo.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"

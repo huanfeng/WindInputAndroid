@@ -12,6 +12,10 @@ package com.windinput.ime.keyboard
  *   否则「上滑 -> 左移 -> 下滑收起」会把残留的左移量误当成扩选。
  *   上滑量 > [Config.thresholdPx] 才算「选中」：手指偏左超过 [Config.leftPx] = 清空输入框，
  *   否则 = 删光标前全部；未过阈值抬手 = 反悔，什么都不删。
+ * - 恢复：下滑量 > activate 且大于横向位移、且宿主有可恢复的删除（[BackspaceGesture.Listener.canRestoreDeleted]）
+ *   时进入，气泡显示「恢复」；下滑量 > threshold 抬手 = 恢复刚删的内容，未过阈值抬手 = 反悔；
+ *   下滑量回到 exit 以内退出，收起后同样须先回到水平原点附近才允许扩选。
+ *   没有可恢复内容时下滑不进入（照旧是单击 / 连删）。
  *
  * 进入用 activate / threshold，退出用更小的 exit / threshold - [Config.hysteresisPx]（滞回），
  * 手指在阈值附近抖动不会反复切换。
@@ -53,9 +57,10 @@ class BackspaceGestureMachine(
         fun cancel()
     }
 
-    enum class Bubble { HIDDEN, IDLE, BEFORE, ALL }
+    /** RESTORE / RESTORE_ARMED = 下滑恢复气泡（未过 / 已过阈值） */
+    enum class Bubble { HIDDEN, IDLE, BEFORE, ALL, RESTORE, RESTORE_ARMED }
 
-    private enum class Mode { IDLE, SELECT, BUBBLE }
+    private enum class Mode { IDLE, SELECT, BUBBLE, RESTORE }
 
     private var pressed = false
     private var swipeOn = false
@@ -93,6 +98,7 @@ class BackspaceGestureMachine(
         if (!pressed || !swipeOn) return
         val left = downX - x
         val up = downY - y
+        val down = -up
         if (needsRecenter && left <= cfg.activatePx) needsRecenter = false
         if (mode == Mode.SELECT) {
             if (left > cfg.exitPx) {
@@ -111,10 +117,24 @@ class BackspaceGestureMachine(
             mode = Mode.IDLE
             needsRecenter = left > cfg.activatePx
         }
-        if (up > cfg.activatePx && up > kotlin.math.abs(x - downX)) {
+        if (mode == Mode.RESTORE) {
+            if (down > cfg.exitPx) {
+                chooseRestore(down)
+                return
+            }
+            setBubble(Bubble.HIDDEN)
+            mode = Mode.IDLE
+            needsRecenter = left > cfg.activatePx
+        }
+        val sideways = kotlin.math.abs(x - downX)
+        if (up > cfg.activatePx && up > sideways) {
             engage()
             mode = Mode.BUBBLE
             chooseBubble(left, up)
+        } else if (down > cfg.activatePx && down > sideways && listener.canRestoreDeleted()) {
+            engage()
+            mode = Mode.RESTORE
+            chooseRestore(down)
         } else if (left > cfg.activatePx && !needsRecenter) {
             engage()
             mode = Mode.SELECT
@@ -135,6 +155,7 @@ class BackspaceGestureMachine(
                 Bubble.ALL -> listener.onClearAll()
                 else -> Unit
             }
+            Mode.RESTORE -> if (b == Bubble.RESTORE_ARMED) listener.onRestoreDeleted()
             Mode.IDLE -> if (plainTap) listener.onDelete()
         }
     }
@@ -172,6 +193,11 @@ class BackspaceGestureMachine(
                 else -> Bubble.BEFORE
             },
         )
+    }
+
+    private fun chooseRestore(down: Float) {
+        val threshold = if (bubble == Bubble.RESTORE_ARMED) cfg.thresholdPx - cfg.hysteresisPx else cfg.thresholdPx
+        setBubble(if (down > threshold) Bubble.RESTORE_ARMED else Bubble.RESTORE)
     }
 
     private fun setBubble(b: Bubble) {

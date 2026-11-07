@@ -52,6 +52,12 @@ class KeyboardView(context: Context) : View(context) {
         /** 退格上滑后左移过阈值抬手：清空（有编码清编码，否则清空整个输入框） */
         fun onBackspaceClearAll()
 
+        /** 退格下滑过阈值抬手：恢复刚删的内容 */
+        fun onBackspaceRestore() = Unit
+
+        /** 有没有可恢复的删除；没有时退格下滑不进恢复（照旧是单击 / 连删） */
+        fun canRestoreDeleted(): Boolean = false
+
         /** 功能键长按（空格 → 按设置切输入法 / 语音；中英键弹不出菜单时退到这里） */
         fun onKeyLongPress(action: KeyAction)
 
@@ -381,7 +387,7 @@ class KeyboardView(context: Context) : View(context) {
     private var spaceSwipeActive = false
     private var lastStepX = 0f
 
-    /** 退格键的全部手势（点按 / 连删 / 左滑扩选 / 上滑双选项）见 [BackspaceGesture] */
+    /** 退格键的全部手势（点按 / 连删 / 左滑扩选 / 上滑双选项 / 下滑恢复）见 [BackspaceGesture] */
     private val backspaceGesture = BackspaceGesture(
         object : BackspaceGesture.Listener {
             override fun onDelete() {
@@ -403,6 +409,12 @@ class KeyboardView(context: Context) : View(context) {
             override fun onClearAll() {
                 listener?.onBackspaceClearAll()
             }
+
+            override fun onRestoreDeleted() {
+                listener?.onBackspaceRestore()
+            }
+
+            override fun canRestoreDeleted() = listener?.canRestoreDeleted() == true
 
             override fun swipeEnabled() = backspaceSwipeEnabled
         },

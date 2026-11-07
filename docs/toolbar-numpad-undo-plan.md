@@ -59,3 +59,11 @@
 - 面板（编辑面板等）的退格同样接这个手势，接口 `BackspaceGesture.Listener.onRestoreDeleted()` / `canRestoreDeleted()`（默认无）。
 - 设置：沿用「退格滑动手势」开关，不另加开关。
 - e2e：删几个字 → 下滑恢复；清空 → 下滑恢复且光标在原位；删后打字再下滑不恢复。
+
+状态：已实现。记录逻辑在 `DeleteUndo`（单测 `DeleteUndoTest`），下滑模式在 `BackspaceGestureMachine`（`BackspaceGestureMachineTest` 的「下滑恢复」一组）；
+e2e 用例 [68]–[68d]（`scripts/emu-cases/backspace-undo.sh`，含符号页面板退格）。实现要点：
+- 单删多是发 KEYCODE_DEL，应用再投递一次才删，删完立刻读光标可能还是删前的位置：此时先挂起，等「旧选区 = 删前选区」的那条
+  `onUpdateSelection` 回报再算删了什么（挂起 1 秒没等到就丢）。
+- 记录后先等删除自己引起的那条回报（光标到恢复点），之前到的旧回报不管；之后光标离开恢复点即作废。恢复时再同步核对一次光标。
+- 密码框（直输）不记，不在内存里留密码片段。
+- 没有可恢复内容时下滑不进恢复模式，行为同改动前（主键盘上手指滑出键外抬手 = 什么都不做，不是单击）。

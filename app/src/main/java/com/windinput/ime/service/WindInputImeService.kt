@@ -2,6 +2,7 @@ package com.windinput.ime.service
 
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
+import android.os.Build
 import android.os.SystemClock
 import android.text.InputType
 import android.view.KeyEvent
@@ -319,6 +320,9 @@ class WindInputImeService :
         /** 光标前文报几个字给核心：联想的下一词表只看 4 个字，留些余量 */
         const val PRECEDING_CHARS = 32
 
+        /** 退格单删前先读光标前多少字备恢复：一下最多删一个字素（带 ZWJ 的 emoji 十几个单元），留足余量 */
+        const val UNDO_PEEK_CHARS = 64
+
         /** 与核心 `wind-mobile` 的 AUTO_SPACE_PUNCT 一致：这几个标点会触发空格换位 */
         private const val AUTO_SPACE_PUNCT = ".,?!;:"
 
@@ -489,6 +493,7 @@ class WindInputImeService :
     override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
         super.onStartInput(attribute, restarting)
         hasInlineComposition = false // 换了输入框，宿主那边没有我们挂的组合区
+        deleteUndo.invalidate() // 删除记录只对原来那个输入框有效
         // 先定学习开关再给焦点：焦点一到，引擎就可能开始记东西
         fieldSuspendsLearning = suspendsLearning(attribute?.inputType ?: 0, attribute?.imeOptions ?: 0)
         applyLearningSuspended()
@@ -560,6 +565,7 @@ class WindInputImeService :
     ) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         updateAutoCaps()
+        deleteUndo.onSelectionUpdate(oldSelStart, oldSelEnd, newSelStart, newSelEnd, SystemClock.uptimeMillis())
         // 挂着内联编码时光标前是组合区里的码，不是正文；组合开始前报的那份仍然对
         if (candidatesStart < 0) reportPrecedingText()
     }
@@ -658,6 +664,12 @@ class WindInputImeService :
      * 作用在选区上，会把用户选中的文字删掉。
      */
     private var hasInlineComposition = false
+
+    /** 退格下滑恢复用：最近一次输入框里的删除，见 [DeleteUndo] */
+    private val deleteUndo = DeleteUndo()
+
+    /** 引擎这一批编辑往输入框里写过字（上屏 / 回退替换）：退格单删期间出现就不记那次删除 */
+    private var wroteText = false
 
     private fun clearInlineComposition(ic: android.view.inputmethod.InputConnection) {
         if (hasInlineComposition) ic.setComposingText("", 1)
@@ -856,6 +868,8 @@ class WindInputImeService :
                         // commitText 会顶掉组合区里的内联编码
                         ic.commitText(op.text, 1)
                         hasInlineComposition = false
+                        wroteText = true
+                        deleteUndo.invalidate()
                     }
                     is EditOp.SetComposition -> {
                         if (op.text.isEmpty() || isCompositionPlaceholder(op.text)) {
@@ -877,6 +891,8 @@ class WindInputImeService :
                     is EditOp.ReplaceBackward -> {
                         ic.deleteSurroundingTextInCodePoints(op.count, 0)
                         ic.commitText(op.text, 1)
+                        wroteText = true
+                        deleteUndo.invalidate()
                     }
                     is EditOp.MoveCursor -> moveCursor(ic, op.delta)
                 }
@@ -939,6 +955,21 @@ class WindInputImeService :
     }
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {
+        when (action) {
+            KeyAction.Backspace -> recordBackwardDelete { performKeyAction(action, shifted) }
+            else -> {
+                // 输入任何字符都让「恢复刚删的」作废：之后再恢复会插到新字后面
+                if (action is KeyAction.Text || action is KeyAction.Commit ||
+                    action == KeyAction.Space || action == KeyAction.Enter
+                ) {
+                    deleteUndo.invalidate()
+                }
+                performKeyAction(action, shifted)
+            }
+        }
+    }
+
+    private fun performKeyAction(action: KeyAction, shifted: Boolean) {
         // 中英切换 / 表情键是宿主侧动作，不走引擎按键路径
         if (action == KeyAction.SwitchLang) {
             toggleLanguage()
@@ -1371,6 +1402,7 @@ class WindInputImeService :
         val selected = ic.getSelectedText(0)
         if (!selected.isNullOrEmpty()) {
             ic.commitText("", 1)
+            recordDeleted(ic, selected.toString(), "")
         }
     }
 
@@ -1385,10 +1417,12 @@ class WindInputImeService :
         }
         val ic = currentInputConnection ?: return
         ic.beginBatchEdit()
-        if (!ic.getSelectedText(0).isNullOrEmpty()) ic.commitText("", 1)
-        val before = ic.getTextBeforeCursor(CLEAR_ALL_MAX, 0)?.length ?: 0
-        if (before > 0) ic.deleteSurroundingText(before, 0)
+        val selected = ic.getSelectedText(0)?.toString().orEmpty()
+        if (selected.isNotEmpty()) ic.commitText("", 1)
+        val before = ic.getTextBeforeCursor(CLEAR_ALL_MAX, 0)?.toString().orEmpty()
+        if (before.isNotEmpty()) ic.deleteSurroundingText(before.length, 0)
         ic.endBatchEdit()
+        recordDeleted(ic, before + selected, "")
     }
 
     /** 面板里的退格键：单次删除沿用各面板原来的处理，滑动手势与键盘退格同一套宿主实现 */
@@ -1396,13 +1430,15 @@ class WindInputImeService :
         // 有编码（符号页保留条区，编码仍可见）时先交引擎退格，和键盘退格键一致；引擎不接再走面板自己的删除
         override fun onDelete() {
             if (composing && engineKey(KeyAction.Backspace, false)) return
-            delete()
+            recordBackwardDelete(delete)
         }
         override fun longPressDelayMs() = longPressDelayMs.toLong()
         override fun onSelect(count: Int) = onBackspaceSelect(count)
         override fun onSelectionDelete() = onBackspaceSwipeDelete()
         override fun onDeleteBeforeCursor() = onBackspaceDeleteBeforeCursor()
         override fun onClearAll() = onBackspaceClearAll()
+        override fun onRestoreDeleted() = onBackspaceRestore()
+        override fun canRestoreDeleted() = this@WindInputImeService.canRestoreDeleted()
         override fun swipeEnabled() = backspaceSwipeOn
     }
 
@@ -1423,12 +1459,73 @@ class WindInputImeService :
         }
         val ic = currentInputConnection ?: return
         ic.beginBatchEdit()
-        if (!ic.getSelectedText(0).isNullOrEmpty()) ic.commitText("", 1)
-        val before = ic.getTextBeforeCursor(CLEAR_ALL_MAX, 0)?.length ?: 0
-        val after = ic.getTextAfterCursor(CLEAR_ALL_MAX, 0)?.length ?: 0
-        if (before + after > 0) ic.deleteSurroundingText(before, after)
+        val selected = ic.getSelectedText(0)?.toString().orEmpty()
+        if (selected.isNotEmpty()) ic.commitText("", 1)
+        val before = ic.getTextBeforeCursor(CLEAR_ALL_MAX, 0)?.toString().orEmpty()
+        val after = ic.getTextAfterCursor(CLEAR_ALL_MAX, 0)?.toString().orEmpty()
+        if (before.length + after.length > 0) ic.deleteSurroundingText(before.length, after.length)
+        ic.endBatchEdit()
+        // 恢复后光标回原位：选区（若有）连同光标前的放回前段，光标后的放回后段
+        recordDeleted(ic, before + selected, after)
+    }
+
+    /**
+     * 退格单删（单击、连删的每一下）：删前删后各取光标，两次之间那段就是删掉的，记进 [deleteUndo]。
+     * 有编码时退格删的是编码，不记；密码框不记（不在内存里留密码片段）；
+     * 引擎这一下顺带往输入框写了字（回退替换等）也不记——那不是单纯的删除。
+     */
+    private fun recordBackwardDelete(delete: () -> Unit) {
+        val ic = currentInputConnection
+        val old = if (composing || directInput || ic == null) null else selectionOf(ic)
+        if (ic == null || old == null) {
+            delete()
+            return
+        }
+        val before = ic.getTextBeforeCursor(UNDO_PEEK_CHARS, 0)?.toString().orEmpty()
+        val selected = if (old[0] != old[1]) ic.getSelectedText(0)?.toString().orEmpty() else ""
+        wroteText = false
+        delete()
+        if (wroteText) return
+        // KEYCODE_DEL 由应用再投递一次才删，这里读到的可能还是删前的光标：那样 DeleteUndo 会等回报
+        val now = selectionOf(ic) ?: return
+        deleteUndo.onBackwardDelete(before, selected, old[0], old[1], now[0], now[1], SystemClock.uptimeMillis())
+    }
+
+    /** 扩选删 / 删光标前 / 清空之后：记一条，恢复点 = 删完后的光标 */
+    private fun recordDeleted(ic: android.view.inputmethod.InputConnection, before: String, after: String) {
+        if (directInput) return
+        val now = selectionOf(ic) ?: return
+        if (now[0] == now[1]) deleteUndo.record(before, after, now[0])
+    }
+
+    /** 选区的绝对位置 [起点, 终点]（与 onUpdateSelection 同口径）；拿不到返回 null */
+    private fun selectionOf(ic: android.view.inputmethod.InputConnection): IntArray? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ic.getSurroundingText(0, 0, 0)?.let {
+                if (it.offset >= 0) return intArrayOf(it.offset + it.selectionStart, it.offset + it.selectionEnd)
+            }
+        }
+        val ext = ic.getExtractedText(ExtractedTextRequest(), 0) ?: return null
+        return intArrayOf(ext.startOffset + ext.selectionStart, ext.startOffset + ext.selectionEnd)
+    }
+
+    /**
+     * 退格下滑抬手：把最近一次删除放回原处（清空则先放光标前段、再放后段，光标停在中间）。
+     * 恢复前同步核对光标仍在记录点，不在就作废不放——防止把旧内容插到别处
+     */
+    override fun onBackspaceRestore() {
+        if (composing) return
+        val ic = currentInputConnection ?: return
+        val sel = selectionOf(ic) ?: return
+        val e = deleteUndo.take(sel[0], sel[1]) ?: return
+        ic.beginBatchEdit()
+        if (e.before.isNotEmpty()) ic.commitText(e.before, 1)
+        // newCursorPosition = 0：光标停在后段开头，即两段之间
+        if (e.after.isNotEmpty()) ic.commitText(e.after, 0)
         ic.endBatchEdit()
     }
+
+    override fun canRestoreDeleted() = !composing && deleteUndo.canRestore
 
     /**
      * 撤销 / 重做：发 Ctrl+Z / Ctrl+Shift+Z。这是 Android 文本框的标准快捷键
@@ -1841,6 +1938,7 @@ class WindInputImeService :
      * 字符却已插到了它前面。选词是同步回调，上屏顺序有保证。
      */
     private fun commitDirect(text: String) {
+        deleteUndo.invalidate()
         if (composing && !directInput) {
             if (loadedCandidates.isNotEmpty()) {
                 session.candidateSelected(0, autoSpace = false)

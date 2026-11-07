@@ -29,7 +29,11 @@ class BackspaceGestureMachineTest {
         override fun onSelectionDelete() { actions += "selDel" }
         override fun onDeleteBeforeCursor() { actions += "delBefore" }
         override fun onClearAll() { actions += "clearAll" }
+        override fun onRestoreDeleted() { actions += "restore" }
+        override fun canRestoreDeleted() = restorable
     }
+
+    private var restorable = true
 
     private val bubbles = mutableListOf<Bubble>()
     private val m = BackspaceGestureMachine(cfg, listener, timer) { bubbles += it }
@@ -176,5 +180,90 @@ class BackspaceGestureMachineTest {
     @Test fun 扩选途中被取消选区收回光标() {
         down(); m.move(60f, 100f); m.cancel()
         assertEquals(listOf("select:3", "select:0"), actions)
+    }
+
+    // ── 下滑恢复 ─────────────────────────────────────────────────
+
+    @Test fun 下滑过阈值抬手恢复() {
+        down(); m.move(100f, 160f); m.up()
+        assertEquals(listOf("restore"), actions)
+        assertEquals(listOf(Bubble.RESTORE_ARMED, Bubble.HIDDEN), bubbles)
+    }
+
+    @Test fun 下滑先出未选中气泡再过阈值高亮() {
+        down(); m.move(100f, 130f); m.move(100f, 150f)
+        assertEquals(listOf(Bubble.RESTORE, Bubble.RESTORE_ARMED), bubbles)
+    }
+
+    @Test fun 下滑未过阈值抬手不恢复也不补单击() {
+        down(); m.move(100f, 130f); m.up()
+        assertEquals(emptyList<String>(), actions)
+    }
+
+    @Test fun 下滑过阈值再滑回起点抬手反悔() {
+        down(); m.move(100f, 160f); m.move(100f, 100f); m.up()
+        assertEquals(emptyList<String>(), actions)
+        assertEquals(listOf(Bubble.RESTORE_ARMED, Bubble.HIDDEN), bubbles)
+    }
+
+    @Test fun 下滑阈值附近抖动不反复切换() {
+        down()
+        m.move(100f, 142f)
+        for (i in 0 until 4) { m.move(100f, 138f); m.move(100f, 142f) }
+        assertEquals(listOf(Bubble.RESTORE_ARMED), bubbles)
+        m.move(100f, 134f)   // 低于回差下沿才退回未选中
+        assertEquals(listOf(Bubble.RESTORE_ARMED, Bubble.RESTORE), bubbles)
+    }
+
+    @Test fun 没有可恢复内容时下滑照旧是单击() {
+        restorable = false
+        down(); m.move(100f, 160f); m.up()
+        assertEquals(listOf("delete"), actions)
+        assertEquals(emptyList<Bubble>(), bubbles)
+    }
+
+    @Test fun 没有可恢复内容时下滑不打断连删() {
+        restorable = false
+        down(); m.move(100f, 160f)
+        assertEquals(true, timerActive)
+    }
+
+    @Test fun 手势开关关闭时下滑也只是单击() {
+        val off = object : BackspaceGesture.Listener by listener {
+            override fun swipeEnabled() = false
+        }
+        val machine = BackspaceGestureMachine(cfg, off, timer) { bubbles += it }
+        machine.down(100f, 100f, 300L); machine.move(100f, 160f); machine.up()
+        assertEquals(listOf("delete"), actions)
+    }
+
+    @Test fun 斜下偏横向为主时不进下滑() {
+        down(); m.move(60f, 120f); m.up()
+        assertEquals(listOf("select:3", "selDel"), actions)
+    }
+
+    @Test fun 扩选中往下移不串成恢复() {
+        down(); m.move(60f, 100f); m.move(60f, 160f); m.up()
+        assertEquals(listOf("select:3", "selDel"), actions)
+    }
+
+    @Test fun 下滑中往左移不串成扩选() {
+        down(); m.move(100f, 160f); m.move(60f, 160f); m.up()
+        assertEquals(listOf("restore"), actions)
+    }
+
+    @Test fun 下滑后直接上滑改为删光标前() {
+        down(); m.move(100f, 160f); m.move(100f, 40f); m.up()
+        assertEquals(listOf("delBefore"), actions)
+    }
+
+    @Test fun 上滑后直接下滑改为恢复() {
+        down(); m.move(100f, 40f); m.move(100f, 160f); m.up()
+        assertEquals(listOf("restore"), actions)
+    }
+
+    @Test fun 下滑气泡收起后残留左移不进扩选() {
+        down(); m.move(100f, 160f); m.move(60f, 160f); m.move(60f, 105f); m.up()
+        assertEquals(emptyList<String>(), actions)
     }
 }
