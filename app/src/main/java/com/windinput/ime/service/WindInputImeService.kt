@@ -55,9 +55,11 @@ import com.windinput.ime.panels.SymbolPages
 import com.windinput.ime.panels.SymbolWindow
 import com.windinput.ime.core.LeadingReading
 import com.windinput.ime.panels.ExpandedCandidatesWindow
+import com.windinput.ime.panels.KeyboardSelectWindow
 import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
 import com.windinput.ime.settings.SettingsActivity
+import com.windinput.ime.settings.SUB_ENABLED_SCHEMAS
 import com.windinput.ime.settings.SUB_NUMPAD_SYMBOLS
 import java.io.File
 
@@ -81,6 +83,7 @@ class WindInputImeService :
     EmojiWindow.Listener,
     SymbolWindow.Listener,
     QuickPanelWindow.Listener,
+    KeyboardSelectWindow.Listener,
     ExpandedCandidatesWindow.Listener {
 
     private lateinit var session: ImeSession
@@ -125,6 +128,7 @@ class WindInputImeService :
     private var symbolWindow: SymbolWindow? = null
     private var expandedCandidatesWindow: ExpandedCandidatesWindow? = null
     private var quickPanelWindow: QuickPanelWindow? = null
+    private var keyboardSelectWindow: KeyboardSelectWindow? = null
 
     /** 编码是否同时写进宿主组合区（ui.android.inline_preedit，默认关，见 onUiEvent） */
     private var inlinePreedit = false
@@ -189,6 +193,7 @@ class WindInputImeService :
                         refreshSchemaKeys()
                         // 切方案期间推来的状态读到的是旧方案列表，切完补刷一次
                         quickPanelWindow?.refresh()
+                        keyboardSelectWindow?.refresh()
                     }
                 },
             ).also { it.start() }
@@ -278,6 +283,7 @@ class WindInputImeService :
         symbolWindow = SymbolWindow({ SymbolPages.load(dataDirs) }, recentSymbolStore, listener = this)
         expandedCandidatesWindow = ExpandedCandidatesWindow(listener = this)
         quickPanelWindow = QuickPanelWindow(listener = this)
+        keyboardSelectWindow = KeyboardSelectWindow(listener = this)
 
         windowManager = InputWindowManager(panelContainer, keyboardWindow!!).also {
             // 面板打开时条区让位：面板自带左上角返回，不再上下两条横栏并排。
@@ -843,6 +849,7 @@ class WindInputImeService :
                 // 键面标点形态跟引擎的真值走：英文模式或关了中文标点，键面就显示 ASCII
                 keyboardWindow?.keyboardView?.chinesePunct = event.chineseMode && event.chinesePunct
                 quickPanelWindow?.updateStatus(event)
+                keyboardSelectWindow?.updateStatus(event)
             }
             is UiEvent.Toast -> showToast(event.text)
         }
@@ -1566,8 +1573,18 @@ class WindInputImeService :
             QuickPanelWindow.Target.EMOJI -> emojiWindow?.let { wm.show(it) }
             QuickPanelWindow.Target.CLIPBOARD -> clipboardWindow?.let { wm.show(it) }
             QuickPanelWindow.Target.TEXT_EDIT -> textEditingWindow?.let { wm.show(it) }
+            QuickPanelWindow.Target.KEYBOARD_SELECT -> keyboardSelectWindow?.let { wm.show(it) }
         }
     }
+
+    // ── 键盘选择面板 ─────────────────────────────────────────────
+
+    override fun onKeyboardSelectNumberPad() {
+        windowManager?.showKeyboard()
+        keyboardWindow?.keyboardView?.setLayer(KeyboardLayer.NUMBER, returnTo = KeyboardLayer.LETTERS)
+    }
+
+    override fun onKeyboardManage() = openSettings("schema", SUB_ENABLED_SCHEMAS)
 
     override fun onOpenSettings() = openSettings()
 
@@ -1606,6 +1623,7 @@ class WindInputImeService :
 
     override fun onToolbarItem(item: ToolbarItem) {
         when (item) {
+            ToolbarItem.KEYBOARD -> onOpenPanel(QuickPanelWindow.Target.KEYBOARD_SELECT)
             ToolbarItem.CLIPBOARD -> onOpenPanel(QuickPanelWindow.Target.CLIPBOARD)
             ToolbarItem.TEXT_EDIT -> onOpenPanel(QuickPanelWindow.Target.TEXT_EDIT)
             ToolbarItem.EMOJI -> onOpenPanel(QuickPanelWindow.Target.EMOJI)

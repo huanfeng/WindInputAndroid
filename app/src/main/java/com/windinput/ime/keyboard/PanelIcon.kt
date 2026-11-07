@@ -57,6 +57,9 @@ class PanelIcon(context: Context) : View(context) {
         /** 单手（手机 + 侧向箭头） */
         ONE_HAND,
 
+        /** 键盘（键盘轮廓）：键盘选择面板的入口 */
+        KEYBOARD,
+
         /** 置顶（实心图钉） */
         PIN,
 
@@ -198,6 +201,7 @@ class PanelIcon(context: Context) : View(context) {
             Glyph.MIC to "语音输入",
             Glyph.GLOBE to "切换输入法",
             Glyph.ONE_HAND to "单手",
+            Glyph.KEYBOARD to "键盘",
             Glyph.PIN to "取消置顶",
             Glyph.PIN_OUTLINE to "置顶",
             Glyph.CLOCK to "最近",

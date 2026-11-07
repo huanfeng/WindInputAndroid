@@ -1798,6 +1798,8 @@ source "$ROOT/scripts/emu-cases/toolbar-edit.sh"
 source "$ROOT/scripts/emu-cases/numpad-side.sh"
 # 退格下滑恢复刚删的内容（[68]–[68d]）
 source "$ROOT/scripts/emu-cases/backspace-undo.sh"
+# 键盘选择面板、快捷面板去掉方案行、123 默认进九宫（[69]–[75]）
+source "$ROOT/scripts/emu-cases/keyboard-select.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"

@@ -12,7 +12,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import com.windinput.ime.core.EngineCmd
-import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
 import com.windinput.ime.keyboard.BarView
 import com.windinput.ime.keyboard.InputWindow
@@ -22,7 +21,8 @@ import com.windinput.ime.keyboard.ToolbarItem
 import com.windinput.ime.keyboard.ToolbarPinEdit
 
 /**
- * 快捷功能面板：主流输入法「更多」页的形态——**方案一行 + 4 列图标格子**。
+ * 快捷功能面板：主流输入法「更多」页的形态——**4 列图标格子**。切方案在「键盘」格打开的
+ * 键盘选择面板（[KeyboardSelectWindow]）里，此前顶上那行方案分段选择器已由它取代。
  *
  * 格子统一：上图标、下文字、等宽等高，开关类格子用强调色表示"开着"。搜狗/百度/Gboard
  * 的功能页都是这一套，用户不用学。此前是三段标签 + 大小不一的文字 chip，看着像设置页
@@ -40,15 +40,12 @@ class QuickPanelWindow(
     interface Listener {
         fun onQuickCommand(cmd: EngineCmd)
 
-        /** 打开某个面板（表情/剪贴板/文本编辑） */
+        /** 打开某个面板（表情/剪贴板/文本编辑/键盘选择） */
         fun onOpenPanel(target: Target)
 
         fun onOpenSettings()
 
         fun onBackToKeyboard()
-
-        /** 当前可选方案 */
-        fun quickSchemas(): List<SchemaEntry>
 
         /** 弹系统输入法选择器 */
         fun onSwitchInputMethod()
@@ -86,11 +83,9 @@ class QuickPanelWindow(
         fun onToolbarItemFromPanel(item: ToolbarItem)
     }
 
-    enum class Target { EMOJI, CLIPBOARD, TEXT_EDIT }
+    enum class Target { EMOJI, CLIPBOARD, TEXT_EDIT, KEYBOARD_SELECT }
 
     private companion object {
-        /** 英文方案 id（与 assets/data/schemas/english.schema.toml 一致） */
-        const val ENGLISH_SCHEMA_ID = "english"
         const val COLUMNS = 4
         const val TILE_HEIGHT_DP = 64
         const val MIN_TILE_HEIGHT_DP = 40
@@ -101,8 +96,6 @@ class QuickPanelWindow(
 
         const val EDIT_HINT = "按住拖动调顺序，点 ⊖ 移除，点 ＋ 加入"
     }
-
-    private var schemaRow: LinearLayout? = null
 
     /**
      * 编辑工具栏中：顶部出工具栏预览（拖动换位、⊖ 移除）；能常驻的格子右上角出 ＋（未常驻）
@@ -126,15 +119,6 @@ class QuickPanelWindow(
             orientation = LinearLayout.VERTICAL
             setPadding(dp(10), dp(8), dp(4), dp(8))
         }
-
-        val schemas = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-        schemaRow = schemas
-        column.addView(
-            schemas,
-            LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(38)).apply {
-                bottomMargin = dp(10)
-            },
-        )
 
         val hint = TextView(context).apply {
             text = EDIT_HINT
@@ -176,7 +160,6 @@ class QuickPanelWindow(
             ),
         )
 
-        rebuildSchemas(context)
         rebuildTiles(context)
 
         // 面板高度固定（= 条区 + 键盘），格子多了要能滚
@@ -213,7 +196,7 @@ class QuickPanelWindow(
 
     /** 离开面板就退出编辑：下次进来是正常的快捷面板 */
     override fun onDetached() {
-        val ctx = schemaRow?.context ?: return
+        val ctx = tileGrid?.context ?: return
         if (editingPins) setEditing(ctx, false)
     }
 
@@ -244,46 +227,20 @@ class QuickPanelWindow(
      */
     fun updateStatus(newStatus: UiEvent.Status) {
         status = newStatus
-        val ctx = schemaRow?.context ?: return
+        val ctx = tileGrid?.context ?: return
         rebuildTiles(ctx)
-        rebuildSchemas(ctx)
     }
 
     /** 每次进入面板刷新一次：方案可能在别处（键盘快捷键/设置页）被切过 */
     override fun onAttached() = refresh()
 
     /**
-     * 重画方案行与功能格子。切方案在后台做，引擎推状态时后台任务还没收尾、方案列表还是
-     * 切之前的缓存——所以后台切完（忙状态解除）时 Service 再叫一次这里。
+     * 重画功能格子（临时拼音格随当前方案出没）。切方案在后台做，引擎推状态时后台任务还没收尾、
+     * 方案列表还是切之前的缓存——所以后台切完（忙状态解除）时 Service 再叫一次这里。
      */
     fun refresh() {
-        val ctx = schemaRow?.context ?: return
-        rebuildSchemas(ctx)
+        val ctx = tileGrid?.context ?: return
         rebuildTiles(ctx)
-    }
-
-    /** 方案一行：分段选择器，等宽，选中项实底 */
-    private fun rebuildSchemas(context: Context) {
-        val row = schemaRow ?: return
-        val density = context.resources.displayMetrics.density
-        row.removeAllViews()
-        val chinese = status?.chineseMode ?: true
-        fun segment(label: String, selected: Boolean, onClick: () -> Unit) {
-            row.addView(
-                chip(context, label, selected, onClick),
-                LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
-                    marginEnd = (6 * density).toInt()
-                },
-            )
-        }
-        // "英文" 与各方案是一组单选：这与桌面主菜单的分组语义一致。
-        // 英文方案不单列一格：这个「英」就是它的入口，两格并排会让人以为是两回事。
-        segment("英", selected = !chinese) { listener.onQuickCommand(EngineCmd.English) }
-        for (s in listener.quickSchemas().filter { it.id != ENGLISH_SCHEMA_ID }) {
-            segment(s.name.ifEmpty { s.id }, selected = chinese && s.active) {
-                listener.onQuickCommand(EngineCmd.SelectSchema(s.index))
-            }
-        }
     }
 
     /** 功能格子：开关在前（带选中态），入口在后 */
@@ -331,6 +288,7 @@ class QuickPanelWindow(
             add("拼", "临时拼音", pin = ToolbarItem.TEMP_PINYIN) { listener.onToolbarItemFromPanel(ToolbarItem.TEMP_PINYIN) }
         }
         add(";", "快捷输入", pin = ToolbarItem.QUICK_INPUT) { listener.onToolbarItemFromPanel(ToolbarItem.QUICK_INPUT) }
+        add(PanelIcon.Glyph.KEYBOARD, "键盘", pin = ToolbarItem.KEYBOARD) { listener.onOpenPanel(Target.KEYBOARD_SELECT) }
         add(PanelIcon.Glyph.EMOJI, "表情", pin = ToolbarItem.EMOJI) { listener.onOpenPanel(Target.EMOJI) }
         add(PanelIcon.Glyph.CLIPBOARD, "剪贴板", pin = ToolbarItem.CLIPBOARD) { listener.onOpenPanel(Target.CLIPBOARD) }
         add(PanelIcon.Glyph.TEXT_EDIT, "文本编辑", pin = ToolbarItem.TEXT_EDIT) { listener.onOpenPanel(Target.TEXT_EDIT) }
@@ -517,43 +475,14 @@ class QuickPanelWindow(
     }
 
     /**
-     * 统一的图标视图：矢量图标直接画；本身是字符的（「，」「Ａ」「繁」…）画成同线宽的圆角方框
-     * 里放字，与线条风格的矢量图标并排时看着是一套。
-     */
-    private fun glyphOrBadge(context: Context, icon: Any, color: Int, sizePx: Int): View {
-        if (icon is PanelIcon.Glyph) {
-            return PanelIcon(context).apply {
-                glyph = icon
-                tint = color
-                scale = 0.86f
-                decorative = true
-            }
-        }
-        val density = context.resources.displayMetrics.density
-        return TextView(context).apply {
-            text = icon.toString()
-            textSize = (sizePx / density) * 0.5f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            setTextColor(color)
-            background = GradientDrawable().apply {
-                cornerRadius = 4 * density
-                setColor(android.graphics.Color.TRANSPARENT)
-                setStroke((1.6f * density).toInt(), color)
-            }
-        }
-    }
-
-    /**
      * 格子高度：所有行在键盘区里一屏放下（此前固定 64dp，第三行被底边裁掉一大半，「切换输入法」
      * 「设置」只露出图标顶，而滚动条是隐藏的，用户不知道还能滑）。上限是原来的 64dp，下限 40dp
      * ——再矮图标与字就叠了，那时宁可滚动。
      */
     private fun tileHeightPx(context: Context, rows: Int): Int {
         val density = context.resources.displayMetrics.density
-        // 上下内边距 + 方案行及其下间距；编辑工具栏时再多出提示行和预览行
-        val reserved = (8 + 8 + 38 + 10 + if (editingPins) PREVIEW_ROW_DP + 8 + 28 else 0) * density
+        // 上下内边距；编辑工具栏时再多出提示行和预览行
+        val reserved = (8 + 8 + if (editingPins) PREVIEW_ROW_DP + 8 + 28 else 0) * density
         val perRow = (PanelScaffold.keyboardHeightPx(context) - reserved) / rows.coerceAtLeast(1) - 6 * density
         // 编辑工具栏时多了两行，一屏放不下就滚，不再往下压：压到 40dp 标签会被裁
         val min = if (editingPins) EDIT_MIN_TILE_HEIGHT_DP else MIN_TILE_HEIGHT_DP
@@ -608,26 +537,33 @@ class QuickPanelWindow(
     }
 
     private val MATCH = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+}
 
-    private fun chip(
-        context: Context,
-        label: String,
-        selected: Boolean,
-        onClick: () -> Unit,
-    ): TextView {
-        val density = context.resources.displayMetrics.density
-        val p = Palette.current
-        return TextView(context).apply {
-            text = label
-            textSize = 13f
-            gravity = Gravity.CENTER
-            maxLines = 1
-            setTextColor(if (selected) p.onAccent else p.text)
-            background = GradientDrawable().apply {
-                cornerRadius = 8 * density
-                setColor(if (selected) p.accent else p.key)
-            }
-            setOnClickListener { onClick() }
+/**
+ * 统一的图标视图：矢量图标直接画；本身是字符的（「，」「Ａ」「繁」…）画成同线宽的圆角方框
+ * 里放字，与线条风格的矢量图标并排时看着是一套。
+ */
+internal fun glyphOrBadge(context: Context, icon: Any, color: Int, sizePx: Int): View {
+    if (icon is PanelIcon.Glyph) {
+        return PanelIcon(context).apply {
+            glyph = icon
+            tint = color
+            scale = 0.86f
+            decorative = true
+        }
+    }
+    val density = context.resources.displayMetrics.density
+    return TextView(context).apply {
+        text = icon.toString()
+        textSize = (sizePx / density) * 0.5f
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+        gravity = Gravity.CENTER
+        includeFontPadding = false
+        setTextColor(color)
+        background = GradientDrawable().apply {
+            cornerRadius = 4 * density
+            setColor(android.graphics.Color.TRANSPARENT)
+            setStroke((1.6f * density).toInt(), color)
         }
     }
 }

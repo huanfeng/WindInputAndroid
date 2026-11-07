@@ -15,6 +15,8 @@ enum class ToolbarItem(
     val glyph: PanelIcon.Glyph?,
     val text: String? = null,
 ) {
+    /** 键盘选择面板（照微信「键盘选择」：切方案、九宫数字、键盘管理） */
+    KEYBOARD("keyboard", "键盘", PanelIcon.Glyph.KEYBOARD),
     CLIPBOARD("clipboard", "剪贴板", PanelIcon.Glyph.CLIPBOARD),
     TEXT_EDIT("text_edit", "文本编辑", PanelIcon.Glyph.TEXT_EDIT),
     EMOJI("emoji", "表情", PanelIcon.Glyph.EMOJI),
@@ -35,8 +37,11 @@ enum class ToolbarItem(
     companion object {
         const val CONFIG_KEY = "ui.android.toolbar_pins"
 
-        /** 出厂常驻：表情、剪贴板、文本编辑（主流输入法工具栏上都有，表情使用频率最高） */
-        const val DEFAULT_PINS = "emoji,clipboard,text_edit"
+        /**
+         * 出厂常驻：键盘选择、表情、剪贴板、文本编辑（主流输入法工具栏上都有，键盘选择放最前同微信）。
+         * 只是缺省值：已保存过常驻配置的用户不强加，要的话在「编辑工具栏」里加
+         */
+        const val DEFAULT_PINS = "keyboard,emoji,clipboard,text_edit"
 
         /** 工具栏放得下的上限：两头各一格之外，再多就挤得点不准 */
         const val MAX_PINS = 5

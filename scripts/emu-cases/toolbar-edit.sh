@@ -10,7 +10,7 @@ te_pins() {   # 配置里的常驻串（没写过 = 出厂默认）
     local v
     v="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -E '^[[:space:]]*toolbar_pins[[:space:]]*=' \
         | sed -E 's/^[^"]*"([^"]*)".*/\1/')"
-    echo "${v:-emoji,clipboard,text_edit}"
+    echo "${v:-keyboard,emoji,clipboard,text_edit}"
 }
 te_preview() {   # 预览行里的常驻项，按界面先后（无障碍树的子节点顺序即排列顺序）
     ime_xml | grep -oE 'content-desc="工具栏·[^"]*"' | sed -E 's/.*·([^"]*)"/\1/' | paste -sd, -
