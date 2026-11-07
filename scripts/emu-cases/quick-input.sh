@@ -1,6 +1,6 @@
 # 快捷输入的数字（被 emu-test.sh source，依赖它的 check / check_match / section / reset_pad /
-# restart_pad / tap_key / tap_ime / key_center / get_pad_text / write_kb_cfg / with_comment_off /
-# SUITE_KB_ORIG / GEO_ROWPX / adb_q 等）。
+# restart_pad / tap_key / tap_cell / tap_ime / key_center / get_pad_text / write_kb_cfg / with_comment_off /
+# SUITE_KB_ORIG / SYM_W / NUM_W / GEO_ROWPX / adb_q / die 等）。
 #
 # 真机反馈：进快捷输入后上滑出数字，若此刻已有「重复上屏」候选（先上屏过字），数字不进缓冲，
 # 而是把重复候选顶上屏再接数字。快捷输入的缓冲是文本（算式、日期），数字是它的一部分；
@@ -18,6 +18,24 @@ qi_cfg() {   # 在整套基线配置的 [ui.android] 段里再加几行（同名
     body="$(printf '%s\n' "$SUITE_KB_ORIG" | grep -vE '^[[:space:]]*(touch_quick_input|toolbar_pins)[[:space:]]*=')"
     with_comment_off "$body" | awk -v add="$1" \
         '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print add }'
+}
+
+# 数字页的数字、句点、九宫左列符号是「原样上屏」键（commit），平时绕过引擎；快捷输入里它们要进缓冲。
+# 整套用例钉的是「123 先进全键盘数字页」（NUMBER_FULL_CFG），九宫从 123 层「1234」进
+qi_pad9() {   # 字母层 → 123 层 → 九宫
+    tap_key SYM; tap_cell 2 "${SYM_W[2]}" 0; sleep 0.4
+}
+qi_num() {    # 九宫数字键：1–9 按行列，0 在底行
+    case "$1" in
+        0) tap_cell 3 "$NUM_W" 2 ;;
+        *) tap_cell $(( ($1 - 1) / 3 )) "$NUM_W" $(( ($1 - 1) % 3 + 1 )) ;;
+    esac
+}
+qi_side() {   # 九宫左列符号（无障碍节点「左列·<符号>」；ERE 元字符要转义）
+    tap_ime "左列·$1" || die "九宫左列找不到「$1」"
+}
+qi_letters() {   # 九宫底行「返回」回 123 层（从哪里进回哪里），123 层「返回」再回字母层
+    tap_cell 3 "$NUM_W" 1; tap_cell 3 "${SYM_W[3]}" 1
 }
 
 section "[80] 快捷输入：已有重复上屏候选时，上滑数字进缓冲，算式空格上屏结果"
@@ -52,6 +70,53 @@ qi_swipe q
 check_match "首选上屏 + 1" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
 qi_swipe w
 check_match "无编码时上滑 2 原样上屏" '^[\x{4e00}-\x{9fa5}]12$' "$(get_pad_text)"
+
+section "[83] 快捷输入：九宫数字页打 12+3 进缓冲（不顶重复候选上屏），空格上屏 15"
+write_kb_cfg "$(qi_cfg 'touch_quick_input = true # emu-test')"
+restart_pad
+reset_pad
+tap_key w; tap_key q; tap_key v; tap_key b; tap_key SPACE; sleep 0.4
+check "前提：先上屏「你好」" "你好" "$(get_pad_text)"
+qi_swipe n
+qi_pad9
+qi_num 1; qi_num 2; qi_side '\+'; qi_num 3
+check "九宫 1 2 + 3 都进缓冲，没有上屏" "你好" "$(get_pad_text)"
+tap_cell 1 "$NUM_W" 4; sleep 0.5   # 九宫右列「空格」
+check "空格上屏算式结果 12+3=15" "你好15" "$(get_pad_text)"
+qi_letters
+
+section "[84] 快捷输入：全键盘 123 层打 12-3.5（半角句点是原样上屏键）进缓冲，空格上屏 8.5"
+write_kb_cfg "$(qi_cfg 'touch_quick_input = true # emu-test')"
+restart_pad
+reset_pad
+tap_key w; tap_key q; tap_key v; tap_key b; tap_key SPACE; sleep 0.4
+qi_swipe n
+tap_key SYM; sleep 0.4
+tap_cell 0 "${SYM_W[0]}" 0; tap_cell 0 "${SYM_W[0]}" 1   # 1 2
+tap_cell 1 "${SYM_W[1]}" 0                               # -
+tap_cell 0 "${SYM_W[0]}" 2                               # 3
+tap_cell 2 "${SYM_W[2]}" 6                               # 半角句点
+tap_cell 0 "${SYM_W[0]}" 4                               # 5
+check "123 层 1 2 - 3 . 5 都进缓冲，没有上屏" "你好" "$(get_pad_text)"
+tap_cell 3 "${SYM_W[3]}" 3; sleep 0.5                    # 空格
+check "空格上屏算式结果 12-3.5=8.5" "你好8.5" "$(get_pad_text)"
+tap_cell 3 "${SYM_W[3]}" 1                               # 「返回」回字母层
+
+section "[85] 无编码时九宫数字、句点、左列符号照旧原样上屏（中文模式句点不变「。」）"
+reset_pad
+qi_pad9
+qi_num 1; tap_cell 3 "$NUM_W" 3; qi_num 2; qi_side '\+'
+check "原样上屏 1.2+" "1.2+" "$(get_pad_text)"
+qi_letters
+
+section "[86] 五笔组码时九宫数字：首选上屏再接数字（不选词）"
+reset_pad
+tap_key a; tap_key a
+qi_pad9
+qi_num 1
+check_match "首选上屏 + 1" '^[\x{4e00}-\x{9fa5}]1$' "$(get_pad_text)"
+qi_letters
+
 # 写回整套用例的基线配置
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
 restart_pad

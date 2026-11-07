@@ -775,6 +775,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_press(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_press_literal(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_reset_schema_setting(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_reset_schema_settings(
@@ -929,6 +931,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_phrases_restore_defaults(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_wind_android_fn_method_windcore_press(`ptr`: Long,`key`: RustBuffer.ByValue,`source`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_press_literal(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_reset_schema_setting(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`key`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1204,6 +1208,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_press() != 61301) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_press_literal() != 23926) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_reset_schema_setting() != 3569) {
@@ -2389,6 +2396,13 @@ public interface WindCoreInterface {
     fun `press`(`key`: PressKey, `source`: KeySource): KeyResult
     
     /**
+     * 「原样上屏」键（九宫数字页的数字、句点、左列符号等）：快捷输入等文本缓冲模式下
+     * 交给引擎进缓冲；其余情况 `consumed=false`，宿主照旧原样上屏（有编码先顶首选）。
+     * 前置条件同 [`Self::press`]：直出时不得调用。
+     */
+    fun `pressLiteral`(`text`: kotlin.String): KeyResult
+    
+    /**
      * 恢复一项：删掉覆盖层的这个键，回到方案文件 / 全局的值。
      */
     fun `resetSchemaSetting`(`schemaId`: kotlin.String, `key`: kotlin.String)
@@ -3153,6 +3167,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterTypePressKey.lower(`key`),
         FfiConverterTypeKeySource.lower(`source`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 「原样上屏」键（九宫数字页的数字、句点、左列符号等）：快捷输入等文本缓冲模式下
+     * 交给引擎进缓冲；其余情况 `consumed=false`，宿主照旧原样上屏（有编码先顶首选）。
+     * 前置条件同 [`Self::press`]：直出时不得调用。
+     */override fun `pressLiteral`(`text`: kotlin.String): KeyResult {
+            return FfiConverterTypeKeyResult.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_press_literal(
+        it,
+        
+        FfiConverterString.lower(`text`),_status)
 }
     }
     )

@@ -1002,7 +1002,9 @@ class WindInputImeService :
             return
         }
         if (action is KeyAction.Commit) {
-            commitDirect(action.text)
+            // 快捷输入等文本缓冲模式下数字页的数字、算符要进缓冲（`;12+3`），由核心判定；
+            // 其余情况核心不收，照旧原样上屏（中文下句点不变「。」，有编码时数字不选词）
+            if (!engineKey(action, shifted)) commitDirect(action.text)
             return
         }
         if (engineKey(action, shifted)) return

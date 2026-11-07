@@ -205,6 +205,12 @@ class RustSession(
      * 前置条件见 [ImeSession.keyPressed]：直出（密码框）时不得调用。
      */
     override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean {
+        if (action is KeyAction.Commit) {
+            // 原样上屏键：只有快捷输入等文本缓冲模式下核心才收（进缓冲），其余交还宿主原样上屏
+            val t0 = SystemClock.elapsedRealtimeNanos()
+            val result = guard.run("pressLiteral", null) { core.pressLiteral(action.text) } ?: return false
+            return deliver(result, "pressLiteral", t0)
+        }
         val key = when (action) {
             is KeyAction.Text -> uniffi.wind_android.PressKey.Char(action.char.toString(), shifted)
             KeyAction.Space -> uniffi.wind_android.PressKey.Space

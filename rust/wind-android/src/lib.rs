@@ -529,6 +529,13 @@ impl WindCore {
         self.core.press(key, source.into()).into()
     }
 
+    /// 「原样上屏」键（九宫数字页的数字、句点、左列符号等）：快捷输入等文本缓冲模式下
+    /// 交给引擎进缓冲；其余情况 `consumed=false`，宿主照旧原样上屏（有编码先顶首选）。
+    /// 前置条件同 [`Self::press`]：直出时不得调用。
+    pub fn press_literal(&self, text: String) -> KeyResult {
+        self.core.press_literal(&text).into()
+    }
+
     /// 英文词后是否自动补空格（默认开）。
     pub fn set_auto_space(&self, on: bool) {
         self.core.set_auto_space(on);
