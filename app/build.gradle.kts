@@ -82,6 +82,8 @@ android {
 
     buildFeatures {
         compose = true
+        // BuildConfig.DEBUG：测试台的输入文本日志只在 debug 包里记
+        buildConfig = true
     }
 
     // release 包直接带版本号命名（WindInputAndroid-0.3.0-dev.N.apk），发出去的文件一眼可辨、

@@ -27,10 +27,11 @@
                 android:resource="@xml/method" />
         </service>
 
-        <!-- 输入测试台：模拟器自动化测试用（scripts/emu-test.ps1） -->
+        <!-- 输入测试台：设置首页「试一试」进入。正式包不导出（别的应用拉不起它）；
+             debug 包在 src/debug/AndroidManifest.xml 里改成导出，供 scripts/emu-test.sh 用 am start 拉起 -->
         <activity
             android:name=".settings.TestPadActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="输入测试台"
             android:windowSoftInputMode="stateVisible|adjustResize" />
 
