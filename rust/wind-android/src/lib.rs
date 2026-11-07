@@ -1056,6 +1056,11 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 用户正在操作联想候选：`true` 暂停联想自动隐藏，`false` 松手后重新计时
+    pub fn assoc_hold(&self, hold: bool) {
+        self.core.assoc_hold(hold);
+    }
+
     /// 联想学习数据（联想里选过的词 + 学到的「下一词」）的条数，所有方案合计。
     pub fn assoc_history_count(&self) -> u64 {
         self.core.assoc_history_count()

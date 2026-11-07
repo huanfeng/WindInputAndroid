@@ -191,6 +191,13 @@ interface ImeSession {
     fun setLearningSuspended(on: Boolean) = Unit
 
     /**
+     * 用户正在操作联想候选（手指按在候选条上、展开面板开着、长按菜单 / 提示卡弹着）。
+     * true 暂停联想的自动隐藏（出厂 5 秒），false 操作结束、从此刻重新计时。
+     * 不在联想态时无操作。
+     */
+    fun assocHold(hold: Boolean) = Unit
+
+    /**
      * 报告光标前的正文（不含组合区），联想据此把逐字上屏拆开的词凑回来。
      * 光标被挪动、正文被别人改过之后报；自己上屏的不必报，核心已跟上。读不到报空串。
      */

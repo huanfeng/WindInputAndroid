@@ -299,6 +299,7 @@ class WindInputImeService :
                 bar.visibility =
                     if (keyboardMode || window.keepsBar) View.VISIBLE else View.GONE
                 bar.setExpanded(window === expandedCandidatesWindow)
+                assocHold.set(AssocHold.Reason.EXPANDED, window === expandedCandidatesWindow)
             }
             it.attachInitial()
         }
@@ -635,6 +636,7 @@ class WindInputImeService :
     override fun onFinishInputView(finishingInput: Boolean) {
         candidateMenu?.dismiss()
         schemaPicker?.dismiss()
+        assocHold.clear()
         abandonComposition()
         // 「词库准备中」不在这里撤：它画在条区里随窗口一起收；撤了再弹键盘时词库还没好，提示却没了
         selecting = false
@@ -1036,6 +1038,21 @@ class WindInputImeService :
     private var candidateMenu: CandidateMenuPopup? = null
 
     /**
+     * 正在操作联想候选（按住条区、展开面板开着、长按卡片 / 菜单弹着）时暂停联想的自动隐藏，
+     * 都结束了再重新计时。见 [AssocHold]。
+     */
+    private val assocHold = AssocHold { session.assocHold(it) }
+
+    override fun onBarTouch(down: Boolean) = assocHold.set(AssocHold.Reason.TOUCH, down)
+
+    /** 候选长按的提示卡 / 菜单：开着时暂停联想自动隐藏，收起（含点外面）时恢复 */
+    private fun holdWhileShowing(popup: CandidateMenuPopup): CandidateMenuPopup {
+        assocHold.set(AssocHold.Reason.POPUP, true)
+        popup.onDismissed = { assocHold.set(AssocHold.Reason.POPUP, false) }
+        return popup
+    }
+
+    /**
      * 方案选择卡片（长按中英键 / 首次使用）。与 [candidateMenu] 分开：候选一变要收的是候选菜单
      * （它记着的下标会失效），方案卡片跟候选无关——共用一个字段时，键盘刚弹出那一下的状态推送
      * 就把首次使用的卡片收掉了。
@@ -1108,7 +1125,7 @@ class WindInputImeService :
         }
         // 没有可做的操作（核心给的菜单为空）就不放「更多操作」：点了只会让卡片消失
         val hasActions = session.candidateMenu(index).isNotEmpty()
-        candidateMenu = CandidateMenuPopup(bar).also { card ->
+        candidateMenu = holdWhileShowing(CandidateMenuPopup(bar)).also { card ->
             card.showTooltip(
                 title,
                 sections,
@@ -1128,7 +1145,7 @@ class WindInputImeService :
         val items = session.candidateMenu(index)
         candidateMenu?.dismiss()
         if (items.isEmpty()) return
-        candidateMenu = CandidateMenuPopup(bar).also { menu ->
+        candidateMenu = holdWhileShowing(CandidateMenuPopup(bar)).also { menu ->
             menu.show(title, items) { entry ->
                 if (entry.action == "copy") {
                     copyCandidate(title)

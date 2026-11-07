@@ -157,6 +157,8 @@ class RustSession(
     override fun setLearningSuspended(on: Boolean) =
         guard.run("setLearningSuspended", Unit) { core.setLearningSuspended(on) }
 
+    override fun assocHold(hold: Boolean) = guard.run("assocHold", Unit) { core.assocHold(hold) }
+
     override fun setPrecedingText(text: String) =
         guard.run("setPrecedingText", Unit) { core.setPrecedingText(text) }
 

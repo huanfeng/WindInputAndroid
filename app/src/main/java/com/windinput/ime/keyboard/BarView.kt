@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.text.TextUtils
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -56,6 +57,9 @@ class BarView(
 
         /** 工具栏上常驻的功能按钮（见 [setPinned]） */
         fun onToolbarItem(item: ToolbarItem)
+
+        /** 手指按在条区上（[down] = true）/ 离开。联想候选正被滑动、长按时不该被计时收掉 */
+        fun onBarTouch(down: Boolean) = Unit
 
     }
 
@@ -367,6 +371,14 @@ class BarView(
     }
 
     /** 条区自身高度写死为 [TOTAL_DP]——它是"总高恒定"这条规矩的落点 */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> listener.onBarTouch(true)
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> listener.onBarTouch(false)
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(
             widthMeasureSpec,

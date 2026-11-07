@@ -238,9 +238,13 @@ class CandidateMenuPopup(private val anchor: View) {
             // IME 窗口以外（应用那边）被点时也收起（首次使用的卡片除外，见 show 的参数说明）
             isOutsideTouchable = dismissOnOutside
             setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
+            setOnDismissListener { onDismissed?.invoke() }
             showAtLocation(anchor, Gravity.NO_GRAVITY, loc[0], loc[1])
         }
     }
+
+    /** 卡片 / 菜单收起时回调（含点外面、被新卡片顶掉） */
+    var onDismissed: (() -> Unit)? = null
 
     val isShowing: Boolean get() = popup?.isShowing == true
 

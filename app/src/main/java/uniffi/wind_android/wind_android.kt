@@ -727,6 +727,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_assoc_history_count(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_assoc_hold(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidate_menu(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_candidate_menu_run(
@@ -888,6 +890,8 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_wind_android_fn_method_windcore_assoc_history_count(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
+    external fun uniffi_wind_android_fn_method_windcore_assoc_hold(`ptr`: Long,`hold`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_wind_android_fn_method_windcore_candidate_menu(`ptr`: Long,`index`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_candidate_menu_run(`ptr`: Long,`index`: Int,`action`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -1144,6 +1148,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_assoc_history_count() != 9201) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_assoc_hold() != 42946) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_candidate_menu() != 58187) {
@@ -2268,6 +2275,11 @@ public interface WindCoreInterface {
     fun `assocHistoryCount`(): kotlin.ULong
     
     /**
+     * 用户正在操作联想候选：`true` 暂停联想自动隐藏，`false` 松手后重新计时
+     */
+    fun `assocHold`(`hold`: kotlin.Boolean)
+    
+    /**
      * 候选长按菜单：按候选类型给出菜单项（文案、启用态与电脑版右键菜单同一份）。
      * `index` 是绝对下标；无候选或越界时为空。
      */
@@ -2761,6 +2773,22 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     }
     )
     }
+    
+
+    
+    /**
+     * 用户正在操作联想候选：`true` 暂停联想自动隐藏，`false` 松手后重新计时
+     */override fun `assocHold`(`hold`: kotlin.Boolean)
+        = 
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_assoc_hold(
+        it,
+        
+        FfiConverterBoolean.lower(`hold`),_status)
+}
+    }
+    
     
 
     

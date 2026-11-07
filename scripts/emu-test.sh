@@ -1864,6 +1864,8 @@ source "$ROOT/scripts/emu-cases/keyboard-select.sh"
 source "$ROOT/scripts/emu-cases/release-prep.sh"
 # 快捷输入的数字：上滑数字进缓冲、普通组码不变（[80]–[82]）
 source "$ROOT/scripts/emu-cases/quick-input.sh"
+# 联想自动隐藏遇到触屏操作暂停（[92]–[93]）
+source "$ROOT/scripts/emu-cases/assoc-hold.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"

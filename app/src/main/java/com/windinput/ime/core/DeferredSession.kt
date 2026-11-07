@@ -157,6 +157,8 @@ class DeferredSession(
 
     override fun setPrecedingText(text: String) = call("setPrecedingText") { it.setPrecedingText(text) }
 
+    override fun assocHold(hold: Boolean) = call("assocHold") { it.assocHold(hold) }
+
     /** 未就绪 / 切方案中 → 交还宿主（字母直接上屏），绝不吞键、绝不等锁 */
     override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean =
         if (busy) false else delegate?.keyPressed(action, shifted, source) ?: false
