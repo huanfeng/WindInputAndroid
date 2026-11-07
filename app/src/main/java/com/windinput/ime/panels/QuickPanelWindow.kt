@@ -338,11 +338,11 @@ class QuickPanelWindow(
             add(PanelIcon.Glyph.MIC, "语音输入", pin = ToolbarItem.VOICE) { listener.onVoiceInput() }
         }
         add(PanelIcon.Glyph.GLOBE, "切换输入法", pin = ToolbarItem.SWITCH_IME) { listener.onSwitchInputMethod() }
-        add(PanelIcon.Glyph.SETTINGS, "设置", pin = ToolbarItem.SETTINGS) { listener.onOpenSettings() }
-        // 放最后：插在中间会把后面各格整体挪一位，老用户的肌肉记忆（与按位置点的测试）全乱
         add(PanelIcon.Glyph.ONE_HAND, "单手", selected = listener.oneHand(), pin = ToolbarItem.ONE_HAND) {
             listener.onToggleOneHand() // 选中态由 Service 改完配置后经 refresh 重画
         }
+        // 「设置」固定在最后一格：主流输入法都把它放末尾，新加的格子插在它前面，它的位置不随之变
+        add(PanelIcon.Glyph.SETTINGS, "设置", pin = ToolbarItem.SETTINGS) { listener.onOpenSettings() }
         val heightPx = tileHeightPx(context, rows = (tiles.size + COLUMNS - 1) / COLUMNS)
         for (t in tiles) grid.addView(t, cell(context, heightPx))
     }
