@@ -1826,6 +1826,8 @@ source "$ROOT/scripts/emu-cases/numpad-side.sh"
 source "$ROOT/scripts/emu-cases/backspace-undo.sh"
 # 键盘选择面板、快捷面板去掉方案行、123 默认进九宫（[69]–[75]）
 source "$ROOT/scripts/emu-cases/keyboard-select.sh"
+# 发版前加固：隐私政策、诊断信息、恢复键盘设置、系统子类型（[76]–[79]）
+source "$ROOT/scripts/emu-cases/release-prep.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
