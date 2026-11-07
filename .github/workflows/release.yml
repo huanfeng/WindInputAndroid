@@ -7,20 +7,30 @@ name: Release
 # 签名：一把个人密钥签所有包（见 keystore/README.md），CI 从 secrets 取：
 #   ANDROID_SIGNING_KEYSTORE_BASE64 / _STORE_PASSWORD / _KEY_ALIAS / _KEY_PASSWORD
 # 缺任何一个**直接失败**。release 包没签名等于没法覆盖安装，宁可不出包。
+#
+# 核心版本：取主仓最新的正式 tag（v 开头、不带 -beta 之类后缀，按版本号排序最高的），
+# 不跟主仓 main——main 上随时有别的提交进来，跟它等于发版内容不可复现。
+# 手动触发可用 core_ref 指定别的 tag / 分支 / 提交（例如验证主仓还没打 tag 的改动）。
 on:
   push:
     tags: ['v*']
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      core_ref:
+        description: '主仓 WindInput 的 ref（留空 = 最新正式 tag）'
+        required: false
+        default: ''
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: 签名 APK
+    name: 签名 APK + AAB
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
+      core: ${{ steps.core.outputs.desc }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -29,6 +39,23 @@ jobs:
         with:
           repository: huanfeng/WindInput
           path: WindInput
+          fetch-depth: 0     # 要全部 tag 才挑得出最新的
+
+      - name: 核心切到主仓最新正式 tag
+        id: core
+        working-directory: WindInput
+        env:
+          CORE_REF: ${{ github.event.inputs.core_ref }}
+        run: |
+          ref="$CORE_REF"
+          if [ -z "$ref" ]; then
+            ref=$(git tag --list 'v*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+            [ -n "$ref" ] || { echo "::error::主仓没有正式 tag（vX.Y.Z）"; exit 1; }
+          fi
+          git checkout --detach "$ref"
+          desc="$ref ($(git rev-parse --short=8 HEAD))"
+          echo "desc=$desc" >> "$GITHUB_OUTPUT"
+          echo "core = $desc"
 
       - uses: ./WindInputAndroid/.github/actions/setup-env
 
@@ -81,6 +108,11 @@ jobs:
         working-directory: WindInputAndroid
         run: ./gradlew :app:assembleRelease --no-daemon
 
+      # Google Play 只收 AAB；同一把密钥签（作 Play 上传密钥），只进 artifact，不挂 GitHub Release
+      - name: 构建 release AAB（Google Play）
+        working-directory: WindInputAndroid
+        run: ./gradlew :app:bundleRelease --no-daemon
+
       # 签名核对不硬编码指纹：从刚解出来的密钥算，与 APK 上的比。硬编码会在换密钥时
       # 变成一条只会误报的检查。
       - name: 签名 = secrets 里的密钥
@@ -105,6 +137,7 @@ jobs:
         run: |
           mkdir -p dist
           cp app/build/outputs/apk/release/WindInputAndroid-*.apk "dist/WindInputAndroid-$V.apk"
+          cp app/build/outputs/bundle/release/*.aab "dist/WindInputAndroid-$V.aab"
           cd dist && sha256sum "WindInputAndroid-$V.apk" > "WindInputAndroid-$V.apk.sha256"
           echo "${{ steps.sign.outputs.fingerprint }}" > "WindInputAndroid-$V.apk.signer-sha256"
           ls -lh
@@ -137,19 +170,26 @@ jobs:
       - name: 生成 Release Notes
         env:
           V: ${{ needs.build.outputs.version }}
+          CORE: ${{ needs.build.outputs.core }}
         run: |
           prev=$(git describe --tags --abbrev=0 --match 'v*' "${GITHUB_REF_NAME}^" 2>/dev/null || true)
           range=${prev:+$prev..}$GITHUB_REF_NAME
+          # 用户向的更新说明手写在 docs/release-notes/v<版本>.md（去掉首行标题，Release 名已有）；
+          # 提交列表是写给开发者看的，有手写说明时折叠起来
+          notes="docs/release-notes/v$V.md"
           {
-            echo "## 安装"
+            if [ -f "$notes" ]; then tail -n +2 "$notes"; echo; fi
+            echo "## 校验"
             echo
             echo "- 签名指纹（SHA-256）：\`$(cat dist/*.signer-sha256)\`。与之前版本同一把密钥，直接覆盖安装。"
             echo "- 校验：\`sha256sum -c WindInputAndroid-$V.apk.sha256\`"
+            echo "- 核心：WindInput $CORE"
             echo
-            echo "## 变更记录（${prev:-起点}..$GITHUB_REF_NAME）"
+            [ -f "$notes" ] && echo "<details><summary>提交记录（${prev:-起点}..$GITHUB_REF_NAME）</summary>" || echo "## 变更记录（${prev:-起点}..$GITHUB_REF_NAME）"
             echo
             git log "$range" --no-merges --pretty=format:'- %s (%h)'
             echo
+            [ -f "$notes" ] && { echo; echo "</details>"; }
           } > release_notes.md
           cat release_notes.md
 
