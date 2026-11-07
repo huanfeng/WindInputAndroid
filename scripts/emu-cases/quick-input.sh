@@ -38,6 +38,35 @@ qi_letters() {   # 九宫底行「返回」回 123 层（从哪里进回哪里�
     tap_cell 3 "$NUM_W" 1; tap_cell 3 "${SYM_W[3]}" 1
 }
 
+# 候选来源（核心 schema.mix_modes 里 quick_mix 的 members）：设置页「快捷候选来源」开关与拖动排序。
+# （--only 时第一个 section 之前的定义才保留，故放在这里）取样词 man：拼音（出厂在英文之前）出「慢 / 满…」，英文出 man。用例前后写回整份核心配置
+qs_open() {   # 设置 → 输入 → 快捷输入 → 快捷候选来源
+    adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SettingsActivity"
+    sleep 2
+    tap_text "输入"; tap_text "快捷输入"; tap_text "快捷候选来源"
+    sleep 1
+}
+qs_type_man() {   # 回测试台，; 进快捷输入打 man（不上屏）
+    adb_q shell am start -f 0x10008000 -n "$PKG/.settings.TestPadActivity"
+    sleep 1
+    reset_pad
+    qi_swipe n
+    tap_key m; tap_key a; tap_key n; sleep 0.6
+}
+qs_has_man() {   # 候选条上有没有英文 man（候选的无障碍文字可能带「，编码 …」）
+    ime_xml | grep -qE 'content-desc="man(，|")' && echo yes || echo no
+}
+qs_members() {   # 核心用户层 quick_mix 的 members，压成一行（数组可能分行写；没写过 = 空）
+    read_core_cfg | awk '/^members = \[/ { on = 1 } on { printf "%s", $0 } on && /\]/ { exit }' \
+        | sed -E 's/[[:space:]]+/ /g; s/\[ /[/; s/,? ?\]/]/'
+}
+qs_handle() {   # 拖动手柄「拖动排序 <来源>」的中心 "x y"
+    local n
+    n="$(dump_xml | sed 's/<node/\n<node/g' | grep -F "content-desc=\"拖动排序 $1\"" | head -1)"
+    [[ "$n" =~ bounds=\"\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]\" ]] || die "找不到「拖动排序 $1」"
+    echo "$(( (BASH_REMATCH[1] + BASH_REMATCH[3]) / 2 )) $(( (BASH_REMATCH[2] + BASH_REMATCH[4]) / 2 ))"
+}
+
 section "[80] 快捷输入：已有重复上屏候选时，上滑数字进缓冲，算式空格上屏结果"
 # 触摸 `;`（n 上滑）进快捷输入要打开设置项 ui.android.touch_quick_input
 write_kb_cfg "$(qi_cfg 'touch_quick_input = true # emu-test')"
@@ -148,6 +177,63 @@ tap_cell 3 "${SYM_W[3]}" 3; sleep 0.5                                           
 check "1/3 按两位小数上屏" "你好0.33" "$(get_pad_text)"
 tap_cell 3 "${SYM_W[3]}" 1
 write_core_cfg "$qi_core_orig"
+
+section "[88] 快捷候选来源：把「英文」拖到「拼音」之前，快捷输入 man 空格上屏英文"
+qs_core_orig="$(read_core_cfg)"
+write_kb_cfg "$(qi_cfg 'touch_quick_input = true # emu-test')"
+restart_pad
+qs_type_man
+tap_key SPACE; sleep 0.5
+check_match "前提：出厂拼音在英文前，空格上屏汉字" '^[\x{4e00}-\x{9fa5}]+$' "$(get_pad_text)"
+qs_open
+read -r qs_x qs_y <<< "$(qs_handle 英文)"
+read -r _ qs_ty <<< "$(qs_handle 拼音)"
+# 慢拖：按住手柄上移一整行（越过拼音那行的一半即换位），抬手保存
+adb_q shell input swipe "$qs_x" "$qs_y" "$qs_x" $(( qs_ty - 20 )) 1500
+sleep 1.2
+check_match "members 里 english 排到 \$primary_pinyin 之前" '"english", "\$primary_pinyin"' "$(qs_members)"
+check "触发键没被写空" "no" "$(read_core_cfg | grep -qE '^trigger_keys = \[\]' && echo yes || echo no)"
+qs_type_man
+check "候选里有 man" "yes" "$(qs_has_man)"
+tap_key SPACE; sleep 0.5
+check "英文在前：空格上屏 man" "man" "$(get_pad_text)"
+
+section "[89] 快捷候选来源：关掉「英文」后快捷输入里不再出英文候选"
+qs_open
+tap_text "英文"
+sleep 1
+check "members 里去掉了 english" "no" "$(qs_members | grep -qF '"english"' && echo yes || echo no)"
+qs_type_man
+check "关掉英文后候选里没有 man" "no" "$(qs_has_man)"
+tap_key SPACE; sleep 0.5
+check_match "空格上屏汉字" '^[\x{4e00}-\x{9fa5}]+$' "$(get_pad_text)"
+
+section "[90] 快捷候选来源：恢复默认（点两下）回到出厂来源与顺序"
+qs_open
+# 恢复默认在列表底下：先滚到底
+adb_q shell input swipe 540 1900 540 500 300; sleep 0.6
+adb_q shell input swipe 540 1900 540 500 300; sleep 0.8
+tap_text "恢复默认"
+sleep 0.4
+tap_text "再点一次确认恢复"
+sleep 1.2
+check "与出厂一致：用户层不留 members" "" "$(qs_members)"
+qs_type_man
+tap_key SPACE; sleep 0.5
+check_match "恢复后拼音在前：空格上屏汉字" '^[\x{4e00}-\x{9fa5}]+$' "$(get_pad_text)"
+
+section "[91] 快捷候选来源：打开「快捷输入历史」才出现「历史条数上限」"
+qs_open
+check "历史关着：没有历史条数上限" "no" "$(dump_xml | grep -qF 'text="历史条数上限"' && echo yes || echo no)"
+adb_q shell input swipe 540 1900 540 900 300; sleep 0.8
+tap_text "快捷输入历史"
+sleep 1
+adb_q shell input swipe 540 1900 540 500 300; sleep 0.8
+check "历史开着：出现历史条数上限" "yes" "$(dump_xml | grep -qF 'text="历史条数上限"' && echo yes || echo no)"
+check_match "members 末尾加上了 quick_input.history" '"english", "quick_input.history"\]' "$(qs_members)"
+write_core_cfg "$qs_core_orig"
+adb_q shell am start -f 0x10008000 -n "$PKG/.settings.TestPadActivity"
+sleep 1
 
 # 写回整套用例的基线配置
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"

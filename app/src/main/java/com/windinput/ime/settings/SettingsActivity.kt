@@ -256,6 +256,9 @@ internal const val SUB_NUMPAD_SYMBOLS = "数字键盘符号"
 /** 关于页里代码画的二级页 */
 internal const val SUB_PRIVACY = "隐私政策"
 
+/** 输入页的「快捷输入」组：清单项之后，代码画「快捷候选来源」入口 */
+private const val SECTION_QUICK_INPUT = "快捷输入"
+
 /** 方案设置里的「双拼」组：清单项之外，代码在组页顶上画布局列表 */
 private const val SECTION_SHUANGPIN = "双拼"
 
@@ -452,6 +455,7 @@ private fun SettingsApp(
             when {
                 page == null -> HomeScreen(setup, manifest, values, schemaState, versionName, actions) { go(Route(it)) }
                 r.sub == null -> PageScreen(manifest, page, values, session, schemaState, versionName) { go(r.copy(sub = it)) }
+                r.detail == DETAIL_QUICK_SOURCES -> QuickSourcesSection(values)
                 r.detail != null -> SchemaDetailSection(r.detail, manifest) { detailTitles[r.detail] = it }
                 else -> SubScreen(manifest, page, r.sub, values, session, schemaState) { id, name ->
                     detailTitles[id] = name
@@ -736,6 +740,9 @@ private fun SubScreen(
             if (page.id == "schema" && sub == "拼音") SchemaDictsSection("细胞词库", listOf("pinyin", "shuangpin"))
             if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
             if (sub == "联想输入") AssocLearningSection()
+            if (page.id == "input" && sub == SECTION_QUICK_INPUT) {
+                QuickSourcesEntry { onOpenSchema(DETAIL_QUICK_SOURCES, DETAIL_QUICK_SOURCES) }
+            }
             // Emoji 开着才列附加模块（同电脑版的 enabled_when）
             if (sub == EMOJI_SECTION &&
                 manifest.items.firstOrNull { it.key == EMOJI_ENABLED_KEY }?.let(values::bool) == true
@@ -811,7 +818,7 @@ private fun GridChip(text: String, checked: Boolean, modifier: Modifier, onClick
 }
 
 @Composable
-private fun ItemRow(item: SettingItem, values: SettingsValues) {
+internal fun ItemRow(item: SettingItem, values: SettingsValues) {
     val scope = rememberCoroutineScope()
     @Suppress("UNUSED_EXPRESSION") values.version // 写入后重组
     fun write(v: Any) {

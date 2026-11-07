@@ -908,6 +908,25 @@ impl WindCore {
             .map_err(|reason| ConfigError::Rejected { reason })
     }
 
+    /// 快捷输入的候选来源（内置 quick_mix 的成员）：当前生效序与出厂序。
+    /// 成员有无即开关、顺序即候选优先级；界面行序与保留未知成员的规则在 K 侧。
+    pub fn quick_mix_members(&self) -> QuickMixMembersInfo {
+        let m = self.core.quick_mix_members();
+        QuickMixMembersInfo {
+            found: m.current.is_some(),
+            current: m.current.unwrap_or_default(),
+            defaults: m.defaults,
+        }
+    }
+
+    /// 整列写回快捷输入的候选来源（触发键等其余字段不动）。
+    /// 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+    pub fn set_quick_mix_members(&self, members: Vec<String>) -> Result<(), ConfigError> {
+        self.core
+            .set_quick_mix_members(members)
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
     // ── 设置页：输入统计 ─────────────────────────────────────────────
 
     /// 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
@@ -1303,6 +1322,14 @@ pub struct TooltipSectionStateInfo {
     pub label: String,
     pub title: String,
     pub enabled: bool,
+}
+
+/// 快捷输入候选来源。`found = false`：配置里没有 quick_mix 实例（`current` 为空）。
+#[derive(Debug, uniffi::Record)]
+pub struct QuickMixMembersInfo {
+    pub found: bool,
+    pub current: Vec<String>,
+    pub defaults: Vec<String>,
 }
 
 /// 一个 emoji 附加模块。`user` = 用户自己放进 `emoji/` 目录的表。

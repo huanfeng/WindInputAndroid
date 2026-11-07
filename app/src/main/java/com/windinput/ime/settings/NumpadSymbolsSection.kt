@@ -226,7 +226,7 @@ internal fun NumpadSymbolsSection() {
 
 /** 拖动手柄：三道横线；整块（不止线条）都可按 */
 @Composable
-private fun DragHandle(description: String, modifier: Modifier) {
+internal fun DragHandle(description: String, modifier: Modifier) {
     val color = MiuixTheme.colorScheme.onSurfaceVariantSummary
     Box(
         modifier = modifier

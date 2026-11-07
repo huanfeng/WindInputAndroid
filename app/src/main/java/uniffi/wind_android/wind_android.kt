@@ -777,6 +777,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_press_literal(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_quick_mix_members(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_reset_schema_setting(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_reset_schema_settings(
@@ -810,6 +812,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_set_learning_suspended(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_preceding_text(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_quick_mix_members(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled(
     ): Int
@@ -934,6 +938,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_press_literal(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_quick_mix_members(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_reset_schema_setting(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`key`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_reset_schema_settings(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -967,6 +973,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_preceding_text(`ptr`: Long,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_quick_mix_members(`ptr`: Long,`members`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_schema_dict_enabled(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`dictId`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
@@ -1213,6 +1221,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_press_literal() != 23926) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_quick_mix_members() != 64002) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_reset_schema_setting() != 3569) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1262,6 +1273,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_preceding_text() != 37493) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_quick_mix_members() != 13583) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_schema_dict_enabled() != 12394) {
@@ -2403,6 +2417,12 @@ public interface WindCoreInterface {
     fun `pressLiteral`(`text`: kotlin.String): KeyResult
     
     /**
+     * 快捷输入的候选来源（内置 quick_mix 的成员）：当前生效序与出厂序。
+     * 成员有无即开关、顺序即候选优先级；界面行序与保留未知成员的规则在 K 侧。
+     */
+    fun `quickMixMembers`(): QuickMixMembersInfo
+    
+    /**
      * 恢复一项：删掉覆盖层的这个键，回到方案文件 / 全局的值。
      */
     fun `resetSchemaSetting`(`schemaId`: kotlin.String, `key`: kotlin.String)
@@ -2502,6 +2522,12 @@ public interface WindCoreInterface {
      * 自己上屏的不必报，核心已按下发的编辑指令跟上。读不到报空串。
      */
     fun `setPrecedingText`(`text`: kotlin.String)
+    
+    /**
+     * 整列写回快捷输入的候选来源（触发键等其余字段不动）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    fun `setQuickMixMembers`(`members`: List<kotlin.String>)
     
     /**
      * 开 / 关一个附加词库：落盘到方案覆盖并即时生效（已加载的引擎热切换或重建）。
@@ -3194,6 +3220,23 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 快捷输入的候选来源（内置 quick_mix 的成员）：当前生效序与出厂序。
+     * 成员有无即开关、顺序即候选优先级；界面行序与保留未知成员的规则在 K 侧。
+     */override fun `quickMixMembers`(): QuickMixMembersInfo {
+            return FfiConverterTypeQuickMixMembersInfo.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_quick_mix_members(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 恢复一项：删掉覆盖层的这个键，回到方案文件 / 全局的值。
      */
     @Throws(ConfigException::class)override fun `resetSchemaSetting`(`schemaId`: kotlin.String, `key`: kotlin.String)
@@ -3494,6 +3537,24 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         it,
         
         FfiConverterString.lower(`text`),_status)
+}
+    }
+    
+    
+
+    
+    /**
+     * 整列写回快捷输入的候选来源（触发键等其余字段不动）。
+     * 只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
+     */
+    @Throws(ConfigException::class)override fun `setQuickMixMembers`(`members`: List<kotlin.String>)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_quick_mix_members(
+        it,
+        
+        FfiConverterSequenceString.lower(`members`),_status)
 }
     }
     
@@ -4751,6 +4812,52 @@ public object FfiConverterTypePhraseInfo: FfiConverterRustBuffer<PhraseInfo> {
             FfiConverterBoolean.write(value.`enabled`, buf)
             FfiConverterBoolean.write(value.`isSystem`, buf)
             FfiConverterString.write(value.`preview`, buf)
+    }
+}
+
+
+
+/**
+ * 快捷输入候选来源。`found = false`：配置里没有 quick_mix 实例（`current` 为空）。
+ */
+data class QuickMixMembersInfo (
+    var `found`: kotlin.Boolean
+    , 
+    var `current`: List<kotlin.String>
+    , 
+    var `defaults`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeQuickMixMembersInfo: FfiConverterRustBuffer<QuickMixMembersInfo> {
+    override fun read(buf: ByteBuffer): QuickMixMembersInfo {
+        return QuickMixMembersInfo(
+            FfiConverterBoolean.read(buf),
+            FfiConverterSequenceString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: QuickMixMembersInfo) = (
+            FfiConverterBoolean.allocationSize(value.`found`) +
+            FfiConverterSequenceString.allocationSize(value.`current`) +
+            FfiConverterSequenceString.allocationSize(value.`defaults`)
+    )
+
+    override fun write(value: QuickMixMembersInfo, buf: ByteBuffer) {
+            FfiConverterBoolean.write(value.`found`, buf)
+            FfiConverterSequenceString.write(value.`current`, buf)
+            FfiConverterSequenceString.write(value.`defaults`, buf)
     }
 }
 
