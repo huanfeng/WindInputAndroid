@@ -30,8 +30,6 @@ class KeyboardView(context: Context) : View(context) {
         /** 左列各格的无障碍节点 id 起点（键的 id 是键位下标，远小于它） */
         const val SIDE_A11Y_BASE = 10_000
 
-        /** 键帽高度（dp）；行高减去它就是上下两行之间的间隙（60 − 51 = 9dp ≈ 24px） */
-        const val KEY_HEIGHT_DP = 51f
     }
 
     interface Listener {
@@ -259,13 +257,13 @@ class KeyboardView(context: Context) : View(context) {
     private val rowHeightPx get() = KeyboardDimens.rowHeightPx(density)
 
     /** 键与键的间隙是两侧各留一半：横向 14px、纵向 24px（@420dpi），与主流输入法同量级 */
-    private val keyGapPx = 2.7f * density
-    private val keyGapVPx get() = (rowHeightPx - KEY_HEIGHT_DP * density).coerceAtLeast(2 * density) / 2
+    private val keyGapPx = KeyboardDimens.KEY_GAP_DP * density
+    private val keyGapVPx get() = KeyboardDimens.keyGapVPx(density)
 
     /** 键区离视图左右边缘的留白：加上半个键间隙，首末键离屏幕边约 16px，不贴边、少误点 */
-    private val edgePadPx = 3.4f * density
+    private val edgePadPx = KeyboardDimens.EDGE_PAD_DP * density
     private val padTopPx = KeyboardDimens.PAD_TOP_DP * density
-    private val keyRadiusPx = 8 * density
+    private val keyRadiusPx = KeyboardDimens.KEY_RADIUS_DP * density
     private val swipeThresholdPx = KeyboardDimens.SWIPE_THRESHOLD_DP * density
     private val swipeActivatePx = KeyboardDimens.SWIPE_ACTIVATE_DP * density
     private val cursorStepPx = KeyboardDimens.CURSOR_STEP_DP * density

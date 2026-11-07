@@ -119,6 +119,24 @@ object KeyboardDimens {
     /** 空格移光标 / 退格扩选的步进距离（dp） */
     const val CURSOR_STEP_DP = 12f
 
+    // ── 键帽几何：KeyboardView 画键与面板里的键帽格子（符号页）共用，两边才对得齐 ──
+
+    /** 键与键横向间隙的一半（dp）：两键之间共 5.4dp */
+    const val KEY_GAP_DP = 2.7f
+
+    /** 键区离视图左右边缘的留白（dp）：加上半个键间隙，首末键离屏幕边约 16px，不贴边、少误点 */
+    const val EDGE_PAD_DP = 3.4f
+
+    /** 键帽圆角（dp） */
+    const val KEY_RADIUS_DP = 8f
+
+    /** 键帽高度（dp）；行高减去它就是上下两行之间的间隙（60 − 51 = 9dp ≈ 24px） */
+    const val KEY_HEIGHT_DP = 51f
+
+    /** 键与键纵向间隙的一半（px）：行高减键帽高，至少留 2dp */
+    fun keyGapVPx(density: Float): Float =
+        (rowHeightPx(density) - KEY_HEIGHT_DP * density).coerceAtLeast(2 * density) / 2
+
     /** 条区编码行高度（dp）；横屏收矮，见 [BarView] */
     var barPreeditDp: Float = 19f
 

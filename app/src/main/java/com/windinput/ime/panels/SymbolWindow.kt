@@ -95,7 +95,9 @@ class SymbolWindow(
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(palette.background)
-            setPadding(0, (KeyboardDimens.PAD_TOP_DP * density).toInt(), 0, 0)
+            // 左右留白与主键盘相同：10 列符号格和字母层 10 列键上下对齐
+            val edge = (KeyboardDimens.EDGE_PAD_DP * density).toInt()
+            setPadding(edge, (KeyboardDimens.PAD_TOP_DP * density).toInt(), edge, 0)
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 PanelScaffold.keyboardHeightPx(context),
@@ -112,19 +114,22 @@ class SymbolWindow(
         root.addView(grid, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, rowHeight * GRID_ROWS))
 
         val bottom = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-        val sideWidth = context.resources.displayMetrics.widthPixels * 15 / 100
+        // 底行宽度按主键盘底行的权重（总权重 10）：「返回」占「符号」键的位置和宽度（1.35），
+        // ⌫ 与「换行」同宽（1.4），锁定键一个字母键宽。点进来、点回去手指不用挪
+        val unit = (context.resources.displayMetrics.widthPixels -
+            2 * (KeyboardDimens.EDGE_PAD_DP * density).toInt()) / 10f
 
         bottom.addView(
-            keyCell(context, "返回", palette.accent, palette.onAccent).apply {
-                // 矢量返回箭头，与面板左上角的返回同一个图标
-                GlyphDrawable.apply(this, PanelIcon.Glyph.BACK, palette.onAccent)
+            keyCell(context, "返回", palette.keySpecial, palette.text).apply {
+                // 功能键底色（与主键盘「符号」「123」同色），矢量返回箭头与面板左上角的返回同一个图标
+                GlyphDrawable.apply(this, PanelIcon.Glyph.BACK, palette.text)
                 contentDescription = "symbol-back"
                 setOnClickListener {
                     KeyHaptics.tap(it)
                     listener.onSymbolBack()
                 }
             },
-            LinearLayout.LayoutParams(sideWidth, rowHeight),
+            LinearLayout.LayoutParams((unit * 1.35f).toInt(), rowHeight),
         )
 
         val tabs = LinearLayout(context).apply {
@@ -168,7 +173,7 @@ class SymbolWindow(
             listener.onSymbolLockChanged(locked)
             paintLock()
         }
-        bottom.addView(lockCell, LinearLayout.LayoutParams(sideWidth * 2 / 3, rowHeight))
+        bottom.addView(lockCell, LinearLayout.LayoutParams(unit.toInt(), rowHeight))
 
         bottom.addView(
             keyCell(context, "⌫", palette.keySpecial, palette.text).apply {
@@ -178,7 +183,7 @@ class SymbolWindow(
                 BackspaceGesture(gesture, gesture::longPressDelayMs, feedback = { KeyHaptics.tap(this) })
                     .attach(this)
             },
-            LinearLayout.LayoutParams(sideWidth, rowHeight),
+            LinearLayout.LayoutParams((unit * 1.4f).toInt(), rowHeight),
         )
         root.addView(bottom, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, rowHeight))
         return root
@@ -255,18 +260,19 @@ class SymbolWindow(
 }
 
 /**
- * 键帽样式的格子：圆角键面 + 3dp 键缝 + 按下高亮，与 KeyboardView 画出来的键一致
- * （圆角 8dp、键缝 3dp 是同一组数）。
+ * 键帽样式的格子：圆角键面 + 键缝 + 按下高亮，与 KeyboardView 画出来的键一致
+ * （圆角、横纵键缝都取 [KeyboardDimens] 同一组数）。
  */
 private fun keyCell(context: Context, label: String, face: Int, textColor: Int): TextView {
     val density = context.resources.displayMetrics.density
-    val gap = (3 * density).toInt()
+    val gapH = (KeyboardDimens.KEY_GAP_DP * density).toInt()
+    val gapV = KeyboardDimens.keyGapVPx(density).toInt()
     fun face(color: Int) = InsetDrawable(
         GradientDrawable().apply {
-            cornerRadius = 8 * density
+            cornerRadius = KeyboardDimens.KEY_RADIUS_DP * density
             setColor(color)
         },
-        gap,
+        gapH, gapV, gapH, gapV,
     )
     return TextView(context).apply {
         text = label
