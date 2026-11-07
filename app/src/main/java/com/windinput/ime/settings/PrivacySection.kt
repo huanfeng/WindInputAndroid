@@ -13,8 +13,8 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/** 官网首页（文档站 WindInputDocs 部署在这里）。站上还没有单独的隐私政策页，先链首页 */
-internal const val WEBSITE_URL = "https://windinput.com"
+/** 官网隐私政策页（文档站 WindInputDocs 的 /privacy，覆盖电脑版与安卓版） */
+internal const val WEBSITE_URL = "https://windinput.com/privacy"
 
 /**
  * 隐私政策（纯文本）。每一条都要与代码事实一致，改功能时一起改：
@@ -77,7 +77,7 @@ internal fun PrivacySection() {
     }
     SectionTitle("更多")
     Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow("清风输入法官网", WEBSITE_URL, icon = SettingsIcons.website) {
+        NavRow("官网隐私政策", WEBSITE_URL, icon = SettingsIcons.website) {
             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(WEBSITE_URL))) }
         }
     }
