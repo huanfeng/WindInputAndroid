@@ -975,6 +975,9 @@ private const val EMOJI_SECTION = "Emoji/OpenCC"
 @Composable
 private fun AboutSection(versionName: String, onOpenSub: (String) -> Unit) {
     var showLicenses by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var collecting by remember { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
         BasicComponent(
             title = "清风输入法",
@@ -983,6 +986,22 @@ private fun AboutSection(versionName: String, onOpenSub: (String) -> Unit) {
         )
         NavRow(SUB_PRIVACY, "不联网，输入与词库只存在本机；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
             onOpenSub(SUB_PRIVACY)
+        }
+        NavRow("反馈问题", "在 GitHub 上提交问题或建议（浏览器打开）", icon = SettingsIcons.feedback) {
+            Diagnostics.openIssues(context)
+        }
+        NavRow(
+            "分享诊断信息",
+            if (collecting) "正在收集…" else "版本、系统、机型、最近的日志与崩溃记录，不含你输入的文字；可附在反馈里",
+            icon = SettingsIcons.diagnostics,
+        ) {
+            if (collecting) return@NavRow
+            collecting = true
+            scope.launch {
+                val text = withContext(Dispatchers.IO) { Diagnostics.collect(context, versionName) }
+                collecting = false
+                Diagnostics.share(context, text)
+            }
         }
         NavRow(
             if (showLicenses) "开源许可 ▴" else "开源许可 ▾",

@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.pm.ApplicationInfo
 import android.os.StrictMode
 import com.windinput.ime.core.AssetsInstaller
+import com.windinput.ime.core.CrashLog
 import com.windinput.ime.core.DataDirs
 import com.windinput.ime.core.RustCoreLoader
 import kotlin.concurrent.thread
@@ -15,6 +16,8 @@ class WindInputApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // 最先装：后面任何一步崩了都要留下栈（「关于 → 分享诊断信息」带上）
+        CrashLog.install(this)
         // 调试包把主线程读写盘记进 logcat（tag StrictMode）：输入法每一帧都在主线程上，
         // 读一次盘在真机上就可能掉帧；正式包不开
         if (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0) {
