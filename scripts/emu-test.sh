@@ -1866,6 +1866,8 @@ source "$ROOT/scripts/emu-cases/release-prep.sh"
 source "$ROOT/scripts/emu-cases/quick-input.sh"
 # 联想自动隐藏遇到触屏操作暂停（[92]–[93]）
 source "$ROOT/scripts/emu-cases/assoc-hold.sh"
+# 触屏键盘的 - / = 不当翻页键（[94]）
+source "$ROOT/scripts/emu-cases/touch-minus.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"

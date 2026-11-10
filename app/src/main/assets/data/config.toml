@@ -6,7 +6,8 @@
 #
 # ── 安卓副本 ────────────────────────────────────────────────────────────────
 # 本文件是主仓 WindInput/data/config.toml 的副本，只有标了「安卓有意不同」的几处值不一样
-# （schema.active、debug.log_level、input.auto_pair.*）。同步方法：拷贝主仓文件，再把这几处
+# （schema.active、debug.log_level、input.auto_pair.*、input.buffer_symbol_chars、
+# keys.page_keys）。同步方法：拷贝主仓文件，再把这几处
 # 改回来。守门测试 FactoryConfigSyncTest 比对两份的键集合与取值，主仓改了就会失败。
 #
 # ── 本文件的契约 ────────────────────────────────────────────────────────────
@@ -753,7 +754,9 @@ punct_on_empty_behavior = "clear"
 # ⚠️ 只在组码中生效；空闲时这些键照旧归标点流水线，否则任何程序里都打不出减号。
 # ⚠️ 不是码元：不参与码长/顶码判定。要真正的码元走 schema.codetable.input_chars，
 #    那条路会无条件夺取该键（本项相反，是让位优先）。
-buffer_symbol_chars = "-"
+# 安卓有意不同（电脑版 "-"）：触屏上 - 是上滑 / 符号页打出来的普通符号，和别的符号一样
+# 「首选上屏再接 -」才是手机上的预期；进缓冲会让候选整条消失、空格上屏一串 nihao-。
+buffer_symbol_chars = ""
 numpad_behavior = "direct"
 # 小键盘恒半角：开启后小键盘的 0-9 与 . + - * / 在全角态下仍输出半角，且不走中文标点与
 # 自定义标点映射。与 numpad_behavior 正交（follow_main 下照常选词，只改出字）。
@@ -1414,7 +1417,9 @@ session_actions = {}
 # 按了别的键都不算，否则 Ctrl+A 的那一下 Ctrl 就会选走候选。与 toggle_mode_keys 撞键时：
 # 有候选选词，无候选切中英文（候选不足以命中该位次则吞键，不切换）。
 select_key_groups = ["semicolon_quote"]
-page_keys = ["pageupdown", "minus_equal"]
+# 安卓有意不同（电脑版 ["pageupdown", "minus_equal"]）：触屏键盘的 - = 是打字用的符号，
+# 候选靠横滑 / 展开面板翻，不靠这两个键；外接键盘的 PageUp/PageDown 仍翻页。
+page_keys = ["pageupdown"]
 highlight_keys = ["arrows", "tab"]
 # 以词定字：用成对标点键从当前高亮候选词中逐字上屏（第1键取第1字、第2键取第2字）。
 # 可选键组 comma_period(,/.) / minus_equal(-/=) / brackets([/])；空数组=禁用。

@@ -30,6 +30,8 @@ class FactoryConfigSyncTest {
             "input.auto_pair.english",
             "input.auto_pair.chinese_pairs",
             "input.auto_pair.english_pairs",
+            "input.buffer_symbol_chars",
+            "keys.page_keys",
         )
 
         val ANDROID = File("src/main/assets/data/config.toml")
