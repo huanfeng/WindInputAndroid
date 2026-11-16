@@ -16,7 +16,7 @@ jobs:
         run: |
           echo "github.repository      = [${{ github.repository }}]"
           echo "github.repositoryId    = [${{ github.repositoryId }}]"
-          echo "github.repository_owner = [${{ github.owner }] [${{ github.repository_owner }}]"
+          echo "github.repository_owner = [${{ github.repository_owner }}]"
           echo "github.event.pull_request.repository = [${{ github.event.pull_request.repository }}]"
           echo "github.event 里的 repo 字段 ="
           echo '${{ toJson(github.event) }}' | head -40
