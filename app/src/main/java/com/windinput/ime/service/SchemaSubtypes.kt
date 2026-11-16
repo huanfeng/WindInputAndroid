@@ -21,7 +21,7 @@ import com.windinput.ime.core.SchemaEntry
  * 回调里的方案已经是当前方案时同样不动；按用户的选择切方案期间，引擎还没切完推来的旧状态
  * 不往系统同步（见 Service 的 awaitingSchema）。
  *
- * 只在 API 33+ 做：子类型的任意文字标签（setSubtypeNameOverride）是 33 才有的，更早的系统只能用
+ * 只在 API 34+ 做：子类型的任意文字标签（setSubtypeNameOverride）是 34 才有的，更早的系统只能用
  * 资源字符串，显示不了方案名——那里只留 method.xml 的兜底子类型。
  */
 internal class SchemaSubtypes(private val service: InputMethodService) {
@@ -66,7 +66,7 @@ internal class SchemaSubtypes(private val service: InputMethodService) {
      * 方案列表为空（核心未就绪）时什么都不做。
      */
     fun sync(schemas: List<SchemaEntry>, currentId: String?) {
-        if (Build.VERSION.SDK_INT < 33 || schemas.isEmpty()) return
+        if (Build.VERSION.SDK_INT < 34 || schemas.isEmpty()) return
         val list = schemas.map { it.id to it.name.ifEmpty { it.id } }
         val subtypes = list.map { (id, name) -> build(id, name) }
         if (list != registered) {
@@ -74,9 +74,7 @@ internal class SchemaSubtypes(private val service: InputMethodService) {
                 imm.setAdditionalInputMethodSubtypes(imiId, subtypes.toTypedArray())
                 // 显式启用全部方案子类型：不然系统按语言挑「隐式启用」的子类型，
                 // 系统语言不是中文时一个都挑不中，切换器里还是只有兜底那一行
-                if (Build.VERSION.SDK_INT >= 34) {
-                    imm.setExplicitlyEnabledInputMethodSubtypes(imiId, subtypes.map { it.hashCode() }.toIntArray())
-                }
+                imm.setExplicitlyEnabledInputMethodSubtypes(imiId, subtypes.map { it.hashCode() }.toIntArray())
                 registered = list
             }.onFailure { Log.w(TAG, "注册方案子类型失败", it) }
         }
@@ -93,7 +91,7 @@ internal class SchemaSubtypes(private val service: InputMethodService) {
     /** 系统回调来的子类型是不是自己同步过去的（是就消费掉这次标记） */
     fun consumeSelfSwitch(subtype: InputMethodSubtype): Boolean = pendingSelfSwitches.remove(subtype.hashCode())
 
-    @RequiresApi(33)
+    @RequiresApi(34)
     private fun build(id: String, name: String): InputMethodSubtype =
         InputMethodSubtype.InputMethodSubtypeBuilder()
             .setSubtypeId(subtypeId(id))
