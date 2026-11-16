@@ -1012,6 +1012,19 @@ private fun AboutSection(versionName: String, onOpenSub: (String) -> Unit) {
             }
         }
         NavRow(
+            "导出诊断压缩包",
+            if (collecting) "正在收集…" else "比上一项多：更长的日志（含崩溃前那次运行）与系统崩溃缓冲，打成 zip；同样不含你输入的文字",
+            icon = SettingsIcons.diagnostics,
+        ) {
+            if (collecting) return@NavRow
+            collecting = true
+            scope.launch {
+                val zip = withContext(Dispatchers.IO) { runCatching { Diagnostics.buildZip(context, versionName) }.getOrNull() }
+                collecting = false
+                if (zip != null) Diagnostics.shareZip(context, zip)
+            }
+        }
+        NavRow(
             if (showLicenses) "开源许可 ▴" else "开源许可 ▾",
             "随包分发的词库数据与程序库的来源和许可证",
             icon = SettingsIcons.licenses,

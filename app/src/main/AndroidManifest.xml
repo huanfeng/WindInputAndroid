@@ -16,6 +16,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WindInput">
 
+        <!-- 诊断压缩包分享：只开放 cacheDir/diagnostics/（见 res/xml/file_paths.xml） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- 输入法服务：Android IME 框架对接点 -->
         <service
             android:name=".service.WindInputImeService"

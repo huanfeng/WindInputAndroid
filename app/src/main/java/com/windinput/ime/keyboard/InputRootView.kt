@@ -5,6 +5,7 @@ import android.os.Build
 import android.view.View
 import android.view.WindowInsets
 import android.widget.LinearLayout
+import com.windinput.ime.core.UiTrace
 
 /**
  * 输入法根视图：候选条 + 面板区的容器，负责**手势导航条/导航栏避让**。
@@ -83,6 +84,7 @@ class InputRootView(context: Context) : LinearLayout(context) {
             insets.systemWindowInsetBottom
         }
         lastInsetBottom = bottom
+        UiTrace.add("insets ${if (portrait) "竖" else "横"} 取值=$bottom 当前避让=$insetBottom 额外留空=$extraBottom | ${UiTrace.describeInsets(insets)}")
         // 横屏时挖孔与三键导航栏在左右两侧：窗口铺到底（服务里开了 cutout ALWAYS），
         // 键往里收，背景照样铺满——否则侧边露出一条底下的应用
         if (Build.VERSION.SDK_INT >= 30) {
@@ -122,6 +124,7 @@ class InputRootView(context: Context) : LinearLayout(context) {
     private fun commitInset(bottom: Int) {
         if (bottom != savedInset(context, portrait)) saveInset(context, portrait, bottom)
         if (bottom != insetBottom) {
+            UiTrace.add("避让 $insetBottom → $bottom（首帧估值 $estimated）")
             android.util.Log.i("InputRootView", "导航避让首帧 $insetBottom（估值 $estimated）→ 实际 $bottom")
             insetBottom = bottom
             applySpacer()

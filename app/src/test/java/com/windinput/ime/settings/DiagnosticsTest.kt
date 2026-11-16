@@ -52,4 +52,13 @@ class DiagnosticsTest {
         assertTrue(text.length < 17_000)
         assertTrue(text.endsWith("（已截断）"))
     }
+
+    /** 压缩包的日志不按 pid 过滤（要带上崩溃前的旧进程），但过滤级别与静音标签不能松 */
+    @Test
+    fun zipLogcatKeepsPrivacyFiltersWithoutPid() {
+        val cmd = Diagnostics.zipLogcatCommand(false)
+        assertTrue("--pid" !in cmd)
+        assertEquals(listOf("WindTestPad:S", "*:I"), cmd.takeLast(2))
+        assertEquals(listOf("-b", "crash"), Diagnostics.zipLogcatCommand(true).let { it.subList(it.indexOf("-b"), it.indexOf("-b") + 2) })
+    }
 }
