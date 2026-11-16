@@ -10,15 +10,17 @@ jobs:
   diag:
     runs-on: ubuntu-latest
     steps:
-      - name: GITHUB_TOKEN 访问测试
+      - name: 事件上下文里的仓库标识
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "== git ls-remote 本仓(与 checkout 相同的 URL)=="
+          echo "github.repository      = [${{ github.repository }}]"
+          echo "github.repositoryId    = [${{ github.repositoryId }}]"
+          echo "github.repository_owner = [${{ github.owner }] [${{ github.repository_owner }}]"
+          echo "github.event.pull_request.repository = [${{ github.event.pull_request.repository }}]"
+          echo "github.event 里的 repo 字段 ="
+          echo '${{ toJson(github.event) }}' | head -40
+          echo "== 用 github.repository 的值直接 ls-remote(复现 checkout 的 URL 拼接)=="
+          git ls-remote "https://x-access-token:$GH_TOKEN@github.com/${{ github.repository }}.git" HEAD 2>&1 | head -3
+          echo "== 对照:硬编码正确 URL =="
           git ls-remote https://x-access-token:$GH_TOKEN@github.com/huanfeng/WindInputAndroid.git HEAD 2>&1 | head -3
-          echo "== git ls-remote 主仓 =="
-          git ls-remote https://x-access-token:$GH_TOKEN@github.com/huanfeng/WindInput.git HEAD 2>&1 | head -3
-          echo "== API: 本仓 =="
-          curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/huanfeng/WindInputAndroid
-          echo "== API: 主仓 =="
-          curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/huanfeng/WindInput
