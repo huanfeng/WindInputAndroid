@@ -1,0 +1,24 @@
+name: token-diag
+# 临时诊断:GITHUB_TOKEN 对本仓 git fetch 报 Repository not found,测 token 视角的
+# git 访问与 API 访问,区分 token 问题还是仓库问题。诊断完删除本文件。
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: GITHUB_TOKEN 访问测试
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "== git ls-remote 本仓(与 checkout 相同的 URL)=="
+          git ls-remote https://x-access-token:$GH_TOKEN@github.com/huanfeng/WindInputAndroid.git HEAD 2>&1 | head -3
+          echo "== git ls-remote 主仓 =="
+          git ls-remote https://x-access-token:$GH_TOKEN@github.com/huanfeng/WindInput.git HEAD 2>&1 | head -3
+          echo "== API: 本仓 =="
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/huanfeng/WindInputAndroid
+          echo "== API: 主仓 =="
+          curl -s -o /dev/null -w "HTTP %{http_code}\n" -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/huanfeng/WindInput
