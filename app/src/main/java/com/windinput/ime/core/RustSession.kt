@@ -56,32 +56,35 @@ class RustSession(
          * 核心是无状态可复用的（焦点/组合都随 focusGained 重置），复用比重建更正确。
          */
         @Synchronized
-        fun getOrCreate(dataDir: File, rustRoot: File): RustSession? {
+        fun getOrCreate(dataDir: File, userRoot: File, localRoot: File): RustSession? {
             instance?.let {
                 Log.i(TAG, "复用已有核心（IME 服务重建）")
                 return it
             }
-            return create(dataDir, rustRoot)?.also { instance = it }
+            return create(dataDir, userRoot, localRoot)?.also { instance = it }
         }
 
         /**
          * 创建会话；.so 加载或核心构造失败返回 null（调用方回退 FakeSession）。
          * @param dataDir 出厂数据目录（filesDir/data，含 schemas/）
-         * @param rustRoot Rust 用户/缓存根（filesDir/rust）
+         * @param userRoot 核心用户目录（Android/data/<包名>/files，用户可编辑）
+         * @param localRoot 核心本地目录（缓存与日志，私有）
          */
-        private fun create(dataDir: File, rustRoot: File): RustSession? {
+        private fun create(dataDir: File, userRoot: File, localRoot: File): RustSession? {
             return try {
-                rustRoot.mkdirs()
+                userRoot.mkdirs()
+                localRoot.mkdirs()
                 // 级别跟随设置项 debug.log_level（出厂 warn：核心 debug 日志里有用户文字）。
                 // 订阅器每个进程只装一次，改设置后要等进程重启
-                val level = LogLevel.read(rustRoot, dataDir)
+                val level = LogLevel.read(File(userRoot, "config.toml"), dataDir)
                 verboseLog = LogLevel.verbose(level)
                 uniffi.wind_android.initLogging(level)
                 // 泵线程在构造期即可能回调（构造期下发），经可空引用避免竞态
                 var sessionRef: RustSession? = null
                 val core = WindCore(
                     dataDir.absolutePath,
-                    rustRoot.absolutePath,
+                    userRoot.absolutePath,
+                    localRoot.absolutePath,
                     // 首装兜底方案：全拼（手机用户绝大多数打拼音；五笔用户在首次方案卡片里换）
                     "pinyin",
                     object : UiEventListener {

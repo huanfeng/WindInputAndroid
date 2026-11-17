@@ -68,6 +68,8 @@ SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Android/sdk}}"
 ADB="${ADB:-$SDK/platform-tools/adb}"
 [[ -x "$ADB" ]] || ADB="$(command -v adb)" || { echo "找不到 adb" >&2; exit 1; }
 PKG="com.windinput.ime"
+# 用户层在外部存储（Android/data/<包名>/files，文件管理器可达）：adb shell 直接读写，不用 run-as
+EXT="/sdcard/Android/data/$PKG/files"
 IME="$PKG/.service.WindInputImeService"
 
 # 坑 4：剥掉 CRLF 的 \r，否则等值断言全线假失败
@@ -492,18 +494,18 @@ get_active_schema() {
     # 行尾注释（`# emu-test` 标记）剥掉再比：核心改写这一行时不一定保留注释。
     # 非 debug 包没有 run-as → 空（读不到）
     local cfg
-    cfg="$(adb_ shell run-as "$PKG" cat files/rust/config/WindInput/config.toml)" || return
+    cfg="$(adb_ shell cat "$EXT/config.toml")" || return
     printf '%s\n' "$cfg" | grep -q 'run-as:' && return
     local line
     line="$(printf '%s\n' "$cfg" | grep -m1 '^active = ' | sed 's/[[:space:]]*#.*$//; s/[[:space:]]*$//')"
     printf '%s' "${line:-active = \"pinyin\"}"
 }
-CORE_CFG=files/rust/config/WindInput/config.toml
-WUBI_SHADOW=files/rust/data/wubi86/shadow.dict.yaml
+CORE_CFG="$EXT/config.toml"
+WUBI_SHADOW="$EXT/data/wubi86/shadow.dict.yaml"
 
 # 核心用户层整文件读 / 写（写经 stdin 灌进 run-as，免得引号层层转义）
-read_core_cfg() { adb_ shell run-as "$PKG" cat "$CORE_CFG"; }
-write_core_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'cat > $CORE_CFG'"; }
+read_core_cfg() { adb_ shell cat "$CORE_CFG"; }
+write_core_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell sh -c "'cat > $CORE_CFG'"; }
 
 # 去掉某个 [表] 段（到下一个 [ 开头的行为止）。直接追加同名段会写出重复表定义，核心整个解析失败
 strip_section() {   # 文本 段名
@@ -559,9 +561,9 @@ if printf '%s\n' "$cfg_now" | grep -q '^english = "A" # emu-test'; then
     write_core_cfg "$(strip_section "$cfg_now" ui.labels)"
     restart_pad
 fi
-if adb_ shell run-as "$PKG" cat "$WUBI_SHADOW" | grep -q $'^aa\t'; then
+if adb_ shell cat "$WUBI_SHADOW" | grep -q $'^aa\t'; then
     echo "${Y}残留 aa 的候选调整规则，清掉后重启${N}"
-    adb_q shell "run-as $PKG sed -i '/^aa\t/d' $WUBI_SHADOW"
+    adb_q shell "sed -i '/^aa\t/d' $WUBI_SHADOW"
     restart_pad
 fi
 # 首次使用的方案卡片会盖住键盘，别的用例全点不中：开跑前记成「已弹过」（[41] 专门测它）
@@ -573,20 +575,20 @@ mark_onboarded() {
 }
 mark_onboarded
 # [40] 中途断掉会留下 inline_preedit = true，之后所有读输入框的断言都带上内联编码
-if adb_ shell run-as "$PKG" cat files/user/config.toml 2>/dev/null | grep -q '^inline_preedit = true'; then
+if adb_ shell cat "$EXT/keyboard/config.toml" 2>/dev/null | grep -q '^inline_preedit = true'; then
     echo "${Y}残留 inline_preedit，清掉${N}"
-    adb_q shell "run-as $PKG sed -i '/^inline_preedit = true/d' files/user/config.toml"
+    adb_q shell "sed -i '/^inline_preedit = true/d' $EXT/keyboard/config.toml"
 fi
 # 候选字后的编码灰字（ui.android.candidate_comment，默认开）让每个候选变宽，tap_candidate
 # 按固定步长点就会错位：整套用例关着它跑，跑完写回原配置。带 `# emu-test` 标记，
 # 中途断掉留下的这一行下次开跑时先剥掉，SUITE_KB_ORIG 拿到的就是用户自己的配置
-KB_CFG=files/user/config.toml
+KB_CFG="$EXT/keyboard/config.toml"
 COMMENT_OFF='candidate_comment = false # emu-test'
 # 「123」默认先进九宫数字（ui.android.number_page = pad9），而整套用例写的是「123 先进全键盘数字页、
 # 再点「符号」位进九宫」的按法：同样带标记钉成 full，跑完写回
 NUMBER_FULL_CFG='number_page = "full" # emu-test'
-write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p files/user && cat > $KB_CFG'"; }
-SUITE_KB_RAW="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null)"
+write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell sh -c "'mkdir -p $EXT/keyboard && cat > $KB_CFG'"; }
+SUITE_KB_RAW="$(adb_ shell cat "$KB_CFG" 2>/dev/null)"
 SUITE_KB_EXISTED=1
 [[ "$SUITE_KB_RAW" == *"No such file"* ]] && { SUITE_KB_EXISTED=0; SUITE_KB_RAW=""; }
 SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF -e "$COMMENT_OFF" -e "$NUMBER_FULL_CFG")"
@@ -616,7 +618,7 @@ restore_suite_kb() {   # 原来没有这个文件就删掉，不写回一个空�
     if (( SUITE_KB_EXISTED )); then
         write_kb_cfg "$SUITE_KB_ORIG"
     else
-        adb_q shell run-as "$PKG" rm -f "$KB_CFG"
+        adb_q shell rm -f "$KB_CFG"
     fi
 }
 trap 'restore_suite_kb; exit 1' TERM INT
@@ -1439,7 +1441,7 @@ sleep 2
 section "[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符"
 # 核心在联想态挂一个占位组合（空格等，桌面 TSF 给候选窗定位用）；手机上写进来就是输入框里
 # 一个带下划线的空格（真机反馈）。键盘侧把纯占位的组合文本挡掉。开关是键盘自己的配置文件。
-kb_orig="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -v 'No such file')"
+kb_orig="$(adb_ shell cat "$KB_CFG" 2>/dev/null | grep -v 'No such file')"
 write_kb_cfg "$(strip_section "$kb_orig" ui.android)
 [ui.android]
 $COMMENT_OFF

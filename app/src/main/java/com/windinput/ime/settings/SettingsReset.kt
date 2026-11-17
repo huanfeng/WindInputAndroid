@@ -9,9 +9,9 @@ import java.io.File
  * 「恢复默认设置」的两档（设置页「高级」）。词库、方案覆盖（schema_overrides/）、扩展词库开关
  * （也在方案覆盖里）、导入的方案都不在这两个文件里，天然不动。
  *
- * - 键盘设置：K 侧 `filesDir/user/config.toml` 里的 `ui.android.*`（键盘高度、振动、手势、
+ * - 键盘设置：K 侧 `<用户根>/keyboard/config.toml` 里的 `ui.android.*`（键盘高度、振动、手势、
  *   工具栏…），下次弹出键盘时 Service 重读。
- * - 输入设置：核心用户层 `filesDir/rust/config/WindInput/config.toml` 里的引擎配置覆盖，
+ * - 输入设置：核心用户层 `<用户根>/config.toml` 里的引擎配置覆盖，
  *   只留 [ENGINE_KEEP]；写完发 ReloadConfig。
  */
 object SettingsReset {
@@ -26,9 +26,6 @@ object SettingsReset {
     fun isKeyboardKey(key: String): Boolean = key.startsWith("ui.android.")
 
     fun keepsEngineKey(key: String): Boolean = key in ENGINE_KEEP
-
-    /** 核心用户层配置文件（与 SettingsValues 的说明一致） */
-    fun engineConfigFile(filesDir: File): File = File(filesDir, "rust/config/WindInput/config.toml")
 
     /** 恢复键盘设置，返回清掉了几项 */
     fun resetKeyboard(userConfig: UserConfig): Int = userConfig.removeIf(::isKeyboardKey)

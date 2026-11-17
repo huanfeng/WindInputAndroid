@@ -476,18 +476,22 @@ impl WindCore {
     /// 构造核心。
     ///
     /// - `data_dir`: 出厂数据目录（schemas/ 所在，即 Android filesDir/data）
-    /// - `user_root`: 用户/缓存数据根（Android filesDir/rust，内部分 config/data/cache）
+    /// - `user_root`: 用户目录（核心的用户配置目录：config.toml、schemas/、用户词库…，布局同桌面；
+    ///   Android 上是 `Android/data/<包名>/files`，用户可经文件管理器直接编辑）
+    /// - `local_root`: 本地目录（词库编译缓存与日志，可再生；Android 上在私有 filesDir 下）
     /// - `schema`: **首装兜底**方案 id（如 "wubi86"）；用户上次选过的优先
     #[uniffi::constructor]
     pub fn new(
         data_dir: String,
         user_root: String,
+        local_root: String,
         schema: String,
         listener: Arc<dyn UiEventListener>,
     ) -> Arc<Self> {
         let core = MobileCore::new(
             Path::new(&data_dir),
             Path::new(&user_root),
+            Path::new(&local_root),
             &schema,
             Arc::new(ListenerSink(listener)),
         );
@@ -694,7 +698,7 @@ impl WindCore {
     // ── 设置页：配置读写 ─────────────────────────────────────────────
     //
     // 设置页的引擎项**只能走这里**：K 侧自己的 `filesDir/user/config.toml` 引擎根本不读，
-    // 核心的用户层在 `user_root/config/WindInput/config.toml`。
+    // 核心的用户层在 `user_root/config.toml`。
 
     /// 当前生效配置的全量快照（TOML 文本，四层合并 + 移动端强制项）。
     pub fn config_snapshot(&self) -> String {

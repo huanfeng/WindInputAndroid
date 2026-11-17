@@ -40,7 +40,7 @@ object CoreAccess {
         val dirs = (context.applicationContext as WindInputApp).dataDirs
         return try {
             AssetsInstaller(context.applicationContext, dirs).installIfNeeded()
-            RustSession.getOrCreate(dirs.dataDir, File(context.filesDir, "rust"))
+            RustSession.getOrCreate(dirs.dataDir, dirs.userRoot, dirs.localRoot)
         } catch (e: Throwable) {
             Log.e(TAG, "核心取用失败", e)
             null

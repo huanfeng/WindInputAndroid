@@ -6,6 +6,7 @@ import android.os.StrictMode
 import com.windinput.ime.core.AssetsInstaller
 import com.windinput.ime.core.CrashLog
 import com.windinput.ime.core.DataDirs
+import com.windinput.ime.core.LegacyUserDataMigration
 import com.windinput.ime.core.RustCoreLoader
 import kotlin.concurrent.thread
 
@@ -25,7 +26,12 @@ class WindInputApp : Application() {
                 StrictMode.ThreadPolicy.Builder().detectDiskReads().detectDiskWrites().penaltyLog().build(),
             )
         }
-        dataDirs = DataDirs(this).also { it.ensureCreated() }
+        // 外部存储（用户层所在）取不到就直接报错，不回退私有目录：见 DataDirs 的说明
+        dataDirs = DataDirs(this).also {
+            // 老版本的用户数据在私有目录，必须在核心构造、键盘读配置之前搬完
+            LegacyUserDataMigration.run(filesDir, it.userRoot)
+            it.ensureCreated()
+        }
         // 出厂数据拷出（首启/升级时执行；小文件阶段秒级，词库进来后改带进度）
         thread(name = "assets-install") {
             AssetsInstaller(this, dataDirs).installIfNeeded()

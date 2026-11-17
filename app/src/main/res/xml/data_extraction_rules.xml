@@ -7,8 +7,7 @@
         <exclude domain="file" path="data/" />
         <exclude domain="file" path="rust/data/WindInput/cache/" />
         <exclude domain="file" path="rust/data/WindInput/logs/" />
-        <exclude domain="file" path="rust/cache/" />
-        <exclude domain="file" path="rust/userdata.redb.state/lock" />
+                <exclude domain="external" path="userdata.redb.state/lock" />
         <exclude domain="sharedpref" path="ime_insets.xml" />
     </cloud-backup>
     <device-transfer>
@@ -16,8 +15,7 @@
         <exclude domain="file" path="data/" />
         <exclude domain="file" path="rust/data/WindInput/cache/" />
         <exclude domain="file" path="rust/data/WindInput/logs/" />
-        <exclude domain="file" path="rust/cache/" />
-        <exclude domain="file" path="rust/userdata.redb.state/lock" />
+                <exclude domain="external" path="userdata.redb.state/lock" />
         <exclude domain="sharedpref" path="ime_insets.xml" />
     </device-transfer>
 </data-extraction-rules>

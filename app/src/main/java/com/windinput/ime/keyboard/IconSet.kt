@@ -11,7 +11,7 @@ import java.io.File
  * 图标源：语义名（`text_edit`）→ 可画的图标。
  *
  * 查找顺序（先到先得，同名整体替代，与数据文件的「用户目录覆盖出厂」同一套规矩）：
- *   1. [init] 传入的覆盖目录，按给定顺序——用户自定义放 `filesDir/user/icons/`，
+ *   1. [init] 传入的覆盖目录，按给定顺序——用户自定义放 `<用户根>/keyboard/icons/`，
  *      日后主题包挂自己的 `icons/` 目录也走这里，调用方与绘制代码都不用改；
  *   2. 内置 `assets/data/icons/<名>.svg`（Lucide，见同目录 README.md）。
  *

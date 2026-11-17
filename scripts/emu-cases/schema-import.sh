@@ -9,7 +9,7 @@
 # 覆盖自带方案：用 APK 自带的 wubi86_pinyin.schema.toml 原样打成包（内容不变，覆盖无害）→
 # 二次确认 → 导入 → 「恢复自带版本」。负例：不是方案包的 zip 要如实报失败。
 
-SI_USER_SCHEMAS=files/rust/config/WindInput/schemas
+SI_USER_SCHEMAS="$EXT/schemas"
 SI_DIR=files/e2e-schema
 SI_URI_BASE="file:///data/user/0/$PKG/$SI_DIR"
 SI_TMP="$(mktemp -d)"
@@ -30,7 +30,7 @@ si_view() {   # 用文件关联打开 files/e2e-schema/<名字>
     adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SchemeImportActivity" -a android.intent.action.VIEW -d "$SI_URI_BASE/$1" -t application/octet-stream
     sleep 2
 }
-si_user_file_exists() { adb_ shell run-as "$PKG" ls "$SI_USER_SCHEMAS/$1" 2>/dev/null | grep -q "$1" && echo yes || echo no; }
+si_user_file_exists() { adb_ shell ls "$SI_USER_SCHEMAS/$1" 2>/dev/null | grep -q "$1" && echo yes || echo no; }
 si_open_enabled_schemas() {   # 设置 → 方案 → 启用的方案
     adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SettingsActivity"
     sleep 2
@@ -66,7 +66,7 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(f"{src}/{rel}", rel)
 PY
     # 干净起点：上次中途断掉可能留着
-    adb_q shell run-as "$PKG" sh -c "'rm -rf $SI_USER_SCHEMAS/wubi98 $SI_USER_SCHEMAS/wubi98.schema.toml $SI_USER_SCHEMAS/wubi98_pinyin.schema.toml'"
+    adb_q shell sh -c "'rm -rf $SI_USER_SCHEMAS/wubi98 $SI_USER_SCHEMAS/wubi98.schema.toml $SI_USER_SCHEMAS/wubi98_pinyin.schema.toml'"
     si_push "$SI_TMP/wubi98.wpkg" wubi98.wpkg
     si_view wubi98.wpkg
     check "预览：标题" "yes" "$(si_has_text 98五笔)"
@@ -131,7 +131,7 @@ pkg("mymix.wpkg", [("mymix.schema.toml", mix)])
 with zipfile.ZipFile(f"{tmp}/notpkg.zip", "w") as z:
     z.writestr("readme.txt", "not a scheme package")
 PY
-adb_q shell run-as "$PKG" rm -f "$SI_USER_SCHEMAS/wubi86_pinyin.schema.toml"
+adb_q shell rm -f "$SI_USER_SCHEMAS/wubi86_pinyin.schema.toml"
 si_push "$SI_TMP/override.wpkg" override.wpkg
 si_view override.wpkg
 check "预览：醒目写明将覆盖自带方案" "yes" "$(dump_xml | grep -q '将覆盖自带方案：wubi86_pinyin' && echo yes || echo no)"
@@ -162,7 +162,7 @@ adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
 
 section "[56] 导入方案：覆盖被自带混输引用的自带方案（pinyin）并遮住自带词库，可恢复"
-adb_q shell run-as "$PKG" sh -c "'rm -rf $SI_USER_SCHEMAS/pinyin $SI_USER_SCHEMAS/pinyin.schema.toml'"
+adb_q shell sh -c "'rm -rf $SI_USER_SCHEMAS/pinyin $SI_USER_SCHEMAS/pinyin.schema.toml'"
 si_push "$SI_TMP/override2.wpkg" override2.wpkg
 si_view override2.wpkg
 check "预览：将覆盖自带方案 pinyin" "yes" "$(dump_xml | grep -q '将覆盖自带方案：pinyin' && echo yes || echo no)"
@@ -180,7 +180,7 @@ check "覆盖 pinyin 后列表显示新名字" "yes" "$(si_has_text 新全拼)"
 # 再导入引用 pinyin 的用户混输，然后删掉它：用户刻意做的 pinyin 覆盖不能被连带恢复
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
-adb_q shell run-as "$PKG" rm -f "$SI_USER_SCHEMAS/mymix.schema.toml"
+adb_q shell rm -f "$SI_USER_SCHEMAS/mymix.schema.toml"
 si_push "$SI_TMP/mymix.wpkg" mymix.wpkg
 si_view mymix.wpkg
 tap_text "导入"

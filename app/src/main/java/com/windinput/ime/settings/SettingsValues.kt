@@ -14,8 +14,8 @@ import uniffi.wind_android.WindCore
  * 设置页的值：按设置项的来源分两条路读写。
  *
  * - **引擎项**：读核心的配置快照（四层合并后的生效值），写走 `config_set`，写完发 ReloadConfig
- *   让核心即时重读。⚠ 不能写 K 侧的 `filesDir/user/config.toml`——引擎根本不读那个文件，
- *   核心的用户层在 `filesDir/rust/config/WindInput/config.toml`。
+ *   让核心即时重读。⚠ 不能写 K 侧的 `<用户根>/keyboard/config.toml`——引擎根本不读那个文件，
+ *   核心的用户层在 `<用户根>/config.toml`（`Android/data/<包名>/files/`）。
  * - **键盘项**：读写 [UserConfig]，下次弹出键盘时 Service 重读。
  *
  * 核心未就绪（[core] 为 null）时引擎项一律不显示：显示一个读不到值、写了也没用的开关，

@@ -10,7 +10,7 @@ NS_DEFAULTS='+|-|*|/|%|=|,|:|@|#|(|)'
 
 ns_cfg() {   # 配置里的列表，项之间用 | 连（没写过这个键 = 「默认」）
     local line
-    line="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -E '^[[:space:]]*number_side_symbols[[:space:]]*=')"
+    line="$(adb_ shell cat "$KB_CFG" 2>/dev/null | grep -E '^[[:space:]]*number_side_symbols[[:space:]]*=')"
     [[ -n "$line" ]] || { echo 默认; return; }
     printf '%s' "$line" | sed -E 's/^[^"]*"(.*)"[^"]*$/\1/; s/\\n/|/g'
 }

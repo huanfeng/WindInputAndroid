@@ -6,13 +6,19 @@ import java.io.File
 /**
  * 数据目录布局：与桌面端目录语义对齐（docs/architecture.md §3.3）。
  *
- * | Android                  | 桌面对应                          | 内容 |
- * |--------------------------|-----------------------------------|------|
- * | filesDir/data            | 安装目录 data/（出厂层，L2）       | 出厂配置/布局/主题/方案，App 升级整体重放 |
- * | filesDir/user            | %APPDATA%/WindInput（用户层，L3）  | 用户 config.toml、覆盖文件、自定义布局 |
- * | cacheDir/dict            | %LOCALAPPDATA%/cache               | 词库 wdat 编译缓存（可再生） |
+ * | Android                                   | 桌面对应                          | 内容 |
+ * |-------------------------------------------|-----------------------------------|------|
+ * | filesDir/data                             | 安装目录 data/（出厂层，L2）       | 出厂配置/布局/主题/方案，App 升级整体重放 |
+ * | getExternalFilesDir(null)（[userRoot]）    | %APPDATA%/WindInput（用户层，L3）  | config.toml、schemas/、schema_overrides/、用户词库与统计——**用户可经文件管理器直接编辑与同步** |
+ * | [userRoot]/keyboard（[keyboardDir]）       | —（键盘独有）                      | 键盘自己的 config.toml、自定义布局与图标 |
+ * | filesDir/rust/data/WindInput（[localRoot]）| %LOCALAPPDATA%/WindInput           | 核心的词库编译缓存与日志（可再生，不进用户视野） |
+ * | cacheDir/dict                             | —                                 | 词库 wdat 编译缓存（可再生） |
  *
- * 覆盖解析与桌面 resolve_data_file 同语义：user 下同名文件整体替代 data 下那份，
+ * 用户层放 `Android/data/<包名>/files` 而不是私有目录：用户要能直接改配置、放扩展词库，
+ * 也为之后的方案同步留出文件入口。外部目录取不到（存储未挂载、个别 ROM 限制）时**直接报错**，
+ * 不回退私有目录——悄悄换位置会让用户改了文件却不生效。
+ *
+ * 覆盖解析与桌面 resolve_data_file 同语义：用户层同名文件整体替代 data 下那份，
  * 失败静默回退。
  */
 class DataDirs(context: Context) {
@@ -20,15 +26,29 @@ class DataDirs(context: Context) {
     /** 出厂数据层（assets 拷出，App 升级时整体重放） */
     val dataDir: File = File(context.filesDir, "data")
 
-    /** 用户数据层（升级保留） */
-    val userDir: File = File(context.filesDir, "user")
+    /**
+     * 用户根 = 核心的用户配置目录（升级保留）。
+     * @throws StorageUnavailableException 外部存储不可用
+     */
+    val userRoot: File = context.getExternalFilesDir(null)
+        ?: throw StorageUnavailableException("无法访问 Android/data/${context.packageName}/files（外部存储不可用）")
+
+    /** 键盘自己的用户层：config.toml、layouts/、icons/（引擎不读） */
+    val keyboardDir: File = File(userRoot, "keyboard")
+
+    /** 核心的本地目录：词库编译缓存与日志（私有、可再生） */
+    val localRoot: File = File(context.filesDir, "rust/data/WindInput")
+
+    /** 核心用户层的 config.toml（设置页的引擎项只能经核心读写，这里仅供重置与日志级别读盘） */
+    val engineConfigFile: File = File(userRoot, "config.toml")
 
     /** 词库编译缓存（可再生，允许系统清理） */
     val dictCacheDir: File = File(context.cacheDir, "dict")
 
     fun ensureCreated() {
         dataDir.mkdirs()
-        userDir.mkdirs()
+        keyboardDir.mkdirs()
+        localRoot.mkdirs()
         dictCacheDir.mkdirs()
     }
 
@@ -37,10 +57,13 @@ class DataDirs(context: Context) {
      * @param relPath 相对路径，如 "layouts/qwerty.toml"
      */
     fun resolveDataFile(relPath: String): File? {
-        val user = File(userDir, relPath)
+        val user = File(keyboardDir, relPath)
         if (user.isFile) return user
         val factory = File(dataDir, relPath)
         if (factory.isFile) return factory
         return null
     }
 }
+
+/** 外部存储（用户层所在）不可用。 */
+class StorageUnavailableException(message: String) : IllegalStateException(message)

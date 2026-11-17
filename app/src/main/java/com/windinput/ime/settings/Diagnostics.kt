@@ -122,7 +122,10 @@ object Diagnostics {
             "系统" to "Android ${Build.VERSION.RELEASE}（API ${Build.VERSION.SDK_INT}）",
             "机型" to "${Build.MANUFACTURER} ${Build.MODEL}",
             "架构" to Build.SUPPORTED_ABIS.joinToString(),
-            "核心日志级别" to LogLevel.read(File(context.filesDir, "rust"), File(context.filesDir, "data")),
+            "核心日志级别" to LogLevel.read(
+                (context.applicationContext as com.windinput.ime.WindInputApp).dataDirs.engineConfigFile,
+                File(context.filesDir, "data"),
+            ),
         )
         val logs = runCatching {
             val proc = ProcessBuilder(logcatCommand(Process.myPid())).redirectErrorStream(true).start()

@@ -884,7 +884,7 @@ internal object UniffiLib {
     ): Long
     external fun uniffi_wind_android_fn_free_windcore(`handle`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
-    external fun uniffi_wind_android_fn_constructor_windcore_new(`dataDir`: RustBuffer.ByValue,`userRoot`: RustBuffer.ByValue,`schema`: RustBuffer.ByValue,`listener`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    external fun uniffi_wind_android_fn_constructor_windcore_new(`dataDir`: RustBuffer.ByValue,`userRoot`: RustBuffer.ByValue,`localRoot`: RustBuffer.ByValue,`schema`: RustBuffer.ByValue,`listener`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_wind_android_fn_method_windcore_assoc_history_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
@@ -1327,7 +1327,7 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_user_words_clear() != 13532) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
-    if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 19999) {
+    if (lib.uniffi_wind_android_checksum_constructor_windcore_new() != 18560) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
 }
@@ -2650,10 +2650,12 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
      * 构造核心。
      *
      * - `data_dir`: 出厂数据目录（schemas/ 所在，即 Android filesDir/data）
-     * - `user_root`: 用户/缓存数据根（Android filesDir/rust，内部分 config/data/cache）
+     * - `user_root`: 用户目录（核心的用户配置目录：config.toml、schemas/、用户词库…，布局同桌面；
+     * Android 上是 `Android/data/<包名>/files`，用户可经文件管理器直接编辑）
+     * - `local_root`: 本地目录（词库编译缓存与日志，可再生；Android 上在私有 filesDir 下）
      * - `schema`: **首装兜底**方案 id（如 "wubi86"）；用户上次选过的优先
      */
-    constructor(`dataDir`: kotlin.String, `userRoot`: kotlin.String, `schema`: kotlin.String, `listener`: UiEventListener) :
+    constructor(`dataDir`: kotlin.String, `userRoot`: kotlin.String, `localRoot`: kotlin.String, `schema`: kotlin.String, `listener`: UiEventListener) :
         this(UniffiWithHandle, 
     uniffiRustCall() { _status ->
     UniffiLib.uniffi_wind_android_fn_constructor_windcore_new(
@@ -2661,6 +2663,7 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         
         FfiConverterString.lower(`dataDir`),
         FfiConverterString.lower(`userRoot`),
+        FfiConverterString.lower(`localRoot`),
         FfiConverterString.lower(`schema`),
         FfiConverterTypeUiEventListener.lower(`listener`),_status)
 }

@@ -40,11 +40,17 @@ class BackupRulesTest {
         }
     }
 
-    /** 设置与个人词库要进备份：别一刀把整个 rust/ 或 user/ 排掉 */
+    @Test
+    fun userRootOnlyExcludesTheProcessLock() {
+        val ext = excludes("backup_rules.xml").filter { it.startsWith("external:") }
+        assertEquals(setOf("external:userdata.redb.state/lock"), ext.toSet())
+    }
+
+    /** 设置与个人词库在用户根（external 域），要进备份：别一刀把整个 external 域排掉 */
     @Test
     fun settingsAndUserDictsStayIncluded() {
         val rules = excludes("backup_rules.xml")
-        for (keep in listOf("file:user/", "file:rust/", "file:rust/config/", "file:rust/userdata.redb.state/")) {
+        for (keep in listOf("external:", "external:keyboard/", "external:data/", "external:config.toml", "external:userdata.redb.state/")) {
             assertTrue("$keep 不该被排除", keep !in rules)
         }
     }

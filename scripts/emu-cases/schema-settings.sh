@@ -5,11 +5,11 @@
 # 判据看两处：覆盖文件 schema_overrides/<id>.toml 写了什么（与 PC 同一份），以及打字时真的变了。
 # 用例前后把五笔的覆盖文件备份 / 还原，不碰别的用例留下的扩展词库开关。
 
-SS_OV_DIR=files/rust/config/WindInput/schema_overrides
-SS_OV_WUBI="$(adb_ shell run-as "$PKG" cat "$SS_OV_DIR/wubi86.toml" 2>/dev/null | grep -v 'No such file')"
-adb_q shell run-as "$PKG" rm -f "$SS_OV_DIR/wubi86.toml"
+SS_OV_DIR="$EXT/schema_overrides"
+SS_OV_WUBI="$(adb_ shell cat "$SS_OV_DIR/wubi86.toml" 2>/dev/null | grep -v 'No such file')"
+adb_q shell rm -f "$SS_OV_DIR/wubi86.toml"
 
-ss_ov() { adb_ shell run-as "$PKG" cat "$SS_OV_DIR/$1.toml" 2>/dev/null | grep -v 'No such file'; }
+ss_ov() { adb_ shell cat "$SS_OV_DIR/$1.toml" 2>/dev/null | grep -v 'No such file'; }
 ss_tap_desc() {   # 按 content-desc 点（图标按钮没有 text）
     local node try
     for ((try = 0; try < 6; try++)); do
@@ -130,8 +130,8 @@ check "全部恢复后显示没有自定义的项" "yes" "$(has_text 没有自�
 
 # 还原五笔覆盖文件（别的用例 / 用户留下的扩展词库开关等）
 if [[ -n "$SS_OV_WUBI" ]]; then
-    printf '%s\n' "$SS_OV_WUBI" | "$ADB" -s "$SERIAL" shell run-as "$PKG" sh -c "'mkdir -p $SS_OV_DIR && cat > $SS_OV_DIR/wubi86.toml'"
+    printf '%s\n' "$SS_OV_WUBI" | "$ADB" -s "$SERIAL" shell sh -c "'mkdir -p $SS_OV_DIR && cat > $SS_OV_DIR/wubi86.toml'"
 else
-    adb_q shell run-as "$PKG" rm -f "$SS_OV_DIR/wubi86.toml"
+    adb_q shell rm -f "$SS_OV_DIR/wubi86.toml"
 fi
 back_to_pad

@@ -30,11 +30,11 @@ object LogLevel {
 
     /**
      * 读盘求当前级别。
-     * @param rustRoot 核心用户 / 缓存根（filesDir/rust），用户层在其下 `config/WindInput/config.toml`
+     * @param engineConfig 核心用户层 config.toml（用户目录根下）
      * @param dataDir 出厂数据层（filesDir/data）
      */
-    fun read(rustRoot: File, dataDir: File): String = resolve(
-        UserConfig(File(rustRoot, "config/WindInput/config.toml")).readAll()[KEY] as? String,
+    fun read(engineConfig: File, dataDir: File): String = resolve(
+        UserConfig(engineConfig).readAll()[KEY] as? String,
         UserConfig(File(dataDir, "config.toml")).readAll()[KEY] as? String,
     )
 }

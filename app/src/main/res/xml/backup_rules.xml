@@ -3,14 +3,13 @@
      Android 12 起用 data_extraction_rules.xml，两份的排除项必须一致，改一份要同步另一份
      （BackupRulesTest 核对）。
 
-     进备份：设置（files/user、files/rust/config，含方案覆盖与导入的方案）、个人词库
-     （files/rust/userdata.redb.state、files/rust/data 下的用户词与统计）、键盘小状态（shared_prefs）。
+     进备份：设置、个人词库与统计、方案覆盖、手放的扩展词库——全在用户根
+     （external 域 = Android/data/<包名>/files，用户可经文件管理器直接编辑），键盘小状态（shared_prefs）。
      不进备份（只写排除项，其余默认都进）：
      - clipboard.json：剪贴板历史，可能有隐私内容，也不该跟着换机
-     - data/：随 APK 的出厂数据，升级时整体重放
-     - rust/data/WindInput/cache、rust/cache：词库编译缓存（上百 MB），可重建
-     - rust/data/WindInput/logs：日志
-     - userdata.redb.state/lock：进程锁文件
+     - data/（file 域）：随 APK 的出厂数据，升级时整体重放
+     - rust/data/WindInput/cache、logs（file 域）：核心的本地目录，词库编译缓存（上百 MB）可重建，日志不带走
+     - userdata.redb.state/lock（external 域）：进程锁文件
      - ime_insets.xml：导航栏避让的本机测量值，换机就不对了
      cacheDir 与 noBackupFilesDir（崩溃记录，见 CrashLog）系统本来就不备份。 -->
 <full-backup-content>
@@ -18,7 +17,6 @@
     <exclude domain="file" path="data/" />
     <exclude domain="file" path="rust/data/WindInput/cache/" />
     <exclude domain="file" path="rust/data/WindInput/logs/" />
-    <exclude domain="file" path="rust/cache/" />
-    <exclude domain="file" path="rust/userdata.redb.state/lock" />
+        <exclude domain="external" path="userdata.redb.state/lock" />
     <exclude domain="sharedpref" path="ime_insets.xml" />
 </full-backup-content>

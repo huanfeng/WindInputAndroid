@@ -36,6 +36,6 @@ class LogLevelTest {
     @Test
     fun bundledFactoryLevelIsWarn() {
         val data = File("src/main/assets/data")
-        assertEquals("warn", LogLevel.read(File("build/nonexistent-rust-root"), data))
+        assertEquals("warn", LogLevel.read(File("build/nonexistent-config.toml"), data))
     }
 }

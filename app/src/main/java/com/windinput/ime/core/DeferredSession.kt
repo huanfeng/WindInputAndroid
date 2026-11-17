@@ -35,7 +35,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class DeferredSession(
     private val dataDir: File,
-    private val rustRoot: File,
+    private val userRoot: File,
+    private val localRoot: File,
     /**
      * 构造前的准备工作（出厂数据拷出），**同样在后台线程执行**。
      *
@@ -119,7 +120,7 @@ class DeferredSession(
                 Log.e(TAG, "出厂数据准备失败，引擎可能读不到方案", e)
             }
             val installed = System.currentTimeMillis() - t0
-            val session = RustSession.getOrCreate(dataDir, rustRoot)
+            val session = RustSession.getOrCreate(dataDir, userRoot, localRoot)
             val cost = System.currentTimeMillis() - t0
             Log.i(TAG, "数据准备 ${installed}ms，核心构造 ${cost - installed}ms")
             if (session == null) {

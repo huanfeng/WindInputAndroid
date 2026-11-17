@@ -76,7 +76,7 @@ private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 internal fun NumpadSymbolsSection() {
     val context = LocalContext.current
     val config = remember {
-        UserConfig(File((context.applicationContext as WindInputApp).dataDirs.userDir, "config.toml"))
+        UserConfig(File((context.applicationContext as WindInputApp).dataDirs.keyboardDir, "config.toml"))
     }
     var symbols by remember {
         mutableStateOf(NumberSideSymbols.parse(config.readAll()[NumberSideSymbols.CONFIG_KEY] as? String))
@@ -250,7 +250,7 @@ internal fun DragHandle(description: String, modifier: Modifier) {
 internal fun NumpadSymbolsEntry(onOpen: () -> Unit) {
     val context = LocalContext.current
     val config = remember {
-        UserConfig(File((context.applicationContext as WindInputApp).dataDirs.userDir, "config.toml"))
+        UserConfig(File((context.applicationContext as WindInputApp).dataDirs.keyboardDir, "config.toml"))
     }
     // 不 remember：从二级页返回时本页重组，摘要按刚改的列表重读（读的是进程内缓存）
     val symbols = NumberSideSymbols.parse(config.readAll()[NumberSideSymbols.CONFIG_KEY] as? String)

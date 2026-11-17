@@ -69,7 +69,7 @@ section "[78] 高级：恢复键盘设置清掉 ui.android.*（点两下确认�
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG" | grep -vE '^[[:space:]]*haptic[[:space:]]*=' |
     awk '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print "haptic = false" }')"
 check "前置：写进了 haptic = false" "yes" \
-    "$(adb_ shell run-as "$PKG" cat "$KB_CFG" | grep -q '^haptic = false' && echo yes || echo no)"
+    "$(adb_ shell cat "$KB_CFG" | grep -q '^haptic = false' && echo yes || echo no)"
 core_before="$(read_core_cfg)"
 rp_settings advanced
 read -r rx ry <<< "$(rp_center 恢复键盘设置)" || true
@@ -78,7 +78,7 @@ if [[ -n "${ry:-}" ]]; then
     adb_q shell input tap "$rx" "$ry"; sleep 1.2
     adb_q shell input tap "$rx" "$ry"; sleep 2
 fi
-kb_after="$(adb_ shell run-as "$PKG" cat "$KB_CFG")"
+kb_after="$(adb_ shell cat "$KB_CFG")"
 check "恢复后 haptic / candidate_comment 都清掉了" "no no" \
     "$(grep -q '^haptic' <<< "$kb_after" && echo yes || echo no) $(grep -q '^candidate_comment' <<< "$kb_after" && echo yes || echo no)"
 check "核心用户层（输入设置、方案）不动" "$core_before" "$(read_core_cfg)"

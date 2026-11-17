@@ -229,7 +229,7 @@ Init-Geometry
 # 照样 PASS（不过是换了个中文方案，断言只看「是不是汉字」），污染留给**下一次**运行，
 # 现象是「昨天好好的今天全挂」。故把「跑完方案没变」单列成一条不变量来守。
 function Get-ActiveSchema {
-    $line = Adb shell run-as $pkg cat files/rust/config/WindInput/config.toml 2>$null |
+    $line = Adb shell cat /sdcard/Android/data/$pkg/files/config.toml 2>$null |
         Select-String '^active = ' | Select-Object -First 1
     if ($line) { return $line.ToString().Trim() }
     return ""   # 首次运行尚未落盘，或非 debug 包没有 run-as

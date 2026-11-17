@@ -5,7 +5,7 @@ import org.tomlj.Toml
 import java.io.File
 
 /**
- * 用户层配置（filesDir/user/config.toml）的最小读写。
+ * 用户层配置（<用户根>/keyboard/config.toml）的最小读写。
  *
  * ⚠️ 过渡实现：正式配置链路由 Rust wind-config 负责（三层合并 + REGISTRY 校验），
  * 本类只服务于 Rust 核心接入前的 Kotlin 侧设置项（点分键 → TOML 节）。

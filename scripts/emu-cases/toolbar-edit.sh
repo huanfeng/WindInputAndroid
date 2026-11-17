@@ -8,7 +8,7 @@
 
 te_pins() {   # 配置里的常驻串（没写过 = 出厂默认）
     local v
-    v="$(adb_ shell run-as "$PKG" cat "$KB_CFG" 2>/dev/null | grep -E '^[[:space:]]*toolbar_pins[[:space:]]*=' \
+    v="$(adb_ shell cat "$KB_CFG" 2>/dev/null | grep -E '^[[:space:]]*toolbar_pins[[:space:]]*=' \
         | sed -E 's/^[^"]*"([^"]*)".*/\1/')"
     echo "${v:-keyboard,emoji,clipboard,text_edit}"
 }
