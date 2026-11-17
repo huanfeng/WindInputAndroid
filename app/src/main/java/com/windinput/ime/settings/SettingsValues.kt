@@ -102,7 +102,10 @@ class SettingsValues(
     }
 
     /** select 的当前值，与选项的 value 同形（字符串） */
-    fun choice(item: SettingItem): String = raw(item)?.toString() ?: ""
+    fun choice(item: SettingItem): String = when (val v = raw(item)) {
+        is List<*> -> v.joinToString(",") // 键名列表（trigger_keys）按逗号拼回下拉项的值
+        else -> v?.toString() ?: ""
+    }
 
     /**
      * 写入。返回错误说明（成功为 null）。后台线程调用。
@@ -131,6 +134,8 @@ class SettingsValues(
             "bool" -> ConfigValue.Bool(value == true || value == "true")
             "int" -> ConfigValue.Int(value.toString().toLong())
             "float" -> ConfigValue.Float(value.toString().toDouble())
+            // 触发键类（trigger_keys）：下拉里一项 = 逗号分隔的一组键名，空串 = 一个都不绑
+            "str_list" -> ConfigValue.StrList(value.toString().split(',').filter { it.isNotBlank() })
             else -> ConfigValue.Str(value.toString())
         }
         return try {

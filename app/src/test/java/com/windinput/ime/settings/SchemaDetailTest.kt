@@ -32,6 +32,7 @@ class SchemaDetailTest {
         "auto_commit_at_full", "clear_on_empty_max", "top_code_commit", "punct_commit", "show_code_hint",
         "single_char", "frequency.enabled", "english_merge.enable", "auto_commit_min_len",
         "short_code_yield_level", "frequency.strategy",
+        "wildcard", "wildcard_key", "wildcard_single_only", "z_key_repeat", "z_key_action",
     )
 
     @Test
@@ -44,7 +45,7 @@ class SchemaDetailTest {
         // 清单里只有 auto_phrase.* 核心没有方案级段，其余都得对上——漏一项就是清单新增了键而核心没跟上
         assertEquals(manifestKeys - "auto_phrase.enabled", rows.map { it.second.key.removePrefix("engine.codetable.") })
         assertEquals("全码唯一自动上屏", rows.first().first.title)
-        assertTrue("核心给了而清单没有的不画", codetableRows(manifest, listOf(item("engine.codetable.wildcard"))).isEmpty())
+        assertTrue("核心给了而清单没有的不画", codetableRows(manifest, listOf(item("engine.codetable.sentence_input"))).isEmpty())
     }
 
     @Test

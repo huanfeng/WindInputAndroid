@@ -23,6 +23,14 @@ import android.view.View
  * 系统据此套用「触摸振动」开关与勿扰规则——自己调振动器若不标用途，用户在系统里关了
  * 触摸振动，键盘照振，和系统键盘的表现对不上。
  */
+/** 点击时先振一下再执行 [onClick]：面板、工具栏等非按键区的可点图标统一走这里，与按键同一套强度开关 */
+fun View.setHapticClick(onClick: () -> Unit) {
+    setOnClickListener {
+        KeyHaptics.tap(it)
+        onClick()
+    }
+}
+
 object KeyHaptics {
 
     var enabled = true

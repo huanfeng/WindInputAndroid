@@ -1,5 +1,6 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.setHapticClick
 import android.content.Context
 import android.graphics.Color
 import android.view.Gravity
@@ -143,7 +144,7 @@ object PanelScaffold {
         PanelIcon(context).apply {
             glyph = PanelIcon.Glyph.BACK
             tint = Palette.current.text
-            setOnClickListener { onBack() }
+            setHapticClick { onBack() }
         }
 
     fun headerButton(context: Context, label: String, isBackspace: Boolean = false, onClick: () -> Unit): TextView =
@@ -155,7 +156,7 @@ object PanelScaffold {
             setTextColor(Palette.current.accent)
             setPadding((14 * density).toInt(), 0, (14 * density).toInt(), 0)
             setBackgroundColor(Color.TRANSPARENT)
-            setOnClickListener { onClick() }
+            setHapticClick { onClick() }
             // 退格与键盘上同一个矢量图标，不用字体里的 ⌫
             if (isBackspace) {
                 minWidth = (52 * density).toInt()

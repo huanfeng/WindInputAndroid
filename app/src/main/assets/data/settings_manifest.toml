@@ -208,6 +208,64 @@ options = [
 [[item]]
 page = "schema"
 section = "码表"
+key = "schema.codetable.wildcard"
+source = "engine"
+type = "toggle"
+title = "通配输入"
+summary = "组码时通配键代替任意一个码元，如五笔的 z；候选显示完整编码"
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.wildcard_key"
+source = "engine"
+type = "select"
+title = "通配键"
+summary = "选字母键会占掉该码元，仅建议用在闲置的键上；符号键在首位也作通配"
+advanced = true
+options = [
+  { value = "z", label = "z" },
+  { value = "?", label = "?" },
+  { value = "*", label = "*" },
+  { value = "`", label = "`" },
+]
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.wildcard_single_only"
+source = "engine"
+type = "toggle"
+title = "通配仅出单字"
+advanced = true
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.z_key_repeat"
+source = "engine"
+type = "toggle"
+title = "z 键重复上屏"
+summary = "空码时按 z 重复上一次上屏的内容（五笔 z 键）"
+
+[[item]]
+page = "schema"
+section = "码表"
+key = "schema.codetable.z_key_action"
+source = "engine"
+type = "select"
+title = "z 键功能"
+summary = "z 在本方案没有编码时，按它进入的模式"
+advanced = true
+options = [
+  { value = "", label = "不启用" },
+  { value = "temp_pinyin", label = "临时拼音" },
+  { value = "temp_english", label = "临时英文" },
+]
+
+[[item]]
+page = "schema"
+section = "码表"
 key = "schema.codetable.frequency.strategy"
 source = "engine"
 type = "select"
@@ -636,6 +694,32 @@ title = "英文标点自动配对"
 # 快捷输入（日期 / 计算 / 拼音 / 英文融合）：电脑版另有触发键多选、候选窗布局、自由输入等
 # schema.mix_modes 里的结构化项，手机端不列；触发键在手机上只有「; 进不进」这一个开关。
 # 候选来源（mix_modes 的 members）与「历史条数上限」由代码画在「快捷候选来源」详情页（QuickSourcesSection），不在清单里
+[[item]]
+page = "input"
+section = "临时拼音"
+key = "input.temp_pinyin.enabled"
+source = "engine"
+type = "toggle"
+title = "临时拼音"
+summary = "码表方案（如五笔）里临时打一个拼音字，打完回到原方案；也可点工具栏的「拼」进入"
+
+[[item]]
+page = "input"
+section = "临时拼音"
+key = "input.temp_pinyin.trigger_keys"
+source = "engine"
+type = "select"
+title = "符号触发键"
+summary = "空码时点键盘上这个符号键即进入临时拼音（该符号本身就不再单独打出）；五笔的 z 键在「方案 → 码表」里设置"
+enabled_when = "input.temp_pinyin.enabled"
+options = [
+  { value = "", label = "不用符号键" },
+  { value = "backtick", label = "` 反引号" },
+  { value = "semicolon", label = "; 分号" },
+  { value = "quote", label = "' 单引号" },
+  { value = "slash", label = "/ 斜杠" },
+]
+
 [[item]]
 page = "input"
 section = "快捷输入"

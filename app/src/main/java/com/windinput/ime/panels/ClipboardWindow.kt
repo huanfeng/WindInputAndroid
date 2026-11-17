@@ -1,5 +1,6 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.setHapticClick
 import android.content.Context
 import android.view.Gravity
 import android.view.View
@@ -82,7 +83,7 @@ class ClipboardWindow(
                     setTextColor(Palette.current.text)
                     val p = (10 * density).toInt()
                     setPadding(p, p, p, p)
-                    setOnClickListener { listener.onPasteText(entry.text) }
+                    setHapticClick { listener.onPasteText(entry.text) }
                 },
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
             )
@@ -113,6 +114,6 @@ class ClipboardWindow(
             this.glyph = glyph
             tint = if (glyph == PanelIcon.Glyph.PIN) Palette.current.accentText else Palette.current.hint
             scale = 0.5f
-            setOnClickListener { onClick() }
+            setHapticClick { onClick() }
         }
 }

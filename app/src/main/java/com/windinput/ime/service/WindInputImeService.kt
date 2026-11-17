@@ -484,16 +484,21 @@ class WindInputImeService :
 
     /** 横竖屏独立键高（twinInt 模式）：旋转会触发 onCreateInputView 重建，天然生效 */
     private fun applyKeyboardDimens() {
+        KeyboardDimens.rowHeightDp = configuredRowHeightDp()
+        val (preedit, main) = barDims()
+        KeyboardDimens.barPreeditDp = preedit
+        KeyboardDimens.barMainRowDp = main
+    }
+
+    /** 设置里当前方向对应的键行高（dp） */
+    private fun configuredRowHeightDp(): Int {
         val portrait =
             resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
-        KeyboardDimens.rowHeightDp = if (portrait) {
+        return if (portrait) {
             userConfig.getInt("ui.android.row_height_portrait", 60)
         } else {
             userConfig.getInt("ui.android.row_height_landscape", 44)
         }
-        val (preedit, main) = barDims()
-        KeyboardDimens.barPreeditDp = preedit
-        KeyboardDimens.barMainRowDp = main
     }
 
     /**
@@ -527,8 +532,9 @@ class WindInputImeService :
         super.onStartInputView(info, restarting)
         // 配色核对：视图是按构造那一刻的深浅色画的，系统没发配置变更时不会重建。
         // 对不上（刚装好时拿到了旧配置、或设置页改了深浅色）就当场重建整个输入视图。
-        // 条区高度同理：设置页切了编码显示方式，要按新高度重建
+        // 条区高度、键行高同理：设置页改了就要按新值重建（键行高此前漏判，要改别的 UI 项才生效）
         if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current ||
+            configuredRowHeightDp() != KeyboardDimens.rowHeightDp ||
             barDims() != (KeyboardDimens.barPreeditDp to KeyboardDimens.barMainRowDp)
         ) {
             setInputView(onCreateInputView())

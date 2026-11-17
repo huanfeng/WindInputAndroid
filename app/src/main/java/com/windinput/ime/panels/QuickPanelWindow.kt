@@ -1,5 +1,6 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.setHapticClick
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
@@ -446,7 +447,7 @@ class QuickPanelWindow(
                 shape = GradientDrawable.OVAL
                 setColor(bg)
             }
-            setOnClickListener { onClick() }
+            setHapticClick { onClick() }
         }
 
     private fun badgeParams(density: Float) =
@@ -532,7 +533,7 @@ class QuickPanelWindow(
                     setPadding(0, (2 * density).toInt(), 0, 0)
                 },
             )
-            setOnClickListener { onClick() }
+            setHapticClick { onClick() }
         }
     }
 

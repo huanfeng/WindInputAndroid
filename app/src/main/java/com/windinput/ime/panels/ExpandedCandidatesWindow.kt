@@ -1,5 +1,6 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.setHapticClick
 import android.content.Context
 import android.view.Gravity
 import android.view.View
@@ -200,7 +201,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     (46 * density).toInt(),
                 ).apply { setMargins((4 * density).toInt(), 0, (4 * density).toInt(), 0) }
-                setOnClickListener { listener.onReadingTapped(r) }
+                setHapticClick { listener.onReadingTapped(r) }
             }
             list.addView(row)
         }
@@ -286,7 +287,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
                     }
                 }
             }
-            holder.view.setOnClickListener { onClick(position) }
+            holder.view.setHapticClick { onClick(position) }
             holder.view.setOnLongClickListener {
                 onLongClick(position)
                 true

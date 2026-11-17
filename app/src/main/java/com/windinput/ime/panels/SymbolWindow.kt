@@ -1,5 +1,6 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.setHapticClick
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
@@ -146,7 +147,7 @@ class SymbolWindow(
                     setTextColor(palette.text)
                     gravity = Gravity.CENTER
                     setPadding((14 * density).toInt(), 0, (14 * density).toInt(), 0)
-                    setOnClickListener { selectTab(index) }
+                    setHapticClick { selectTab(index) }
                 },
                 LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, (rowHeight * 0.7f).toInt()),
             )

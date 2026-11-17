@@ -201,7 +201,7 @@ class BarView(
     /** 候选态尾格：展开全部候选 */
     private val expandButton = PanelIcon(context).apply {
         glyph = PanelIcon.Glyph.EXPAND
-        setOnClickListener { listener.onToggleExpanded() }
+        setHapticClick { listener.onToggleExpanded() }
     }
 
     /**
@@ -299,7 +299,7 @@ class BarView(
     private val trailingIcon = PanelIcon(context).apply {
         glyph = PanelIcon.Glyph.COLLAPSE
         boxDp = TOOLBAR_COLLAPSE_BOX_DP
-        setOnClickListener {
+        setHapticClick {
             if (expanded) listener.onToggleExpanded() else listener.onToolbarAction(ToolbarAction.HIDE_IME)
         }
     }
@@ -483,7 +483,7 @@ class BarView(
     fun showClipSuggestion(text: String) {
         if (wantsCandidateRow) return
         suggestionText.text = text
-        suggestionText.setOnClickListener {
+        suggestionText.setHapticClick {
             hideClipSuggestion()
             listener.onPasteSuggestion(text)
         }
@@ -528,6 +528,6 @@ class BarView(
     private fun icon(glyph: PanelIcon.Glyph, onClick: () -> Unit): PanelIcon =
         PanelIcon(context).apply {
             this.glyph = glyph
-            setOnClickListener { onClick() }
+            setHapticClick { onClick() }
         }
 }

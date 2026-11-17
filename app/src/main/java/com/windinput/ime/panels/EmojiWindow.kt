@@ -1,5 +1,6 @@
 package com.windinput.ime.panels
 
+import com.windinput.ime.keyboard.setHapticClick
 import android.content.Context
 import android.graphics.Color
 import android.graphics.Typeface
@@ -62,7 +63,7 @@ class EmojiWindow(
                     textSize = 18f
                     gravity = Gravity.CENTER
                     setPadding((12 * density).toInt(), 0, (12 * density).toInt(), 0)
-                    setOnClickListener { selectTab(index) }
+                    setHapticClick { selectTab(index) }
                     // 「最近」不是表情，用矢量图标（同快捷面板那一套），不拿 🕐 冒充分类
                     if (index == 0) {
                         minWidth = (44 * density).toInt()
@@ -156,7 +157,7 @@ class EmojiWindow(
         override fun onBindViewHolder(holder: Holder, position: Int) {
             val emoji = items[position]
             holder.view.text = emoji
-            holder.view.setOnClickListener { onClick(emoji) }
+            holder.view.setHapticClick { onClick(emoji) }
         }
 
         override fun getItemCount() = items.size

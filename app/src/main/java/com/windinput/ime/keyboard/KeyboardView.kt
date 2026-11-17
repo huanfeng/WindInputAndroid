@@ -992,7 +992,8 @@ class KeyboardView(context: Context) : View(context) {
         val swipeChar = if (swipeArmed) key?.swipeFor(englishMode) else null
         val popupChoice = popupManager.popupSelectedIndex()
             ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
-        val skipTap = longPressFired // 长按触发过则不补单击
+        // 长按触发过、或字符气泡弹出过（含下滑取消）都不补单击
+        val skipTap = longPressFired || popupManager.isPopupShown
         val wasSpaceSwipe = spaceSwipeActive
         if (key?.action == KeyAction.Backspace) {
             backspaceGesture.up()

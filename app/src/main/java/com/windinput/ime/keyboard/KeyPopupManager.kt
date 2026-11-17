@@ -18,6 +18,9 @@ class KeyPopupManager(private val anchor: View) {
     private val density = anchor.resources.displayMetrics.density
 
     private companion object {
+        /** [selectedIndex] 的「已取消」哨兵：字符气泡被手指下滑出键位 */
+        const val CANCELLED = -1
+
         /** 上滑气泡下沿高出指尖多少（dp），见 [showSwipeBubble]：手指高约 40dp，再近就被遮住 */
         const val SWIPE_BUBBLE_GAP_DP = 40f
 
@@ -64,6 +67,9 @@ class KeyPopupManager(private val anchor: View) {
     private var popupClamped = false
     private var popupMoved = false
 
+    /** 字符气泡对应键位的下沿（anchor 坐标）；手指滑到它以下即取消本次长按输入 */
+    private var popupKeyBottom = 0f
+
     val isPopupShown: Boolean get() = popup != null
 
     /** [initial] 非 0 时气泡把该项摆在键中心正上方，选中也按手指相对键中心的横移算（边缘键被挤偏也不乱跳） */
@@ -100,6 +106,7 @@ class KeyPopupManager(private val anchor: View) {
         popupInitial = start
         popupMoved = false
         popupAnchorX = keyRect.centerX()
+        popupKeyBottom = keyRect.bottom
         selectedIndex = start
         highlight()
         popup = popupWindow(row, w, h + 2 * inset).also {
@@ -166,7 +173,10 @@ class KeyPopupManager(private val anchor: View) {
     /** 手指位置（anchor 坐标）更新选中项：字符气泡看横向，竖排菜单看纵向 */
     fun updatePopupSelection(x: Float, y: Float) {
         if (popupItems.isEmpty()) return
-        selectedIndex = if (menuRowH > 0) {
+        selectedIndex = if (menuRowH == 0 && y > popupKeyBottom) {
+            // 字符气泡：手指往下滑出键位即取消（与系统键盘一致），抬手不上屏也不补单击
+            CANCELLED
+        } else if (menuRowH > 0) {
             // 手指还在菜单下沿以下（键位上）：不算选了哪项，保持初始项——抬手即作罢。
             // 否则一按住往旁边蹭一下，就会落到离键最近的最后一项（切换输入法）上
             val bottom = menuTop + menuRowH * popupItems.size
@@ -194,7 +204,8 @@ class KeyPopupManager(private val anchor: View) {
     }
 
     /** 当前选中项**下标**；未弹出返回 null。调用方按下标映回自己的字符表（气泡里显示的可能是换过形态的） */
-    fun popupSelectedIndex(): Int? = if (popupItems.isEmpty()) null else selectedIndex
+    fun popupSelectedIndex(): Int? =
+        if (popupItems.isEmpty() || selectedIndex == CANCELLED) null else selectedIndex
 
     fun dismissPopup() {
         popup?.dismiss()
