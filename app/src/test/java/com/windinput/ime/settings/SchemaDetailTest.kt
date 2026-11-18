@@ -42,8 +42,14 @@ class SchemaDetailTest {
         val manifestKeys = manifest.items
             .filter { it.page == "schema" && it.section == "码表" }
             .map { it.key.removePrefix("schema.codetable.") }
-        // 清单里只有 auto_phrase.* 核心没有方案级段，其余都得对上——漏一项就是清单新增了键而核心没跟上
-        assertEquals(manifestKeys - "auto_phrase.enabled", rows.map { it.second.key.removePrefix("engine.codetable.") })
+        // 清单「码表」节的键，核心要么有方案级覆盖（得逐项对上——漏一项就是清单新增了键而核心没跟上），
+        // 要么明确列在 globalOnly 里（只有全局值的进阶参数）。新增清单键又不在两边，这里就红
+        val globalOnly = manifestKeys.filter {
+            it == "auto_phrase.enabled" || it.startsWith("auto_phrase.") ||
+                it.startsWith("frequency.") && it != "frequency.enabled" && it != "frequency.strategy" ||
+                it.startsWith("english_merge.") && it != "english_merge.enable" || it.startsWith("single_code_")
+        }
+        assertEquals(manifestKeys - globalOnly.toSet(), rows.map { it.second.key.removePrefix("engine.codetable.") })
         assertEquals("全码唯一自动上屏", rows.first().first.title)
         assertTrue("核心给了而清单没有的不画", codetableRows(manifest, listOf(item("engine.codetable.sentence_input"))).isEmpty())
     }
