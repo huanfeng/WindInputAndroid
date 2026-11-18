@@ -53,7 +53,7 @@ object SettingsIcons {
     /** 有专属图标的二级入口名（与 [bySection] 同步） */
     val SECTION_ICON_NAMES = setOf(
         "码表", "拼音", "模糊音", "双拼", "混输", "英文",
-        "默认状态", "字符与标点", "标点配对", "快捷输入", "临时拼音", "临时英文", "联想输入", "简繁转换", "Emoji/OpenCC", "纠错与提示",
+        "默认状态", "字符与标点", "标点配对", "快捷输入", "临时拼音", "临时英文", "智能符号", "联想输入", "简繁转换", "Emoji/OpenCC", "纠错与提示",
     )
 
     /** 清单 `icon` 字段可写的名字 */
@@ -87,6 +87,7 @@ object SettingsIcons {
             "快捷输入" to MiuixIcons.Stopwatch,
             "临时拼音" to MiuixIcons.Edit,
             "临时英文" to MiuixIcons.Translate,
+            "智能符号" to MiuixIcons.Refresh,
             "联想输入" to MiuixIcons.Link,
             "简繁转换" to MiuixIcons.ConvertFile,
             "Emoji/OpenCC" to MiuixIcons.Favorites,

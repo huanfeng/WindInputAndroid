@@ -32,6 +32,9 @@ class SettingsValues(
 
         /** 「显示实体键盘设置」开关的键（键盘项，出厂关）：[SettingItem.hardware] 的项靠它放出来 */
         const val HARDWARE_GATE = "ui.android.show_hardware_options"
+
+        /** 列表型配置在文本框 / 下拉值里的分隔：空白或逗号（配对字符、键名里都不会出现这两种） */
+        private val LIST_SEPARATOR = Regex("[,\\s]+")
     }
 
     /** 值变化的版本号：Compose 读它，写入后递增触发重组 */
@@ -105,6 +108,12 @@ class SettingsValues(
         else -> 0
     }
 
+    /** text 项的当前值：列表型配置拼成空格分隔的一行 */
+    fun text(item: SettingItem): String = when (val v = raw(item)) {
+        is List<*> -> v.joinToString(" ")
+        else -> v?.toString() ?: ""
+    }
+
     /** select 的当前值，与选项的 value 同形（字符串） */
     fun choice(item: SettingItem): String = when (val v = raw(item)) {
         is List<*> -> v.joinToString(",") // 键名列表（trigger_keys）按逗号拼回下拉项的值
@@ -139,7 +148,7 @@ class SettingsValues(
             "int" -> ConfigValue.Int(value.toString().toLong())
             "float" -> ConfigValue.Float(value.toString().toDouble())
             // 触发键类（trigger_keys）：下拉里一项 = 逗号分隔的一组键名，空串 = 一个都不绑
-            "str_list" -> ConfigValue.StrList(value.toString().split(',').filter { it.isNotBlank() })
+            "str_list" -> ConfigValue.StrList(value.toString().split(LIST_SEPARATOR).filter { it.isNotBlank() })
             else -> ConfigValue.Str(value.toString())
         }
         return try {

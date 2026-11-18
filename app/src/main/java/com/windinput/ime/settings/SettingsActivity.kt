@@ -828,6 +828,9 @@ internal fun ItemRow(item: SettingItem, values: SettingsValues) {
         "toggle" -> ToggleLine(item.title, item.summary, values.bool(item)) { write(it) }
         "int" -> IntRow(item, values.int(item)) { write(it) }
         "select" -> SelectRow(item, values.choice(item)) { write(it) }
+        "text" -> TextRow(item, values.text(item)) { v ->
+            withContext(Dispatchers.IO) { values.set(item, v) }
+        }
     }
 }
 

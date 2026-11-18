@@ -315,6 +315,22 @@ max = 8
 [[item]]
 page = "schema"
 section = "拼音"
+key = "schema.pinyin.separator"
+source = "engine"
+type = "select"
+title = "拼音分隔符"
+summary = "消歧用，如输入 xi'an 得到「西安」。自动 = 默认用 '，' 被选择键占用时改用 `"
+advanced = true
+options = [
+  { value = "auto", label = "自动" },
+  { value = "quote", label = "单引号 '" },
+  { value = "backtick", label = "反引号 `" },
+  { value = "none", label = "不使用" },
+]
+
+[[item]]
+page = "schema"
+section = "拼音"
 key = "schema.pinyin.sentence_uses_user_words"
 source = "engine"
 type = "toggle"
@@ -757,14 +773,6 @@ title = "数字后智能标点"
 [[item]]
 page = "input"
 section = "字符与标点"
-key = "input.symbol.smart_mode"
-source = "engine"
-type = "toggle"
-title = "中文标点智能符号"
-
-[[item]]
-page = "input"
-section = "字符与标点"
 key = "input.spacing.cjk_latin"
 source = "engine"
 type = "toggle"
@@ -790,6 +798,28 @@ summary = "紧跟在英文字母后打的标点保持英文形态，如 hello, w
 
 [[item]]
 page = "input"
+section = "字符与标点"
+key = "input.punct.smart_list"
+source = "engine"
+type = "text"
+title = "数字后保持英文的标点"
+summary = "数字后打这些标点时保持英文形态，如 3.14；直接写在一起，默认 .,:"
+enabled_when = "input.punct.smart_after_digit"
+advanced = true
+
+[[item]]
+page = "input"
+section = "字符与标点"
+key = "input.punct.latin_smart_list"
+source = "engine"
+type = "text"
+title = "英文后保持英文的标点"
+summary = "英文后保持英文形态的标点，默认 ./_:@；不含逗号，因为中文句子里英文词后常接中文逗号"
+enabled_when = "input.punct.smart_after_latin"
+advanced = true
+
+[[item]]
+page = "input"
 section = "标点配对"
 key = "input.auto_pair.chinese"
 source = "engine"
@@ -803,6 +833,113 @@ key = "input.auto_pair.english"
 source = "engine"
 type = "toggle"
 title = "英文标点自动配对"
+
+[[item]]
+page = "input"
+section = "标点配对"
+key = "input.auto_pair.chinese_pairs"
+source = "engine"
+type = "text"
+title = "中文配对字符"
+summary = "参与自动配对的中文标点对，用空格隔开，每对两个字符，如 （） 【】 《》 “” ‘’"
+enabled_when = "input.auto_pair.chinese"
+advanced = true
+
+[[item]]
+page = "input"
+section = "标点配对"
+key = "input.auto_pair.english_pairs"
+source = "engine"
+type = "text"
+title = "英文配对字符"
+summary = "用空格隔开，每对两个字符，如 () [] {}。不建议放引号：撇号和收尾的双引号会被当成再开一对"
+enabled_when = "input.auto_pair.english"
+advanced = true
+
+[[item]]
+page = "input"
+section = "标点配对"
+key = "input.auto_pair.jump_out_keys"
+source = "engine"
+type = "text"
+title = "配对跳出键"
+summary = "配对状态下按这些键跳到右符号之后，用空格隔开：right_symbol（右符号本身）、tab、enter、space、escape；留空则不启用"
+advanced = true
+
+[[item]]
+page = "input"
+section = "智能符号"
+key = "input.symbol.smart_mode"
+source = "engine"
+type = "toggle"
+title = "中文标点智能符号"
+summary = "连按两次同一中文标点转英文；数字后的标点方向相反（先出英文，再按转中文）"
+
+[[item]]
+page = "input"
+section = "智能符号"
+key = "input.symbol.english_punct_mode"
+source = "engine"
+type = "toggle"
+title = "英文标点智能符号"
+summary = "标点切到英文时，连按两次同一英文标点转中文"
+
+[[item]]
+page = "input"
+section = "智能符号"
+key = "input.symbol.english_mode"
+source = "engine"
+type = "toggle"
+title = "英文模式智能符号"
+summary = "英文输入模式下，连按两次同一英文标点转中文；开启后输入法会接管这些标点键"
+
+[[item]]
+page = "input"
+section = "智能符号"
+key = "input.symbol.smart_timeout_ms"
+source = "engine"
+type = "int"
+title = "智能符号时限"
+summary = "两次按键的最大间隔，三种场景共用"
+min = 100
+max = 2000
+step = 50
+unit = "ms"
+
+[[item]]
+page = "input"
+section = "智能符号"
+key = "input.symbol.smart_method"
+source = "engine"
+type = "select"
+title = "智能符号上屏方式"
+summary = "直接替换：第一次直接上屏，再按时删掉改成另一形态，所见即所得；组合态预览：先以预览态显示，超时或再按才定型，兼容性好，适合直接替换表现异常的应用"
+advanced = true
+options = [
+  { value = "delete_replace", label = "直接替换（推荐）" },
+  { value = "hold_composition", label = "组合态预览（兼容性好）" },
+]
+
+[[item]]
+page = "input"
+section = "智能符号"
+key = "input.symbol.smart_chars"
+source = "engine"
+type = "text"
+title = "中文符号字符集"
+summary = "参与转换的中文标点"
+enabled_when = "input.symbol.smart_mode"
+advanced = true
+
+[[item]]
+page = "input"
+section = "智能符号"
+key = "input.symbol.english_chars"
+source = "engine"
+type = "text"
+title = "英文符号字符集"
+summary = "两个英文场景共用，填按键本身的英文标点（如 . 而非 。）；不建议放括号引号"
+advanced = true
 
 # 快捷输入（日期 / 计算 / 拼音 / 英文融合）：电脑版另有触发键多选、候选窗布局、自由输入等
 # schema.mix_modes 里的结构化项，手机端不列；触发键在手机上只有「; 进不进」这一个开关。
@@ -934,6 +1071,17 @@ type = "toggle"
 title = "允许输入符号与数字"
 summary = "数字和符号进入缓冲而不是上屏或选词，便于打 C++、x64 一类标识符"
 enabled_when = "input.temp_english.enabled"
+advanced = true
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.symbol_chars"
+source = "engine"
+type = "text"
+title = "可输入的字符集"
+summary = "允许进入缓冲的符号和数字，逐字符填写，不支持 a-z 这类范围。未列入的字符保持原职责：符号上屏退出、数字选词。留空则一个都不放行"
+enabled_when = "input.temp_english.allow_symbols"
 advanced = true
 
 [[item]]
