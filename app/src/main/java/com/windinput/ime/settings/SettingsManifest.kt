@@ -55,6 +55,8 @@ data class SettingItem(
     val card: String? = null,
     /** 本项所在卡画成两列勾选网格（只用于短标题的开关） */
     val grid: Boolean = false,
+    /** 只对实体键盘有意义（触发键、快捷键）：「显示实体键盘设置」打开才显示，免得手机用户翻到一堆用不上的项 */
+    val hardware: Boolean = false,
 )
 
 data class SettingsManifestData(
@@ -146,6 +148,7 @@ object SettingsManifest {
                 enabledWhen = t.getString("enabled_when"),
                 card = t.getString("card"),
                 grid = t.getBoolean("grid") ?: false,
+                hardware = t.getBoolean("hardware") ?: false,
             )
         }
         // 引用的键必须是清单里的开关：写错一个字，二选一就变成能同时开、依赖项就永远不显示

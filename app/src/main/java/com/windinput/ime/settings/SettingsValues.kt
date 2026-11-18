@@ -27,8 +27,11 @@ class SettingsValues(
     private val userConfig: UserConfig,
     private val core: WindCore?,
 ) {
-    private companion object {
-        const val TAG = "SettingsValues"
+    companion object {
+        private const val TAG = "SettingsValues"
+
+        /** 「显示实体键盘设置」开关的键（键盘项，出厂关）：[SettingItem.hardware] 的项靠它放出来 */
+        const val HARDWARE_GATE = "ui.android.show_hardware_options"
     }
 
     /** 值变化的版本号：Compose 读它，写入后递增触发重组 */
@@ -78,6 +81,7 @@ class SettingsValues(
      * 「提示范围」还会因「显示正确拼音」开着而单独露出来。
      */
     fun visible(item: SettingItem, all: List<SettingItem>, depth: Int = 0): Boolean {
+        if (item.hardware && userConfig.readAll()[HARDWARE_GATE] != true) return false
         val dep = item.enabledWhen ?: return true
         val depItem = all.firstOrNull { it.key == dep } ?: return true
         // 清单解析时不查环；写成环也只是收起，不会栈溢出

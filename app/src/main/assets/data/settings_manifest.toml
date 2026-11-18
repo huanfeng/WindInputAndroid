@@ -26,6 +26,7 @@
 #            依赖链逐级生效：A 依赖 B、B 依赖 C，C 关着时 A、B 都不显示
 
 #   card     二级页里再分卡片：同 section 内按 card 首次出现序各成一张带标题的卡（缺省 = 无标题的头一张）
+#   hardware true = 只对实体键盘有意义的项（触发键、快捷键），「高级 → 显示实体键盘设置」打开才显示
 #   grid     true = 这张卡画成两列勾选网格（只用于短标题的开关，如模糊音的拼音对）
 #   preview  int 项拖动时的预览：keyboard_rows（按所选行高画四行键）/ candidate_text（按所选字号写一行候选）
 #
@@ -288,12 +289,98 @@ title = "智能组词"
 [[item]]
 page = "schema"
 section = "拼音"
+key = "schema.pinyin.sentence_count"
+source = "engine"
+type = "int"
+title = "智能组词显示条数"
+summary = "候选里同时列出几种整句解读，1 = 只出一条"
+enabled_when = "schema.pinyin.use_smart_compose"
+advanced = true
+min = 1
+max = 8
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.sentence_max_count"
+source = "engine"
+type = "int"
+title = "智能组词备选条数"
+summary = "一共算几种整句解读；少于显示条数时按显示条数算"
+enabled_when = "schema.pinyin.use_smart_compose"
+advanced = true
+min = 1
+max = 8
+
+[[item]]
+page = "schema"
+section = "拼音"
 key = "schema.pinyin.sentence_uses_user_words"
 source = "engine"
 type = "toggle"
 title = "组词时使用自造词"
 summary = "智能组词时把你造过的词也算进去。关闭时整句只用系统词库，自造的词打整句时不认"
 enabled_when = "schema.pinyin.use_smart_compose"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.aux_code.enabled"
+source = "engine"
+type = "toggle"
+title = "辅助码"
+summary = "打出候选后按触发键，用字形码进一步筛选；单个方案可在方案详情里单独开关"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.aux_code.max_phrase_len"
+source = "engine"
+type = "int"
+title = "辅助码参与筛选的最大词长"
+summary = "超过这个字数的词组不参与筛选，0 = 不限；单字始终参与"
+enabled_when = "schema.pinyin.aux_code.enabled"
+advanced = true
+min = 0
+max = 20
+unit = "字"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.aux_code.direct"
+source = "engine"
+type = "toggle"
+title = "直接辅助码"
+summary = "仅双拼：音节后直接敲字形码筛选，不按引导键"
+enabled_when = "schema.pinyin.aux_code.enabled"
+advanced = true
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.completion.min_syllables"
+source = "engine"
+type = "int"
+title = "词组补全最少音节数"
+summary = "输入达到几个音节才给词组候选，1 = 不限制"
+advanced = true
+min = 1
+max = 6
+unit = "个音节"
+
+[[item]]
+page = "schema"
+section = "拼音"
+key = "schema.pinyin.completion.max_extra_syllables"
+source = "engine"
+type = "int"
+title = "词组最多超出音节数"
+summary = "词组最多比已输入的多几个音节，越小越贴近已打的字"
+advanced = true
+min = 0
+max = 10
+unit = "个音节"
 
 # 整句语法模型写移动端覆盖键 mobile.grammar.enabled（手机默认开，电脑版出厂关，各管各的）
 [[item]]
@@ -677,6 +764,32 @@ title = "中文标点智能符号"
 
 [[item]]
 page = "input"
+section = "字符与标点"
+key = "input.spacing.cjk_latin"
+source = "engine"
+type = "toggle"
+title = "中英文之间自动加空格"
+summary = "打中文后接英文、或英文后接中文时，自动补一个空格"
+
+[[item]]
+page = "input"
+section = "字符与标点"
+key = "input.spacing.cjk_digit"
+source = "engine"
+type = "toggle"
+title = "中文与数字之间自动加空格"
+
+[[item]]
+page = "input"
+section = "字符与标点"
+key = "input.punct.smart_after_latin"
+source = "engine"
+type = "toggle"
+title = "英文后保持英文标点"
+summary = "紧跟在英文字母后打的标点保持英文形态，如 hello, world"
+
+[[item]]
+page = "input"
 section = "标点配对"
 key = "input.auto_pair.chinese"
 source = "engine"
@@ -710,6 +823,7 @@ key = "input.temp_pinyin.trigger_keys"
 source = "engine"
 type = "select"
 title = "符号触发键"
+hardware = true
 summary = "空码时点键盘上这个符号键即进入临时拼音（该符号本身就不再单独打出）；五笔的 z 键在「方案 → 码表」里设置"
 enabled_when = "input.temp_pinyin.enabled"
 options = [
@@ -718,6 +832,140 @@ options = [
   { value = "semicolon", label = "; 分号" },
   { value = "quote", label = "' 单引号" },
   { value = "slash", label = "/ 斜杠" },
+]
+
+# 临时英文：中文方案里临时打一个英文词。手机上用 ⇧ 再点字母进入；触发键只对实体键盘有意义，收在「显示实体键盘设置」后面
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.enabled"
+source = "engine"
+type = "toggle"
+title = "临时英文"
+summary = "中文方案里点 ⇧ 再点字母，临时打一个英文词，打完回到中文"
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.shift_behavior"
+source = "engine"
+type = "select"
+title = "⇧ + 字母的行为"
+summary = "中文模式下点 ⇧ 再点字母时做什么"
+enabled_when = "input.temp_english.enabled"
+options = [
+  { value = "temp_english", label = "进入临时英文" },
+  { value = "direct_commit", label = "直接上屏大写字母" },
+]
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.show_candidates"
+source = "engine"
+type = "toggle"
+title = "显示英文候选"
+summary = "关闭则只留所打原文一条"
+enabled_when = "input.temp_english.enabled"
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.raw_candidate"
+source = "engine"
+type = "select"
+title = "首候选为输入原文"
+summary = "「仅词库词」= 所打字母串本身是词库里的词才作首候选"
+enabled_when = "input.temp_english.enabled"
+options = [
+  { value = "always", label = "总是" },
+  { value = "in_dict", label = "仅词库词" },
+  { value = "off", label = "不显示" },
+]
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.commit_space"
+source = "engine"
+type = "toggle"
+title = "上屏后自动加空格"
+enabled_when = "input.temp_english.enabled"
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.case_variants"
+source = "engine"
+type = "toggle"
+title = "生成大小写变形候选"
+summary = "全小写 / 首字母大写 / 全大写，各占一个候选位"
+enabled_when = "input.temp_english.enabled"
+advanced = true
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.case_follow_input"
+source = "engine"
+type = "toggle"
+title = "候选跟随输入的大小写"
+summary = "⇧ 进入时首字母恒大写，开着时词库候选恒为首字母大写"
+enabled_when = "input.temp_english.enabled"
+advanced = true
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.phrase_seg"
+source = "engine"
+type = "toggle"
+title = "用 ' 分词打英文词组"
+summary = "各段只打前缀。开启后 ' 不再作第三候选键"
+enabled_when = "input.temp_english.enabled"
+advanced = true
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.allow_symbols"
+source = "engine"
+type = "toggle"
+title = "允许输入符号与数字"
+summary = "数字和符号进入缓冲而不是上屏或选词，便于打 C++、x64 一类标识符"
+enabled_when = "input.temp_english.enabled"
+advanced = true
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.shift_when_composing"
+source = "engine"
+type = "select"
+title = "打码时点 ⇧ + 字母"
+summary = "已经打了编码时再点 ⇧ 加字母"
+enabled_when = "input.temp_english.enabled"
+advanced = true
+options = [
+  { value = "buffer", label = "大写字母进入编码" },
+  { value = "commit_enter", label = "上屏候选并进入临时英文" },
+]
+
+[[item]]
+page = "input"
+section = "临时英文"
+key = "input.temp_english.trigger_keys"
+source = "engine"
+type = "select"
+title = "符号触发键"
+summary = "实体键盘：空码时按这个符号键进入临时英文"
+enabled_when = "input.temp_english.enabled"
+hardware = true
+options = [
+  { value = "", label = "不用符号键" },
+  { value = "quote", label = "' 单引号" },
+  { value = "slash", label = "/ 斜杠" },
+  { value = "backslash", label = "\\ 反斜杠" },
 ]
 
 [[item]]
@@ -1440,6 +1688,16 @@ summary = "复制新内容后在候选栏位置显示一条粘贴建议，30 秒
 default = true
 
 # ═══ 高级 ═══════════════════════════════════════════════════════
+
+[[item]]
+page = "advanced"
+section = "实体键盘"
+key = "ui.android.show_hardware_options"
+source = "android"
+type = "toggle"
+title = "显示实体键盘设置"
+summary = "外接键盘 / 平板用户打开：显示只有实体键盘才用得上的项，如各种模式的符号触发键"
+default = false
 
 [[item]]
 page = "advanced"

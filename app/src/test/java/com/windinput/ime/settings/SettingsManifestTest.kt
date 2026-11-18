@@ -140,6 +140,22 @@ class SettingsManifestTest {
         }
     }
 
+    /** 实体键盘专属项靠「显示实体键盘设置」放出来：开关本身得在清单里、是键盘项、出厂关，且开关自己不能被藏起来 */
+    @Test
+    fun hardwareItemsAreGatedByAnAndroidToggle() {
+        val m = bundled
+        val hw = m.items.filter { it.hardware }
+        assertTrue("至少有临时英文 / 临时拼音的触发键", hw.map { it.key }.containsAll(
+            listOf("input.temp_english.trigger_keys", "input.temp_pinyin.trigger_keys"),
+        ))
+        val gate = m.items.firstOrNull { it.key == SettingsValues.HARDWARE_GATE }
+        assertTrue("清单里缺开关 ${SettingsValues.HARDWARE_GATE}", gate != null)
+        assertEquals(SettingSource.ANDROID, gate!!.source)
+        assertEquals("toggle", gate.type)
+        assertEquals(false, gate.defaultValue)
+        assertTrue("开关自己不能是实体键盘项", !gate.hardware)
+    }
+
     /** 分二级页的页：每组都有专属图标，且至少一项（空组会是一个点进去什么都没有的入口） */
     @Test
     fun subpageSectionsHaveIconsAndItems() {
