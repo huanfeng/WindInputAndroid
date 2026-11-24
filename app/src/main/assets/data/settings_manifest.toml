@@ -1725,6 +1725,16 @@ options = [
 
 [[item]]
 page = "keyboard"
+section = "键位"
+key = "ui.android.second_candidate_swipe"
+source = "android"
+type = "toggle"
+title = "空格 / 中英键上滑选第二候选"
+summary = "有编码时，在空格键或中英键上向上滑，等于选第二个候选（原本这两个键的上滑是空的）。没有编码时不起作用；默认关闭"
+default = false
+
+[[item]]
+page = "keyboard"
 section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"

@@ -264,7 +264,7 @@ private const val SECTION_SHUANGPIN = "双拼"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
 internal val RESERVED_SUBPAGES =
-    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS, SUB_PRIVACY)
+    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS, SUB_KEYMAP_EDITOR, SUB_PRIVACY)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -670,6 +670,7 @@ private fun PageScreen(
         if (page.id == "ui") SkinSection()
         if (page.id == "ui") TooltipSectionsSection()
         if (page.id == SettingsActivity.PAGE_KEYBOARD) NumpadSymbolsEntry { onOpenSub(SUB_NUMPAD_SYMBOLS) }
+        if (page.id == SettingsActivity.PAGE_KEYBOARD) KeymapEditorEntry { onOpenSub(SUB_KEYMAP_EDITOR) }
         if (page.id == "advanced") ResetSection(values)
     }
 }
@@ -726,6 +727,7 @@ private fun SubScreen(
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
         page.id == "dict" && sub == DICT_STATS -> DictStatsSection(session)
         page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_NUMPAD_SYMBOLS -> NumpadSymbolsSection()
+        page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_KEYMAP_EDITOR -> KeymapEditorSection()
         page.id == "about" && sub == SUB_PRIVACY -> PrivacySection()
         else -> {
             @Suppress("UNUSED_EXPRESSION") values.version
@@ -741,8 +743,8 @@ private fun SubScreen(
             if (page.id == "schema" && sub == "拼音") SchemaDictsSection("细胞词库", listOf("pinyin", "shuangpin"))
             if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
             if (sub == "联想输入") AssocLearningSection()
-            if (page.id == "input" && sub == SECTION_QUICK_INPUT) {
             if (page.id == SettingsActivity.PAGE_KEYBOARD && sub == KEYMAP_SECTION) KeymapStatusNote()
+            if (page.id == "input" && sub == SECTION_QUICK_INPUT) {
                 QuickSourcesEntry { onOpenSchema(DETAIL_QUICK_SOURCES, DETAIL_QUICK_SOURCES) }
             }
             // Emoji 开着才列附加模块（同电脑版的 enabled_when）

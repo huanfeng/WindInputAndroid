@@ -44,6 +44,7 @@ import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.LayoutTweaks
 import com.windinput.ime.keyboard.keymap.KeymapPresets
+import com.windinput.ime.keyboard.keymap.KeymapMerge
 import com.windinput.ime.keyboard.keymap.KeymapRepository
 import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.IconSet
@@ -163,7 +164,7 @@ class WindInputImeService :
         keymapRepository = KeymapRepository(dirs.keymapFile, presetFile = {
             KeymapPresets.fileFor(userConfig.getString(KeymapPresets.SETTING_KEY, KeymapPresets.DEFAULT))
                 ?.let(dirs::resolveDataFile)
-        })
+        }, editorFile = dirs.keymapEditorFile)
         userConfig = UserConfig(dirs.keyboardConfigFile)
         // 图标：用户目录 icons/ 下的同名 SVG 覆盖内置图标（日后主题包挂同一机制）
         IconSet.init(assets, listOf(File(dirs.mobileDir, "icons")))
@@ -287,7 +288,7 @@ class WindInputImeService :
             listener = this,
             layoutProvider = { layer ->
                 // 用户键位覆盖放在 LayoutTweaks 之后：底行改写会产生新键（合一键 merged_punct），覆盖按 id 认
-                keymapRepository.apply(
+                val merged = keymapRepository.apply(
                     LayoutTweaks.apply(
                         layoutRepository.rows(layer), layer,
                         bottomRow = userConfig.getString("ui.android.bottom_row", LayoutTweaks.BOTTOM_SPLIT),
@@ -295,6 +296,12 @@ class WindInputImeService :
                     ),
                     layer,
                 )
+                // R7：开关（默认关）打开时，空格 / 中英键的空上滑槽在预编辑时选第二候选；用户绑过的不碰
+                if (layer != KeyboardLayer.NUMBER && userConfig.getBoolean(KEY_SECOND_CANDIDATE_SWIPE, false)) {
+                    KeymapMerge.fillSecondCandidate(merged)
+                } else {
+                    merged
+                }
             },
         )
         textEditingWindow = TextEditingWindow(listener = this)
@@ -337,6 +344,7 @@ class WindInputImeService :
     private companion object {
         /** 单手模式：off / left / right；last 记着上次用的那一侧，快捷面板重新打开时回到它 */
         const val KEY_ONE_HAND = "ui.android.one_hand"
+        const val KEY_SECOND_CANDIDATE_SWIPE = "ui.android.second_candidate_swipe"
         const val KEY_ONE_HAND_LAST = "ui.android.one_hand_last"
 
         const val TAG = "WindIme"
@@ -1029,7 +1037,21 @@ class WindInputImeService :
             "para_end" -> onEditAction(TextEditingWindow.EditAction.END)
             "clipboard" -> onOpenPanel(QuickPanelWindow.Target.CLIPBOARD)
             "symbol_page" -> onKeyAction(KeyAction.SymbolPage, shifted = false)
+            "punct_toggle" -> session.runCommand(EngineCmd.TogglePunct)
+            "one_hand" -> onToggleOneHand()
+            // R7：预编辑时选第二候选；没有编码 / 候选不足时什么也不做
+            "candidate_2" -> if (composing && loadedCandidates.size > 1) onCandidateSelected(1)
         }
+    }
+
+    /** keymap.toml 的 phrase：按命令短语编码取第一条启用的，优先用核心现算好的展示文本（日期等） */
+    override fun onKeyPhrase(code: String) {
+        val core = com.windinput.ime.settings.CoreAccess.obtainCore(this) ?: return
+        val hit = runCatching { core.phrases() }.getOrNull()
+            ?.firstOrNull { it.code == code && it.enabled }
+            ?: return
+        val text = hit.preview.ifEmpty { hit.text }
+        if (text.isNotEmpty()) onKeyAction(KeyAction.Commit(text), shifted = false)
     }
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {

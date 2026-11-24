@@ -15,7 +15,7 @@ import com.windinput.ime.keyboard.KeyboardLayer
  * - 单字符的上滑（`char` / 一个字的 `text`）直接写回 [KeyDef.swipeUp]，走原有的气泡、角标与引擎路径；
  *   多字符文本与功能动作落在 [KeyDef.upOut]；下滑只有 [KeyDef.downOut]。
  * - 长按气泡是「每字符一项」的字符串，所以气泡项只收单字符；多字符项跳过并告警。
- * - `template` / `phrase` 与未实现的 `func` 先跳过并告警（阶段 2）。
+ * - 未实现的 `func`（目前只有 history）跳过并告警；`template` / `phrase` 在阶段 2 已支持。
  * - 退格键有自己的手势机，覆盖一律不收。
  */
 object KeymapMerge {
@@ -23,7 +23,9 @@ object KeymapMerge {
     /** 阶段 1 已实现的功能动作；白名单里其余名字（punct_toggle / one_hand / history）等阶段 2 */
     val IMPLEMENTED_FUNCS = setOf(
         "select_all", "cut", "copy", "paste", "undo", "redo", "para_start", "para_end", "clipboard", "symbol_page",
+        "punct_toggle", "one_hand", "candidate_2",
     )
+    // history（输入历史）没有现成的键盘侧入口（核心的「快捷输入历史」是候选来源，不是面板），仍留在白名单里但跳过并告警
 
     /** 功能动作在键帽角标上显示的短名 */
     fun funcLabel(name: String): String = when (name) {
@@ -37,6 +39,10 @@ object KeymapMerge {
         "para_end" -> "行末"
         "clipboard" -> "剪贴板"
         "symbol_page" -> "符号"
+        "punct_toggle" -> "标点"
+        "one_hand" -> "单手"
+        "candidate_2" -> "次选"
+        "history" -> "历史"
         else -> name
     }
 
@@ -111,11 +117,34 @@ object KeymapMerge {
         else -> null
     }
 
-    /** 多字符 Text 与已实现的 Func 可用；Template / Phrase / 未实现的 Func 告警跳过 */
+    /** 角标上显示的短名：文本原样、功能 / 模板 / 短语取各自的名字 */
+    fun outputLabel(o: KeyOutput): String? = when (o) {
+        is KeyOutput.Char -> o.c.toString()
+        is KeyOutput.Text -> o.text
+        is KeyOutput.Func -> funcLabel(o.name)
+        is KeyOutput.Template -> KeyTemplate.label(o.template)
+        is KeyOutput.Phrase -> o.id
+    }
+
+    /**
+     * R7（开关打开时由 Service 调用）：空格 / 中英切换键的上滑本来是空槽，在预编辑时拿它选第二候选。
+     * **只填空槽**：用户在 keymap.toml 里绑过的、或本来就有上滑字符的键不碰；没有编码时 Service 侧什么也不做。
+     */
+    fun fillSecondCandidate(rows: List<List<KeyDef>>): List<List<KeyDef>> = rows.map { row ->
+        row.map { k ->
+            if ((k.action == KeyAction.Space || k.action == KeyAction.SwitchLang) && k.upOut == null && k.swipeUp == null) {
+                k.copy(upOut = KeyOutput.Func("candidate_2"))
+            } else {
+                k
+            }
+        }
+    }
+
+    /** 多字符 Text、Template、Phrase 与已实现的 Func 可用；未实现的 Func 告警跳过 */
     private fun supported(where: String, gesture: String, o: KeyOutput, warn: (String) -> Unit): Boolean = when (o) {
-        is KeyOutput.Text -> true
+        is KeyOutput.Text, is KeyOutput.Template, is KeyOutput.Phrase -> true
         is KeyOutput.Func ->
             if (o.name in IMPLEMENTED_FUNCS) true else false.also { warn("$where.$gesture：功能 ${o.name} 暂未实现，已跳过") }
-        else -> false.also { warn("$where.$gesture：该输出类型暂未实现，已跳过") }
+        else -> false.also { warn("$where.$gesture：该输出类型不支持，已跳过") }
     }
 }

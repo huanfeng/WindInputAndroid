@@ -74,6 +74,23 @@ class KeymapPresetsTest {
     }
 
     @Test
+    fun editorFileSitsBetweenPresetAndHandWrittenFile() {
+        val user = File(tmp.root, "keymap.toml")
+        val editor = File(tmp.root, "keymap_editor.toml")
+        val repo = KeymapRepository(user, {}, editor) { presetFile("cn_marks") }
+        val rows = KeyboardLayouts.qwerty
+        fun swipe(id: String) = repo.apply(rows, KeyboardLayer.LETTERS).flatten().first { it.id == id }.swipeUp
+        assertEquals('《', swipe("z")) // 只有预设
+        editor.writeText("[layer.letters.key.z]\nswipe_up = \"（\"")
+        assertEquals('（', swipe("z")) // 页面的改动盖过预设
+        assertEquals('》', swipe("x")) // 预设里页面没动的键保留
+        user.writeText("[layer.letters.key.z]\nswipe_up = \"〔\"")
+        assertEquals('〔', swipe("z")) // 手写文件最优先
+        user.delete()
+        assertEquals('（', swipe("z"))
+    }
+
+    @Test
     fun noPresetAndNoFileLeavesLayoutUntouched() {
         val repo = KeymapRepository(File(tmp.root, "none.toml"), {})
         assertTrue(repo.apply(KeyboardLayouts.qwerty, KeyboardLayer.LETTERS) === KeyboardLayouts.qwerty)

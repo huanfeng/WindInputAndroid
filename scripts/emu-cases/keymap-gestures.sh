@@ -43,3 +43,24 @@ check "x 下滑全选，再退格：整个输入框清空" "" "$(get_pad_text)"
 adb_q shell rm -f "$KM_DIR/keymap.toml"
 restart_pad
 reset_pad
+
+# ── [96] 模板：z 上滑 = {date}（上屏时现算），与设备上的日期比对 ─────────────────────────
+section "[96] 键位覆盖：z 上滑模板 {date}"
+km_tmp="$(mktemp)"
+cat > "$km_tmp" <<'TOML'
+version = 1
+[layer.letters.key.z]
+swipe_up = { template = "{date}" }
+TOML
+adb_q shell mkdir -p "$KM_DIR"
+adb_q push "$km_tmp" "$KM_DIR/keymap.toml" >/dev/null
+rm -f "$km_tmp"
+restart_pad
+reset_pad
+[[ -n "$(wait_chinese)" ]] || die "中文方案未就绪"
+reset_pad
+km_swipe z -3
+check "z 上滑：上屏设备当天日期" "$(adb_ shell date +%Y-%m-%d | tr -d '\r')" "$(get_pad_text)"
+adb_q shell rm -f "$KM_DIR/keymap.toml"
+restart_pad
+reset_pad

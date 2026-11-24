@@ -85,18 +85,64 @@ class KeymapMergeTest {
     }
 
     @Test
-    fun unimplementedFuncAndTemplateAreSkippedWithWarning() {
+    fun historyFuncIsStillSkippedWithWarning() {
         val warns = mutableListOf<String>()
         val m = merge(
             """
             [layer.letters.key.z]
-            swipe_up = { func = "one_hand" }
-            swipe_down = { template = "{date}" }
+            swipe_up = { func = "history" }
             """.trimIndent(),
             warns,
         )
         assertEquals(key(rows, "z"), key(m, "z"))
-        assertEquals(2, warns.size)
+        assertEquals(1, warns.size)
+    }
+
+    @Test
+    fun templatePhraseAndNewFuncsAreAccepted() {
+        val m = merge(
+            """
+            [layer.letters.key.z]
+            swipe_up = { template = "{date}" }
+            swipe_down = { phrase = "rq" }
+            [layer.letters.key.x]
+            swipe_up = { func = "punct_toggle" }
+            swipe_down = { func = "one_hand" }
+            """.trimIndent(),
+        )
+        assertEquals(KeyOutput.Template("{date}"), key(m, "z").upOut)
+        assertEquals(KeyOutput.Phrase("rq"), key(m, "z").downOut)
+        assertEquals(KeyOutput.Func("punct_toggle"), key(m, "x").upOut)
+        assertEquals(KeyOutput.Func("one_hand"), key(m, "x").downOut)
+    }
+
+    @Test
+    fun outputLabels() {
+        assertEquals("日期", KeymapMerge.outputLabel(KeyOutput.Template("{date}")))
+        assertEquals("rq", KeymapMerge.outputLabel(KeyOutput.Phrase("rq")))
+        assertEquals("标点", KeymapMerge.outputLabel(KeyOutput.Func("punct_toggle")))
+        assertEquals("次选", KeymapMerge.outputLabel(KeyOutput.Func("candidate_2")))
+        assertEquals("《", KeymapMerge.outputLabel(KeyOutput.Text("《")))
+    }
+
+    @Test
+    fun secondCandidateFillsOnlyEmptySlotsOfSpaceAndLangKey() {
+        val filled = KeymapMerge.fillSecondCandidate(rows)
+        val special = filled.flatten().filter { it.action == KeyAction.Space || it.action == KeyAction.SwitchLang }
+        assertTrue(special.isNotEmpty())
+        assertTrue(special.all { it.upOut == KeyOutput.Func("candidate_2") })
+        // 其余键一个字节都不变
+        val others = { l: List<List<KeyDef>> -> l.flatten().filter { it.action != KeyAction.Space && it.action != KeyAction.SwitchLang } }
+        assertEquals(others(rows), others(filled))
+    }
+
+    @Test
+    fun secondCandidateKeepsUserBoundSlot() {
+        val bound = merge("[layer.letters.key.space]\nswipe_up = { func = \"paste\" }")
+        val space = bound.flatten().first { it.action == KeyAction.Space }
+        assertEquals(KeyOutput.Func("paste"), space.upOut)
+        val filled = KeymapMerge.fillSecondCandidate(bound).flatten().first { it.action == KeyAction.Space }
+        assertEquals(KeyOutput.Func("paste"), filled.upOut)
     }
 
     @Test

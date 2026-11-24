@@ -39,6 +39,12 @@ class DataDirs(context: Context) {
     /** 用户键位覆盖（`keymap.toml`，只存差异，见 docs/key-mapping-skin-plan.md）；移动端独有文件名 */
     val keymapFile: File = File(mobileDir, "keymap.toml")
 
+    /**
+     * 设置页「自定义键位」写的差异（同 keymap.toml 格式）。与手写的 keymap.toml 分开存：页面整份重写它，
+     * 不会碰用户手写的内容 / 注释；叠加次序 预设 < 本文件 < keymap.toml（手写的优先）。
+     */
+    val keymapEditorFile: File = File(mobileDir, "keymap_editor.toml")
+
     /** 用户皮肤目录：`skins/<id>/skin.toml`（内置皮肤在 [dataDir]/skins，随 App 升级重放） */
     val userSkinsDir: File = File(mobileDir, "skins")
 

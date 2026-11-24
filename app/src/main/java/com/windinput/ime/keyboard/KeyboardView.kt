@@ -13,6 +13,7 @@ import android.view.View
 import android.widget.OverScroller
 import com.windinput.ime.core.KeyDropStats
 import com.windinput.ime.keyboard.keymap.KeyOutput
+import com.windinput.ime.keyboard.keymap.KeyTemplate
 import com.windinput.ime.keyboard.keymap.KeymapMerge
 
 /**
@@ -61,6 +62,9 @@ class KeyboardView(context: Context) : View(context) {
 
         /** 用户键位覆盖里的功能动作（下滑 / 上滑绑定 select_all、paste 等，名字见 KeymapMerge） */
         fun onKeyFunc(name: String) = Unit
+
+        /** 用户键位覆盖里的短语（keymap.toml 的 phrase = 命令短语的编码）；宿主查短语库后上屏 */
+        fun onKeyPhrase(code: String) = Unit
 
         /** 功能键长按（空格 → 按设置切输入法 / 语音；中英键弹不出菜单时退到这里） */
         fun onKeyLongPress(action: KeyAction)
@@ -743,7 +747,8 @@ class KeyboardView(context: Context) : View(context) {
             val label = displayLabel(key)
             textPaint.textSize = labelSizePx(label)
             val isLetter = (key.action as? KeyAction.Text)?.char?.isLetter() == true
-            val hint = if (isLetter && !showSwipeHints) null else upLabelOf(key)
+            // 预编辑次选（R7）的上滑藏着：空格 / 中英键上常驻一个「次选」角标没意义（没编码时它什么也不做）
+            val hint = if (isLetter && !showSwipeHints || (key.upOut as? KeyOutput.Func)?.name == "candidate_2") null else upLabelOf(key)
             val downHint = if (isLetter && !showSwipeHints) null else downLabelOf(key)
             // 有角标的字母键：主字下移一点，给顶上居中的角标让出位置（豆包的排法）
             val shiftDown = if (hint != null && isLetter) 4 * density else 0f
@@ -1115,17 +1120,15 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 上滑角标 / 气泡上显示的文字：用户覆盖的文本与功能名，或出厂的副字符（按当前中英标点形态） */
     private fun upLabelOf(key: KeyDef): String? = when (val o = key.upOut) {
-        is KeyOutput.Text -> o.text
-        is KeyOutput.Func -> KeymapMerge.funcLabel(o.name)
-        else -> key.swipeFor(englishMode)?.let { Punct.display(it, chinesePunct) }
+        null -> key.swipeFor(englishMode)?.let { Punct.display(it, chinesePunct) }
+        else -> KeymapMerge.outputLabel(o)
     }
 
     private fun downLabelOf(key: KeyDef): String? = when (val o = key.downOut) {
         null -> null
         is KeyOutput.Char -> Punct.display(o.c, chinesePunct)
         is KeyOutput.Text -> if (o.text.length == 1) Punct.display(o.text[0], chinesePunct) else o.text
-        is KeyOutput.Func -> KeymapMerge.funcLabel(o.name)
-        else -> null
+        else -> KeymapMerge.outputLabel(o)
     }
 
     /** 执行上滑 / 下滑绑定的输出：字符走原有的符号动作，多字符文本原样上屏，功能交给宿主 */
@@ -1136,7 +1139,11 @@ class KeyboardView(context: Context) : View(context) {
                 if (o.text.length == 1) listener?.onKeyAction(symbolAction(o.text[0]), shifted = false)
                 else listener?.onKeyAction(KeyAction.Commit(o.text), shifted = false)
             is KeyOutput.Func -> listener?.onKeyFunc(o.name)
-            else -> Unit
+            is KeyOutput.Template -> {
+                val text = KeyTemplate.render(o.template, java.time.LocalDateTime.now())
+                if (text.isNotEmpty()) listener?.onKeyAction(KeyAction.Commit(text), shifted = false)
+            }
+            is KeyOutput.Phrase -> listener?.onKeyPhrase(o.id)
         }
     }
 
