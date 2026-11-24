@@ -983,20 +983,55 @@ private const val EMOJI_SECTION = "Emoji/OpenCC"
 
 // ── 关于 ─────────────────────────────────────────────────────────
 
+/** 「检查更新」行的状态：null = 还没点过（此前不联网） */
+private sealed interface UpdateState {
+    data object Checking : UpdateState
+    data class Done(val result: UpdateCheck.Result) : UpdateState
+}
+
 @Composable
 private fun AboutSection(versionName: String, onOpenSub: (String) -> Unit) {
     var showLicenses by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var collecting by remember { mutableStateOf(false) }
+    var update by remember { mutableStateOf<UpdateState?>(null) }
     Card(modifier = Modifier.fillMaxWidth()) {
         BasicComponent(
             title = "清风输入法",
             summary = "版本 $versionName",
             startAction = { WindInputLogo(Modifier.padding(end = 14.dp).size(40.dp)) },
         )
-        NavRow(SUB_PRIVACY, "不联网，输入与词库只存在本机；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
+        NavRow(SUB_PRIVACY, "输入与词库只存在本机，仅检查更新时联网；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
             onOpenSub(SUB_PRIVACY)
+        }
+        NavRow(
+            "检查更新",
+            when (val u = update) {
+                null -> "点一下才会联网，查询官网上的最新版本"
+                UpdateState.Checking -> "正在检查…"
+                is UpdateState.Done -> when (val r = u.result) {
+                    is UpdateCheck.Result.UpToDate -> "已是最新版本（${r.latest}），点击重新检查"
+                    is UpdateCheck.Result.Available ->
+                        "发现新版本 ${r.latest.version}" +
+                            (if (r.latest.size > 0) "（${r.latest.size / 1048576} MB）" else "") +
+                            "，点击用浏览器下载，下载后点开安装即可覆盖升级"
+                    is UpdateCheck.Result.Failed -> "检查失败：${r.reason}，点击重试"
+                }
+            },
+            icon = SettingsIcons.website,
+        ) {
+            val done = (update as? UpdateState.Done)?.result
+            if (done is UpdateCheck.Result.Available) {
+                Diagnostics.openUrl(context, done.latest.apkUrl)
+                return@NavRow
+            }
+            if (update == UpdateState.Checking) return@NavRow
+            update = UpdateState.Checking
+            scope.launch {
+                val r = withContext(Dispatchers.IO) { UpdateCheck.check(versionName) }
+                update = UpdateState.Done(r)
+            }
         }
         NavRow("反馈问题", "在 GitHub 上提交问题或建议（浏览器打开）", icon = SettingsIcons.feedback) {
             Diagnostics.openIssues(context)

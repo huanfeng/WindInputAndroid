@@ -18,14 +18,17 @@ internal const val WEBSITE_URL = "https://windinput.com/privacy"
 
 /**
  * 隐私政策（纯文本）。每一条都要与代码事实一致，改功能时一起改：
- * - 不联网：清单只申请了 VIBRATE，没有 INTERNET（PrivacyPolicyTest 核对 AndroidManifest）；
+ * - 联网：清单只申请了 VIBRATE 与 INTERNET，INTERNET 只用于「检查更新」，用户点了才请求
+ *   （UpdateCheck；PrivacyPolicyTest 核对 AndroidManifest）；
  * - 备份范围：见 res/xml/backup_rules.xml、data_extraction_rules.xml；
  * - 诊断信息的内容：见 [Diagnostics]。
  */
 internal val PRIVACY_POLICY: List<Pair<String, String>> = listOf(
-    "不联网" to
-        "清风输入法没有申请网络权限，程序本身无法连接互联网：不上传你输入的任何内容，" +
-        "没有云输入、云同步、广告或统计上报。\n" +
+    "联网" to
+        "清风输入法只在你点「关于 → 检查更新」时才联网：向官网（windinput.com）请求一份很小的版本信息，" +
+        "与用浏览器打开网页相同，请求里不带你输入的内容，也不带设备标识。启动、打字、打开设置页时都不联网。\n" +
+        "不上传你输入的任何内容，没有云输入、云同步、广告或统计上报。网络权限可以在系统设置里随时收回，" +
+        "收回后输入功能不受影响，只是检查更新会失败。\n" +
         "「关于」里的「反馈问题」「官网」会交给浏览器打开网页，「分享诊断信息」「导出诊断压缩包」由你在系统分享面板里选择发给谁，" +
         "这些都由你主动发起，经由别的应用完成。",
     "启用时的系统提示" to
@@ -45,6 +48,7 @@ internal val PRIVACY_POLICY: List<Pair<String, String>> = listOf(
         "换机后可以恢复。剪贴板历史、崩溃记录、日志与可重建的缓存不进备份。",
     "权限用途" to
         "· 振动：按键振动反馈（强度可在设置里调，也可关闭）\n" +
+        "· 网络：只用于检查更新，你点了才请求\n" +
         "· 输入法服务：系统要求输入法声明的绑定权限，只有系统能连接它\n" +
         "清风输入法不申请麦克风、通讯录、位置、存储等权限。语音输入是把你转到系统里另装的语音输入法，" +
         "本应用不录音。导入方案、导入导出词库时读写的文件，都由你在系统文件选择器里逐次选定，或由你从别的应用打开 / 分享过来。",

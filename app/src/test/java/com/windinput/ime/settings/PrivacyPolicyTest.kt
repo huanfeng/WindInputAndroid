@@ -13,16 +13,19 @@ class PrivacyPolicyTest {
         .map { it.groupValues[1] }
         .toSet()
 
-    /** 政策写的是「没有申请网络权限」「只申请振动」 */
+    /** 政策写的是「只申请振动与网络（网络仅用于检查更新）」 */
     @Test
-    fun manifestRequestsOnlyVibrate() {
-        assertEquals(setOf("android.permission.VIBRATE"), permissions)
+    fun manifestRequestsOnlyVibrateAndInternet() {
+        assertEquals(
+            setOf("android.permission.VIBRATE", "android.permission.INTERNET"),
+            permissions,
+        )
     }
 
     @Test
     fun policyCoversRequiredTopics() {
         val titles = PRIVACY_POLICY.map { it.first }
-        for (t in listOf("不联网", "启用时的系统提示", "数据只存本地", "权限用途", "删除数据")) {
+        for (t in listOf("联网", "启用时的系统提示", "数据只存本地", "权限用途", "删除数据")) {
             assertTrue("隐私政策缺「$t」", t in titles)
         }
     }

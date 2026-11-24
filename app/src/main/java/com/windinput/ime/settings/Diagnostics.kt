@@ -191,6 +191,14 @@ object Diagnostics {
         return compose(header, logs, CrashLog.last(context), UiTrace.deviceInfo(context) + UiTrace.snapshot(), collectExtraSections())
     }
 
+    /** 交给浏览器打开链接（检查更新的 APK 直链等）。只传 https，别的一律不开。 */
+    fun openUrl(context: Context, url: String) {
+        if (!url.startsWith("https://")) return
+        runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.onFailure { Log.w(TAG, "打不开链接", it) }
+    }
+
     fun openIssues(context: Context) {
         runCatching {
             context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ISSUE_URL)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

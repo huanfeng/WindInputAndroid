@@ -4,6 +4,10 @@
     <!-- 按键振动强度可调：系统 performHapticFeedback 的强度定死，要自己调振动器（KeyHaptics） -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
+    <!-- 只用于「关于 → 检查更新」：用户点了才请求官网的版本信息，其余时间不联网（UpdateCheck）。
+         用户可在系统设置里收回，收回后输入功能不受影响 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- 系统备份：设置与个人词库进备份，剪贴板历史、出厂数据、缓存不进（见 res/xml/backup_rules.xml） -->
     <application
         android:name=".WindInputApp"
