@@ -613,6 +613,7 @@ private fun pageSummary(
             ?: schemaState?.activeName?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
         "dict" -> "我的词条 · 添加词条 · 命令短语 · 词库统计"
+        "sync" -> "WebDAV / S3 · 口令加密 · 多设备"
         "about" -> "版本 $versionName"
         else -> sectionList(manifest, page.id)
     }
@@ -643,6 +644,7 @@ private fun PageScreen(
         "schema" -> SchemaSection(schemaState, onOpenSub)
         "stats" -> StatsSection()
         "dict" -> DictOverview(session, onOpen = onOpenSub)
+        "sync" -> SyncSection()
         "about" -> AboutSection(versionName, onOpenSub)
     }
     @Suppress("UNUSED_EXPRESSION") values.version // 开关变了，依赖它的项跟着显示 / 隐藏
@@ -1006,7 +1008,7 @@ private fun AboutSection(versionName: String, onOpenSub: (String) -> Unit) {
             summary = "版本 $versionName",
             startAction = { WindInputLogo(Modifier.padding(end = 14.dp).size(40.dp)) },
         )
-        NavRow(SUB_PRIVACY, "输入与词库只存在本机，仅检查更新时联网；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
+        NavRow(SUB_PRIVACY, "输入与词库只存在本机；检查更新、启用数据同步后才联网；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
             onOpenSub(SUB_PRIVACY)
         }
         NavRow(

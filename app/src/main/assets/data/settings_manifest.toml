@@ -94,6 +94,13 @@ title = "高级"
 segment = "tail"
 icon = "Settings"
 
+# 数据同步页整页由代码画（SyncSection），清单里只登记入口，没有设置项
+[[page]]
+id = "sync"
+title = "数据同步"
+segment = "tail"
+icon = "Backup"
+
 [[page]]
 id = "about"
 title = "关于"

@@ -48,7 +48,7 @@ import top.yukonga.miuix.kmp.icon.extended.Unlock
 object SettingsIcons {
 
     /** 清单 `icon` 可写的名字（与 [byName] 同步；单测用它核对清单，免得在 JVM 上构造矢量图） */
-    val PAGE_ICON_NAMES = setOf("Layers", "Tune", "Theme", "Months", "Notes", "GridView", "Tasks", "Paste", "Settings", "Info")
+    val PAGE_ICON_NAMES = setOf("Layers", "Tune", "Theme", "Months", "Notes", "GridView", "Tasks", "Paste", "Settings", "Info", "Backup")
 
     /** 有专属图标的二级入口名（与 [bySection] 同步） */
     val SECTION_ICON_NAMES = setOf(
@@ -69,6 +69,7 @@ object SettingsIcons {
             "Paste" to MiuixIcons.Paste,
             "Settings" to MiuixIcons.Settings,
             "Info" to MiuixIcons.Info,
+            "Backup" to MiuixIcons.Backup,
         )
     }
 
@@ -109,6 +110,8 @@ object SettingsIcons {
     val clear: ImageVector get() = MiuixIcons.Delete
     val backup: ImageVector get() = MiuixIcons.Backup
     val import: ImageVector get() = MiuixIcons.Import
+    val refresh: ImageVector get() = MiuixIcons.Refresh
+    val export: ImageVector get() = MiuixIcons.Send
     val licenses: ImageVector get() = MiuixIcons.Share
 
     // 「关于」与「高级」里代码画的行

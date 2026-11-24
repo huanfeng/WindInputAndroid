@@ -14,7 +14,7 @@ class SettingsManifestTest {
     @Test
     fun homeHasThreeSegmentsInDesignOrder() {
         assertEquals(
-            listOf("schema", "input", "ui", "stats", "dict", "keyboard", "keys", "toolbar", "advanced", "about"),
+            listOf("schema", "input", "ui", "stats", "dict", "keyboard", "keys", "toolbar", "advanced", "sync", "about"),
             bundled.pages.map { it.id },
         )
         assertEquals(listOf("shared", "android", "tail"), bundled.pages.map { it.segment }.distinct())
