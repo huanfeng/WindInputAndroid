@@ -303,7 +303,8 @@ private class SyncUiState {
         return SyncHub.get(core, (context.applicationContext as WindInputApp).dataDirs)
     }
 
-    suspend fun reload(context: Context) {
+    /** [keepDraft]：操作失败时保留用户正在编辑的草稿，只刷新基线与状态 */
+    suspend fun reload(context: Context, keepDraft: Boolean = false) {
         val loaded = withContext(Dispatchers.IO) {
             handle(context)?.let { h ->
                 // 本机名称默认取机型名：首次进页就写下，别的设备的列表里才认得出
@@ -324,7 +325,7 @@ private class SyncUiState {
             return
         }
         baseJson = loaded.first
-        draft = SyncModel.parseSettings(loaded.first)
+        if (!keepDraft) draft = SyncModel.parseSettings(loaded.first)
         status = SyncModel.parseStatus(loaded.second)
     }
 
@@ -350,7 +351,7 @@ private class SyncUiState {
             }
             busy = false
             message = result.first.ifEmpty { null }
-            runCatching { reload(context) }
+            runCatching { reload(context, keepDraft = result.second) }
         }
     }
 
