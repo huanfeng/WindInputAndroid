@@ -1,5 +1,7 @@
 package com.windinput.ime.keyboard
 
+import com.windinput.ime.skin.SkinGeometry
+
 import com.windinput.ime.keyboard.keymap.KeyOutput
 
 /**
@@ -133,23 +135,51 @@ object KeyboardDimens {
     /** 空格移光标 / 退格扩选的步进距离（dp） */
     const val CURSOR_STEP_DP = 12f
 
+    /**
+     * 当前生效的几何（皮肤 + 用户调节），由 Service 在构造输入视图前注入（与 [rowHeightDp] 同一种
+     * 「Service 注入、视图取用」的模式）。默认值 = 出厂常量，所以不动设置的人看到的键盘与此前逐像素一致。
+     * 键盘与面板（符号页、编辑面板）都从这里取数，两边才对得齐。
+     */
+    @Volatile
+    var geometry: SkinGeometry = SkinGeometry()
+
+    /** 键帽高度的下限（dp）：再矮就没法点了。旧版横屏行高最低 36dp，所以不能卡 40 */
+    const val MIN_KEY_HEIGHT_DP = 36f
+
     // ── 键帽几何：KeyboardView 画键与面板里的键帽格子（符号页）共用，两边才对得齐 ──
 
-    /** 键与键横向间隙的一半（dp）：两键之间共 5.4dp */
-    const val KEY_GAP_DP = 2.7f
+    /** 键与键横向间隙的一半（dp）：默认两键之间共 5.4dp */
+    val KEY_GAP_DP: Float get() = geometry.keyGapHalfDp
 
     /** 键区离视图左右边缘的留白（dp）：加上半个键间隙，首末键离屏幕边约 16px，不贴边、少误点 */
-    const val EDGE_PAD_DP = 3.4f
+    val EDGE_PAD_DP: Float get() = geometry.edgePadDp
 
-    /** 键帽圆角（dp） */
-    const val KEY_RADIUS_DP = 8f
+    /** 键帽圆角（dp）；实际绘制再按键帽高度钳到半高以内，见 [keyRadiusPx] */
+    val KEY_RADIUS_DP: Float get() = geometry.keyRadiusDp
 
-    /** 键帽高度（dp）；行高减去它就是上下两行之间的间隙（60 − 51 = 9dp ≈ 24px） */
-    const val KEY_HEIGHT_DP = 51f
+    /** 键帽高度（dp）：只在行间距未被用户固定时参与（行高减它 = 行间距，默认 60 − 51 = 9dp） */
+    val KEY_HEIGHT_DP: Float get() = geometry.keyHeightDp
 
-    /** 键与键纵向间隙的一半（px）：行高减键帽高，至少留 2dp */
-    fun keyGapVPx(density: Float): Float =
-        (rowHeightPx(density) - KEY_HEIGHT_DP * density).coerceAtLeast(2 * density) / 2
+    /**
+     * 键与键纵向间隙的一半（px）。
+     * - 行间距没被固定（默认）：沿用旧推导「行高减键帽高」，至少 2dp——旧用户调过行高的观感不变；
+     * - 行间距被固定（用户在外观里调过）：间隙就是它，键帽高 = 行高 − 间隙，并保证键帽不低于
+     *   [MIN_KEY_HEIGHT_DP]、间隙不小于 2dp。调间距不改行高，所以整体高度不变。
+     */
+    fun keyGapVPx(density: Float): Float {
+        val min = 2 * density
+        if (!geometry.rowGapFixed) {
+            return (rowHeightPx(density) - KEY_HEIGHT_DP * density).coerceAtLeast(min) / 2
+        }
+        val max = (rowHeightPx(density) - MIN_KEY_HEIGHT_DP * density).coerceAtLeast(min)
+        return (geometry.rowGapDp * density).coerceIn(min, max) / 2
+    }
+
+    /** 键帽圆角（px），钳到键帽半高以内（再大就是药丸形，不会画出怪形状） */
+    fun keyRadiusPx(density: Float): Float {
+        val keyHeight = rowHeightPx(density) - 2 * keyGapVPx(density)
+        return (KEY_RADIUS_DP * density).coerceIn(0f, keyHeight / 2)
+    }
 
     /** 条区编码行高度（dp）；横屏收矮，见 [BarView] */
     var barPreeditDp: Float = 19f

@@ -270,10 +270,13 @@ class KeyboardView(context: Context) : View(context) {
     /** 键区离视图左右边缘的留白：加上半个键间隙，首末键离屏幕边约 16px，不贴边、少误点 */
     private val edgePadPx = KeyboardDimens.EDGE_PAD_DP * density
     private val padTopPx = KeyboardDimens.PAD_TOP_DP * density
-    private val keyRadiusPx = KeyboardDimens.KEY_RADIUS_DP * density
+    private val keyRadiusPx = KeyboardDimens.keyRadiusPx(density)
     private val swipeThresholdPx = KeyboardDimens.SWIPE_THRESHOLD_DP * density
     private val swipeActivatePx = KeyboardDimens.SWIPE_ACTIVATE_DP * density
     private val cursorStepPx = KeyboardDimens.CURSOR_STEP_DP * density
+
+    /** 键面字号倍率（外观里调）；几何变了整个输入视图重建，构造时取一次 */
+    private val labelScale = KeyboardDimens.geometry.labelScale
 
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -287,7 +290,7 @@ class KeyboardView(context: Context) : View(context) {
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = hintColor
         textAlign = Paint.Align.RIGHT
-        textSize = 11 * density
+        textSize = 11 * density * labelScale
     }
 
     /** 每次 layout 重算的键位命中区域；[row] 用于落在空白处时找同一行最近的键 */
@@ -813,11 +816,11 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 两个字以上的功能键（换行 / 发送 / 分词 / 123）字号收小，免得挤出键帽 */
     private fun labelSizePx(label: String): Float =
-        (if (label.length >= 2) 16 else 20) * density
+        (if (label.length >= 2) 16 else 20) * density * labelScale
 
     private val smallPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = hintColor
-        textSize = 12 * density
+        textSize = 12 * density * labelScale
     }
 
     private fun drawCentered(canvas: Canvas, text: String, rect: RectF, paint: Paint) {
@@ -839,14 +842,14 @@ class KeyboardView(context: Context) : View(context) {
             rect.top + rect.height() * 0.50f,
             textPaint,
         )
-        smallPaint.textSize = 11 * density
+        smallPaint.textSize = 11 * density * labelScale
         canvas.drawText(
             minor,
             rect.left + rect.width() * 0.52f,
             rect.top + rect.height() * 0.80f,
             smallPaint,
         )
-        smallPaint.textSize = 12 * density
+        smallPaint.textSize = 12 * density * labelScale
     }
 
     /**

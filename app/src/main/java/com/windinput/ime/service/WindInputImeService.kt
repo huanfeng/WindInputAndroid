@@ -242,9 +242,10 @@ class WindInputImeService :
         // 否则按旧宽度和坐标留在新视图上（首次卡片点外面不收，会一直挂着）
         candidateMenu?.dismiss()
         schemaPicker?.dismiss()
+        // 皮肤先于几何：几何 = 皮肤的几何 + 用户在外观里调的旋钮
+        skinStore.activate()
         applyKeyboardDimens()
         // 深浅色：uiMode 变化会让系统重跑本方法，下面所有视图都按新调色板构造
-        skinStore.activate()
         Palette.apply(this, userConfig.getString("ui.android.theme", "system"))
         // 根视图自理手势条/导航栏避让（IME 窗口不吃系统自动 padding）
         val root = InputRootView(this)
@@ -500,10 +501,14 @@ class WindInputImeService :
     /** 横竖屏独立键高（twinInt 模式）：旋转会触发 onCreateInputView 重建，天然生效 */
     private fun applyKeyboardDimens() {
         KeyboardDimens.rowHeightDp = configuredRowHeightDp()
+        KeyboardDimens.geometry = effectiveGeometry()
         val (preedit, main) = barDims()
         KeyboardDimens.barPreeditDp = preedit
         KeyboardDimens.barMainRowDp = main
     }
+
+    /** 皮肤几何 + 用户调的旋钮（没调过就是皮肤原样，出厂外观不变） */
+    private fun effectiveGeometry() = skinStore.geometryAdjust().applyTo(com.windinput.ime.skin.SkinRuntime.active.geometry)
 
     /** 设置里当前方向对应的键行高（dp） */
     private fun configuredRowHeightDp(): Int {
@@ -563,6 +568,7 @@ class WindInputImeService :
         skinStore.activate()
         if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current ||
             configuredRowHeightDp() != KeyboardDimens.rowHeightDp ||
+            effectiveGeometry() != KeyboardDimens.geometry ||
             barDims() != (KeyboardDimens.barPreeditDp to KeyboardDimens.barMainRowDp)
         ) {
             UiTrace.add(UiTrace.REBUILD, "输入视图按设置/配色变化重建")

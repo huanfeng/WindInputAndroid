@@ -68,4 +68,5 @@ internal fun SkinSection() {
             }
         }
     }
+    GeometrySection()
 }

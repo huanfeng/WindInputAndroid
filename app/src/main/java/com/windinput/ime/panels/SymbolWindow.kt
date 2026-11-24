@@ -270,7 +270,7 @@ internal fun keyCell(context: Context, label: String, face: Int, textColor: Int)
     val gapV = KeyboardDimens.keyGapVPx(density).toInt()
     fun face(color: Int) = InsetDrawable(
         GradientDrawable().apply {
-            cornerRadius = KeyboardDimens.KEY_RADIUS_DP * density
+            cornerRadius = KeyboardDimens.keyRadiusPx(density)
             setColor(color)
         },
         gapH, gapV, gapH, gapV,

@@ -55,20 +55,19 @@ class SkinStore(
         return out
     }
 
-    fun activeId(): String {
-        if (!prefsFile.isFile) return DEFAULT_ID
-        return try {
-            val id = org.tomlj.Toml.parse(prefsFile.readText()).getString("active")
-            if (id != null && (id == DEFAULT_ID || ID_OK.matches(id))) id else DEFAULT_ID
-        } catch (e: Exception) {
-            DEFAULT_ID
-        }
-    }
+    fun activeId(): String = SkinPrefsFile.read(prefsFile).active
 
     fun setActive(id: String) {
         require(id == DEFAULT_ID || ID_OK.matches(id)) { "皮肤 id 不合法：$id" }
-        prefsFile.parentFile?.mkdirs()
-        prefsFile.writeText("version = 1\nactive = \"$id\"\n")
+        SkinPrefsFile.write(prefsFile, SkinPrefsFile.read(prefsFile).copy(active = id))
+    }
+
+    /** 用户调的几何旋钮（没调过 = 空）；叠到 [SkinRuntime.active] 的几何上用 [GeometryAdjust.applyTo] */
+    fun geometryAdjust(): GeometryAdjust = SkinPrefsFile.read(prefsFile).adjust
+
+    /** 写入几何旋钮并保留所选皮肤；全 null = 恢复默认（段落一并删掉） */
+    fun setGeometryAdjust(adjust: GeometryAdjust) {
+        SkinPrefsFile.write(prefsFile, SkinPrefsFile.read(prefsFile).copy(adjust = adjust))
     }
 
     /**

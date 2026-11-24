@@ -96,6 +96,10 @@ data class SkinGeometry(
     val cursorStepDp: Float = 12f,
     val barPreeditDp: Float = 19f,
     val barMainRowDp: Float = 38f,
+    /** 键面字号倍率（主字、角标）；用户在外观里调，皮肤文件不写它 */
+    val labelScale: Float = 1f,
+    /** 行间距由用户固定：true 时键纵向间隙 = [rowGapDp]（键帽高 = 行高 − 间隙），false 时沿用旧推导（行高 − [keyHeightDp]） */
+    val rowGapFixed: Boolean = false,
 ) {
     /** 两键横向间隙（整数口径，= skin.toml 的 key_gap_h） */
     val keyGapHDp: Float get() = keyGapHalfDp * 2
