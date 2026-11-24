@@ -6,6 +6,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.widget.LinearLayout
 import com.windinput.ime.core.UiTrace
+import com.windinput.ime.skin.SkinBackground
 
 /**
  * 输入法根视图：候选条 + 面板区的容器，负责**手势导航条/导航栏避让**。
@@ -59,8 +60,9 @@ class InputRootView(context: Context) : LinearLayout(context) {
 
     init {
         orientation = VERTICAL
-        // 与键盘同色，否则底部露出异色带
-        setBackgroundColor(Palette.current.background)
+        // 与键盘同色，否则底部露出异色带。根视图只画这一个背景 Drawable（皮肤背景的收口点，
+        // 将来渐变 / 图片换 SkinBackground 的实现即可）；纯色时各子视图仍刷实色，外观不变
+        background = SkinBackground.Solid(Palette.current.background).toDrawable()
         fitsSystemWindows = false
         addView(bottomSpacer, LayoutParams(LayoutParams.MATCH_PARENT, insetBottom))
         // 诊断：布局落定后的实测高度。空白是我们垫的（spacer 高）还是系统给的窗口比内容大
