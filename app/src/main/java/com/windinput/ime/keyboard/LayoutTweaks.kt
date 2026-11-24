@@ -26,6 +26,7 @@ object LayoutTweaks {
         enText = '.',
         enSwipeUp = ',',
         longPress = ",.;:\"'\\?!^",
+        id = "merged_punct",
     )
 
     fun apply(rows: List<List<KeyDef>>, layer: KeyboardLayer, bottomRow: String, numberPage: String): List<List<KeyDef>> =

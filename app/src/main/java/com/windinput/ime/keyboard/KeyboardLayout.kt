@@ -65,6 +65,11 @@ data class KeyDef(
     val rowSpan: Int = 1,
     /** 强调色键面（123 层、数字键盘左下角的返回键，两家都用强调色） */
     val isAccent: Boolean = false,
+    /**
+     * 稳定 id（用户键位覆盖的锚点），规则见 [LayoutIds]。构造处不必写：解析布局 / 内置布局出口统一补齐；
+     * 空串 = 尚未分配。只是标识，不参与任何绘制与手势逻辑。
+     */
+    val id: String = "",
 ) {
     /** 按当前模式取点按输出的字符；非字符键为 null */
     fun textFor(english: Boolean): Char? =
@@ -195,7 +200,7 @@ object KeyboardLayouts {
     )
 
     /** 内置 qwerty 主布局（26 键，上滑/长按副字符） */
-    val qwerty: List<List<KeyDef>> = listOf(
+    val qwerty: List<List<KeyDef>> = LayoutIds.assign(listOf(
         charKeys("qwertyuiop", "1234567890"),
         listOf(halfSpacer) + charKeys("asdfghjkl", "~!@#%\"”*?", "     '&  ") + listOf(halfSpacer),
         buildList {
@@ -204,14 +209,14 @@ object KeyboardLayouts {
             add(KeyDef("⌫", KeyAction.Backspace, widthWeight = 1.5f, isSpecial = true))
         },
         lettersBottomRow,
-    )
+    ))
 
     /**
      * 123 层，按两家的形态（docs/android-ime-features.md §14.2）。标点一律写 ASCII，
      * 中文模式下显示「：（）…“」等中文形态。第 3 行最后一个是**半角句点**（原样上屏，
      * 打小数用）；英文模式下它改出分号，免得一行里两个句点。
      */
-    val symbols: List<List<KeyDef>> = listOf(
+    val symbols: List<List<KeyDef>> = LayoutIds.assign(listOf(
         charKeys("1234567890"),
         buildList {
             addAll(charKeys("-/:~()"))
@@ -236,7 +241,7 @@ object KeyboardLayouts {
             KeyDef("空格", KeyAction.Space, widthWeight = 5.1f),
             KeyDef("换行", KeyAction.Enter, widthWeight = 1.4f, isSpecial = true),
         ),
-    )
+    ))
 
     private fun digit(c: Char) = KeyDef(c.toString(), KeyAction.Commit(c.toString()), widthWeight = 1.4f)
     private val sideSpacer = KeyDef("", KeyAction.Spacer)
@@ -246,7 +251,7 @@ object KeyboardLayouts {
      * （见 KeyboardView.sideSymbols）；「换行」占两行，第 4 行同一位置是等宽占位。
      * 数字和句点都原样上屏，不经引擎。
      */
-    val number: List<List<KeyDef>> = listOf(
+    val number: List<List<KeyDef>> = LayoutIds.assign(listOf(
         listOf(sideSpacer, digit('1'), digit('2'), digit('3'),
             KeyDef("⌫", KeyAction.Backspace, isSpecial = true)),
         listOf(sideSpacer, digit('4'), digit('5'), digit('6'),
@@ -260,7 +265,7 @@ object KeyboardLayouts {
             KeyDef(".", KeyAction.Commit("."), widthWeight = 1.4f),
             sideSpacer,
         ),
-    )
+    ))
 
     fun rows(layer: KeyboardLayer): List<List<KeyDef>> = when (layer) {
         KeyboardLayer.LETTERS -> qwerty

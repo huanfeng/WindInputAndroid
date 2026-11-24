@@ -59,7 +59,7 @@ class LayoutRepository(private val resolve: (String) -> File?) {
         val id = layerToId.getValue(layer)
         if (file != null) {
             try {
-                val parsed = LayoutParser.parse(file.readText())
+                val parsed = LayoutParser.parse(file.readText()) { Log.w(TAG, "layout $id: $it") }
                 if (parsed.isNotEmpty()) return parsed
                 Log.w(TAG, "layout $id empty, fallback to builtin")
             } catch (e: Exception) {
@@ -76,7 +76,8 @@ class LayoutRepository(private val resolve: (String) -> File?) {
  */
 object LayoutParser {
 
-    fun parse(toml: String): List<List<KeyDef>> {
+    /** @param warn 非致命问题（如 id 重复）的日志出口；纯 JVM 单测里默认丢弃 */
+    fun parse(toml: String, warn: (String) -> Unit = {}): List<List<KeyDef>> {
         val result = Toml.parse(toml)
         if (result.hasErrors()) {
             throw IllegalArgumentException(
@@ -84,9 +85,10 @@ object LayoutParser {
             )
         }
         val rowsArray = result.getArray("rows") ?: return emptyList()
-        return (0 until rowsArray.size()).map { i ->
-            parseRow(rowsArray.getTable(i))
-        }
+        return LayoutIds.assign(
+            (0 until rowsArray.size()).map { i -> parseRow(rowsArray.getTable(i)) },
+            warn,
+        )
     }
 
     /**
@@ -121,7 +123,7 @@ object LayoutParser {
             val entry = keys.getTable(i)
 
             number(entry, "spacer")?.let { w ->
-                add(KeyDef("", KeyAction.Spacer, w))
+                add(KeyDef("", KeyAction.Spacer, w, id = entry.getString("id") ?: ""))
                 continue
             }
 
@@ -147,6 +149,7 @@ object LayoutParser {
                         width,
                         enText = entry.getString("en_text")?.firstOrNull(),
                         rowSpan = rowSpan,
+                        id = entry.getString("id") ?: "",
                     ),
                 )
                 continue
@@ -164,6 +167,7 @@ object LayoutParser {
                         longPress = longPress,
                         enText = entry.getString("en_text")?.firstOrNull(),
                         enSwipeUp = entry.getString("en_swipe_up")?.firstOrNull(),
+                        id = entry.getString("id") ?: "",
                     ),
                 )
                 continue
@@ -186,7 +190,12 @@ object LayoutParser {
             // 功能键缺省灰底；空格缺省画成字母键的白底（豆包 / 微信都是白空格）。`special` 显式覆盖：
             // 九宫格里的小空格是灰的功能键。此前这里一律 isSpecial，字母层的长空格成了灰键
             val special = entry.getBoolean("special") ?: (action != KeyAction.Space)
-            add(KeyDef(label, action, width, isSpecial = special, rowSpan = rowSpan, isAccent = accent))
+            add(
+                KeyDef(
+                    label, action, width, isSpecial = special, rowSpan = rowSpan, isAccent = accent,
+                    id = entry.getString("id") ?: "",
+                ),
+            )
         }
     }
 }

@@ -2,6 +2,7 @@ package com.windinput.ime.keyboard
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -106,6 +107,8 @@ class LayoutParserTest {
             assertEquals("$file row $i accent", builtin[i].map { it.isAccent }, bundled[i].map { it.isAccent })
             // 键底色（功能键灰、字母与空格白）也要一致：此前文件里的空格被解析成灰键，内置是白键
             assertEquals("$file row $i special", builtin[i].map { it.isSpecial }, bundled[i].map { it.isSpecial })
+            // 键位 id 也要一致：覆盖按 id 定位，随包与内置两套 id 不同会让覆盖在回退时悄悄失效
+            assertEquals("$file row $i id", builtin[i].map { it.id }, bundled[i].map { it.id })
         }
     }
 
@@ -174,5 +177,70 @@ class LayoutParserTest {
         for ((i, row) in KeyboardLayouts.qwerty.withIndex()) {
             assertEquals("row $i", 10f, row.sumOf { it.widthWeight.toDouble() }.toFloat(), 0.001f)
         }
+    }
+
+    // ── 稳定 id（用户键位覆盖的锚点，见 LayoutIds）──
+
+    private fun ids(file: String): List<String> =
+        LayoutParser.parse(File("src/main/assets/data/layouts/$file").readText()).flatten().map { it.id }
+
+    @Test
+    fun idsAreUniqueNonBlankInEveryBundledLayout() {
+        for (f in listOf("qwerty.toml", "symbols.toml", "number.toml")) {
+            val all = ids(f)
+            assertTrue("$f 有空 id", all.none { it.isBlank() })
+            assertEquals("$f id 重复", all.size, all.toSet().size)
+        }
+    }
+
+    /** 钉死出厂 id 集合：以后无意改键面 / 顺序导致 id 变化，用户的覆盖会静默失效，这里要红 */
+    @Test
+    fun qwertyIdsAreStable() {
+        val all = ids("qwerty.toml")
+        assertEquals(
+            listOf("q", "w", "e", "r", "t", "y", "u", "i", "o", "p"),
+            all.take(10),
+        )
+        val set = all.toSet()
+        for (c in "asdfghjklzxcvbnm") assertTrue("缺字母键 $c", c.toString() in set)
+        for (id in listOf("shift", "backspace", "symbol_page", "switch_symbols", "comma", "space", "period", "switch_lang", "enter")) {
+            assertTrue("缺功能键 $id", id in set)
+        }
+        // 半宽占位：spacer、spacer-2（出现顺序）
+        assertTrue("spacer" in set && "spacer-2" in set)
+    }
+
+    @Test
+    fun symbolsAndNumberIdsAreStable() {
+        val sym = ids("symbols.toml").toSet()
+        for (id in listOf("1", "0", "number_pad", "backspace", "symbol_page", "switch_symbols", "emoji", "space", "enter", "c_period", "x5c")) {
+            assertTrue("symbols 缺 $id", id in sym)
+        }
+        val num = ids("number.toml").toSet()
+        for (id in listOf("c_1", "c_0", "c_9", "backspace", "space", "enter", "symbol_page", "switch_symbols", "c_period", "spacer")) {
+            assertTrue("number 缺 $id", id in num)
+        }
+    }
+
+    @Test
+    fun explicitIdWinsAndDuplicatesFallBackWithWarning() {
+        val warnings = mutableListOf<String>()
+        val rows = LayoutParser.parse(
+            """
+            [[rows]]
+            key = [ { text = "a", id = "mine" }, { text = "b", id = "mine" }, { text = "mine" } ]
+            """.trimIndent(),
+            warnings::add,
+        )
+        assertEquals("mine", rows[0][0].id)
+        assertEquals("b", rows[0][1].id)
+        assertEquals(1, warnings.size)
+        assertEquals(3, rows[0].map { it.id }.toSet().size)
+    }
+
+    @Test
+    fun derivedIdsGetOccurrenceSuffixOnCollision() {
+        val rows = LayoutParser.parse("[[rows]]\nkeys = \"aa\"\n[[rows]]\nkeys = \"a\"\n")
+        assertEquals(listOf("a", "a-2", "a-3"), rows.flatten().map { it.id })
     }
 }

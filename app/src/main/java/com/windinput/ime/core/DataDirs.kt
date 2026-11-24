@@ -36,6 +36,9 @@ class DataDirs(context: Context) {
     /** 移动端独有的用户层目录：keyboard.toml、layouts/、icons/（引擎不读） */
     val mobileDir: File = File(userRoot, "mobile")
 
+    /** 用户键位覆盖（`keymap.toml`，只存差异，见 docs/key-mapping-skin-plan.md）；移动端独有文件名 */
+    val keymapFile: File = File(mobileDir, "keymap.toml")
+
     /** 键盘自己的配置（`ui.android.*`）；叫 keyboard.toml 而不是 config.toml，是为了不与 PC / 引擎的 config.toml 同名 */
     val keyboardConfigFile: File = File(mobileDir, "keyboard.toml")
 
