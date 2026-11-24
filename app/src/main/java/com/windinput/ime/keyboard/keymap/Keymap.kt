@@ -51,6 +51,24 @@ data class KeymapParseResult(
     fun overrideFor(layer: String, keyId: String, gesture: Gesture): GestureOverride? =
         layers[layer]?.get(keyId)?.get(gesture)
 
+    /**
+     * 用 [over] 逐手势覆盖本结果（本结果是底，如预设；[over] 是用户的 keymap.toml）。
+     * 版本与 [tooNew] 取 [over] 的：预设是随包出厂的，只有用户文件可能来自更新版本。
+     */
+    fun overlaid(over: KeymapParseResult): KeymapParseResult {
+        if (over.layers.isEmpty()) return over.copy(layers = layers, warnings = warnings + over.warnings)
+        if (layers.isEmpty()) return over
+        val merged = LinkedHashMap<String, Map<String, Map<Gesture, GestureOverride>>>()
+        for (layer in layers.keys + over.layers.keys) {
+            val keys = LinkedHashMap<String, Map<Gesture, GestureOverride>>()
+            val a = layers[layer].orEmpty()
+            val b = over.layers[layer].orEmpty()
+            for (k in a.keys + b.keys) keys[k] = a[k].orEmpty() + b[k].orEmpty()
+            merged[layer] = keys
+        }
+        return KeymapParseResult(over.version, over.tooNew, merged, warnings + over.warnings)
+    }
+
     companion object {
         val EMPTY = KeymapParseResult(1, false, emptyMap(), emptyList())
     }

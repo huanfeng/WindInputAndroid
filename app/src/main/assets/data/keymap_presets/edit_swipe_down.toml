@@ -1,0 +1,12 @@
+# 预设「下滑编辑」：z x c v 下滑 = 全选 / 剪切 / 复制 / 粘贴（参考主流输入法的皮肤做法）。
+# 只加下滑，不动任何上滑符号。
+version = 1
+
+[layer.letters.key.z]
+swipe_down = { func = "select_all" }
+[layer.letters.key.x]
+swipe_down = { func = "cut" }
+[layer.letters.key.c]
+swipe_down = { func = "copy" }
+[layer.letters.key.v]
+swipe_down = { func = "paste" }

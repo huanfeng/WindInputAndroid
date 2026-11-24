@@ -1,0 +1,16 @@
+# 预设「中文括号」：字母行 z x c v b n 的上滑改成 （ ） 【 】 〔 〕。
+# 括号成对出现，不依赖自动配对；只写差异，用户 keymap.toml 逐手势覆盖本预设。
+version = 1
+
+[layer.letters.key.z]
+swipe_up = "（"
+[layer.letters.key.x]
+swipe_up = "）"
+[layer.letters.key.c]
+swipe_up = "【"
+[layer.letters.key.v]
+swipe_up = "】"
+[layer.letters.key.b]
+swipe_up = "〔"
+[layer.letters.key.n]
+swipe_up = "〕"

@@ -1709,6 +1709,22 @@ options = [
 
 [[item]]
 page = "keyboard"
+section = "键位"
+key = "ui.android.keymap_preset"
+source = "android"
+type = "select"
+title = "上滑 / 下滑符号方案"
+summary = "默认是出厂键位，一个键都不改。其它方案只改上滑符号或加下滑编辑；mobile/keymap.toml 里手写的改动优先于方案"
+default = "default"
+options = [
+  { value = "default", label = "默认" },
+  { value = "cn_marks", label = "中文书名号与引号" },
+  { value = "cn_brackets", label = "中文括号" },
+  { value = "edit_swipe_down", label = "下滑编辑（全选 / 剪切 / 复制 / 粘贴）" },
+]
+
+[[item]]
+page = "keyboard"
 section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"

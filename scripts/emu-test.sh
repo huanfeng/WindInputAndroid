@@ -1873,6 +1873,8 @@ source "$ROOT/scripts/emu-cases/touch-minus.sh"
 
 section "[14] 跑完不改变活跃方案"
 schema_after="$(get_active_schema)"
+# 用户键位覆盖：上滑改字符、下滑出文本 / 全选（[95]）
+source "$ROOT/scripts/emu-cases/keymap-gestures.sh"
 if [[ -z "$SCHEMA_BEFORE" ]]; then
     echo "  ${D}SKIP  首次运行，无基线可比${N}"
 else

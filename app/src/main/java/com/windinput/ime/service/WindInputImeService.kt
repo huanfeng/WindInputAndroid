@@ -43,6 +43,7 @@ import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.LayoutTweaks
+import com.windinput.ime.keyboard.keymap.KeymapPresets
 import com.windinput.ime.keyboard.keymap.KeymapRepository
 import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.IconSet
@@ -157,7 +158,10 @@ class WindInputImeService :
         val dirs = (application as WindInputApp).dataDirs
         dataDirs = dirs
         layoutRepository = LayoutRepository(dirs)
-        keymapRepository = KeymapRepository(dirs.keymapFile)
+        keymapRepository = KeymapRepository(dirs.keymapFile, presetFile = {
+            KeymapPresets.fileFor(userConfig.getString(KeymapPresets.SETTING_KEY, KeymapPresets.DEFAULT))
+                ?.let(dirs::resolveDataFile)
+        })
         userConfig = UserConfig(dirs.keyboardConfigFile)
         // 图标：用户目录 icons/ 下的同名 SVG 覆盖内置图标（日后主题包挂同一机制）
         IconSet.init(assets, listOf(File(dirs.mobileDir, "icons")))

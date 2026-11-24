@@ -231,9 +231,11 @@ long_press = ["，", "；", "：", "“", "‘", "、"]
 - 删掉覆盖项即回到出厂；版本过高的文件被忽略且设置页有提示；
 - 关闭「显示上滑符号」时角标行为不变。
 **测试**：合并规则（L1 → L3 差异覆盖、按 id 定位、认不出的键跳过）、`symbolActionFor` 对 `Text` 的路径、预设切换、auto_pair 条件段，全部 JVM 单测；e2e 只加 1–2 个用例（上滑出 `《`、配对预设）。
-**状态**：In Progress（2026-11-24：手写 `keymap.toml` 的部分已完成并在模拟器验证——上滑 `《`、下滑 `——`、下滑「全选」；
-`KeymapMerge` / `KeymapRepository`，`KeyDef.upOut/downOut`。已实现的 func：select_all / cut / copy / paste / undo / redo / para_start（=行首）/ para_end（=行末）/ clipboard / symbol_page；
-punct_toggle / one_hand / history、`template` / `phrase` 留阶段 2。**未做**：设置页预设选择、auto_pair 相关预设、e2e 用例、下滑的气泡反馈（现靠键帽底部角标 + 过阈值震动）。长按气泡项目前只收单字符）
+**状态**：Complete（2026-11-24）
+- 已做：手写 `mobile/keymap.toml` 改上滑 / 下滑 / 长按（`KeymapMerge` / `KeymapRepository`，`KeyDef.upOut/downOut`）；设置页「键盘 → 键位 → 上滑 / 下滑符号方案」（`ui.android.keymap_preset`，出厂预设放 `data/keymap_presets/*.toml`：`cn_marks` 书名号与引号、`cn_brackets` 中文括号、`edit_swipe_down` 下滑全选 / 剪切 / 复制 / 粘贴；默认 = 不套预设，键盘一键不改）；预设是底、用户 keymap.toml 逐手势覆盖；用户可在 `mobile/keymap_presets/` 放同名文件替代出厂预设；keymap.toml 版本过高 / 有被跳过的项时「键位」页顶部提示（`KeymapStatusNote`）。
+- 已实现的 func：select_all / cut / copy / paste / undo / redo / para_start（=行首）/ para_end（=行末）/ clipboard / symbol_page；punct_toggle / one_hand / history、`template` / `phrase` 留阶段 2。长按气泡项目前只收单字符。
+- 验证：JVM 单测（预设全可解析且键位 id 都命中、合并优先级、tooNew 保留预设、仓库重读）；e2e `[95]`（`scripts/emu-cases/keymap-gestures.sh`：上滑《、下滑——、下滑全选）。
+- 未做：下滑的气泡反馈（现靠键帽底部角标 + 过阈值震动）；auto_pair 预设按 R6 不做；设置页内没有预设的预览。
 
 ### 阶段 2：手势扩展与动作类型
 **目标**：（下滑手势已在阶段 1 完成）`Template`（日期时间）、`Phrase`、更多 `Func`（切标点 / 单手 / 撤销 / 符号页）（R4、R5）；空格上滑 / 中英键在预编辑时作次选（R7）。设置页「自定义键位」单键编辑（§4.2）。

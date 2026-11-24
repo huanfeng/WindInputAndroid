@@ -741,6 +741,7 @@ private fun SubScreen(
             if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
             if (sub == "联想输入") AssocLearningSection()
             if (page.id == "input" && sub == SECTION_QUICK_INPUT) {
+            if (page.id == SettingsActivity.PAGE_KEYBOARD && sub == KEYMAP_SECTION) KeymapStatusNote()
                 QuickSourcesEntry { onOpenSchema(DETAIL_QUICK_SOURCES, DETAIL_QUICK_SOURCES) }
             }
             // Emoji 开着才列附加模块（同电脑版的 enabled_when）

@@ -1,0 +1,14 @@
+# 预设「中文书名号与引号」：字母行 z x c v m 的上滑改成 《 》 「 」 ·。
+# 只写差异；用户的 mobile/keymap.toml 逐手势覆盖本预设。想改预设本身：复制到 mobile/keymap_presets/ 同名文件即可替代。
+version = 1
+
+[layer.letters.key.z]
+swipe_up = "《"
+[layer.letters.key.x]
+swipe_up = "》"
+[layer.letters.key.c]
+swipe_up = "「"
+[layer.letters.key.v]
+swipe_up = "」"
+[layer.letters.key.m]
+swipe_up = "·"
