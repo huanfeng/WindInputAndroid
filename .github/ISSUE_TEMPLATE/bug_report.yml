@@ -1,0 +1,96 @@
+name: Bug 反馈
+description: 报告一个 Bug 帮助我们改进
+labels: ["缺陷"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢你提交 Bug 反馈！请尽量详细描述。
+
+        > 输入相关的问题请附上「设置 → 诊断导出」生成的文件（含按键与候选统计，不含输入内容；发之前请自查）。
+
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 切换到清风输入法
+        2. 打开某某应用
+        3. 输入 '...'
+        4. 出现异常
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: 输入法版本
+      description: 设置 → 关于
+      placeholder: "0.5.4"
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: 机型与系统
+      description: 品牌、型号、Android 版本、厂商 ROM（如 HyperOS 2 / One UI 7）
+      placeholder: "Xiaomi 14 / Android 15 / HyperOS 2"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: nav
+    attributes:
+      label: 导航方式
+      options:
+        - 三键导航
+        - 手势导航
+        - 不确定
+    validations:
+      required: false
+
+  - type: dropdown
+    id: schema
+    attributes:
+      label: 当前输入方案
+      options:
+        - 五笔 86
+        - 全拼
+        - 双拼
+        - 笔画
+        - 其他（请在描述中说明）
+    validations:
+      required: false
+
+  - type: textarea
+    id: app
+    attributes:
+      label: 出现问题的应用
+      placeholder: 微信 / 浏览器 / ……
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图、录屏或诊断导出文件

@@ -27,6 +27,8 @@ permissions:
 jobs:
   build:
     name: 签名 APK + AAB
+    # fork 没有签名 secrets，跑了只会失败；只在官方仓库执行
+    if: github.repository == 'huanfeng/WindInputAndroid'
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.v.outputs.version }}
@@ -152,7 +154,7 @@ jobs:
   publish:
     name: 创建草稿 Release
     needs: build
-    if: github.ref_type == 'tag'
+    if: github.repository == 'huanfeng/WindInputAndroid' && github.ref_type == 'tag'
     runs-on: ubuntu-latest
     permissions:
       contents: write

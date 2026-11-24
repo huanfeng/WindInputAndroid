@@ -25,3 +25,6 @@ docs/superpowers/
 # 签名：debug 密钥随仓库分发（keystore/debug.keystore 故意不忽略）；release 密钥绝不进仓库
 keystore/*.jks
 keystore/release*
+
+# 本机生成物（图片生成等中间产物）
+output/

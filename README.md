@@ -1,6 +1,6 @@
 # WindInput Android（清风输入法 安卓版）
 
-基于 [WindInput](../WindInput) Rust 核心的 Android 输入法。
+基于 [WindInput](https://github.com/huanfeng/WindInput) Rust 核心的 Android 输入法。
 架构总览与移植决策见 [docs/architecture.md](docs/architecture.md)。
 
 ## 架构速览
@@ -153,3 +153,15 @@ CI 上 **不跑** Rust 测试——它要主仓 build_dev/data，缺数据时用
 - [x] 123 层 / 符号页 / 九宫格数字键盘、单手模式（九宫格拼音待做）
 - [x] 物理键盘按键直连引擎
 - [ ] 浮动候选窗、Direct Boot、键盘边距配置——余下缺口见 §12
+
+## 许可证
+
+- **本仓库自有代码**（Kotlin 壳、`rust/wind-android` 绑定层、文档）采用 [MPL-2.0](LICENSE)。
+- **随包分发的核心**（主仓 [WindInput](https://github.com/huanfeng/WindInput)，GPL-3.0-or-later）与
+  **词库数据**（白霜拼音 GPL-3.0、rime-stroke LGPL-3.0 等，逐条见 `app/src/main/assets/licenses/notices.toml`
+  与应用内「开源许可」页）各自适用其许可证。
+- 因此**构建出的 APK 作为整体按 GPL-3.0 分发**：MPL-2.0 §3.3 允许把 MPL 文件并入以 GPL 发布的更大作品，
+  本仓文件均不带 Exhibit B（「与次级许可证不兼容」）声明。单独复用本仓的 MPL 文件不受 GPL 约束；
+  只要链接了核心，就须遵守 GPL。
+- 提交贡献须签署 [CLA](CLA.md)，细节见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- 项目名称与标识的使用约定同主仓 [BRANDING.md](https://github.com/huanfeng/WindInput/blob/main/BRANDING.md)。
