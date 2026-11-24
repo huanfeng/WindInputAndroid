@@ -63,17 +63,17 @@ class CandidateBarView(context: Context) : View(context) {
     private var barHeightPx = (44 * density).toInt()
     private val itemPaddingH = 14 * density
 
-    private val bgColor = Palette.current.background
+    private val bgColor = Palette.current.barBackground
     private val pressedColor = Palette.current.accentSoft
     private val separatorColor = Palette.current.separator
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Palette.current.text
+        color = Palette.current.candidateText
         textSize = 21 * density
     }
 
     /** 首选的字：强调字色，与其余候选区分开（首选再加一块键面色的圆角底，见 [onDraw]） */
     private val firstPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Palette.current.accentText
+        color = Palette.current.candidateSelected
         textSize = 21 * density
     }
 
@@ -85,7 +85,7 @@ class CandidateBarView(context: Context) : View(context) {
 
     /** 注释灰字（码表剩余编码、拼音候选反查码）：候选字号的 0.6 倍，紧跟在字后 */
     private val commentPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Palette.current.hint
+        color = Palette.current.candidateComment
         textSize = 21 * density * COMMENT_SCALE
     }
     private val commentGap = 3 * density

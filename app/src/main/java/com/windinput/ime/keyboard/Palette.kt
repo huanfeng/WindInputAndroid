@@ -15,7 +15,7 @@ import com.windinput.ime.skin.SkinRuntime
  * （深浅色切换、旋转）时**整个重建**（`onCreateInputView` 重跑），所以每次构造
  * 取到的就是当时该用的那套；给每个 View 挂监听反而多一条不会被走到的路。
  */
-class Palette(
+data class Palette(
     /** 键盘底色（键与键之间的缝） */
     val background: Int,
     /** 列表行 / 面板内容区的面（条区与面板顶栏用 [background]，与键盘同色） */
@@ -46,6 +46,40 @@ class Palette(
     val icon: Int,
     /** 气泡描边 */
     val border: Int,
+    // ── 阶段 1 新增槽位（docs/mobile-skin-design.md §3.2）：全部可省略，缺省按回退链取现有槽位，
+    //    所以不写它们的皮肤（含内置默认）与此前逐像素一致 ──
+    /** 普通键的主字（缺省 [text]） */
+    val keyText: Int = text,
+    /** 功能键的字与图标（缺省 [text]） */
+    val keySpecialText: Int = text,
+    /** 键面角标，即上滑 / 下滑符号（缺省 [hint]） */
+    val keyHint: Int = hint,
+    /** 强调键面：回车等（缺省 [accent]） */
+    val keyAccent: Int = accent,
+    /** 键面描边（0 = 不描边） */
+    val keyBorder: Int = 0,
+    /** 键面下沿投影色（0 = 不画；偏移固定 1dp） */
+    val keyShadow: Int = 0,
+    /** 条区（编码行 + 候选行 + 工具栏）底色（缺省 [background]） */
+    val barBackground: Int = background,
+    /** 候选字（缺省 [text]） */
+    val candidateText: Int = text,
+    /** 选中候选的文字（缺省 [accentText]） */
+    val candidateSelected: Int = accentText,
+    /** 候选注释（缺省 [hint]） */
+    val candidateComment: Int = hint,
+    /** 长按气泡 / 候选菜单底（缺省 [key]） */
+    val popupBackground: Int = key,
+    /** 气泡描边（缺省 [border]） */
+    val popupBorder: Int = border,
+    /** 气泡文字（缺省 [text]） */
+    val popupText: Int = text,
+    /** 气泡选中项底（缺省 [accentSoft]） */
+    val popupSelected: Int = accentSoft,
+    /** 符号 / 表情 / 剪贴板等面板内容区（缺省 [surface]） */
+    val panelBackground: Int = surface,
+    /** 背景图上的遮罩色（含透明度；0 = 无）。阶段 3 的背景图用，此阶段只解析 */
+    val scrim: Int = 0,
 ) {
     companion object {
         /**

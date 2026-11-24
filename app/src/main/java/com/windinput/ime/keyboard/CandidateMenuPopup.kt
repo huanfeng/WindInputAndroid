@@ -113,7 +113,7 @@ class CandidateMenuPopup(private val anchor: View) {
                         // 拆字段的字根是私用区字符，只给它们套字根字体，其余照常
                         text = ZiGenFont.apply(context, if (head != null && sec.inline && i == 0) "$head：$line" else line)
                         textSize = 15f
-                        setTextColor(p.text)
+                        setTextColor(p.popupText)
                         setTextIsSelectable(false)
                         setPadding(0, dp(1), 0, dp(1))
                     },
@@ -150,7 +150,7 @@ class CandidateMenuPopup(private val anchor: View) {
                     textSize = 15f
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
-                    setTextColor(p.text)
+                    setTextColor(p.popupText)
                     setPadding(dp(4), 0, dp(4), 0)
                 },
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
@@ -169,8 +169,8 @@ class CandidateMenuPopup(private val anchor: View) {
             setPadding(dp(10), dp(8), dp(10), dp(10))
             background = GradientDrawable().apply {
                 cornerRadius = 10 * density
-                setColor(p.surface)
-                setStroke(dp(1), p.border)
+                setColor(p.panelBackground)
+                setStroke(dp(1), p.popupBorder)
             }
             addView(header)
         }
@@ -193,14 +193,14 @@ class CandidateMenuPopup(private val anchor: View) {
             setTextColor(
                 when {
                     current -> p.accentText
-                    enabled -> p.text
+                    enabled -> p.popupText
                     else -> p.hint
                 },
             )
             if (current) typeface = android.graphics.Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
                 cornerRadius = 6 * density
-                setColor(if (current) p.accentSoft else p.key)
+                setColor(if (current) p.popupSelected else p.popupBackground)
             }
             isEnabled = enabled
             setOnClickListener { onClick() }

@@ -264,7 +264,7 @@ class KeyPopupManager(private val anchor: View) {
     fun setSwipeArmed(armed: Boolean) {
         val p = Palette.current
         swipeTop?.apply {
-            setTextColor(if (armed) p.accentText else p.text)
+            setTextColor(if (armed) p.accentText else p.popupText)
             textSize = if (armed) 30f else 24f
             typeface = if (armed) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
         }
@@ -286,10 +286,10 @@ class KeyPopupManager(private val anchor: View) {
 
     private fun highlight() {
         popupItems.forEachIndexed { i, tv ->
-            tv.setTextColor(if (i == selectedIndex) Palette.current.accentText else Palette.current.text)
+            tv.setTextColor(if (i == selectedIndex) Palette.current.accentText else Palette.current.popupText)
             tv.background = if (i == selectedIndex) {
                 GradientDrawable().apply {
-                    setColor(Palette.current.accentSoft)
+                    setColor(Palette.current.popupSelected)
                     cornerRadius = (BUBBLE_RADIUS_DP - BUBBLE_INSET_DP) * density
                 }
             } else {
@@ -319,14 +319,14 @@ class KeyPopupManager(private val anchor: View) {
             text = label
             textSize = size
             gravity = Gravity.CENTER
-            setTextColor(Palette.current.text)
+            setTextColor(Palette.current.popupText)
             background = bubbleBackground()
         }
 
     private fun bubbleBackground(): GradientDrawable =
         GradientDrawable().apply {
-            setColor(Palette.current.key)
+            setColor(Palette.current.popupBackground)
             cornerRadius = BUBBLE_RADIUS_DP * density
-            setStroke((1 * density).toInt(), Palette.current.border)
+            setStroke((1 * density).toInt(), Palette.current.popupBorder)
         }
 }

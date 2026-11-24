@@ -163,7 +163,7 @@ class BarView(
         // 横屏编码行只有 16dp：去掉顶部内边距、短称收矮，否则短称被裁、拼音的 g/j/p/q/y 下伸被裁
         val compact = KeyboardDimens.barPreeditDp < 20f
         setPadding(dp(10), 0, 0, 0)
-        setBackgroundColor(Palette.current.background)
+        setBackgroundColor(Palette.current.barBackground)
         addView(modeLabel, LayoutParams(LayoutParams.WRAP_CONTENT, dp(if (compact) 13 else 15)))
         addView(preeditText, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
         addView(pagerText, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
@@ -326,7 +326,7 @@ class BarView(
         }
         candidateRow = LinearLayout(context).apply {
             orientation = VERTICAL
-            setBackgroundColor(Palette.current.background)
+            setBackgroundColor(Palette.current.barBackground)
             addView(preeditRow, LayoutParams(MATCH, dp(KeyboardDimens.barPreeditDp)))
             addView(candidateLine, LayoutParams(MATCH, 0, 1f))
         }
@@ -341,7 +341,7 @@ class BarView(
         }
         suggestionRow = LinearLayout(context).apply {
             orientation = HORIZONTAL
-            setBackgroundColor(Palette.current.background)
+            setBackgroundColor(Palette.current.barBackground)
             addView(
                 PanelIcon(context).apply {
                     glyph = PanelIcon.Glyph.CLIPBOARD
@@ -517,7 +517,7 @@ class BarView(
      */
     private fun buildToolbar(): View = LinearLayout(context).apply {
         orientation = HORIZONTAL
-        setBackgroundColor(Palette.current.background)
+        setBackgroundColor(Palette.current.barBackground)
         setPadding(dp(TOOLBAR_SIDE_PAD_DP), 0, dp(TOOLBAR_SIDE_PAD_DP), 0)
         addView(gridIcon, LayoutParams(dp(TOOLBAR_ICON_DP), LayoutParams.MATCH_PARENT))
         addView(pinnedRow, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))

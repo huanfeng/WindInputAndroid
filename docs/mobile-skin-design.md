@@ -345,7 +345,12 @@ key_alpha = 0.9               # 键面不透明度倍率
 **目标**：新增槽位（§3.2）接进 `KeyboardView` / `BarView` / `CandidateBarView` / 气泡 / 面板；内置 3–5 个 TOML 预设 + 动态取色（API 31+）；设置页「外观」可选择皮肤；`skin_prefs.toml` 读写。
 **验收**：切预设后键盘、条区、气泡、面板同时变色且无残留旧色；深浅色跟随系统仍正确；皮肤文件手改后「重新载入」生效；故意写坏的皮肤回退到内置并有提示。
 **测试**：槽位覆盖率测试（遍历 `Palette` 所有槽位确保每个都有调用点，防新增槽位无人使用）；对比度计算纯函数（文字 / 键面合成后 < 3:1 给警告，不阻塞）；预设全部能被解析。
-**状态**：Not Started
+**状态**：Complete（2026-11-24；动态取色预设按决定不做）
+- 已落地：16 个新增槽位（`keyText / keySpecialText / keyHint / keyAccent / keyBorder / keyShadow / barBackground / candidateText / candidateSelected / candidateComment / popupBackground / popupBorder / popupText / popupSelected / panelBackground / scrim`），`Palette` 改 data class、新槽位缺省按回退链取现有槽位；除 `scrim`（阶段 3 背景图遮罩，现仅解析）外都已接进键盘、条区、候选、气泡、候选菜单、面板。
+- `SkinStore`（发现 / 选择 / 载入，文件戳缓存）、`mobile/skin_prefs.toml`、内置预设 `assets/data/skins/{graphite,mint,sakura,paper}.toml`（石墨 / 薄荷 / 樱粉 / 纸质，与用户皮肤同一个 `SkinParser`）；设置页「外观 → 键盘皮肤」可选择与「重新载入」，坏皮肤回退默认并列出原因；`SkinContrast` 对比度警告（< 3:1，不阻塞）。
+- 切换皮肤不用重启：Service 每次弹键盘 `activate()`，`SkinRuntime.active` 换实例即触发输入视图重建。
+- 验证：默认皮肤键盘区与阶段 0 逐像素一致（浅 / 深）；模拟器上 mint → sakura 在进程内切换生效。
+- ⚠ 阶段 0 的潜伏崩溃：`SkinParser.REF` 的裸 `}` 在 Android ICU 正则里非法（JVM 单测放行），一旦真正调用解析器就崩；已转义。JVM 单测测不到这类平台差异，所以解析器第一次上设备必须真机 / 模拟器过一遍。
 
 ### 阶段 2：几何参数化
 **目标**：`KeyboardDimens` 常量变 `geometry` 字段；`row_gap` 独立（取代「行高 − 51」）；设置页滑块（键间距、行间距、圆角、字号），每个带范围、实时预览、「恢复默认」。

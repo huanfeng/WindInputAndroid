@@ -113,7 +113,7 @@ class ExpandedCandidatesWindow(private val listener: Listener) : InputWindow() {
         grid = RecyclerView(context).apply {
             layoutManager = lm
             adapter = this@ExpandedCandidatesWindow.adapter
-            setBackgroundColor(Palette.current.surface)
+            setBackgroundColor(Palette.current.panelBackground)
             addOnScrollListener(
                 object : RecyclerView.OnScrollListener() {
                     override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) {

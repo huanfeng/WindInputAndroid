@@ -1,0 +1,23 @@
+# 内置皮肤「石墨」：中性灰，安静克制。
+# 与用户皮肤走同一个读取器（SkinParser）；只写现有 15 个槽位，其余新增槽位按回退链派生。
+version = 1
+
+[meta]
+name = "石墨"
+
+[colors]
+background = { light = "#E4E4E6", dark = "#101012" }
+surface = { light = "#EDEDEF", dark = "#1A1A1D" }
+key = { light = "#FFFFFF", dark = "#2C2C30" }
+keySpecial = { light = "#CFCFD3", dark = "#212124" }
+keyPressed = { light = "#BDBDC3", dark = "#424248" }
+text = { light = "#1C1C1E", dark = "#F2F2F4" }
+hint = { light = "#8E8E93", dark = "#8E8E96" }
+accent = { light = "#4B5563", dark = "#6B7280" }
+onAccent = { light = "#FFFFFF", dark = "#FFFFFF" }
+accentSoft = { light = "#4B55631A", dark = "#9CA3AF33" }
+accentText = { light = "#374151", dark = "#C7CCD6" }
+preedit = { light = "#5C5C62", dark = "#A0A0A8" }
+separator = { light = "#D0D0D4", dark = "#2A2A2E" }
+icon = { light = "#48484E", dark = "#B4B4BC" }
+border = { light = "#DCDCE0", dark = "#3A3A40" }

@@ -1,0 +1,23 @@
+# 内置皮肤「薄荷」：偏绿的冷色，强调色翠绿。
+# 与用户皮肤走同一个读取器（SkinParser）；只写现有 15 个槽位，其余新增槽位按回退链派生。
+version = 1
+
+[meta]
+name = "薄荷"
+
+[colors]
+background = { light = "#DDE8E3", dark = "#0F1714" }
+surface = { light = "#E8F0EC", dark = "#18221E" }
+key = { light = "#FFFFFF", dark = "#2A3631" }
+keySpecial = { light = "#C3D4CC", dark = "#202A26" }
+keyPressed = { light = "#AFC4BA", dark = "#3F4F48" }
+text = { light = "#17231E", dark = "#EEF4F1" }
+hint = { light = "#7C8F86", dark = "#85978E" }
+accent = { light = "#0D7F63", dark = "#17906F" }
+onAccent = { light = "#FFFFFF", dark = "#FFFFFF" }
+accentSoft = { light = "#0D7F631A", dark = "#4ADE8033" }
+accentText = { light = "#0A6B53", dark = "#6EE7B7" }
+preedit = { light = "#4F6259", dark = "#9DB0A7" }
+separator = { light = "#C5D5CD", dark = "#26322D" }
+icon = { light = "#44574E", dark = "#B0C2B8" }
+border = { light = "#D3E0DA", dark = "#364540" }

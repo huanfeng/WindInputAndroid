@@ -1,0 +1,23 @@
+# 内置皮肤「纸质」：暖米色，强调色琥珀。
+# 与用户皮肤走同一个读取器（SkinParser）；只写现有 15 个槽位，其余新增槽位按回退链派生。
+version = 1
+
+[meta]
+name = "纸质"
+
+[colors]
+background = { light = "#E8E1D3", dark = "#17140E" }
+surface = { light = "#F0EADD", dark = "#211D15" }
+key = { light = "#FFFDF8", dark = "#363024" }
+keySpecial = { light = "#D6CDB9", dark = "#2A251B" }
+keyPressed = { light = "#C7BCA3", dark = "#4A4232" }
+text = { light = "#2A241A", dark = "#F5F0E4" }
+hint = { light = "#918873", dark = "#9A9078" }
+accent = { light = "#9A5B13", dark = "#B26A1A" }
+onAccent = { light = "#FFFFFF", dark = "#FFFFFF" }
+accentSoft = { light = "#9A5B131A", dark = "#F5A52433" }
+accentText = { light = "#8A4F0E", dark = "#F5C06B" }
+preedit = { light = "#615841", dark = "#B3A98F" }
+separator = { light = "#D9D0BC", dark = "#302B1F" }
+icon = { light = "#54492F", dark = "#C7BDA2" }
+border = { light = "#E0D8C6", dark = "#453D2C" }

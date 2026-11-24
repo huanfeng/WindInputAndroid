@@ -1,0 +1,23 @@
+# 内置皮肤「樱粉」：淡粉底，强调色玫红。
+# 与用户皮肤走同一个读取器（SkinParser）；只写现有 15 个槽位，其余新增槽位按回退链派生。
+version = 1
+
+[meta]
+name = "樱粉"
+
+[colors]
+background = { light = "#EADFE3", dark = "#1A1216" }
+surface = { light = "#F2E9EC", dark = "#241A1F" }
+key = { light = "#FFFFFF", dark = "#38282F" }
+keySpecial = { light = "#D9C6CD", dark = "#2C2025" }
+keyPressed = { light = "#C9B1BA", dark = "#4E3943" }
+text = { light = "#261A1F", dark = "#F6EEF1" }
+hint = { light = "#98808A", dark = "#A28D96" }
+accent = { light = "#C2185B", dark = "#D81B60" }
+onAccent = { light = "#FFFFFF", dark = "#FFFFFF" }
+accentSoft = { light = "#C2185B1A", dark = "#F4729933" }
+accentText = { light = "#AD1457", dark = "#F48FB1" }
+preedit = { light = "#6B5660", dark = "#B9A3AC" }
+separator = { light = "#DCCBD1", dark = "#34252B" }
+icon = { light = "#5C4750", dark = "#CBB5BE" }
+border = { light = "#E6D8DD", dark = "#4A3640" }

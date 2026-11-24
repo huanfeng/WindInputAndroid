@@ -86,7 +86,7 @@ class EmojiWindow(
         grid = RecyclerView(context).apply {
             layoutManager = GridLayoutManager(context, COLUMNS)
             adapter = this@EmojiWindow.adapter
-            setBackgroundColor(Palette.current.surface)
+            setBackgroundColor(Palette.current.panelBackground)
         }
         content.addView(
             grid,

@@ -39,6 +39,16 @@ class DataDirs(context: Context) {
     /** 用户键位覆盖（`keymap.toml`，只存差异，见 docs/key-mapping-skin-plan.md）；移动端独有文件名 */
     val keymapFile: File = File(mobileDir, "keymap.toml")
 
+    /** 用户皮肤目录：`skins/<id>/skin.toml`（内置皮肤在 [dataDir]/skins，随 App 升级重放） */
+    val userSkinsDir: File = File(mobileDir, "skins")
+
+    /** 皮肤选择（`active = "<id>"`）；移动端独有文件名 */
+    val skinPrefsFile: File = File(mobileDir, "skin_prefs.toml")
+
+    /** 皮肤的发现 / 选择 / 载入；Service 与设置页各自建一个，状态都在文件里 */
+    fun skinStore(): com.windinput.ime.skin.SkinStore =
+        com.windinput.ime.skin.SkinStore(File(dataDir, "skins"), userSkinsDir, skinPrefsFile)
+
     /** 键盘自己的配置（`ui.android.*`）；叫 keyboard.toml 而不是 config.toml，是为了不与 PC / 引擎的 config.toml 同名 */
     val keyboardConfigFile: File = File(mobileDir, "keyboard.toml")
 

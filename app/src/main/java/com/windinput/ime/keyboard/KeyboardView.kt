@@ -255,7 +255,8 @@ class KeyboardView(context: Context) : View(context) {
     private val keySpecialColor = palette.keySpecial
     private val keyPressedColor = palette.keyPressed
     private val textColor = palette.text
-    private val hintColor = palette.hint
+    private val hintColor = palette.keyHint
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
     private val density = resources.displayMetrics.density
 
@@ -695,13 +696,29 @@ class KeyboardView(context: Context) : View(context) {
         for ((key, rect) in keyBounds) {
             keyPaint.color = when {
                 key === highlightKey -> keyPressedColor
-                key.isAccent -> palette.accent
+                key.isAccent -> palette.keyAccent
                 key.action == KeyAction.Shift && (shifted || shiftLocked) -> keyPressedColor
                 key.isSpecial -> keySpecialColor
                 else -> keyColor
             }
+            // 立体键：投影先画（键面压在它上面），描边最后画；两个槽位缺省 0 = 都不画，默认皮肤与此前一致
+            if (palette.keyShadow != 0) {
+                edgePaint.style = Paint.Style.FILL
+                edgePaint.color = palette.keyShadow
+                canvas.drawRoundRect(rect.left, rect.top + density, rect.right, rect.bottom + density, keyRadiusPx, keyRadiusPx, edgePaint)
+            }
             canvas.drawRoundRect(rect, keyRadiusPx, keyRadiusPx, keyPaint)
-            textPaint.color = if (key.isAccent) palette.onAccent else textColor
+            if (palette.keyBorder != 0) {
+                edgePaint.style = Paint.Style.STROKE
+                edgePaint.strokeWidth = density
+                edgePaint.color = palette.keyBorder
+                canvas.drawRoundRect(rect, keyRadiusPx, keyRadiusPx, edgePaint)
+            }
+            textPaint.color = when {
+                key.isAccent -> palette.onAccent
+                key.isSpecial -> palette.keySpecialText
+                else -> palette.keyText
+            }
             if (key.action == KeyAction.SwitchLang) {
                 drawLangKey(canvas, rect)
                 continue

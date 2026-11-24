@@ -27,16 +27,28 @@ object SkinParser {
         val warnings: List<String>,
         /** 皮肤版本高于本版本支持的，整份被忽略 */
         val tooNew: Boolean = false,
+        /** `[meta] name`，设置页列表显示；没写为 null */
+        val name: String? = null,
     )
 
-    /** 阶段 0 认的 15 个槽位（与 [Palette] 一一对应）；新增槽位随后续阶段加入，写了也先忽略 */
-    private val SLOTS = listOf(
+    /** 现有 15 个槽位（与 [Palette] 前 15 个字段一一对应）：缺省取内置默认皮肤 */
+    private val BASE_SLOTS = listOf(
         "background", "surface", "key", "keySpecial", "keyPressed", "text", "hint", "accent",
         "onAccent", "accentSoft", "accentText", "preedit", "separator", "icon", "border",
     )
 
+    /** 阶段 1 新增槽位 → 缺省回退到的槽位；无回退的（描边 / 投影 / 遮罩）缺省 = 0（不画） */
+    private val FALLBACK = mapOf(
+        "keyText" to "text", "keySpecialText" to "text", "keyHint" to "hint", "keyAccent" to "accent",
+        "barBackground" to "background", "candidateText" to "text", "candidateSelected" to "accentText",
+        "candidateComment" to "hint", "popupBackground" to "key", "popupBorder" to "border",
+        "popupText" to "text", "popupSelected" to "accentSoft", "panelBackground" to "surface",
+    )
+    private val NO_FALLBACK = listOf("keyBorder", "keyShadow", "scrim")
+    private val SLOTS = BASE_SLOTS + FALLBACK.keys + NO_FALLBACK
+
     private val HEX = Regex("^#([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$")
-    private val REF = Regex("^\\$\\{([^}]*)}$")
+    private val REF = Regex("^\\$\\{([^}]*)\\}$") // `}` 必须转义：Android 的 ICU 正则不接受裸 `}`，JVM 单测却放行（阶段 0 的潜伏崩溃）
 
     fun parse(text: String): Result {
         val default = SkinRuntime.DEFAULT
@@ -68,7 +80,8 @@ object SkinParser {
         val geometry = geometry(toml.get("geometry") as? TomlTable, default.geometry, warnings)
 
         val unchanged = light == default.light && dark == default.dark && geometry == default.geometry
-        return Result(if (unchanged) default else SkinRuntime(light, dark, geometry), warnings)
+        val name = (toml.get("meta") as? TomlTable)?.getString("name")?.takeIf { it.isNotBlank() }
+        return Result(if (unchanged) default else SkinRuntime(light, dark, geometry), warnings, name = name)
     }
 
     // ── 颜色 ─────────────────────────────────────────────────────
@@ -78,7 +91,8 @@ object SkinParser {
         val baseBySlot = slotsOf(base)
         val out = HashMap<String, Int>()
         for (slot in SLOTS) {
-            out[slot] = resolve(slot, colors, night, mutableSetOf(), warnings) ?: baseBySlot.getValue(slot)
+            out[slot] = resolve(slot, colors, night, mutableSetOf(), warnings)
+                ?: fallbackValue(slot, out, baseBySlot)
         }
         val p = fromSlots(out)
         // 与默认逐项相同就复用默认实例：Service 靠 `!==` 判断配色有没有变，别平白造出新实例
@@ -114,7 +128,7 @@ object SkinParser {
                     return null
                 }
                 // 被引用的槽位没写时取它的缺省——resolve 返回 null 在这里也得区分「没写」与「成环」
-                return if (colors.get(ref) == null) defaultOf(ref, night) else resolve(ref, colors, night, visiting, warnings)
+                return if (colors.get(ref) == null) defaultOf(ref, night, colors, visiting, warnings) else resolve(ref, colors, night, visiting, warnings)
             }
             val c = parseColor(s)
             if (c == null) warnings += "colors.$slot 的值 \"$s\" 不是 #RRGGBB / #RRGGBBAA"
@@ -124,8 +138,18 @@ object SkinParser {
         }
     }
 
-    private fun defaultOf(slot: String, night: Boolean): Int =
-        slotsOf(SkinRuntime.DEFAULT.palette(night)).getValue(slot)
+    /** 没写（或写坏）的槽位取什么：现有槽位取内置默认；新增槽位取回退槽位已求出的值，无回退的取 0 */
+    private fun fallbackValue(slot: String, resolved: Map<String, Int>, base: Map<String, Int>): Int =
+        if (slot in BASE_SLOTS) base.getValue(slot) else FALLBACK[slot]?.let { resolved[it] ?: base[it] } ?: 0
+
+    /** 被引用而没写的槽位：沿同一条回退链取值（回退槽位自己写了就用它写的） */
+    private fun defaultOf(slot: String, night: Boolean, colors: TomlTable, visiting: MutableSet<String>, warnings: MutableList<String>): Int {
+        val base = slotsOf(SkinRuntime.DEFAULT.palette(night))
+        if (slot in BASE_SLOTS) return base.getValue(slot)
+        val fb = FALLBACK[slot] ?: return 0
+        return if (colors.get(fb) == null) defaultOf(fb, night, colors, visiting, warnings)
+        else resolve(fb, colors, night, visiting, warnings) ?: defaultOf(fb, night, colors, mutableSetOf(), warnings)
+    }
 
     /** `#RRGGBB` → 不透明；`#RRGGBBAA` → AA 在末尾，转成 Android 的 ARGB */
     internal fun parseColor(s: String): Int? {
@@ -141,6 +165,12 @@ object SkinParser {
         "hint" to p.hint, "accent" to p.accent, "onAccent" to p.onAccent,
         "accentSoft" to p.accentSoft, "accentText" to p.accentText, "preedit" to p.preedit,
         "separator" to p.separator, "icon" to p.icon, "border" to p.border,
+        "keyText" to p.keyText, "keySpecialText" to p.keySpecialText, "keyHint" to p.keyHint,
+        "keyAccent" to p.keyAccent, "keyBorder" to p.keyBorder, "keyShadow" to p.keyShadow,
+        "barBackground" to p.barBackground, "candidateText" to p.candidateText,
+        "candidateSelected" to p.candidateSelected, "candidateComment" to p.candidateComment,
+        "popupBackground" to p.popupBackground, "popupBorder" to p.popupBorder, "popupText" to p.popupText,
+        "popupSelected" to p.popupSelected, "panelBackground" to p.panelBackground, "scrim" to p.scrim,
     )
 
     private fun fromSlots(m: Map<String, Int>) = Palette(
@@ -149,6 +179,13 @@ object SkinParser {
         hint = m.getValue("hint"), accent = m.getValue("accent"), onAccent = m.getValue("onAccent"),
         accentSoft = m.getValue("accentSoft"), accentText = m.getValue("accentText"), preedit = m.getValue("preedit"),
         separator = m.getValue("separator"), icon = m.getValue("icon"), border = m.getValue("border"),
+        keyText = m.getValue("keyText"), keySpecialText = m.getValue("keySpecialText"), keyHint = m.getValue("keyHint"),
+        keyAccent = m.getValue("keyAccent"), keyBorder = m.getValue("keyBorder"), keyShadow = m.getValue("keyShadow"),
+        barBackground = m.getValue("barBackground"), candidateText = m.getValue("candidateText"),
+        candidateSelected = m.getValue("candidateSelected"), candidateComment = m.getValue("candidateComment"),
+        popupBackground = m.getValue("popupBackground"), popupBorder = m.getValue("popupBorder"),
+        popupText = m.getValue("popupText"), popupSelected = m.getValue("popupSelected"),
+        panelBackground = m.getValue("panelBackground"), scrim = m.getValue("scrim"),
     )
 
     // ── 几何 ─────────────────────────────────────────────────────

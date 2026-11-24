@@ -120,6 +120,7 @@ class WindInputImeService :
 
     private lateinit var layoutRepository: LayoutRepository
     private lateinit var keymapRepository: KeymapRepository
+    private lateinit var skinStore: com.windinput.ime.skin.SkinStore
     private lateinit var userConfig: UserConfig
     private lateinit var clipboardStore: ClipboardStore
     private lateinit var recentEmojiStore: RecentStore
@@ -158,6 +159,7 @@ class WindInputImeService :
         val dirs = (application as WindInputApp).dataDirs
         dataDirs = dirs
         layoutRepository = LayoutRepository(dirs)
+        skinStore = dirs.skinStore()
         keymapRepository = KeymapRepository(dirs.keymapFile, presetFile = {
             KeymapPresets.fileFor(userConfig.getString(KeymapPresets.SETTING_KEY, KeymapPresets.DEFAULT))
                 ?.let(dirs::resolveDataFile)
@@ -242,6 +244,7 @@ class WindInputImeService :
         schemaPicker?.dismiss()
         applyKeyboardDimens()
         // 深浅色：uiMode 变化会让系统重跑本方法，下面所有视图都按新调色板构造
+        skinStore.activate()
         Palette.apply(this, userConfig.getString("ui.android.theme", "system"))
         // 根视图自理手势条/导航栏避让（IME 窗口不吃系统自动 padding）
         val root = InputRootView(this)
@@ -556,6 +559,8 @@ class WindInputImeService :
         // 配色核对：视图是按构造那一刻的深浅色画的，系统没发配置变更时不会重建。
         // 对不上（刚装好时拿到了旧配置、或设置页改了深浅色）就当场重建整个输入视图。
         // 条区高度、键行高同理：设置页改了就要按新值重建（键行高此前漏判，要改别的 UI 项才生效）
+        // 皮肤文件改了 / 设置页换了皮肤：activate 按文件戳判断，没变几乎零开销；变了 active 换新实例，下面的比较就会触发重建
+        skinStore.activate()
         if (Palette.resolve(this, userConfig.getString("ui.android.theme", "system")) !== Palette.current ||
             configuredRowHeightDp() != KeyboardDimens.rowHeightDp ||
             barDims() != (KeyboardDimens.barPreeditDp to KeyboardDimens.barMainRowDp)
