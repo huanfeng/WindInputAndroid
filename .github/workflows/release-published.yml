@@ -1,14 +1,15 @@
 name: Release Published
 
 # Release 发布（草稿人工过目后点 Publish）后的下游动作，与主仓 release-published.yml 同一套路：
-#   1. mirror-r2    把 APK 镜像到 Cloudflare R2（dl.windinput.com/android/），国内用户直连下载
+#   1. mirror-r2    把 APK 镜像到 Cloudflare R2（dl.windinput.com/WindInputAndroid-<版本>.apk），国内用户直连下载
 #   2. notify-docs  通知文档站同步安卓版元数据（data/latest-android.json、更新记录）
 #
 # 与电脑版的区别：
 #   - 安卓版现在都是预发布，所以**预发布也镜像**；元数据里 channel 记 preview / stable，
 #     文档站据此决定怎么展示。电脑版的「预发布不进 R2」是因为那里的 latest.json 是应用内升级的开关，
 #     而安卓版没有联网权限、没有应用内升级，镜像只服务于下载页。
-#   - 对象放在 android/ 前缀下，与电脑版的清理步骤（按文件名删旧包）互不相干。
+#   - 对象放在桶根、文件名以 WindInputAndroid- 开头：下载走网关 Worker（计数、镜像分流，见 WindInputSite
+#     worker/src/env.ts 的 ARTIFACTS），与电脑版的清理步骤（按文件名删旧包）互不相干。
 #
 # 配置项（Settings → Secrets and variables → Actions）。缺任一项时对应 job 跳过而非失败：
 #   Variables: DOCS_REPO（huanfeng/WindInputDocs）、R2_BUCKET、R2_BASE_URL（https://dl.windinput.com）
@@ -83,12 +84,12 @@ jobs:
         id: up
         if: steps.gate.outputs.skip != 'true'
         run: |
-          wrangler r2 object put --remote "$R2_BUCKET/android/WindInputAndroid-${V}.apk" \
+          wrangler r2 object put --remote "$R2_BUCKET/WindInputAndroid-${V}.apk" \
             --file "dl/WindInputAndroid-${V}.apk" --content-type "application/vnd.android.package-archive"
-          wrangler r2 object put --remote "$R2_BUCKET/android/WindInputAndroid-${V}.apk.sha256" \
+          wrangler r2 object put --remote "$R2_BUCKET/WindInputAndroid-${V}.apk.sha256" \
             --file "dl/WindInputAndroid-${V}.apk.sha256" --content-type "text/plain; charset=utf-8"
           echo "done=true" >> "$GITHUB_OUTPUT"
-          echo "已镜像 ${R2_BASE_URL}/android/WindInputAndroid-${V}.apk"
+          echo "已镜像 ${R2_BASE_URL}/WindInputAndroid-${V}.apk"
 
   notify-docs:
     name: 通知文档站同步
