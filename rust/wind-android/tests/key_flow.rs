@@ -155,6 +155,7 @@ fn build_core(tag: &str, fresh: bool) -> Option<(Arc<WindCore>, Arc<Recorder>)> 
     let core = WindCore::new(
         data_dir().to_string_lossy().into_owned(),
         user_root.to_string_lossy().into_owned(),
+        user_root.join("local").to_string_lossy().into_owned(),
         "wubi86".into(),
         rec.clone(),
     );
@@ -1735,6 +1736,7 @@ fn auto_pair_quotes_and_brackets_put_cursor_between() {
     let core = WindCore::new(
         data_dir().to_string_lossy().into_owned(),
         user_root.to_string_lossy().into_owned(),
+        user_root.join("local").to_string_lossy().into_owned(),
         "wubi86".into(),
         rec.clone(),
     );

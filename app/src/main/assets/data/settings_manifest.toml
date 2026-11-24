@@ -765,6 +765,15 @@ options = [
 [[item]]
 page = "input"
 section = "字符与标点"
+key = "input.scope_relax.always_append"
+source = "engine"
+type = "toggle"
+title = "智能档末尾显示生僻字"
+summary = "候选检索范围为「智能」时，把被过滤的生僻字放在候选最后（带「·」标记），否则同码有常用字的生僻字打不出来"
+
+[[item]]
+page = "input"
+section = "字符与标点"
 key = "input.punct.smart_after_digit"
 source = "engine"
 type = "toggle"

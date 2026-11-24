@@ -46,7 +46,21 @@ class CandidateMenuPopup(private val anchor: View) {
         dismiss()
         if (items.isEmpty() || anchor.windowToken == null) return
         val content = card(title)
-        content.addView(menuGrid(items, onPick))
+        // 条目多时（电脑版的两层菜单在手机上摊成一层，十几项）网格会比可用高度还高，没有滚动就
+        // 把最后一行挤出屏幕（真机反馈：「设为生僻字」被截断）。上限留出标题行和上下边距
+        val maxBody = ((anchor.rootView.height - anchor.height) - dp(64)).coerceAtLeast(dp(120))
+        val scroll = object : android.widget.ScrollView(anchor.context) {
+            override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+                super.onMeasure(
+                    widthMeasureSpec,
+                    View.MeasureSpec.makeMeasureSpec(maxBody, View.MeasureSpec.AT_MOST),
+                )
+            }
+        }.apply {
+            isVerticalScrollBarEnabled = true
+            addView(menuGrid(items, onPick))
+        }
+        content.addView(scroll)
         present(content, dismissOnOutside)
     }
 
@@ -173,6 +187,9 @@ class CandidateMenuPopup(private val anchor: View) {
             textSize = 14f
             gravity = Gravity.CENTER
             maxLines = 1
+            // 4 列下一格只有 1/4 宽，「固定到第 4」这类六七个字的文案会顶到格子边：超宽时缩字号
+            // 而不是截断（下限 11sp，再长才截）。动作按钮等不在网格里的格子同样受益
+            setAutoSizeTextTypeUniformWithConfiguration(11, 14, 1, android.util.TypedValue.COMPLEX_UNIT_SP)
             setTextColor(
                 when {
                     current -> p.accentText
@@ -201,7 +218,10 @@ class CandidateMenuPopup(private val anchor: View) {
                 GridLayout.LayoutParams().apply {
                     width = 0
                     height = dp(40)
-                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+                    // ⚠️ 行必须显式 FILL：GridLayout 行的默认对齐是**文字基线**，同一行里「置顶」与
+                    // 「固定到第 2」的基线不同，格子就一个高一个低（真机反馈：排版错乱）
+                    rowSpec = GridLayout.spec(GridLayout.UNDEFINED, 1, GridLayout.FILL)
+                    columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1, GridLayout.FILL, 1f)
                     setMargins(dp(3), dp(3), dp(3), dp(3))
                 },
             )
