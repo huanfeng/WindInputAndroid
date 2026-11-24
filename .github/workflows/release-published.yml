@@ -1,0 +1,117 @@
+name: Release Published
+
+# Release 发布（草稿人工过目后点 Publish）后的下游动作，与主仓 release-published.yml 同一套路：
+#   1. mirror-r2    把 APK 镜像到 Cloudflare R2（dl.windinput.com/android/），国内用户直连下载
+#   2. notify-docs  通知文档站同步安卓版元数据（data/latest-android.json、更新记录）
+#
+# 与电脑版的区别：
+#   - 安卓版现在都是预发布，所以**预发布也镜像**；元数据里 channel 记 preview / stable，
+#     文档站据此决定怎么展示。电脑版的「预发布不进 R2」是因为那里的 latest.json 是应用内升级的开关，
+#     而安卓版没有联网权限、没有应用内升级，镜像只服务于下载页。
+#   - 对象放在 android/ 前缀下，与电脑版的清理步骤（按文件名删旧包）互不相干。
+#
+# 配置项（Settings → Secrets and variables → Actions）。缺任一项时对应 job 跳过而非失败：
+#   Variables: DOCS_REPO（huanfeng/WindInputDocs）、R2_BUCKET、R2_BASE_URL（https://dl.windinput.com）
+#   Secrets:   DOCS_REPO_PAT（对文档仓有 contents:write）、CLOUDFLARE_API_TOKEN（R2 Edit）、CLOUDFLARE_ACCOUNT_ID
+#
+# ⚠️ 依赖 release.yml 的 draft: true：GITHUB_TOKEN 创建的 Release 不会触发 published 事件，
+# 草稿由人手点发布才会走到这里。
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要补同步的 Release tag（如 v0.5.3）"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mirror-r2:
+    name: APK 镜像到 R2
+    if: github.repository == 'huanfeng/WindInputAndroid'
+    runs-on: ubuntu-latest
+    env:
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      R2_BASE_URL: ${{ vars.R2_BASE_URL }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    outputs:
+      done: ${{ steps.up.outputs.done }}
+    steps:
+      - name: 检查 R2 配置
+        id: gate
+        run: |
+          if [ -z "$R2_BUCKET" ] || [ -z "$R2_BASE_URL" ] || [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::R2 配置不完整（vars.R2_BUCKET / vars.R2_BASE_URL / secrets.CLOUDFLARE_API_TOKEN / secrets.CLOUDFLARE_ACCOUNT_ID），跳过镜像。"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v7
+        if: steps.gate.outputs.skip != 'true'
+        with:
+          node-version: 20
+
+      - name: 安装 wrangler
+        if: steps.gate.outputs.skip != 'true'
+        run: npm install -g wrangler@4
+
+      - name: 下载 APK 并核对 sha256
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          V="${TAG#v}"
+          echo "V=$V" >> "$GITHUB_ENV"
+          mkdir -p dl
+          gh release download "$TAG" --repo "${{ github.repository }}" \
+            --pattern "WindInputAndroid-${V}.apk" --pattern "WindInputAndroid-${V}.apk.sha256" --dir dl
+          expect=$(awk '{print $1}' "dl/WindInputAndroid-${V}.apk.sha256")
+          actual=$(sha256sum "dl/WindInputAndroid-${V}.apk" | awk '{print $1}')
+          [ "$expect" = "$actual" ] || { echo "::error::sha256 sidecar($expect) 与 APK 实际值($actual) 不符"; exit 1; }
+          echo "SHA=$actual" >> "$GITHUB_ENV"
+          echo "SIZE=$(stat -c %s "dl/WindInputAndroid-${V}.apk")" >> "$GITHUB_ENV"
+
+      # 只传 APK 与校验文件。元数据 latest-android.json 由文档站从 Release 组装（与其它平台一致），
+      # 这里不写，避免两处各有一份真相。
+      - name: 上传到 R2
+        id: up
+        if: steps.gate.outputs.skip != 'true'
+        run: |
+          wrangler r2 object put --remote "$R2_BUCKET/android/WindInputAndroid-${V}.apk" \
+            --file "dl/WindInputAndroid-${V}.apk" --content-type "application/vnd.android.package-archive"
+          wrangler r2 object put --remote "$R2_BUCKET/android/WindInputAndroid-${V}.apk.sha256" \
+            --file "dl/WindInputAndroid-${V}.apk.sha256" --content-type "text/plain; charset=utf-8"
+          echo "done=true" >> "$GITHUB_OUTPUT"
+          echo "已镜像 ${R2_BASE_URL}/android/WindInputAndroid-${V}.apk"
+
+  notify-docs:
+    name: 通知文档站同步
+    # 镜像成功（或根本没配 R2，此时元数据会指向 GitHub 之外取不到的地址，所以必须镜像成功才通知）
+    needs: mirror-r2
+    if: github.repository == 'huanfeng/WindInputAndroid' && needs.mirror-r2.outputs.done == 'true'
+    runs-on: ubuntu-latest
+    env:
+      DOCS_REPO: ${{ vars.DOCS_REPO }}
+      PAT: ${{ secrets.DOCS_REPO_PAT }}
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      # 文档仓侧由 sync-android.yml 接收 android-release-updated；另有每日 schedule 兜底。
+      - name: 发送 repository_dispatch
+        run: |
+          if [ -z "$DOCS_REPO" ] || [ -z "$PAT" ]; then
+            echo "::warning::未配置 vars.DOCS_REPO 或 secrets.DOCS_REPO_PAT，跳过通知；文档仓的每日 schedule 会兜底。"
+            exit 0
+          fi
+          jq -n --arg tag "$TAG" '{event_type: "android-release-updated", client_payload: {tag: $tag}}' \
+            | curl -fsS -X POST \
+                -H "Accept: application/vnd.github+json" \
+                -H "Authorization: Bearer $PAT" \
+                "https://api.github.com/repos/${DOCS_REPO}/dispatches" \
+                --data-binary @-
+          echo "已通知 ${DOCS_REPO} 同步 $TAG"
