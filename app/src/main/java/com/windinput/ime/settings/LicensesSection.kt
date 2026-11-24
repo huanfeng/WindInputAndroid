@@ -31,7 +31,7 @@ object Notices {
     const val DIR = "licenses"
 
     /** 有全文的许可证 id（= DIR 下的文件名去掉 .txt） */
-    val FULL_TEXTS = setOf("GPL-3.0", "LGPL-3.0", "Apache-2.0", "MIT", "MPL-2.0", "ISC", "Unicode-3.0", "CC-BY-SA-4.0", "CC-BY-4.0")
+    val FULL_TEXTS = setOf("GPL-3.0", "LGPL-3.0", "Apache-2.0", "MIT", "MPL-2.0", "ISC", "Unicode-3.0", "CC-BY-SA-4.0", "CC-BY-4.0", "BSD-3-Clause")
 
     /** 没有许可证文本可附的来源：政府发布的公开标准；来源未附任何许可的数据（拆字库、字根字体，同电脑版 NOTICE） */
     val NO_TEXT = setOf("公开标准", "未声明")
