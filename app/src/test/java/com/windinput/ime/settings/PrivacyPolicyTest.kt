@@ -13,7 +13,7 @@ class PrivacyPolicyTest {
         .map { it.groupValues[1] }
         .toSet()
 
-    /** 政策写的是「只申请振动与网络（网络仅用于检查更新）」 */
+    /** 政策写的是「只申请振动与网络（网络用于检查更新与用户启用的数据同步）」 */
     @Test
     fun manifestRequestsOnlyVibrateAndInternet() {
         assertEquals(
