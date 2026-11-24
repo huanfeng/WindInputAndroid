@@ -43,6 +43,7 @@ import com.windinput.ime.keyboard.InputWindowManager
 import com.windinput.ime.keyboard.KeyAction
 import com.windinput.ime.keyboard.KeyboardDimens
 import com.windinput.ime.keyboard.LayoutTweaks
+import com.windinput.ime.keyboard.keymap.KeymapRepository
 import com.windinput.ime.keyboard.KeyboardLayer
 import com.windinput.ime.keyboard.IconSet
 import com.windinput.ime.keyboard.KeyboardView
@@ -117,6 +118,7 @@ class WindInputImeService :
     private var autoCapEnabled = true
 
     private lateinit var layoutRepository: LayoutRepository
+    private lateinit var keymapRepository: KeymapRepository
     private lateinit var userConfig: UserConfig
     private lateinit var clipboardStore: ClipboardStore
     private lateinit var recentEmojiStore: RecentStore
@@ -155,6 +157,7 @@ class WindInputImeService :
         val dirs = (application as WindInputApp).dataDirs
         dataDirs = dirs
         layoutRepository = LayoutRepository(dirs)
+        keymapRepository = KeymapRepository(dirs.keymapFile)
         userConfig = UserConfig(dirs.keyboardConfigFile)
         // 图标：用户目录 icons/ 下的同名 SVG 覆盖内置图标（日后主题包挂同一机制）
         IconSet.init(assets, listOf(File(dirs.mobileDir, "icons")))
@@ -275,10 +278,14 @@ class WindInputImeService :
         keyboardWindow = KeyboardWindow(
             listener = this,
             layoutProvider = { layer ->
-                LayoutTweaks.apply(
-                    layoutRepository.rows(layer), layer,
-                    bottomRow = userConfig.getString("ui.android.bottom_row", LayoutTweaks.BOTTOM_SPLIT),
-                    numberPage = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_PAD9),
+                // 用户键位覆盖放在 LayoutTweaks 之后：底行改写会产生新键（合一键 merged_punct），覆盖按 id 认
+                keymapRepository.apply(
+                    LayoutTweaks.apply(
+                        layoutRepository.rows(layer), layer,
+                        bottomRow = userConfig.getString("ui.android.bottom_row", LayoutTweaks.BOTTOM_SPLIT),
+                        numberPage = userConfig.getString("ui.android.number_page", LayoutTweaks.NUMBER_PAD9),
+                    ),
+                    layer,
                 )
             },
         )
@@ -992,6 +999,22 @@ class WindInputImeService :
         // onUpdateSelection 的异步报告在挪光标后可能还没到，这里同步读一次，不留窗口。
         if (action is KeyAction.Text && latinInput && !composing && action.char in AUTO_SPACE_PUNCT) reportPrecedingText()
         return session.keyPressed(action, shifted, source)
+    }
+
+    /** 用户键位覆盖里绑的功能动作（keymap.toml 的 func，实现范围见 KeymapMerge.IMPLEMENTED_FUNCS） */
+    override fun onKeyFunc(name: String) {
+        when (name) {
+            "select_all" -> onEditAction(TextEditingWindow.EditAction.SELECT_ALL)
+            "cut" -> onEditAction(TextEditingWindow.EditAction.CUT)
+            "copy" -> onEditAction(TextEditingWindow.EditAction.COPY)
+            "paste" -> onEditAction(TextEditingWindow.EditAction.PASTE)
+            "undo" -> onEditAction(TextEditingWindow.EditAction.UNDO)
+            "redo" -> onEditAction(TextEditingWindow.EditAction.REDO)
+            "para_start" -> onEditAction(TextEditingWindow.EditAction.HOME)
+            "para_end" -> onEditAction(TextEditingWindow.EditAction.END)
+            "clipboard" -> onOpenPanel(QuickPanelWindow.Target.CLIPBOARD)
+            "symbol_page" -> onKeyAction(KeyAction.SymbolPage, shifted = false)
+        }
     }
 
     override fun onKeyAction(action: KeyAction, shifted: Boolean) {

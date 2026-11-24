@@ -1,5 +1,7 @@
 package com.windinput.ime.keyboard
 
+import com.windinput.ime.keyboard.keymap.KeyOutput
+
 /**
  * 键位模型与内置 qwerty 布局。
  *
@@ -70,6 +72,13 @@ data class KeyDef(
      * 空串 = 尚未分配。只是标识，不参与任何绘制与手势逻辑。
      */
     val id: String = "",
+    /**
+     * 用户键位覆盖带来的上滑输出（keymap.toml）：多字符文本或功能动作。单字符覆盖直接落在 [swipeUp]
+     * （走原有路径），所以出厂布局里它恒为 null。非 null 时 [swipeUp] / [enSwipeUp] 已被清空。
+     */
+    val upOut: KeyOutput? = null,
+    /** 用户键位覆盖带来的下滑输出；出厂布局没有下滑，恒为 null = 无下滑手势 */
+    val downOut: KeyOutput? = null,
 ) {
     /** 按当前模式取点按输出的字符；非字符键为 null */
     fun textFor(english: Boolean): Char? =

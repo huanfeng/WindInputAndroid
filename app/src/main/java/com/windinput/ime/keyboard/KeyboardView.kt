@@ -12,6 +12,8 @@ import android.view.VelocityTracker
 import android.view.View
 import android.widget.OverScroller
 import com.windinput.ime.core.KeyDropStats
+import com.windinput.ime.keyboard.keymap.KeyOutput
+import com.windinput.ime.keyboard.keymap.KeymapMerge
 
 /**
  * 软键盘主视图：自定义 View + Canvas 绘制（渲染路线见 docs/architecture.md §3.6）。
@@ -56,6 +58,9 @@ class KeyboardView(context: Context) : View(context) {
 
         /** 有没有可恢复的删除；没有时退格下滑不进恢复（照旧是单击 / 连删） */
         fun canRestoreDeleted(): Boolean = false
+
+        /** 用户键位覆盖里的功能动作（下滑 / 上滑绑定 select_all、paste 等，名字见 KeymapMerge） */
+        fun onKeyFunc(name: String) = Unit
 
         /** 功能键长按（空格 → 按设置切输入法 / 语音；中英键弹不出菜单时退到这里） */
         fun onKeyLongPress(action: KeyAction)
@@ -367,6 +372,10 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 上滑已过阈值：抬手上屏副字符 */
     private var swipeArmed = false
+
+    /** 下滑手势（仅用户键位覆盖里绑了下滑的键）：已开始 / 已过阈值（抬手才执行，滑回去可反悔） */
+    private var swipeDownShown = false
+    private var swipeDownArmed = false
 
     /** 正弹着长按菜单的功能键（中英键）；抬手时按菜单上的选中项回调 */
     private var optionsAction: KeyAction? = null
@@ -714,7 +723,8 @@ class KeyboardView(context: Context) : View(context) {
             val label = displayLabel(key)
             textPaint.textSize = labelSizePx(label)
             val isLetter = (key.action as? KeyAction.Text)?.char?.isLetter() == true
-            val hint = if (isLetter && !showSwipeHints) null else key.swipeFor(englishMode)
+            val hint = if (isLetter && !showSwipeHints) null else upLabelOf(key)
+            val downHint = if (isLetter && !showSwipeHints) null else downLabelOf(key)
             // 有角标的字母键：主字下移一点，给顶上居中的角标让出位置（豆包的排法）
             val shiftDown = if (hint != null && isLetter) 4 * density else 0f
             val textY = rect.centerY() - (textPaint.ascent() + textPaint.descent()) / 2 + shiftDown
@@ -725,8 +735,13 @@ class KeyboardView(context: Context) : View(context) {
             canvas.drawText(label, rect.centerX() - glyphBounds.exactCenterX(), textY, textPaint)
             // 副字符角标（按当前模式显示中英形态）：字母键在顶上居中（豆包、微信都这么排，
             // 一眼扫过去数字行就是一排 1–0），其余键仍在右上角；字母键的角标受开关控制
+            if (downHint != null) {
+                hintPaint.textAlign = Paint.Align.CENTER
+                canvas.drawText(downHint, rect.centerX(), rect.bottom - 5 * density, hintPaint)
+                hintPaint.textAlign = Paint.Align.RIGHT
+            }
             if (hint != null) {
-                val text = Punct.display(hint, chinesePunct)
+                val text = hint
                 if (isLetter) {
                     hintPaint.textAlign = Paint.Align.CENTER
                     canvas.drawText(text, rect.centerX(), rect.top + 12 * density, hintPaint)
@@ -881,7 +896,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun gestureInProgress(): Boolean =
-        popupManager.isPopupShown || swipeShown || spaceSwipeActive || backspaceGesture.isEngaged ||
+        popupManager.isPopupShown || swipeShown || swipeDownShown || spaceSwipeActive || backspaceGesture.isEngaged ||
             longPressFired
 
     private fun startPress(pointerId: Int, x: Float, y: Float) {
@@ -891,6 +906,8 @@ class KeyboardView(context: Context) : View(context) {
         downY = y
         swipeShown = false
         swipeArmed = false
+        swipeDownShown = false
+        swipeDownArmed = false
         optionsAction = null
         longPressFired = false
         spaceSwipeActive = false
@@ -959,13 +976,13 @@ class KeyboardView(context: Context) : View(context) {
 
         // 上滑副字符：往上一动就从键位长出一体式气泡（上半副字符、下半主字符），过阈值副字符
         // 变强调色，抬手才上屏——上滑途中看得见要出什么，滑过头了退回来还能反悔
-        val swipeChar = key.swipeFor(englishMode)
-        if (swipeSymbolsEnabled && swipeChar != null) {
+        val upLabel = upLabelOf(key)
+        if (swipeSymbolsEnabled && upLabel != null) {
             if (!swipeShown && dy > swipeActivatePx && dy > kotlin.math.abs(dx)) {
                 val rect = pressedRect ?: return
                 swipeShown = true
                 cancelTimers()
-                popupManager.showSwipeBubble(rect, displayLabel(key), Punct.display(swipeChar, chinesePunct), y)
+                popupManager.showSwipeBubble(rect, displayLabel(key), upLabel, y)
             }
             if (swipeShown) {
                 popupManager.moveSwipeBubble(y)
@@ -978,9 +995,29 @@ class KeyboardView(context: Context) : View(context) {
                 return
             }
         }
+        // 下滑（只有用户在 keymap.toml 里给这个键绑了下滑才有）：过起算距离后进入，过阈值「上膛」，
+        // 抬手执行；滑回阈值内再抬手就作罢。没有上滑那样的气泡，靠键帽底部的角标提示
+        if (swipeSymbolsEnabled && key.downOut != null) {
+            val down = -dy
+            if (!swipeDownShown && down > swipeActivatePx && down > kotlin.math.abs(dx)) {
+                swipeDownShown = true
+                cancelTimers()
+                popupManager.dismissAll()
+            }
+            if (swipeDownShown) {
+                val armed = down > swipeThresholdPx
+                if (armed != swipeDownArmed) {
+                    swipeDownArmed = armed
+                    if (armed) KeyHaptics.tap(this)
+                }
+                return
+            }
+        }
         // 滑出键位即取消（滑动输入为二期能力）。判据以**按下的键**为准、带键缝一半 + touchSlop 的
         // 容差：此前一出矩形就按「同行最近键」改判，快打时拇指蹭几像素整次点按就丢了（B4）
         val r = pressedRect ?: return
+        // 绑了下滑的键：向下漂移不判取消（否则漂过容差就在起算距离之前被取消了）
+        if (key.downOut != null && dy < 0) return
         if (TapHit.shouldCancelOnMove(
                 TapHit.Rect(r.left, r.top, r.right, r.bottom),
                 x,
@@ -1005,7 +1042,12 @@ class KeyboardView(context: Context) : View(context) {
             return
         }
         val key = pressedKey
-        val swipeChar = if (swipeArmed) key?.swipeFor(englishMode) else null
+        val swipeOutput: KeyOutput? = when {
+            swipeArmed && key?.upOut != null -> key.upOut
+            swipeDownArmed -> key?.downOut
+            else -> null
+        }
+        val swipeChar = if (swipeArmed && swipeOutput == null) key?.swipeFor(englishMode) else null
         val popupChoice = popupManager.popupSelectedIndex()
             ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
         // 长按触发过、或字符气泡弹出过（含下滑取消）都不补单击
@@ -1023,6 +1065,10 @@ class KeyboardView(context: Context) : View(context) {
         }
         cancelPress()
         when {
+            swipeOutput != null -> {
+                performOutput(swipeOutput)
+                resetSingleShift(key)
+            }
             swipeChar != null -> {
                 listener?.onKeyAction(symbolAction(swipeChar), shifted = false)
                 resetSingleShift(key)
@@ -1046,6 +1092,33 @@ class KeyboardView(context: Context) : View(context) {
      * （中文模式 j 的右引号 ”）引擎翻不出 VK，用 [KeyAction.Commit] 直接上屏（有编码时先顶首选）。
      */
     private fun symbolAction(c: Char): KeyAction = symbolActionFor(c, chinesePunct)
+
+    /** 上滑角标 / 气泡上显示的文字：用户覆盖的文本与功能名，或出厂的副字符（按当前中英标点形态） */
+    private fun upLabelOf(key: KeyDef): String? = when (val o = key.upOut) {
+        is KeyOutput.Text -> o.text
+        is KeyOutput.Func -> KeymapMerge.funcLabel(o.name)
+        else -> key.swipeFor(englishMode)?.let { Punct.display(it, chinesePunct) }
+    }
+
+    private fun downLabelOf(key: KeyDef): String? = when (val o = key.downOut) {
+        null -> null
+        is KeyOutput.Char -> Punct.display(o.c, chinesePunct)
+        is KeyOutput.Text -> if (o.text.length == 1) Punct.display(o.text[0], chinesePunct) else o.text
+        is KeyOutput.Func -> KeymapMerge.funcLabel(o.name)
+        else -> null
+    }
+
+    /** 执行上滑 / 下滑绑定的输出：字符走原有的符号动作，多字符文本原样上屏，功能交给宿主 */
+    private fun performOutput(o: KeyOutput) {
+        when (o) {
+            is KeyOutput.Char -> listener?.onKeyAction(symbolAction(o.c), shifted = false)
+            is KeyOutput.Text ->
+                if (o.text.length == 1) listener?.onKeyAction(symbolAction(o.text[0]), shifted = false)
+                else listener?.onKeyAction(KeyAction.Commit(o.text), shifted = false)
+            is KeyOutput.Func -> listener?.onKeyFunc(o.name)
+            else -> Unit
+        }
+    }
 
     /** 按下反馈：震动 + 按键音，各自受开关控制 */
     private fun feedback(key: KeyDef) {
