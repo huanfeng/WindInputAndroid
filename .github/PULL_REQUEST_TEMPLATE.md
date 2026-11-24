@@ -1,3 +1,5 @@
+<!-- 本仓库是安卓版仓库；电脑版（Windows / macOS / Linux）与核心引擎的改动请到主仓 https://github.com/huanfeng/WindInput 提交 -->
+
 ## 变更说明
 
 <!-- 简要描述这个 PR 做了什么 -->

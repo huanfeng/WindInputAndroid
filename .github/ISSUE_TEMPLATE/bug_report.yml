@@ -7,6 +7,8 @@ body:
       value: |
         感谢你提交 Bug 反馈！请尽量详细描述。
 
+        > ⚠️ 本仓库是**安卓版**仓库，只收集安卓版的问题。Windows / macOS / Linux 版的问题请到[主仓](https://github.com/huanfeng/WindInput/issues)提交。
+
         > ### 📋 输入相关的问题，请附上诊断压缩包
         > 一份诊断能省掉十轮来回。**抓取方式：**
         > 1. 能稳定复现的：先复现一次问题

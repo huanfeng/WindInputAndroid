@@ -2,7 +2,7 @@ blank_issues_enabled: true
 contact_links:
   - name: 电脑版
     url: https://github.com/huanfeng/WindInput/issues
-    about: 反馈的是 Windows / macOS / Linux 版的问题，请到主仓提交
+    about: 本仓库只收集安卓版的问题；Windows / macOS / Linux 版及核心引擎的问题请到主仓提交
   - name: 使用问题
     url: https://github.com/huanfeng/WindInputAndroid/discussions
     about: 文档未覆盖的使用问题请到 Discussions 讨论

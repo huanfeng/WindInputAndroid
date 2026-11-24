@@ -7,6 +7,8 @@ body:
       value: |
         感谢你的建议！请描述你期望的功能，我们会认真评估。
 
+        > ⚠️ 本仓库是**安卓版**仓库，只收集安卓版的问题。Windows / macOS / Linux 版的问题请到[主仓](https://github.com/huanfeng/WindInput/issues)提交。
+
   - type: textarea
     id: problem
     attributes:
