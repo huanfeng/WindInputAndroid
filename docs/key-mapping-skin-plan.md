@@ -180,6 +180,8 @@ long_press = ["，", "；", "：", "“", "‘", "、"]
 
 ### 3.7 配置存储与版本迁移
 
+> 2026-11-24：`<userRoot>/keyboard/` 已迁为 `<userRoot>/mobile/`，键盘配置文件改名 `keyboard.toml`（`MobileDirMigration`）。下文凡写 `keyboard/config.toml` 的都指 `mobile/keyboard.toml`。
+
 - 新增 `<userRoot>/mobile/keymap.toml`（键位覆盖）与 `<userRoot>/mobile/skins/`（皮肤包，见皮肤设计文档）。`keymap.toml` 与每个皮肤的描述文件都**首行 `version = N`**。
 - **读取规则**：版本号高于当前支持 → 忽略整个文件并在设置页提示「配置来自更新版本」，**不覆盖、不删除**；缺失版本号按 `1`；字段名拼错 / 未知手势 / 未知 `func` → 跳过该项并写日志，**不让整份覆盖失效**（与现有「解析失败回退」同一哲学，但粒度更细）。
 - **出厂布局升级**：因为覆盖是按键位的差异，升级时不需要迁移用户文件；只有「键位 `id` 改名 / 删除」才会让覆盖项失效。约定：**布局键位 `id` 一经发布不改名**，必须改时在 `keymap.toml` 的读取处加一张旧 `id` → 新 `id` 映射表，并加单测。

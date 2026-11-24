@@ -175,7 +175,7 @@ object Diagnostics {
             "架构" to Build.SUPPORTED_ABIS.joinToString(),
             "键盘设置" to keyboardSettingsLine { key, default ->
                 runCatching {
-                    UserConfig(File((context.applicationContext as com.windinput.ime.WindInputApp).dataDirs.keyboardDir, "config.toml"))
+                    UserConfig((context.applicationContext as com.windinput.ime.WindInputApp).dataDirs.keyboardConfigFile)
                         .getInt(key, default)
                 }.getOrNull()
             },

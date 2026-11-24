@@ -575,14 +575,14 @@ mark_onboarded() {
 }
 mark_onboarded
 # [40] 中途断掉会留下 inline_preedit = true，之后所有读输入框的断言都带上内联编码
-if adb_ shell cat "$EXT/keyboard/config.toml" 2>/dev/null | grep -q '^inline_preedit = true'; then
+if adb_ shell cat "$EXT/mobile/keyboard.toml" 2>/dev/null | grep -q '^inline_preedit = true'; then
     echo "${Y}残留 inline_preedit，清掉${N}"
-    adb_q shell "sed -i '/^inline_preedit = true/d' $EXT/keyboard/config.toml"
+    adb_q shell "sed -i '/^inline_preedit = true/d' $EXT/mobile/keyboard.toml"
 fi
 # 候选字后的编码灰字（ui.android.candidate_comment，默认开）让每个候选变宽，tap_candidate
 # 按固定步长点就会错位：整套用例关着它跑，跑完写回原配置。带 `# emu-test` 标记，
 # 中途断掉留下的这一行下次开跑时先剥掉，SUITE_KB_ORIG 拿到的就是用户自己的配置
-KB_CFG="$EXT/keyboard/config.toml"
+KB_CFG="$EXT/mobile/keyboard.toml"
 COMMENT_OFF='candidate_comment = false # emu-test'
 # 「123」默认先进九宫数字（ui.android.number_page = pad9），而整套用例写的是「123 先进全键盘数字页、
 # 再点「符号」位进九宫」的按法：同样带标记钉成 full，跑完写回

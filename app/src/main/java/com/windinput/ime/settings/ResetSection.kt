@@ -77,8 +77,7 @@ internal fun ResetSection(values: SettingsValues) {
 private fun runReset(context: android.content.Context, tier: ResetTier, values: SettingsValues): String = try {
     when (tier) {
         ResetTier.KEYBOARD -> {
-            val userDir = (context.applicationContext as WindInputApp).dataDirs.keyboardDir
-            val n = SettingsReset.resetKeyboard(UserConfig(File(userDir, "config.toml")))
+            val n = SettingsReset.resetKeyboard(UserConfig((context.applicationContext as WindInputApp).dataDirs.keyboardConfigFile))
             values.touch()
             if (n == 0) "键盘设置已是出厂值" else "已恢复 $n 项键盘设置，下次弹出键盘时生效"
         }

@@ -11,7 +11,7 @@ import java.io.File
  * 布局仓库：TOML 布局文件解析 + 三级覆盖解析。
  *
  * 解析顺序（与桌面 resolve_data_file 同语义，失败静默回退）：
- *   <用户根>/keyboard/layouts/{id}.toml → filesDir/data/layouts/{id}.toml → 代码内置。
+ *   <用户根>/mobile/layouts/{id}.toml → filesDir/data/layouts/{id}.toml → 代码内置。
  */
 class LayoutRepository(private val resolve: (String) -> File?) {
 

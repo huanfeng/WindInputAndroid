@@ -10,7 +10,7 @@ import java.io.File
  * |-------------------------------------------|-----------------------------------|------|
  * | filesDir/data                             | 安装目录 data/（出厂层，L2）       | 出厂配置/布局/主题/方案，App 升级整体重放 |
  * | getExternalFilesDir(null)（[userRoot]）    | %APPDATA%/WindInput（用户层，L3）  | config.toml、schemas/、schema_overrides/、用户词库与统计——**用户可经文件管理器直接编辑与同步** |
- * | [userRoot]/keyboard（[keyboardDir]）       | —（键盘独有）                      | 键盘自己的 config.toml、自定义布局与图标 |
+ * | [userRoot]/mobile（[mobileDir]）           | —（移动端独有）                    | keyboard.toml（键盘配置）、自定义布局与图标，之后还有 keymap.toml、skins/；**不使用 PC 已占用的文件名**，便于与 PC 同步时按目录区分归属 |
  * | filesDir/rust/data/WindInput（[localRoot]）| %LOCALAPPDATA%/WindInput           | 核心的词库编译缓存与日志（可再生，不进用户视野） |
  * | cacheDir/dict                             | —                                 | 词库 wdat 编译缓存（可再生） |
  *
@@ -33,8 +33,11 @@ class DataDirs(context: Context) {
     val userRoot: File = context.getExternalFilesDir(null)
         ?: throw StorageUnavailableException("无法访问 Android/data/${context.packageName}/files（外部存储不可用）")
 
-    /** 键盘自己的用户层：config.toml、layouts/、icons/（引擎不读） */
-    val keyboardDir: File = File(userRoot, "keyboard")
+    /** 移动端独有的用户层目录：keyboard.toml、layouts/、icons/（引擎不读） */
+    val mobileDir: File = File(userRoot, "mobile")
+
+    /** 键盘自己的配置（`ui.android.*`）；叫 keyboard.toml 而不是 config.toml，是为了不与 PC / 引擎的 config.toml 同名 */
+    val keyboardConfigFile: File = File(mobileDir, "keyboard.toml")
 
     /** 核心的本地目录：词库编译缓存与日志（私有、可再生） */
     val localRoot: File = File(context.filesDir, "rust/data/WindInput")
@@ -47,7 +50,7 @@ class DataDirs(context: Context) {
 
     fun ensureCreated() {
         dataDir.mkdirs()
-        keyboardDir.mkdirs()
+        mobileDir.mkdirs()
         localRoot.mkdirs()
         dictCacheDir.mkdirs()
     }
@@ -57,7 +60,7 @@ class DataDirs(context: Context) {
      * @param relPath 相对路径，如 "layouts/qwerty.toml"
      */
     fun resolveDataFile(relPath: String): File? {
-        val user = File(keyboardDir, relPath)
+        val user = File(mobileDir, relPath)
         if (user.isFile) return user
         val factory = File(dataDir, relPath)
         if (factory.isFile) return factory

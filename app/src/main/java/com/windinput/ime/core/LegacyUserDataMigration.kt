@@ -50,7 +50,7 @@ object LegacyUserDataMigration {
     }
 
     /** 把 [from] 合并进 [to]（不覆盖已有文件）。**全部**复制成功才删除 [from]；返回是否全部成功。 */
-    private fun mergeInto(from: File, to: File, log: (String) -> Unit): Boolean = try {
+    internal fun mergeInto(from: File, to: File, log: (String) -> Unit): Boolean = try {
         val ok = if (from.isDirectory) {
             to.mkdirs()
             from.listFiles().orEmpty().map { mergeInto(it, File(to, it.name), log) }.all { it }

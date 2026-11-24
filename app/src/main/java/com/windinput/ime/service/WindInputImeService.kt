@@ -155,9 +155,9 @@ class WindInputImeService :
         val dirs = (application as WindInputApp).dataDirs
         dataDirs = dirs
         layoutRepository = LayoutRepository(dirs)
-        userConfig = UserConfig(File(dirs.keyboardDir, "config.toml"))
+        userConfig = UserConfig(dirs.keyboardConfigFile)
         // 图标：用户目录 icons/ 下的同名 SVG 覆盖内置图标（日后主题包挂同一机制）
-        IconSet.init(assets, listOf(File(dirs.keyboardDir, "icons")))
+        IconSet.init(assets, listOf(File(dirs.mobileDir, "icons")))
         // 首次弹键盘前把布局与用户配置解析进缓存：tomlj 走 ANTLR，首次解析还要加载一大批类，
         // 放在 onCreateInputView 里就是主线程上一百多毫秒（模拟器实测，键盘弹出掉帧）
         // 配置排在最前：onCreateInputView 头一件事就是按配置定键高，它先进缓存，主线程就不用自己解析

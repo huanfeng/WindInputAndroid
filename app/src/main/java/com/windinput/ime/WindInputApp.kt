@@ -7,6 +7,7 @@ import com.windinput.ime.core.AssetsInstaller
 import com.windinput.ime.core.CrashLog
 import com.windinput.ime.core.DataDirs
 import com.windinput.ime.core.LegacyUserDataMigration
+import com.windinput.ime.core.MobileDirMigration
 import com.windinput.ime.core.RustCoreLoader
 import kotlin.concurrent.thread
 
@@ -41,6 +42,8 @@ class WindInputApp : Application() {
         dataDirs = DataDirs(this).also {
             // 老版本的用户数据在私有目录，必须在核心构造、键盘读配置之前搬完
             LegacyUserDataMigration.run(filesDir, it.userRoot)
+            // keyboard/ → mobile/（键盘配置改名 keyboard.toml，与 PC 的 config.toml 脱钩）；排在上一步之后
+            MobileDirMigration.run(it.userRoot)
             it.ensureCreated()
         }
         // 出厂数据拷出（首启/升级时执行；小文件阶段秒级，词库进来后改带进度）

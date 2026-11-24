@@ -378,11 +378,11 @@ key_alpha = 0.9               # 键面不透明度倍率
 - **字体授权**：随包分发字体有版权风险；强制 `license` 字段 + 导入预览显示，内置皮肤不带字体。
 - **`skin.toml` 命名**：避免叫 `theme.toml`（PC 同名文件语义不同，同步工具按文件名识别时会混）。`key-mapping-skin-plan.md` 里「`theme.toml` 15 槽位」的旧写法要改为 `skin.toml`。
 
-**待你定**
-1. **目录**：新文件放 `<userRoot>/mobile/`（与键位映射文档一致），但现有键盘用户层在 `<userRoot>/keyboard/`（`DataDirs.keyboardDir`，含 `config.toml`、`layouts/`、`icons/`），且 `keyboard/config.toml` 与 PC 的 `config.toml` **文件名相同**（不同目录，路径上不冲突，但按文件名同步的工具会混）。选项：A）`mobile/` 新建、`keyboard/` 保持不动，新旧并存（改动最小）；B）把 `keyboard/` 整体迁到 `mobile/` 并把 `config.toml` 改名为 `keyboard.toml`（一次性迁移，同步最干净）。**我倾向 B，但放在阶段 0 之前单独做**，因为之后同步实现会受益，迁移代码要带单测与回退。
-2. **内置预设形态**：TOML 资源经同一加载器（我的倾向，吃狗粮、也是别人做皮肤的样板），还是写成 Kotlin 对象（启动更快一点点）。
-3. **PC 主题的颜色导入**：是否提供「导入电脑版主题的颜色」（仅 `[colors]`，按 §2.2 映射表转成 `skin.toml`，在 Kotlin 里做，不碰 Rust）。成本小、对用户有「我的 PC 主题手机上也能用」的价值；但映射不是一一对应，需要预览确认。
-4. **`.wskin` 扩展名与文件关联**：与方案包 `.wpkg` 一样注册 `VIEW / SEND` intent-filter（仅 `.wskin` 与 `application/zip` 且 `package.toml kind=skin`），会不会与现有 zip 关联抢？（方案包导入 Activity 已经挂了 zip，需要在预览前先按 `kind` 分流到正确的导入页。）
-5. **皮肤是否允许覆盖按键标签的字体大小 / 角标位置**（`label_size`、`hint_pos`）：会让不同皮肤的键面信息密度差别很大，影响键位映射里「角标」的显示空间。我倾向允许但钳制在 ±20%。
-6. **动态取色预设**是否值得在阶段 1 就做（API 31+，机型覆盖率高，成本低），还是留到阶段 3 之后。
-7. **同步实现**何时做、走什么通道（WebDAV / 文件夹同步 / 自建）——本文只保证文件布局与分类对同步友好，不预设通道。
+**已定（2026-11-24）**
+1. **目录**：选 B，已落地。`<userRoot>/keyboard/` 整体迁到 `<userRoot>/mobile/`，键盘的 `config.toml` 改名 `keyboard.toml`（`MobileDirMigration`，不覆盖已有文件、幂等、带单测）。同步按目录区分归属，不再有与 PC 同名的移动端文件。
+2. **内置预设**：用 TOML 资源，经与用户皮肤同一个加载器——与以后 iOS 端复用。**图片等位图资源一律独立成文件**（放在皮肤目录的 `assets/` 下，`skin.toml` 只写相对路径引用），不内嵌进 TOML（不用 base64）。
+3. **PC 主题颜色导入**：不做。主题编辑器后续会直接提供专门的移动版皮肤输出。
+4. **`.wskin` 文件关联**：待阶段 4 再定（预览前按 `package.toml` 的 `kind` 分流）。
+5. **皮肤可改字号等**：允许（`label_size`、`hint_size`、`hint_pos` 等），钳制范围在阶段 2 定。
+6. **动态取色预设**：待定，不阻塞阶段 1。
+7. **同步**：走 WebDAV / S3 同步配置；PC 与移动端的部分输入数据会合并。本文只需保证**结构与目录不与 PC 冲突**，不预设通道、不设计同步协议。设备相关的值（行高、留空、单手、振动）标 `sync = false`，仍按此约定。

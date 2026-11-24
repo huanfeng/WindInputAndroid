@@ -50,7 +50,7 @@ class BackupRulesTest {
     @Test
     fun settingsAndUserDictsStayIncluded() {
         val rules = excludes("backup_rules.xml")
-        for (keep in listOf("external:", "external:keyboard/", "external:data/", "external:config.toml", "external:userdata.redb.state/")) {
+        for (keep in listOf("external:", "external:mobile/", "external:data/", "external:config.toml", "external:userdata.redb.state/")) {
             assertTrue("$keep 不该被排除", keep !in rules)
         }
     }

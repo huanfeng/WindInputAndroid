@@ -21,7 +21,7 @@ enum class SettingSource {
     /** 引擎配置：经核心 `config_set` 写进核心用户层 */
     ENGINE,
 
-    /** 键盘自己的配置：K 侧 `<用户根>/keyboard/config.toml`，引擎不读 */
+    /** 键盘自己的配置：K 侧 `<用户根>/mobile/keyboard.toml`，引擎不读 */
     ANDROID,
 }
 

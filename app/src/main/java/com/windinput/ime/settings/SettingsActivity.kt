@@ -158,7 +158,7 @@ class SettingsActivity : ComponentActivity() {
         // 方案导入的缓存文件：上次进程被杀可能留下，只清早于十分钟的（不碰别处正在进行的导入）
         Thread { SchemeImportFiles.clearStale(applicationContext) }.start()
         val dirs = (application as WindInputApp).dataDirs
-        val userConfig = UserConfig(File(dirs.keyboardDir, "config.toml"))
+        val userConfig = UserConfig(dirs.keyboardConfigFile)
         val manifest = SettingsManifest.load(this)
         val versionName = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
