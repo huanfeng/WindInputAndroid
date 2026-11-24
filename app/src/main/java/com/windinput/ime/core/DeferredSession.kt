@@ -161,8 +161,21 @@ class DeferredSession(
     override fun assocHold(hold: Boolean) = call("assocHold") { it.assocHold(hold) }
 
     /** 未就绪 / 切方案中 → 交还宿主（字母直接上屏），绝不吞键、绝不等锁 */
-    override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean =
-        if (busy) false else delegate?.keyPressed(action, shifted, source) ?: false
+    override fun keyPressed(action: KeyAction, shifted: Boolean, source: KeySource): Boolean {
+        val d = delegate
+        if (busy || d == null) {
+            // 字母没进引擎、由宿主直接上屏：同一串输入里一部分在引擎、一部分在文本框，
+            // 用户看到的就是「拼音不完整」（B4）。这里只记一笔供诊断；不缓冲重放——引擎的
+            // 提交经 listener 回到主线程，放到 worker 上执行会让上屏落在后台线程，且「切方案
+            // 期间交还宿主」本就是上面写明的取舍
+            KeyDropStats.global.record(
+                KeyDropStats.Reason.CORE_BUSY_BYPASS,
+                if (d == null) "核心未就绪" else "后台命令进行中",
+            )
+            return false
+        }
+        return d.keyPressed(action, shifted, source)
+    }
 
     override fun candidateSelected(index: Int, autoSpace: Boolean): Boolean =
         if (busy) false else delegate?.candidateSelected(index, autoSpace) ?: false

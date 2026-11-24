@@ -1033,6 +1033,7 @@ class WindInputImeService :
         val ic = currentInputConnection
         if (ic == null) {
             android.util.Log.w(TAG, "默认行为无法执行：currentInputConnection 为 null action=$action")
+            com.windinput.ime.core.KeyDropStats.global.record(com.windinput.ime.core.KeyDropStats.Reason.NO_INPUT_CONNECTION)
             return
         }
         when (action) {

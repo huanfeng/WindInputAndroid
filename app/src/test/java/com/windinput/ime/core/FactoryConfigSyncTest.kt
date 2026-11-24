@@ -32,6 +32,8 @@ class FactoryConfigSyncTest {
             "input.auto_pair.english_pairs",
             "input.buffer_symbol_chars",
             "keys.page_keys",
+            // 触屏没有翻页键，智能档直接把被滤的生僻字追加在末尾；电脑端出厂 false
+            "input.scope_relax.always_append",
         )
 
         val ANDROID = File("src/main/assets/data/config.toml")

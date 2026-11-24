@@ -26,6 +26,17 @@ class WindInputApp : Application() {
                 StrictMode.ThreadPolicy.Builder().detectDiskReads().detectDiskWrites().penaltyLog().build(),
             )
         }
+        // 触摸丢键统计进诊断导出：用户反馈「碰了字母没上屏」时，按原因计数和最近记录能看出丢在哪条路径
+        com.windinput.ime.settings.Diagnostics.registerExtraSection("触摸丢键统计") {
+            val k = com.windinput.ime.core.KeyDropStats.global
+            buildString {
+                appendLine(k.summary())
+                val fmt = java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US)
+                for (e in k.recent()) {
+                    appendLine("${fmt.format(java.util.Date(e.timeMs))} ${e.reason}${e.detail?.let { " $it" } ?: ""}")
+                }
+            }.trimEnd()
+        }
         // 外部存储（用户层所在）取不到就直接报错，不回退私有目录：见 DataDirs 的说明
         dataDirs = DataDirs(this).also {
             // 老版本的用户数据在私有目录，必须在核心构造、键盘读配置之前搬完

@@ -11,6 +11,7 @@ import android.view.MotionEvent
 import android.view.VelocityTracker
 import android.view.View
 import android.widget.OverScroller
+import com.windinput.ime.core.KeyDropStats
 
 /**
  * 软键盘主视图：自定义 View + Canvas 绘制（渲染路线见 docs/architecture.md §3.6）。
@@ -844,7 +845,10 @@ class KeyboardView(context: Context) : View(context) {
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 // 上一指正处在手势里（气泡选字、空格移光标、退格扩选/连删、长按）时不打断它
-                if (pressedKey != null && gestureInProgress()) return true
+                if (pressedKey != null && gestureInProgress()) {
+                    KeyDropStats.global.record(KeyDropStats.Reason.SECOND_FINGER_IGNORED)
+                    return true
+                }
                 val i = event.actionIndex
                 if (pressedKey != null) finishPress()
                 // 落在左侧符号列：那里不是键（占位空白），按键位找会命中同行最近的数字键、打错字。
@@ -868,6 +872,7 @@ class KeyboardView(context: Context) : View(context) {
                 activePointerId = MotionEvent.INVALID_POINTER_ID
             }
             MotionEvent.ACTION_CANCEL -> {
+                if (pressedKey != null) KeyDropStats.global.record(KeyDropStats.Reason.CANCEL_ACTION)
                 cancelPress()
                 activePointerId = MotionEvent.INVALID_POINTER_ID
             }
@@ -973,8 +978,19 @@ class KeyboardView(context: Context) : View(context) {
                 return
             }
         }
-        // 滑出键位即取消（滑动输入为二期能力）
-        if (findKey(x, y) !== key && dy < swipeThresholdPx / 2) {
+        // 滑出键位即取消（滑动输入为二期能力）。判据以**按下的键**为准、带键缝一半 + touchSlop 的
+        // 容差：此前一出矩形就按「同行最近键」改判，快打时拇指蹭几像素整次点按就丢了（B4）
+        val r = pressedRect ?: return
+        if (TapHit.shouldCancelOnMove(
+                TapHit.Rect(r.left, r.top, r.right, r.bottom),
+                x,
+                y,
+                TapHit.margin(keyGapPx, touchSlopPx.toFloat()),
+                dyUp = dy,
+                swipeThresholdPx = swipeThresholdPx,
+            )
+        ) {
+            KeyDropStats.global.record(KeyDropStats.Reason.DRIFT_CANCEL)
             cancelPress()
         }
     }
@@ -994,6 +1010,11 @@ class KeyboardView(context: Context) : View(context) {
             ?.let { i -> key?.let { popupChars(it).getOrNull(i) } }
         // 长按触发过、或字符气泡弹出过（含下滑取消）都不补单击
         val skipTap = longPressFired || popupManager.isPopupShown
+        // 字符气泡弹着、手指却滑出了气泡（选中项为空）：抬手既不上屏也不补单击——用户可能是
+        // 慢点按，记一笔供诊断
+        if (key != null && popupManager.isPopupShown && popupChoice == null && !longPressFired) {
+            KeyDropStats.global.record(KeyDropStats.Reason.POPUP_CANCEL)
+        }
         val wasSpaceSwipe = spaceSwipeActive
         if (key?.action == KeyAction.Backspace) {
             backspaceGesture.up()
