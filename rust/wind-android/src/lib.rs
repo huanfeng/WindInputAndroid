@@ -32,7 +32,9 @@ use wind_mobile::{
 };
 
 pub mod scheme;
+pub mod sync;
 pub use scheme::{SchemeDeleteInfo, SchemeImportInfo, SchemePreviewInfo};
+pub use sync::{MobileSyncHandle, SyncError};
 
 uniffi::setup_scaffolding!();
 
