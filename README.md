@@ -18,7 +18,7 @@
 <p align="center">
   <a href="https://windinput.com"><b>官网</b></a> ·
   <a href="https://github.com/huanfeng/WindInputAndroid/releases"><b>下载</b></a> ·
-  <a href="https://windinput.com/docs"><b>使用文档</b></a> ·
+  <a href="docs/development.md"><b>开发指南</b></a> ·
   <a href="https://github.com/huanfeng/WindInput"><b>电脑版</b></a>
 </p>
 
@@ -42,7 +42,7 @@
 3. 升级直接覆盖安装，设置与用户词库都会保留
 
 要求：Android 8.0（API 26）及以上，**仅提供 64 位（arm64-v8a）**安装包。
-输入法不会自己检查更新，新版本请留意 Releases 或官网。
+输入法不会自己检查更新，新版本请留意 [Releases](https://github.com/huanfeng/WindInputAndroid/releases)（官网暂无安卓版下载与文档）。
 
 ## 反馈问题
 

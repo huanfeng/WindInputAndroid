@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
-  - name: 使用文档
-    url: https://windinput.com/docs
-    about: 安装、配置与常见问题，请先查阅在线文档
+  - name: 电脑版
+    url: https://github.com/huanfeng/WindInput/issues
+    about: 反馈的是 Windows / macOS / Linux 版的问题，请到主仓提交
   - name: 使用问题
     url: https://github.com/huanfeng/WindInputAndroid/discussions
     about: 文档未覆盖的使用问题请到 Discussions 讨论
