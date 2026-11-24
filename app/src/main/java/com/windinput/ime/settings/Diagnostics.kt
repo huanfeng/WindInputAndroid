@@ -9,11 +9,13 @@ import android.util.Log
 import com.windinput.ime.core.CrashLog
 import com.windinput.ime.core.LogLevel
 import com.windinput.ime.core.UiTrace
+import com.windinput.ime.core.UserConfig
 import androidx.core.content.FileProvider
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -37,6 +39,49 @@ object Diagnostics {
 
     private const val TAG = "Diagnostics"
     private const val ZIP_DIR = "diagnostics"
+
+    /**
+     * 额外的诊断段：别的模块（如触摸丢键统计）在这里登记一个标题与取文本的函数，导出诊断时
+     * 各自成段追加。这样诊断类不必依赖那些模块，也不用每加一类数据就改一遍 [collect]。
+     * 取文本的函数在导出线程里调用，抛异常的段会被跳过而不影响其余内容。
+     */
+    private val extraSections = CopyOnWriteArrayList<Pair<String, () -> String>>()
+
+    fun registerExtraSection(title: String, provider: () -> String) {
+        extraSections.removeAll { it.first == title }
+        extraSections += title to provider
+    }
+
+    internal fun collectExtraSections(): List<Pair<String, String>> =
+        extraSections.mapNotNull { (title, provider) -> runCatching { title to provider() }.getOrNull() }
+
+    /**
+     * 与键盘空白 / 尺寸相关的用户设置，一行写完。读不到的项写 ?：空白可能是用户自己设了留空，
+     * 光看合成后的避让值分不出来。只含数值，不含任何输入内容。
+     */
+    internal fun keyboardSettingsLine(readInt: (key: String, default: Int) -> Int?): String {
+        fun v(key: String, default: Int) = readInt(key, default)?.toString() ?: "?"
+        return "竖屏键行高 ${v("ui.android.row_height_portrait", 60)}dp  横屏键行高 ${v("ui.android.row_height_landscape", 44)}dp  " +
+            "底部留空 ${v("ui.android.keyboard_bottom_gap", 0)}dp  侧边留空 ${v("ui.android.keyboard_side_gap", 0)}dp"
+    }
+
+    /** 压缩包里的 README：让收到包的人（和导出包的用户）知道里面是什么、怎么复现 */
+    internal fun readme(versionName: String): String = """
+        清风输入法诊断包（版本 $versionName）
+
+        反馈键盘显示问题（如下方空白）时的操作：
+        1. 打开出问题的界面，让键盘弹出并停留约 2 秒；
+        2. 设置 → 关于 → 导出诊断压缩包，发给开发者；
+        3. 另附一张截图，标出空白的位置。
+
+        包内文件：
+        - diagnostics.txt  版本、系统、机型、键盘设置、窗口与 insets 数值、界面诊断轨迹、最近日志
+        - logcat.txt / logcat-crash.txt  INFO 及以上日志（含崩溃前一次运行）与系统崩溃缓冲区
+        - crash.txt  最近一次崩溃栈
+
+        隐私：只含数值、开关、应用包名与输入类型位，不含输入的文字；
+        不含设备序列号、IMEI 或账号。本应用不联网，发给谁由你在系统分享面板里选。
+    """.trimIndent() + "\n"
 
     /** 只读本进程的日志（应用读不到别的进程），过滤见类注释 */
     internal fun logcatCommand(pid: Int): List<String> = listOf(
@@ -70,6 +115,7 @@ object Diagnostics {
         val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
         val out = File(dir, "WindInput-diagnostics-$versionName-$stamp.zip")
         val entries = linkedMapOf(
+            "README.txt" to readme(versionName),
             "diagnostics.txt" to collect(context, versionName),
             "logcat.txt" to readLogcat(zipLogcatCommand(false)).joinToString("\n"),
             "logcat-crash.txt" to readLogcat(zipLogcatCommand(true)).joinToString("\n"),
@@ -101,6 +147,7 @@ object Diagnostics {
         logTail: List<String>,
         crash: String?,
         ui: List<String> = emptyList(),
+        extra: List<Pair<String, String>> = emptyList(),
     ): String = buildString {
         append("清风输入法诊断信息\n")
         for ((k, v) in header) append(k).append("：").append(v).append('\n')
@@ -109,6 +156,10 @@ object Diagnostics {
         if (ui.isNotEmpty()) {
             append("\n── 界面诊断（键盘避让/insets，不含用户输入）──\n")
             for (line in ui) append(line).append('\n')
+        }
+        for ((title, body) in extra) {
+            append("\n── ").append(title).append(" ──\n")
+            append(body.trimEnd()).append('\n')
         }
         append("\n── 最近日志（INFO 及以上，").append(logTail.size).append(" 行）──\n")
         if (logTail.isEmpty()) append("（读不到日志）\n")
@@ -122,6 +173,12 @@ object Diagnostics {
             "系统" to "Android ${Build.VERSION.RELEASE}（API ${Build.VERSION.SDK_INT}）",
             "机型" to "${Build.MANUFACTURER} ${Build.MODEL}",
             "架构" to Build.SUPPORTED_ABIS.joinToString(),
+            "键盘设置" to keyboardSettingsLine { key, default ->
+                runCatching {
+                    UserConfig(File((context.applicationContext as com.windinput.ime.WindInputApp).dataDirs.keyboardDir, "config.toml"))
+                        .getInt(key, default)
+                }.getOrNull()
+            },
             "核心日志级别" to LogLevel.read(
                 (context.applicationContext as com.windinput.ime.WindInputApp).dataDirs.engineConfigFile,
                 File(context.filesDir, "data"),
@@ -131,7 +188,7 @@ object Diagnostics {
             val proc = ProcessBuilder(logcatCommand(Process.myPid())).redirectErrorStream(true).start()
             proc.inputStream.bufferedReader().use { it.readLines() }.also { proc.waitFor() }
         }.onFailure { Log.w(TAG, "读日志失败", it) }.getOrDefault(emptyList())
-        return compose(header, logs, CrashLog.last(context), UiTrace.deviceInfo(context) + UiTrace.snapshot())
+        return compose(header, logs, CrashLog.last(context), UiTrace.deviceInfo(context) + UiTrace.snapshot(), collectExtraSections())
     }
 
     fun openIssues(context: Context) {

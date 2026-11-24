@@ -61,4 +61,42 @@ class DiagnosticsTest {
         assertEquals(listOf("WindTestPad:S", "*:I"), cmd.takeLast(2))
         assertEquals(listOf("-b", "crash"), Diagnostics.zipLogcatCommand(true).let { it.subList(it.indexOf("-b"), it.indexOf("-b") + 2) })
     }
+    @Test
+    fun composeAppendsExtraSectionsBeforeLogs() {
+        val text = Diagnostics.compose(
+            emptyList(), listOf("I/x: a"), null,
+            extra = listOf("触摸丢键统计" to "取消=3\n漂出=1\n"),
+        )
+        assertTrue(text.contains("── 触摸丢键统计 ──\n取消=3\n漂出=1\n"))
+        assertTrue(text.indexOf("触摸丢键统计") < text.indexOf("最近日志"))
+    }
+
+    @Test
+    fun extraSectionsSkipFailingProvidersAndReplaceSameTitle() {
+        Diagnostics.registerExtraSection("T1") { "old" }
+        Diagnostics.registerExtraSection("T1") { "new" }
+        Diagnostics.registerExtraSection("T2") { error("boom") }
+        val got = Diagnostics.collectExtraSections().filter { it.first.startsWith("T") }
+        assertEquals(listOf("T1" to "new"), got)
+    }
+
+    @Test
+    fun keyboardSettingsLineShowsValuesAndMarksUnreadable() {
+        val line = Diagnostics.keyboardSettingsLine { key, default ->
+            if (key.endsWith("side_gap")) null else if (key.endsWith("bottom_gap")) 12 else default
+        }
+        assertTrue(line, "竖屏键行高 60dp" in line)
+        assertTrue(line, "横屏键行高 44dp" in line)
+        assertTrue(line, "底部留空 12dp" in line)
+        assertTrue(line, "侧边留空 ?dp" in line)
+    }
+
+    @Test
+    fun readmeCarriesVersionStepsAndPrivacyNote() {
+        val text = Diagnostics.readme("0.5.4-dev.2")
+        assertTrue(text.contains("0.5.4-dev.2"))
+        assertTrue(text.contains("停留约 2 秒"))
+        assertTrue(text.contains("导出诊断压缩包"))
+        assertTrue(text.contains("不含输入的文字"))
+    }
 }

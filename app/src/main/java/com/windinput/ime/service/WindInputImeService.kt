@@ -27,6 +27,7 @@ import com.windinput.ime.core.RustCoreLoader
 import com.windinput.ime.core.RustSession
 import com.windinput.ime.core.SchemaEntry
 import com.windinput.ime.core.UiEvent
+import com.windinput.ime.core.UiTrace
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.core.suspendsLearning
 import com.windinput.ime.keyboard.BackspaceGesture
@@ -530,6 +531,17 @@ class WindInputImeService :
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // 诊断：只记包名与输入类型位，不含输入框里的文字 / 提示 / 标签
+        UiTrace.add(
+            UiTrace.INPUT,
+            UiTrace.describeInput(
+                info?.packageName,
+                info?.inputType ?: 0,
+                info?.imeOptions ?: 0,
+                restarting,
+                window?.window?.attributes?.layoutInDisplayCutoutMode,
+            ),
+        )
         // 配色核对：视图是按构造那一刻的深浅色画的，系统没发配置变更时不会重建。
         // 对不上（刚装好时拿到了旧配置、或设置页改了深浅色）就当场重建整个输入视图。
         // 条区高度、键行高同理：设置页改了就要按新值重建（键行高此前漏判，要改别的 UI 项才生效）
@@ -537,6 +549,7 @@ class WindInputImeService :
             configuredRowHeightDp() != KeyboardDimens.rowHeightDp ||
             barDims() != (KeyboardDimens.barPreeditDp to KeyboardDimens.barMainRowDp)
         ) {
+            UiTrace.add(UiTrace.REBUILD, "输入视图按设置/配色变化重建")
             setInputView(onCreateInputView())
         }
         session.candidateComments = userConfig.getBoolean("ui.android.candidate_comment", true)

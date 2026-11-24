@@ -63,6 +63,24 @@ class InputRootView(context: Context) : LinearLayout(context) {
         setBackgroundColor(Palette.current.background)
         fitsSystemWindows = false
         addView(bottomSpacer, LayoutParams(LayoutParams.MATCH_PARENT, insetBottom))
+        // 诊断：布局落定后的实测高度。空白是我们垫的（spacer 高）还是系统给的窗口比内容大
+        // （根视图高 − 内容高 − spacer 高 > 0），只有实测值分得清。尺寸没变不重复记
+        addOnLayoutChangeListener { v, _, top, _, bottom, _, oldTop, _, oldBottom ->
+            if (bottom - top == oldBottom - oldTop && oldBottom != 0) return@addOnLayoutChangeListener
+            val loc = IntArray(2).also(v::getLocationOnScreen)
+            val spacerH = bottomSpacer.height
+            UiTrace.add(
+                UiTrace.LAYOUT,
+                describeLayout(
+                    rootH = bottom - top,
+                    spacerH = spacerH,
+                    contentH = bottom - top - spacerH,
+                    topOnScreen = loc[1],
+                    screenH = resources.displayMetrics.heightPixels,
+                    extraBottom = extraBottom,
+                ),
+            )
+        }
     }
 
     /** 占位 View 必须始终在最后一个（子 View 由 Service 依次 addView） */
@@ -78,13 +96,16 @@ class InputRootView(context: Context) : LinearLayout(context) {
         val bottom = if (Build.VERSION.SDK_INT >= 30) {
             val nav = insets.getInsets(WindowInsets.Type.navigationBars()).bottom
             val gesture = insets.getInsets(WindowInsets.Type.systemGestures()).bottom
-            maxOf(nav, gesture)
+            val density = resources.displayMetrics.density
+            chooseBottomAvoidance(nav, gesture, density).also {
+                UiTrace.add(UiTrace.INSETS, "避让取值 " + describeAvoidance(nav, gesture, density, it))
+            }
         } else {
             @Suppress("DEPRECATION")
             insets.systemWindowInsetBottom
         }
         lastInsetBottom = bottom
-        UiTrace.add("insets ${if (portrait) "竖" else "横"} 取值=$bottom 当前避让=$insetBottom 额外留空=$extraBottom | ${UiTrace.describeInsets(insets)}")
+        UiTrace.add(UiTrace.INSETS, "${if (portrait) "竖" else "横"} 取值=$bottom 当前避让=$insetBottom 额外留空=$extraBottom | ${UiTrace.describeInsets(insets)} | ${UiTrace.describeNavVisibility(insets)}")
         // 横屏时挖孔与三键导航栏在左右两侧：窗口铺到底（服务里开了 cutout ALWAYS），
         // 键往里收，背景照样铺满——否则侧边露出一条底下的应用
         if (Build.VERSION.SDK_INT >= 30) {
@@ -109,9 +130,10 @@ class InputRootView(context: Context) : LinearLayout(context) {
         // 落实前再读一次窗口当前的 insets：瞬时 0 之后若没有新的派发，真值只在这里能拿到
         val now = if (Build.VERSION.SDK_INT >= 30) {
             rootWindowInsets?.let {
-                maxOf(
+                chooseBottomAvoidance(
                     it.getInsets(WindowInsets.Type.navigationBars()).bottom,
                     it.getInsets(WindowInsets.Type.systemGestures()).bottom,
+                    resources.displayMetrics.density,
                 )
             } ?: 0
         } else {
@@ -124,7 +146,7 @@ class InputRootView(context: Context) : LinearLayout(context) {
     private fun commitInset(bottom: Int) {
         if (bottom != savedInset(context, portrait)) saveInset(context, portrait, bottom)
         if (bottom != insetBottom) {
-            UiTrace.add("避让 $insetBottom → $bottom（首帧估值 $estimated）")
+            UiTrace.add(UiTrace.COMMIT, "避让 $insetBottom → $bottom（首帧估值 $estimated）")
             android.util.Log.i("InputRootView", "导航避让首帧 $insetBottom（估值 $estimated）→ 实际 $bottom")
             insetBottom = bottom
             applySpacer()
@@ -135,8 +157,43 @@ class InputRootView(context: Context) : LinearLayout(context) {
         /** 避让高度突然变成 0 时等多久再信：头一次派发的瞬时 0 通常几帧内就被真值覆盖 */
         private const val LOWERED_SETTLE_MS = 400L
 
+        /** 纯手势导航下的避让上限（dp）：盖住手势条即可，荣耀识别区 40dp 垫满就是空白反馈 */
+        private const val GESTURE_BAR_CAP_DP = 16
+
         /** 进程内记住上次的真值：API 26–29 没有 WindowMetrics，重建输入视图时用它 */
         private var lastInsetBottom = -1
+
+        /**
+         * 底部避让取值（纯函数，单测见 InputRootViewInsetsTest）。
+         *
+         * 三键/两键导航是实色栏，按导航栏高度避让（nav>0）。
+         * 纯手势导航（nav=0）不能垫整个 systemGestures 识别区：荣耀 MagicOS 报 140px
+         * （40dp@560dpi），垫下去就是「键盘下方空白」的用户反馈；小米报 56px（约 13dp），
+         * 空白不明显所以之前没暴露。手势条本身浮在键盘上，远低于识别区高度，
+         * 垫到手势条典型高度 16dp 为止。（tappableElement 荣耀报 0，不作依据。）
+         */
+        internal fun chooseBottomAvoidance(nav: Int, gesture: Int, density: Float): Int =
+            if (nav > 0) nav else minOf(gesture, (GESTURE_BAR_CAP_DP * density).toInt())
+
+        /**
+         * 一次避让取值是怎么算出来的（纯函数，单测见 InputRootViewDiagnosticsTest）：走了 nav 分支
+         * 还是手势分支、16dp 钳制有没有生效。用户导出诊断包时，据此就能看出荣耀那类机型的空白是
+         * 钳制之后仍留下的，还是系统给的窗口本身更高。
+         */
+        internal fun describeAvoidance(nav: Int, gesture: Int, density: Float, result: Int): String {
+            val cap = (GESTURE_BAR_CAP_DP * density).toInt()
+            return if (nav > 0) {
+                "nav=$nav gesture=$gesture → 分支=导航栏(取nav) 结果=$result"
+            } else {
+                "nav=0 gesture=$gesture cap=${cap}px(${GESTURE_BAR_CAP_DP}dp) → 分支=纯手势 " +
+                    "钳制=${if (gesture > cap) "生效" else "未触发"} 结果=$result"
+            }
+        }
+
+        /** 布局落定后的实测值；[contentH] 之外多出来的高度就是 spacer（避让 + 用户留空） */
+        internal fun describeLayout(rootH: Int, spacerH: Int, contentH: Int, topOnScreen: Int, screenH: Int, extraBottom: Int): String =
+            "根视图高=$rootH 内容高=$contentH 底部占位=$spacerH(含用户留空$extraBottom) " +
+                "顶边屏幕y=$topOnScreen 底边屏幕y=${topOnScreen + rootH} 屏幕高=$screenH 底边距屏幕底=${screenH - topOnScreen - rootH}"
 
         private fun prefs(context: Context) =
             context.getSharedPreferences("ime_insets", Context.MODE_PRIVATE)
@@ -161,9 +218,10 @@ class InputRootView(context: Context) : LinearLayout(context) {
                 return runCatching {
                     val wm = context.getSystemService(android.view.WindowManager::class.java)
                     val insets = wm.currentWindowMetrics.windowInsets
-                    maxOf(
+                    chooseBottomAvoidance(
                         insets.getInsets(WindowInsets.Type.navigationBars()).bottom,
                         insets.getInsets(WindowInsets.Type.systemGestures()).bottom,
+                        context.resources.displayMetrics.density,
                     )
                 }.getOrDefault(0)
             }
