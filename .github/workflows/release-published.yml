@@ -91,6 +91,27 @@ jobs:
           echo "done=true" >> "$GITHUB_OUTPUT"
           echo "已镜像 ${R2_BASE_URL}/WindInputAndroid-${V}.apk"
 
+      # 只留最近 KEEP 个版本（含刚传的这个）。wrangler 没有 list 命令，版本清单取自 GitHub Release：
+      # 按语义化版本排序（正式版大于同号预发布，故把 '-' 换成 '~' 再 sort -V），
+      # 删排在 KEEP 名之后的几个（每次发版只会新挤出一个，多取几个是兜底漏掉的）。
+      # 对象不存在时 delete 会报错，一律忽略。传成功之后才清理，失败时旧版本原样留着。
+      - name: 清理 R2 上的旧版本
+        if: steps.gate.outputs.skip != 'true'
+        env:
+          KEEP: "3"
+        run: |
+          gh release list --repo "${{ github.repository }}" --limit 100 --json tagName,isDraft \
+            --jq '.[] | select(.isDraft | not) | .tagName | ltrimstr("v")' \
+            | sed 's/-/~/' | sort -rV | sed 's/~/-/' > versions.txt
+          echo "版本（新到旧）:"; cat versions.txt
+          # 本次版本必须保留：补传旧版本时它可能排在 KEEP 名之外，那种情况下不删它自己
+          tail -n +$((KEEP + 1)) versions.txt | head -n 5 | while read -r old; do
+            [ -n "$old" ] && [ "$old" != "$V" ] || continue
+            echo "清理 $old"
+            wrangler r2 object delete --remote "$R2_BUCKET/WindInputAndroid-${old}.apk" || true
+            wrangler r2 object delete --remote "$R2_BUCKET/WindInputAndroid-${old}.apk.sha256" || true
+          done
+
   notify-docs:
     name: 通知文档站同步
     # 镜像成功（或根本没配 R2，此时元数据会指向 GitHub 之外取不到的地址，所以必须镜像成功才通知）
