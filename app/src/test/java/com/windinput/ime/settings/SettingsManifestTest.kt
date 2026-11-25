@@ -177,12 +177,12 @@ class SettingsManifestTest {
     fun fuzzyPageSplitsIntoCards() {
         val items = bundled.sectionsOf("schema").first { it.first == "模糊音" }.second
         assertEquals(listOf(null, "声母", "韵母"), items.map { it.card }.distinct())
-        assertEquals("schema.pinyin.fuzzy.enabled", items.first().key)
+        assertEquals("input.fuzzy.enabled", items.first().key)
         assertEquals(13, items.drop(1).size)
         assertTrue("拼音对都画成网格", items.drop(1).all { it.grid })
         assertTrue(
             "总开关关着时拼音对都收起",
-            items.drop(1).all { it.enabledWhen == "schema.pinyin.fuzzy.enabled" },
+            items.drop(1).all { it.enabledWhen == "input.fuzzy.enabled" },
         )
     }
 

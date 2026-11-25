@@ -478,7 +478,7 @@ options = [
 [[item]]
 page = "schema"
 section = "模糊音"
-key = "schema.pinyin.fuzzy.enabled"
+key = "input.fuzzy.enabled"
 source = "engine"
 type = "toggle"
 title = "模糊音"
@@ -489,143 +489,143 @@ page = "schema"
 section = "模糊音"
 card = "声母"
 grid = true
-key = "schema.pinyin.fuzzy.zh_z"
+key = "input.fuzzy.zh_z"
 source = "engine"
 type = "toggle"
 title = "zh ↔ z"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "声母"
 grid = true
-key = "schema.pinyin.fuzzy.ch_c"
+key = "input.fuzzy.ch_c"
 source = "engine"
 type = "toggle"
 title = "ch ↔ c"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "声母"
 grid = true
-key = "schema.pinyin.fuzzy.sh_s"
+key = "input.fuzzy.sh_s"
 source = "engine"
 type = "toggle"
 title = "sh ↔ s"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "声母"
 grid = true
-key = "schema.pinyin.fuzzy.n_l"
+key = "input.fuzzy.n_l"
 source = "engine"
 type = "toggle"
 title = "n ↔ l"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "声母"
 grid = true
-key = "schema.pinyin.fuzzy.f_h"
+key = "input.fuzzy.f_h"
 source = "engine"
 type = "toggle"
 title = "f ↔ h"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "声母"
 grid = true
-key = "schema.pinyin.fuzzy.r_l"
+key = "input.fuzzy.r_l"
 source = "engine"
 type = "toggle"
 title = "r ↔ l"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "韵母"
 grid = true
-key = "schema.pinyin.fuzzy.an_ang"
+key = "input.fuzzy.an_ang"
 source = "engine"
 type = "toggle"
 title = "an ↔ ang"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "韵母"
 grid = true
-key = "schema.pinyin.fuzzy.en_eng"
+key = "input.fuzzy.en_eng"
 source = "engine"
 type = "toggle"
 title = "en ↔ eng"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "韵母"
 grid = true
-key = "schema.pinyin.fuzzy.in_ing"
+key = "input.fuzzy.in_ing"
 source = "engine"
 type = "toggle"
 title = "in ↔ ing"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "韵母"
 grid = true
-key = "schema.pinyin.fuzzy.ian_iang"
+key = "input.fuzzy.ian_iang"
 source = "engine"
 type = "toggle"
 title = "ian ↔ iang"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "韵母"
 grid = true
-key = "schema.pinyin.fuzzy.uan_uang"
+key = "input.fuzzy.uan_uang"
 source = "engine"
 type = "toggle"
 title = "uan ↔ uang"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "韵母"
 grid = true
-key = "schema.pinyin.fuzzy.un_ong"
+key = "input.fuzzy.un_ong"
 source = "engine"
 type = "toggle"
 title = "un ↔ ong"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"
 section = "模糊音"
 card = "韵母"
 grid = true
-key = "schema.pinyin.fuzzy.eng_ong"
+key = "input.fuzzy.eng_ong"
 source = "engine"
 type = "toggle"
 title = "eng ↔ ong"
-enabled_when = "schema.pinyin.fuzzy.enabled"
+enabled_when = "input.fuzzy.enabled"
 
 [[item]]
 page = "schema"

@@ -333,9 +333,9 @@ min_length = 3
 # 开时建议 5）。另外只在打的不是完整拼音时补：整串怎么切都切不成完整全拼音节
 # （templa 补 template；shang、chang 不补）。双拼方案下不生效（判据按全拼音节定义）。
 complete_min_length = 0
-# 完整单词英文最靠前排第几位（1 起）。0 = 按方案自动：全拼 1、双拼 2（双拼下 the、good
-# 这类词几乎都解得出中文，英文不抢首选）；写了非 0 值则全拼双拼都用它。
-exact_position = 0
+# 完整单词英文最靠前排第几位（1 起）。出厂双拼方案写 2（双拼下 the、good 这类词几乎
+# 都解得出中文，英文不抢首选）。
+exact_position = 1
 # 前缀补全英文最靠前排第几位（1 起；0 = 默认 2；恒在完整单词之后）。
 complete_position = 2
 # 中文侧有候选时英文最多几条（完整单词优先，再补前缀补全）；中文侧没有候选时给一页补全。
@@ -375,26 +375,10 @@ max_phrase_len = 0
 #     enabled = true
 #     direct = true
 direct = false
-
-# 模糊音：enabled 是总开关，下面每项各自控制一组等价音（默认全关，逐项按需开启）。
-[schema.pinyin.fuzzy]
-enabled = false
-# 声母组
-zh_z = false
-ch_c = false
-sh_s = false
-n_l = false
-f_h = false
-r_l = false
-# 韵母组（前后鼻音）
-an_ang = false
-en_eng = false
-in_ing = false
-ian_iang = false
-uan_uang = false
-# 韵母组（un/eng 与 ong）
-un_ong = false
-eng_ong = false
+# 直接辅助码的风格（只在 direct 生效时起作用）：true = 连续——辅码可打在任一音节后，适合长句
+# （go + kqk → 「国情」；末字 1 位在串尾也提前）；false = 串尾——只在整串末尾敲 1～2 位，词组任一字命中，
+# 适合单次打词组（uidu + pl → 「释读」）。方案可用同名键覆盖。
+continuous = true
 
 # 拼音调频（衰减参数；三个数值 0 = 用词频 store 的内置默认）。
 [schema.pinyin.frequency]
@@ -847,6 +831,27 @@ correction = false
 scope = "first"
 # 提示带声调（「苹(píng)果」）；注释变量 ${correct_pinyin} 同样跟随。
 tone = false
+
+# 模糊音：全拼、双拼与混输里的拼音共用。enabled 是总开关，下面每项各自控制一组等价音
+# （默认全关，逐项按需开启）。旧键 schema.pinyin.fuzzy.* 仍可读写，等价于这里。
+[input.fuzzy]
+enabled = false
+# 声母组
+zh_z = false
+ch_c = false
+sh_s = false
+n_l = false
+f_h = false
+r_l = false
+# 韵母组（前后鼻音）
+an_ang = false
+en_eng = false
+in_ing = false
+ian_iang = false
+uan_uang = false
+# 韵母组（un/eng 与 ong）
+un_ong = false
+eng_ong = false
 
 # 联想：上屏之后按**刚上屏的内容**给候选，而不是按编码。
 #
@@ -1415,6 +1420,8 @@ key_actions = {}
 #       commit_code(上屏编码，同回车上屏编码，但不看 [input] enter_behavior：那里设成
 #           清空编码时，这个键仍上屏编码。打了码没出候选时也能按，没在打字、联想候选时
 #           这个键照常。极点 / 小鸭的习惯是 lctrl = "commit_code")
+#       syllable_prev / syllable_next(编码区光标整音节左 / 右跳，两端回绕；没有可用切分时
+#           退回单字符。内建的 Ctrl+←/→ 已是这个效果，不用绑；要关它写 "ctrl+left" = "none"）
 #       command:<表达式>(执行一段命令，写法同上面 key_actions 的 command:。正在打的码原样
 #           留着，不上屏也不清空；打了码还没出候选时也能按，没在打字时这个键照常)
 # 例（Tab 向下翻页、CapsLock 向上翻页）：
@@ -1918,6 +1925,7 @@ speed_factor = 0.85
 enabled = false
 
 [debug]
+# trace / debug / info / warn / error。注意 info 及以下级别不得含用户输入内容与候选词。
 # trace / debug / info / warn / error。注意 info 及以下级别不得含用户输入内容与候选词。
 # trace / debug / info / warn / error。注意 info 及以下级别不得含用户输入内容与候选词。
 # 安卓有意不同（电脑版 info）：日志进系统 logcat、任何有调试权限的人都读得到，出厂只记警告以上
