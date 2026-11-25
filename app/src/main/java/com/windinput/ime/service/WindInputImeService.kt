@@ -353,9 +353,13 @@ class WindInputImeService :
         /** 用九宫格布局的方案 id 集合（statePrefs）：布局按方案记，键盘列表里选哪格就记哪种 */
         const val KEY_T9_SCHEMAS = "t9_schemas"
 
-        /** 九宫格「分词」键空闲时候选栏列出的常用标点 */
+        /**
+         * 九宫格「分词」键（键面 @#）空闲时候选栏列出的符号。左栏已有，。？！等中文标点，
+         * 这里给其余常用符号，@ # 打头。
+         */
         val T9_BAR_SYMBOLS = listOf(
-            "，", "。", "？", "！", "、", "：", "；", "“", "”", "…", "～", "（", "）", "《", "》", "@", "#", "%", "&", "*",
+            "@", "#", "*", "&", "%", "/", "_", "-", "+", "=", "$", "~", "^", "\\", "|",
+            "(", ")", "[", "]", "{", "}", "<", ">", "《", "》", "【", "】", "·",
         )
 
         /** 九宫格拼音左列的标点（可上下滚动，点选原样上屏，有编码时先顶首选） */
@@ -1150,7 +1154,7 @@ class WindInputImeService :
     }
 
     private fun performKeyAction(action: KeyAction, shifted: Boolean) {
-        // 九宫格「分词」键空闲时不进引擎：候选栏列出常用标点（主流九键的 1 键）。组码时才是分词
+        // 九宫格「分词」键空闲时不进引擎：候选栏列出 @# 等符号（主流九键的 1 键）。组码时才是分词
         if (action == KeyAction.Keypad(T9_SEPARATOR) && !composing) {
             showT9Symbols()
             return
@@ -2191,7 +2195,7 @@ class WindInputImeService :
     /** 符号页开着时条区候选行放最近用过的符号（点了直接上屏）；为 false 时条区照常 */
     private var symbolHistoryInBar = false
 
-    /** 候选栏正摆着九宫格「分词」键（空闲时）列出的常用标点；点一个原样上屏 */
+    /** 候选栏正摆着九宫格「分词」键（空闲时）列出的符号；点一个原样上屏 */
     private var t9SymbolsInBar = false
 
     private fun showT9Symbols() {

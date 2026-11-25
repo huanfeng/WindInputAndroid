@@ -821,7 +821,7 @@ class KeyboardView(context: Context) : View(context) {
             if (splitMode) return "分词"
             if (shiftLocked) return "⇪"
         }
-        // 九宫格的分词键：组码时切音节，空闲时是常用标点（候选栏列出来选）
+        // 九宫格的分词键：组码时切音节，空闲时键面 @#（候选栏列出符号来选）
         if (key.action == KeyAction.Keypad(T9_SEPARATOR) && !composing) return T9_SYMBOL_LABEL
         val action = key.action
         val ch = key.textFor(englishMode)
@@ -1468,8 +1468,8 @@ class KeyboardView(context: Context) : View(context) {
 /** 九宫格分词键上报的键字符（与核心的分词符一致） */
 const val T9_SEPARATOR = '\''
 
-/** 九宫格分词键空闲时的键面 */
-const val T9_SYMBOL_LABEL = "，。?!"
+/** 九宫格分词键空闲时的键面（左栏已有，。？！，这个键给的是其余符号） */
+const val T9_SYMBOL_LABEL = "@#"
 
 /**
  * 上滑 / 长按气泡符号 → 动作。ASCII 走引擎；非 ASCII 字面字符引擎翻不出 VK，直接上屏。

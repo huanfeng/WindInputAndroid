@@ -328,7 +328,7 @@ object KeyboardLayouts {
      * 九宫格拼音（中文拼音方案在键盘列表里选了九宫格时代替字母层），按主流九键排布：
      * 左列同数字键盘是占位空白，视图在那里画可滚动的标点列；右列 ⌫、重输、0，右下角是换行；
      * 底行 符号、123、空格、中英、换行。`2`-`9` 上滑出数字；「分词」组码时切音节，空闲时在
-     * 候选栏列出常用标点。
+     * 候选栏列出 @# 等符号（键面 @#）。
      */
     val t9: List<List<KeyDef>> = LayoutIds.assign(listOf(
         listOf(sideSpacer, keypad('\'', "分词", '1').copy(longPress = "1"), keypad('2', "ABC", '2'),
