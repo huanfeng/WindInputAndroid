@@ -769,7 +769,7 @@ private fun SubScreen(
 
 /** 一张卡片：常用项直接列出，`advanced` 项收进底部的「进阶」折叠区 */
 @Composable
-private fun SettingsCard(title: String, items: List<SettingItem>, values: SettingsValues) {
+private fun SettingsCard(title: String, items: List<SettingItem>, values: ItemValues) {
     var expanded by rememberSaveable(title) { mutableStateOf(false) }
     val (advanced, normal) = items.partition { it.advanced }
     if (title.isNotEmpty()) SmallTitle(title)
@@ -786,7 +786,7 @@ private fun SettingsCard(title: String, items: List<SettingItem>, values: Settin
 
 /** 两列勾选网格：短标题的一组开关（模糊音的拼音对），一行一个开关太稀、一屏看不全 */
 @Composable
-private fun ToggleGridCard(title: String, items: List<SettingItem>, values: SettingsValues) {
+private fun ToggleGridCard(title: String, items: List<SettingItem>, values: ItemValues) {
     val scope = rememberCoroutineScope()
     @Suppress("UNUSED_EXPRESSION") values.version
     if (title.isNotEmpty()) SmallTitle(title)
@@ -832,11 +832,12 @@ private fun GridChip(text: String, checked: Boolean, modifier: Modifier, onClick
 }
 
 @Composable
-internal fun ItemRow(item: SettingItem, values: SettingsValues) {
+internal fun ItemRow(raw: SettingItem, values: ItemValues) {
     val scope = rememberCoroutineScope()
     @Suppress("UNUSED_EXPRESSION") values.version // 写入后重组
+    val item = raw.copy(summary = values.summary(raw))
     fun write(v: Any) {
-        scope.launch { withContext(Dispatchers.IO) { values.set(item, v) } }
+        scope.launch { withContext(Dispatchers.IO) { values.set(raw, v) } }
     }
     when (item.type) {
         "toggle" -> ToggleLine(item.title, item.summary, values.bool(item)) { write(it) }

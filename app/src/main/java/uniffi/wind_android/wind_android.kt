@@ -723,6 +723,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_uieventlistener_on_toast(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_apply_scheme_form(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_assoc_history_clear(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_assoc_history_count(
@@ -798,6 +800,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_schemas(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_scheme_delete(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_scheme_form(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_scheme_import(
     ): Int
@@ -892,6 +896,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_constructor_windcore_new(`dataDir`: RustBuffer.ByValue,`userRoot`: RustBuffer.ByValue,`localRoot`: RustBuffer.ByValue,`schema`: RustBuffer.ByValue,`listener`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
+    external fun uniffi_wind_android_fn_method_windcore_apply_scheme_form(`ptr`: Long,`schemaId`: RustBuffer.ByValue,`sets`: RustBuffer.ByValue,`resets`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): Unit
     external fun uniffi_wind_android_fn_method_windcore_assoc_history_clear(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): Long
     external fun uniffi_wind_android_fn_method_windcore_assoc_history_count(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
@@ -967,6 +973,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_schemas(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_scheme_delete(`ptr`: Long,`id`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_scheme_form(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_scheme_import(`ptr`: Long,`path`: RustBuffer.ByValue,`replace`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1156,6 +1164,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_uieventlistener_on_toast() != 36283) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_apply_scheme_form() != 4047) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_assoc_history_clear() != 9869) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1268,6 +1279,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_scheme_delete() != 44501) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_scheme_form() != 26257) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_scheme_import() != 64774) {
@@ -2286,6 +2300,12 @@ public object FfiConverterTypeUiEventListener: FfiConverter<UiEventListener, Lon
 public interface WindCoreInterface {
     
     /**
+     * 改方案的表单项：`sets` 写入、`resets` 恢复方案默认；一项不合格整批不写。写完重载配置。
+     * 与 [`Self::set_schema_setting`] 共用覆盖文件锁。
+     */
+    fun `applySchemeForm`(`schemaId`: kotlin.String, `sets`: List<SchemeFormSet>, `resets`: List<kotlin.String>)
+    
+    /**
      * 清空全部方案的联想学习数据，返回删掉的条数。词频、用户词不动。
      */
     fun `assocHistoryClear`(): kotlin.ULong
@@ -2503,6 +2523,12 @@ public interface WindCoreInterface {
      * 共享文件保留，只读层永不删；用户层文件在只读层有同路径副本的不受共享保护。
      */
     fun `schemeDelete`(`id`: kotlin.String): SchemeDeleteInfo
+    
+    /**
+     * 方案的完整设置表单：生效值 / 方案默认 / 方案预设三张表（TOML 文本，顶层键为
+     * `schema.<类型>.<项>`），混输另给成员。与电脑版 `schema.getSettings` 同口径。
+     */
+    fun `schemeForm`(`schemaId`: kotlin.String): SchemeFormInfo
     
     /**
      * 导入方案包。`replace=false` 时已存在的文件跳过。成功后使引擎缓存失效、刷新已装方案并重载配置。
@@ -2781,6 +2807,26 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
             UniffiLib.uniffi_wind_android_fn_clone_windcore(handle, status)
         }
     }
+
+    
+    /**
+     * 改方案的表单项：`sets` 写入、`resets` 恢复方案默认；一项不合格整批不写。写完重载配置。
+     * 与 [`Self::set_schema_setting`] 共用覆盖文件锁。
+     */
+    @Throws(ConfigException::class)override fun `applySchemeForm`(`schemaId`: kotlin.String, `sets`: List<SchemeFormSet>, `resets`: List<kotlin.String>)
+        = 
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_apply_scheme_form(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),
+        FfiConverterSequenceTypeSchemeFormSet.lower(`sets`),
+        FfiConverterSequenceString.lower(`resets`),_status)
+}
+    }
+    
+    
 
     
     /**
@@ -3454,6 +3500,25 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
         it,
         
         FfiConverterString.lower(`id`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 方案的完整设置表单：生效值 / 方案默认 / 方案预设三张表（TOML 文本，顶层键为
+     * `schema.<类型>.<项>`），混输另给成员。与电脑版 `schema.getSettings` 同口径。
+     */
+    @Throws(ConfigException::class)override fun `schemeForm`(`schemaId`: kotlin.String): SchemeFormInfo {
+            return FfiConverterTypeSchemeFormInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_scheme_form(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),_status)
 }
     }
     )
@@ -5296,6 +5361,110 @@ public object FfiConverterTypeSchemeDeleteInfo: FfiConverterRustBuffer<SchemeDel
 
 
 /**
+ * 方案的完整设置表单。三张表都是 TOML 文本，顶层键为完整点分键。
+ */
+data class SchemeFormInfo (
+    /**
+     * 生效值
+     */
+    var `effective`: kotlin.String
+    , 
+    /**
+     * 方案默认值（恢复默认后的值）
+     */
+    var `defaultValues`: kotlin.String
+    , 
+    /**
+     * 方案文件改过的项在类型内置默认里的值
+     */
+    var `builtin`: kotlin.String
+    , 
+    /**
+     * 混输：`[主成员, 次成员]`；其它方案为空
+     */
+    var `members`: List<kotlin.String>
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemeFormInfo: FfiConverterRustBuffer<SchemeFormInfo> {
+    override fun read(buf: ByteBuffer): SchemeFormInfo {
+        return SchemeFormInfo(
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterString.read(buf),
+            FfiConverterSequenceString.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemeFormInfo) = (
+            FfiConverterString.allocationSize(value.`effective`) +
+            FfiConverterString.allocationSize(value.`defaultValues`) +
+            FfiConverterString.allocationSize(value.`builtin`) +
+            FfiConverterSequenceString.allocationSize(value.`members`)
+    )
+
+    override fun write(value: SchemeFormInfo, buf: ByteBuffer) {
+            FfiConverterString.write(value.`effective`, buf)
+            FfiConverterString.write(value.`defaultValues`, buf)
+            FfiConverterString.write(value.`builtin`, buf)
+            FfiConverterSequenceString.write(value.`members`, buf)
+    }
+}
+
+
+
+/**
+ * 表单的一项写入。
+ */
+data class SchemeFormSet (
+    var `key`: kotlin.String
+    , 
+    var `value`: ConfigValue
+    
+){
+    
+
+    
+
+    
+    companion object
+}
+
+/**
+ * @suppress
+ */
+public object FfiConverterTypeSchemeFormSet: FfiConverterRustBuffer<SchemeFormSet> {
+    override fun read(buf: ByteBuffer): SchemeFormSet {
+        return SchemeFormSet(
+            FfiConverterString.read(buf),
+            FfiConverterTypeConfigValue.read(buf),
+        )
+    }
+
+    override fun allocationSize(value: SchemeFormSet) = (
+            FfiConverterString.allocationSize(value.`key`) +
+            FfiConverterTypeConfigValue.allocationSize(value.`value`)
+    )
+
+    override fun write(value: SchemeFormSet, buf: ByteBuffer) {
+            FfiConverterString.write(value.`key`, buf)
+            FfiConverterTypeConfigValue.write(value.`value`, buf)
+    }
+}
+
+
+
+/**
  * 导入结果。
  */
 data class SchemeImportInfo (
@@ -6937,6 +7106,34 @@ public object FfiConverterSequenceTypeSchemaSettingItem: FfiConverterRustBuffer<
         buf.putInt(value.size)
         value.iterator().forEach {
             FfiConverterTypeSchemaSettingItem.write(it, buf)
+        }
+    }
+}
+
+
+
+
+/**
+ * @suppress
+ */
+public object FfiConverterSequenceTypeSchemeFormSet: FfiConverterRustBuffer<List<SchemeFormSet>> {
+    override fun read(buf: ByteBuffer): List<SchemeFormSet> {
+        val len = buf.getInt()
+        return List<SchemeFormSet>(len) {
+            FfiConverterTypeSchemeFormSet.read(buf)
+        }
+    }
+
+    override fun allocationSize(value: List<SchemeFormSet>): ULong {
+        val sizeForLength = 4UL
+        val sizeForItems = value.map { FfiConverterTypeSchemeFormSet.allocationSize(it) }.sum()
+        return sizeForLength + sizeForItems
+    }
+
+    override fun write(value: List<SchemeFormSet>, buf: ByteBuffer) {
+        buf.putInt(value.size)
+        value.iterator().forEach {
+            FfiConverterTypeSchemeFormSet.write(it, buf)
         }
     }
 }

@@ -26,19 +26,16 @@ import uniffi.wind_android.WindCore
 class SettingsValues(
     private val userConfig: UserConfig,
     private val core: WindCore?,
-) {
+) : ItemValues {
     companion object {
         private const val TAG = "SettingsValues"
 
         /** 「显示实体键盘设置」开关的键（键盘项，出厂关）：[SettingItem.hardware] 的项靠它放出来 */
         const val HARDWARE_GATE = "ui.android.show_hardware_options"
-
-        /** 列表型配置在文本框 / 下拉值里的分隔：空白或逗号（配对字符、键名里都不会出现这两种） */
-        private val LIST_SEPARATOR = Regex("[,\\s]+")
     }
 
     /** 值变化的版本号：Compose 读它，写入后递增触发重组 */
-    var version by mutableIntStateOf(0)
+    override var version by mutableIntStateOf(0)
         private set
 
     /** 绕过 [set] 改了配置文件之后（恢复默认设置）让界面重读 */
@@ -55,6 +52,9 @@ class SettingsValues(
 
     val engineReady: Boolean get() = core != null && types.isNotEmpty()
 
+    /** 核心注册表里这个键的类型；方案表单写入时按它转换值 */
+    fun typeOf(key: String): String? = types[key]
+
     /** 读核心的注册表与快照（后台线程） */
     fun load() {
         val c = core ?: return
@@ -69,7 +69,7 @@ class SettingsValues(
      * 这一项现在能不能显示：键盘项总能；引擎项要核心就绪且键在注册表里。
      * 清单里写错的引擎键在这里被挡掉并记一条警告——不显示一个「点了没反应」的开关。
      */
-    fun available(item: SettingItem): Boolean {
+    override fun available(item: SettingItem): Boolean {
         if (item.source == SettingSource.ANDROID) return true
         if (!engineReady) return false
         return (item.key in types).also { known ->
@@ -83,7 +83,9 @@ class SettingsValues(
      * 逐级看：依赖的开关自己被收起（它的依赖关着）时本项也收起，否则总开关关着时
      * 「提示范围」还会因「显示正确拼音」开着而单独露出来。
      */
-    fun visible(item: SettingItem, all: List<SettingItem>, depth: Int = 0): Boolean {
+    override fun visible(item: SettingItem, all: List<SettingItem>): Boolean = visible(item, all, 0)
+
+    private fun visible(item: SettingItem, all: List<SettingItem>, depth: Int): Boolean {
         if (item.hardware && userConfig.readAll()[HARDWARE_GATE] != true) return false
         val dep = item.enabledWhen ?: return true
         val depItem = all.firstOrNull { it.key == dep } ?: return true
@@ -96,29 +98,17 @@ class SettingsValues(
         SettingSource.ANDROID -> userConfig.readAll()[item.key] ?: item.defaultValue
     }
 
-    fun bool(item: SettingItem): Boolean = when (val v = raw(item)) {
-        is Boolean -> v
-        is String -> v == "true"
-        else -> false
-    }
+    override fun bool(item: SettingItem): Boolean = RawValue.bool(raw(item))
 
-    fun int(item: SettingItem): Int = when (val v = raw(item)) {
-        is Number -> v.toInt()
-        is String -> v.toIntOrNull() ?: 0
-        else -> 0
-    }
+    override fun int(item: SettingItem): Int = RawValue.int(raw(item))
 
     /** text 项的当前值：列表型配置拼成空格分隔的一行 */
-    fun text(item: SettingItem): String = when (val v = raw(item)) {
-        is List<*> -> v.joinToString(" ")
-        else -> v?.toString() ?: ""
-    }
+    override fun text(item: SettingItem): String = RawValue.text(raw(item))
 
     /** select 的当前值，与选项的 value 同形（字符串） */
-    fun choice(item: SettingItem): String = when (val v = raw(item)) {
-        is List<*> -> v.joinToString(",") // 键名列表（trigger_keys）按逗号拼回下拉项的值
-        else -> v?.toString() ?: ""
-    }
+    override fun choice(item: SettingItem): String = RawValue.choice(raw(item))
+
+    override fun summary(item: SettingItem): String? = item.summary
 
     /**
      * 写入。返回错误说明（成功为 null）。后台线程调用。
@@ -127,7 +117,7 @@ class SettingsValues(
      * 两边都读到对方「关着」，各写各的，二选一就同时开了；两次 ReloadConfig 也会交错。
      */
     @Synchronized
-    fun set(item: SettingItem, value: Any): String? {
+    override fun set(item: SettingItem, value: Any): String? {
         // 二选一：打开本项时先关掉另一项（两边都是引擎项，一次重载）
         val partner = item.exclusiveWith?.takeIf { value == true || value == "true" }
         val err = when (item.source) {
@@ -143,14 +133,7 @@ class SettingsValues(
 
     private fun setEngine(key: String, value: Any, turnOff: String? = null): String? {
         val c = core ?: return "输入法核心未就绪"
-        val cv = when (types[key]) {
-            "bool" -> ConfigValue.Bool(value == true || value == "true")
-            "int" -> ConfigValue.Int(value.toString().toLong())
-            "float" -> ConfigValue.Float(value.toString().toDouble())
-            // 触发键类（trigger_keys）：下拉里一项 = 逗号分隔的一组键名，空串 = 一个都不绑
-            "str_list" -> ConfigValue.StrList(value.toString().split(LIST_SEPARATOR).filter { it.isNotBlank() })
-            else -> ConfigValue.Str(value.toString())
-        }
+        val cv = configValueOf(types[key], value)
         return try {
             if (turnOff != null && engine[turnOff] == true) c.configSet(turnOff, ConfigValue.Bool(false))
             c.configSet(key, cv)
