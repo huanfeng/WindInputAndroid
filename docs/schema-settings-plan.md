@@ -1,7 +1,9 @@
 # 手机端单个方案设置：规划
 
 > 2026-11-06。第一期：自定义行为、方案覆盖（码表）、辅助码 + 双拼布局、整句输入。
-> 状态：已实现（主仓 `wind-mobile` 门面 + FFI + 设置页详情页），e2e 用例 [58]–[61]（`scripts/emu-cases/schema-settings.sh`）。
+> 2026-11-25 第二期：主仓取消类型级全局配置（`docs/design/scheme-settings-flatten.md`），**全部**方案设置项按方案存，
+> 设置页改为「一个方案一页、按组分子页」，见 §6。§1–§5 记录第一期，§6 以后的内容以 §6 为准。
+> 状态：已实现，e2e 用例 [38] [58]–[61] [73]（`scripts/emu-cases/schema-settings.sh`）。
 > 不做：切入热键、特殊模式（overlay）、PC「自定义行为」里的每页候选数 / 文字排列 / 字体 / 注释模板 / 自定义标点表。
 > PC 对照：`wind-setting/src/dialogs/schema_manager.rs`（节与 TAB）、`schema_codetable.rs`（码表覆盖项）；
 > 设计：主仓 `docs/design/schema-settings-vertical-tabs.md`、`schema-scoped-behavior.md`、`aux-code-schema-source.md`、
@@ -85,3 +87,24 @@ effective_codetable / followed_codetable / aux_code_source_options / shuangpin_l
 - 码表覆盖 PC 有 ~20 项，手机只做清单里已有的 11 项；其余（精确匹配、通配、z 键……）全局页手机也没有，暂不列。
 - 方案文件被用户方案包替换后，覆盖层里的旧键仍按新方案文件深合并——与 PC 相同。
 - 风险：读改写与 PC 设置页不会并发（手机端只有本进程写）；与扩展词库开关的并发由同一把锁兜住。
+
+## 6. 第二期（2026-11-25）：全部方案设置按方案存
+
+- **FFI**：`scheme_form(id) -> SchemeFormInfo{effective, default_values, builtin, members}`（三张 TOML 表，键为
+  `schema.<类型>.<项>`）与 `apply_scheme_form(id, sets, resets)`；主仓 `wind-mobile/src/scheme_form.rs`，
+  与 PC `schema.getSettings` / `schema.setSettings` 同口径（`EngineManager::scheme_settings_snapshot` / `scheme_settings_apply`）。
+  第一期的 `schema_settings` / `set_schema_setting` 仍给「自定义行为」「辅助码」「整句输入」与信息头用。
+- **清单**：`settings_manifest.toml` 的隐藏页 `scheme_form`，每项带 `section`（组名）与 `schemes = [类型…]`；
+  组：全拼 / 双拼 = 基本、智能组词、词组补全、英文候选、调频、自动学习、辅助码；码表 = 上屏、匹配、通配与 z 键、调频、
+  自动造词、英文候选；混输 = 基本、拼音部分、英文部分；英文 = 候选、调频、自动造词。
+- **方案页**：一个列表，每行「方案名　开关 | 齿轮」；开关启用 / 停用，点行或齿轮进该方案设置页。
+  切换当前方案交给键盘。方案页下方只剩全局的模糊音。
+- **方案设置页**：信息卡 → 本方案预设 → 各组入口（副标题写组的总开关状态或前几项）→ 全部恢复默认；
+  代码画的组：九宫格键盘（全拼 / 双拼，「基本」之后）、扩展词库、自定义行为、整句输入（码表）、成员方案（混输）。
+  选回方案默认值 = 删覆盖；改过的项写「已自定义 · 默认：x」。路由 `Route("schema", "scheme:<id>", <组名>)`。
+- **九宫格**：方案设置「九宫格键盘」组里「启用九宫格键盘布局」，存键盘配置 `ui.android.t9.schemas`（逗号分隔 id）；
+  没设过时全拼类开、双拼类关。读法栏开关（仅全拼）与九宫格标点仍是所有方案共用。
+- **不折叠**：全应用去掉「进阶」折叠；全局设置的进阶项放进分组页底部「更多设置」的下一层（`detail = "more:<组名>"`）。
+- **笔画**：`role = "aux"` 的方案装了默认不启用（核心 `config_api::set_default_off_schemas`）。
+- 已知缺口：「恢复默认设置」只清 `config.toml`，不清 `schema_overrides/`。
+
