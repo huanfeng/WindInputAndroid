@@ -475,8 +475,9 @@ private fun SettingsApp(
                     onLoaded = { detailTitles[schemeSub(schemeId)] = it },
                 )
                 r.detail == DETAIL_QUICK_SOURCES -> QuickSourcesSection(values)
+                moreSectionOf(r.detail) != null -> MoreScreen(manifest, page, moreSectionOf(r.detail)!!, values)
                 else -> SubScreen(manifest, page, r.sub, values, session, schemaState) { id, name ->
-                    if (id == DETAIL_QUICK_SOURCES) {
+                    if (id == DETAIL_QUICK_SOURCES || moreSectionOf(id) != null) {
                         detailTitles[id] = name
                         go(r.copy(detail = id))
                     } else {
@@ -493,6 +494,21 @@ private fun screenTitle(manifest: SettingsManifestData, r: Route, titles: Map<St
     r.sub?.let { sub -> titles[sub] ?: schemeIdOf(sub) ?: sub }
         ?: manifest.pages.firstOrNull { it.id == r.page }?.title ?: "清风输入法"
 
+
+/** 分组页下「更多设置」页的路由：`Route(page, sub = <组名>, detail = "more:<组名>")` */
+private const val MORE_DETAIL_PREFIX = "more:"
+internal const val MORE_TITLE = "更多设置"
+
+internal fun moreDetail(section: String) = MORE_DETAIL_PREFIX + section
+
+internal fun moreSectionOf(detail: String?): String? =
+    detail?.takeIf { it.startsWith(MORE_DETAIL_PREFIX) }?.removePrefix(MORE_DETAIL_PREFIX)
+
+/** 「更多设置」入口的副标题：前三项标题，多了写总数 */
+internal fun moreSummary(items: List<SettingItem>): String {
+    val head = items.take(3).joinToString(" · ") { it.title }
+    return if (items.size > 3) "$head 等 ${items.size} 项" else head
+}
 
 /** 方案设置页的路由：`Route(page = "schema", sub = "scheme:<方案 id>", detail = <组名>)` */
 private const val SCHEME_SUB_PREFIX = "scheme:"
@@ -759,7 +775,8 @@ private fun SubScreen(
         page.id == "about" && sub == SUB_PRIVACY -> PrivacySection()
         else -> {
             @Suppress("UNUSED_EXPRESSION") values.version
-            val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
+            val all = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
+            val (more, items) = all.partition { it.advanced }
             // 组内再按 card 分卡（模糊音：总开关 / 声母 / 韵母；纠错与提示：总开关 / 纠错规则 / 正确拼音提示）
             for ((card, cardItems) in items.groupBy { it.card }) {
                 val title = card ?: ""
@@ -777,24 +794,37 @@ private fun SubScreen(
             ) {
                 EmojiModulesSection()
             }
+            if (more.isNotEmpty()) MoreSettingsEntry(more) { onOpenSchema(moreDetail(sub), MORE_TITLE) }
         }
     }
 }
 
-/** 一张卡片：常用项直接列出，`advanced` 项收进底部的「进阶」折叠区 */
+/** 「更多设置」页：一个分组的进阶项 */
+@Composable
+private fun MoreScreen(manifest: SettingsManifestData, page: SettingPage, section: String, values: SettingsValues) {
+    @Suppress("UNUSED_EXPRESSION") values.version
+    val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == section }?.second.orEmpty()
+        .filter { it.advanced }
+    SettingsCard("", items, values)
+}
+
+/** 一张卡片：逐行列出（进阶项不在这里画，见 [MoreSettingsEntry]） */
 @Composable
 private fun SettingsCard(title: String, items: List<SettingItem>, values: ItemValues) {
-    var expanded by rememberSaveable(title) { mutableStateOf(false) }
-    val (advanced, normal) = items.partition { it.advanced }
     if (title.isNotEmpty()) SmallTitle(title)
     Card(modifier = Modifier.fillMaxWidth()) {
         // 按键名定身份：enabled_when 让中间某行出现 / 消失时，各行记住的状态（滑块草稿等）
         // 不能按位置串到别的行上
-        for (item in normal) key(item.key) { ItemRow(item, values) }
-        if (advanced.isNotEmpty()) {
-            NavRow(if (expanded) "进阶 ▴" else "进阶 ▾", "工程参数，一般不用改") { expanded = !expanded }
-            if (expanded) for (item in advanced) key(item.key) { ItemRow(item, values) }
-        }
+        for (item in items) key(item.key) { ItemRow(item, values) }
+    }
+}
+
+/** 分组页底部「更多设置」入口：进阶项（工程参数）不折叠，放进下一层页面 */
+@Composable
+private fun MoreSettingsEntry(items: List<SettingItem>, onOpen: () -> Unit) {
+    Spacer(Modifier.height(16.dp))
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow(title = MORE_TITLE, summary = moreSummary(items), onClick = onOpen)
     }
 }
 

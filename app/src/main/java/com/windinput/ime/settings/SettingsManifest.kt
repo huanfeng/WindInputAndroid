@@ -43,7 +43,7 @@ data class SettingItem(
     val unit: String? = null,
     /** select 的选项：(value, label)，value 一律是字符串，写入时按键的类型转换 */
     val options: List<Pair<String, String>> = emptyList(),
-    /** 收进卡片底部的「进阶」折叠区 */
+    /** 工程参数：不在分组页列出，放进分组页底部「更多设置」的下一层（只用于分子页的页面） */
     val advanced: Boolean = false,
     /** int 项拖动时的预览：keyboard_rows（按所选行高画四行键）/ candidate_text（按所选字号写一行候选） */
     val preview: String? = null,
