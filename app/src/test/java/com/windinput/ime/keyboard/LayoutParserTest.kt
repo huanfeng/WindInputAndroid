@@ -102,6 +102,7 @@ class LayoutParserTest {
             assertEquals("$file row $i swipe", builtin[i].map { it.swipeUp }, bundled[i].map { it.swipeUp })
             assertEquals("$file row $i enSwipe", builtin[i].map { it.enSwipeUp }, bundled[i].map { it.enSwipeUp })
             assertEquals("$file row $i longPress", builtin[i].map { it.longPress }, bundled[i].map { it.longPress })
+            assertEquals("$file row $i longPressInitial", builtin[i].map { it.longPressInitial }, bundled[i].map { it.longPressInitial })
             assertEquals("$file row $i enText", builtin[i].map { it.enText }, bundled[i].map { it.enText })
             assertEquals("$file row $i rowSpan", builtin[i].map { it.rowSpan }, bundled[i].map { it.rowSpan })
             assertEquals("$file row $i accent", builtin[i].map { it.isAccent }, bundled[i].map { it.isAccent })
@@ -134,8 +135,9 @@ class LayoutParserTest {
         val two = keys.first { (it.action as? KeyAction.Keypad)?.key == '2' }
         assertEquals("ABC", two.label)
         assertEquals('2', two.swipeUp)
-        // 长按气泡：数字、小写、大写
-        assertEquals("2abcABC", two.popupChars(english = false))
+        // 长按气泡：大写、数字（初始选中）、小写
+        assertEquals("ABC2abc", two.popupChars(english = false))
+        assertEquals(3, two.popupInitialIndex(english = false))
         assertTrue(keys.any { it.action == KeyAction.ClearInput })
         // 右下角是换行，右列第三格是 0
         assertEquals(KeyAction.Enter, KeyboardLayouts.t9.last().last().action)

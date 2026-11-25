@@ -104,7 +104,7 @@ object KeymapMerge {
                 val c = singleChar(item)
                 if (c != null) chars.append(c) else warn("$where.long_press：气泡项只支持单个字符，已跳过 $item")
             }
-            if (chars.isNotEmpty() || ov.bubble.isEmpty()) out = out.copy(longPress = chars.toString())
+            if (chars.isNotEmpty() || ov.bubble.isEmpty()) out = out.copy(longPress = chars.toString(), longPressInitial = 0)
         }
         if (g.containsKey(Gesture.TAP)) warn("$where：阶段 1 不支持改点按，已跳过")
         return out

@@ -140,6 +140,7 @@ object LayoutParser {
             val rowSpan = number(entry, "row_span")?.toInt() ?: 1
             val accent = entry.getBoolean("accent") ?: false
             val longPress = entry.getString("long_press") ?: ""
+            val longPressInitial = number(entry, "long_press_initial")?.toInt() ?: 0
             val swipeUp = entry.getString("swipe_up")?.firstOrNull()
 
             val chars = entry.getString("chars")
@@ -174,6 +175,7 @@ object LayoutParser {
                         width,
                         swipeUp = swipeUp,
                         longPress = longPress,
+                        longPressInitial = longPressInitial,
                         id = entry.getString("id") ?: "",
                     ),
                 )
@@ -190,6 +192,7 @@ object LayoutParser {
                         width,
                         swipeUp = swipeUp,
                         longPress = longPress,
+                        longPressInitial = longPressInitial,
                         enText = entry.getString("en_text")?.firstOrNull(),
                         enSwipeUp = entry.getString("en_swipe_up")?.firstOrNull(),
                         id = entry.getString("id") ?: "",

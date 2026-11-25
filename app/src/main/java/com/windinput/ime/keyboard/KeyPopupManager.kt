@@ -76,9 +76,11 @@ class KeyPopupManager(private val anchor: View) {
     fun showPopup(keyRect: RectF, chars: List<String>, initial: Int = 0) {
         dismissAll()
         if (chars.isEmpty()) return
-        itemWidthPx = (44 * density).toInt()
         val h = (52 * density).toInt()
         val inset = (BUBBLE_INSET_DP * density).toInt()
+        // 项多（九宫格 7 / 9 键：PQRS 7 pqrs）时整条不能宽过键盘，否则下面夹位置的区间为空。
+        // 每格收窄到放得下为止
+        itemWidthPx = minOf((44 * density).toInt(), (anchor.width - 2 * inset) / chars.size).coerceAtLeast(1)
         val w = itemWidthPx * chars.size + 2 * inset
         val row = LinearLayout(anchor.context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -97,7 +99,7 @@ class KeyPopupManager(private val anchor: View) {
             val loc = IntArray(2)
             anchor.getLocationInWindow(loc)
             val want = (loc[0] + keyRect.centerX() - inset - itemWidthPx * (start + 0.5f)).toInt()
-            pos[0] = want.coerceIn(loc[0], loc[0] + anchor.width - w)
+            pos[0] = want.coerceIn(loc[0], maxOf(loc[0], loc[0] + anchor.width - w))
             // q / p 一类边缘键：气泡被屏幕夹偏，不再对着键中心，改按各格的真实位置命中，
             // 否则够不着靠边那一侧的选项
             popupClamped = pos[0] != want
@@ -303,7 +305,7 @@ class KeyPopupManager(private val anchor: View) {
         val loc = IntArray(2)
         anchor.getLocationInWindow(loc)
         val x = (loc[0] + keyRect.centerX() - w / 2f).toInt()
-            .coerceIn(loc[0], loc[0] + anchor.width - w)
+            .coerceIn(loc[0], maxOf(loc[0], loc[0] + anchor.width - w))
         val y = (loc[1] + keyRect.top - h - 8 * density).toInt()
         return intArrayOf(x, y)
     }

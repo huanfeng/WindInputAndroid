@@ -70,6 +70,8 @@ data class KeyDef(
     val swipeUp: Char? = null,
     /** 长按气泡字符集（每字符一项，横移选择）；空 = 无气泡 */
     val longPress: String = "",
+    /** [longPress] 气泡初始高亮第几项（长按不动抬手即出它）；字母键另有规则，见 [popupInitialIndex] */
+    val longPressInitial: Int = 0,
     /** 英文模式下改输出的字符（`，。`合一键：中文点按是逗号，英文是句点）；null = 同 [action] */
     val enText: Char? = null,
     /** 英文模式下的上滑字符；null = 同 [swipeUp] */
@@ -113,9 +115,11 @@ data class KeyDef(
         return "${c.uppercaseChar()}$sym$c"
     }
 
-    /** 气泡初始高亮项：字母键带符号时是中间的符号（长按不动抬手即出符号），其余是第 0 项 */
-    fun popupInitialIndex(english: Boolean): Int =
-        if (isLetterPopupKey() && swipeFor(english) != null) 1 else 0
+    /** 气泡初始高亮项：字母键带符号时是中间的符号（长按不动抬手即出符号），其余按 [longPressInitial] */
+    fun popupInitialIndex(english: Boolean): Int = when {
+        isLetterPopupKey() -> if (swipeFor(english) != null) 1 else 0
+        else -> longPressInitial
+    }
 }
 
 enum class KeyboardLayer { LETTERS, SYMBOLS, NUMBER }
@@ -315,13 +319,17 @@ object KeyboardLayouts {
         ),
     ))
 
-    /** 九宫格编码键：上滑出数字；长按气泡是「数字、小写字母、大写字母」，选中即原样上屏 */
+    /**
+     * 九宫格编码键：上滑出数字；长按气泡同全键盘字母键的排法——左边大写、中间数字（初始选中，
+     * 长按不动抬手即出数字）、右边小写，选中即原样上屏
+     */
     private fun keypad(key: Char, label: String, digit: Char) = KeyDef(
         label,
         KeyAction.Keypad(key),
         widthWeight = 1.4f,
         swipeUp = digit,
-        longPress = digit + label.lowercase() + label.uppercase(),
+        longPress = label.uppercase() + digit + label.lowercase(),
+        longPressInitial = label.length,
     )
 
     /**
@@ -331,7 +339,7 @@ object KeyboardLayouts {
      * 候选栏列出 @# 等符号（键面 @#）。
      */
     val t9: List<List<KeyDef>> = LayoutIds.assign(listOf(
-        listOf(sideSpacer, keypad('\'', "分词", '1').copy(longPress = "1"), keypad('2', "ABC", '2'),
+        listOf(sideSpacer, keypad('\'', "分词", '1').copy(longPress = "1", longPressInitial = 0), keypad('2', "ABC", '2'),
             keypad('3', "DEF", '3'), KeyDef("⌫", KeyAction.Backspace, isSpecial = true)),
         listOf(sideSpacer, keypad('4', "GHI", '4'), keypad('5', "JKL", '5'), keypad('6', "MNO", '6'),
             KeyDef("重输", KeyAction.ClearInput, isSpecial = true)),

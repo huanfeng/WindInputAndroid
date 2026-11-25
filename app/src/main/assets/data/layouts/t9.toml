@@ -3,7 +3,8 @@
 # 主流九键排布：左列前三行是占位空白，视图在那里画可上下滚动的标点列；右列 ⌫、重输、0，
 # 右下角换行；底行 符号、123、空格、中英、换行。
 # `keypad` 是上报给核心的编码键字符（2-9；分词键是 '），进编码缓冲，不是数字；
-# `swipe_up` 是上滑出的真数字，`long_press` 是长按气泡（数字、小写、大写），二者都原样上屏
+# `swipe_up` 是上滑出的真数字，`long_press` 是长按气泡（大写、数字、小写，同全键盘字母键），
+# `long_press_initial` 是气泡初始选中第几项（数字，长按不动抬手即出数字）；二者都原样上屏
 # （有编码时先顶首选）。「分词」键空闲时键面 @#，在候选栏列出 @# 等符号，组码时切音节。
 # 键面的字母只是提示：哪个键代表哪些字母由引擎的键面映射决定。
 
@@ -15,26 +16,26 @@ name = "九宫格拼音"
 key = [
   { spacer = 1 },
   { keypad = "'", label = "分词", swipe_up = "1", long_press = "1", width = 1.4 },
-  { keypad = "2", label = "ABC", swipe_up = "2", long_press = "2abcABC", width = 1.4 },
-  { keypad = "3", label = "DEF", swipe_up = "3", long_press = "3defDEF", width = 1.4 },
+  { keypad = "2", label = "ABC", swipe_up = "2", long_press = "ABC2abc", long_press_initial = 3, width = 1.4 },
+  { keypad = "3", label = "DEF", swipe_up = "3", long_press = "DEF3def", long_press_initial = 3, width = 1.4 },
   { label = "⌫", action = "backspace" },
 ]
 
 [[rows]]
 key = [
   { spacer = 1 },
-  { keypad = "4", label = "GHI", swipe_up = "4", long_press = "4ghiGHI", width = 1.4 },
-  { keypad = "5", label = "JKL", swipe_up = "5", long_press = "5jklJKL", width = 1.4 },
-  { keypad = "6", label = "MNO", swipe_up = "6", long_press = "6mnoMNO", width = 1.4 },
+  { keypad = "4", label = "GHI", swipe_up = "4", long_press = "GHI4ghi", long_press_initial = 3, width = 1.4 },
+  { keypad = "5", label = "JKL", swipe_up = "5", long_press = "JKL5jkl", long_press_initial = 3, width = 1.4 },
+  { keypad = "6", label = "MNO", swipe_up = "6", long_press = "MNO6mno", long_press_initial = 3, width = 1.4 },
   { label = "重输", action = "clear_input" },
 ]
 
 [[rows]]
 key = [
   { spacer = 1 },
-  { keypad = "7", label = "PQRS", swipe_up = "7", long_press = "7pqrsPQRS", width = 1.4 },
-  { keypad = "8", label = "TUV", swipe_up = "8", long_press = "8tuvTUV", width = 1.4 },
-  { keypad = "9", label = "WXYZ", swipe_up = "9", long_press = "9wxyzWXYZ", width = 1.4 },
+  { keypad = "7", label = "PQRS", swipe_up = "7", long_press = "PQRS7pqrs", long_press_initial = 4, width = 1.4 },
+  { keypad = "8", label = "TUV", swipe_up = "8", long_press = "TUV8tuv", long_press_initial = 3, width = 1.4 },
+  { keypad = "9", label = "WXYZ", swipe_up = "9", long_press = "WXYZ9wxyz", long_press_initial = 4, width = 1.4 },
   { commit = "0", special = true },
 ]
 
