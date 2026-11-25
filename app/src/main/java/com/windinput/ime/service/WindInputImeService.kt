@@ -66,7 +66,6 @@ import com.windinput.ime.panels.KeyboardSelectWindow
 import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
 import com.windinput.ime.settings.SettingsActivity
-import com.windinput.ime.settings.SUB_ENABLED_SCHEMAS
 import com.windinput.ime.settings.SUB_NUMPAD_SYMBOLS
 import com.windinput.ime.settings.SUB_T9_SYMBOLS
 import java.io.File
@@ -1895,7 +1894,7 @@ class WindInputImeService :
 
     override fun t9Schemas(): Set<String> = t9SchemaSet()
 
-    override fun onKeyboardManage() = openSettings("schema", SUB_ENABLED_SCHEMAS)
+    override fun onKeyboardManage() = openSettings("schema", null)
 
     override fun onOpenSettings() = openSettings()
 

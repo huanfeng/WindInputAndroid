@@ -87,12 +87,12 @@ reset_pad
 tap_key LANG; sleep 3
 check_match "中英键切回五笔：aa 出汉字" "$CN" "$(wait_chinese)"
 
-section "[73] 键盘选择：「键盘管理」打开设置的「启用的方案」页"
+section "[73] 键盘选择：「键盘管理」打开设置的方案页"
 reset_pad
 ks_open
 tap_ime 键盘管理
 sleep 2
-check "进到启用的方案页" "yes" "$(has_text 启用的方案)"
+check "进到方案页（方案列表）" "yes" "$(has_text 导入方案)"
 back_to_pad
 reset_pad
 

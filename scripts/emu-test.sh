@@ -1339,7 +1339,7 @@ tap_key e; tap_key m; tap_key o; tap_key j; tap_key SPACE
 # uiautomator 把 BMP 以外的字符写成 XML 数字实体：😂（U+1F602）读回来是 &#128514;
 check "emoj 上屏表情" "😂" "$(get_pad_text)"
 
-section "[38] 设置页层级：首页 → 方案 → 码表 → 返回；词库 → 我的词条、词库统计；联想学习数据"
+section "[38] 设置页层级：首页 → 方案 → 五笔 → 上屏 → 返回；词库 → 我的词条、词库统计；联想学习数据"
 # 设置页分了两层（方案 / 输入按组进二级页，词库拆成入口），返回走预测性返回的回调。
 # 这里只验「点得进、退得回、每层该有的东西在」，不验视觉。
 has_text() {   # 当前界面有没有这段文字（等界面稳定，最多约 4 秒）
@@ -1354,12 +1354,15 @@ adb_q shell am start -n "$PKG/.settings.SettingsActivity"
 sleep 3
 check "首页有「开始使用」" "yes" "$(has_text 开始使用)"
 tap_text "方案"
-check "方案页有「码表」入口" "yes" "$(has_text 码表)"
-tap_text "码表"
-check "码表二级页有开关" "yes" "$(has_text 全码唯一自动上屏)"
+check "方案页有方案列表与导入入口" "yes" "$(has_text 导入方案)"
+tap_text "五笔"   # 点行进该方案的设置页
+check "方案设置页有分组入口" "yes" "$(has_text 上屏)"
+tap_text "上屏"
+check "分组页直接列出开关" "yes" "$(has_text 全码唯一自动上屏)"
 adb_q shell input keyevent BACK; sleep 1
 adb_q shell input keyevent BACK; sleep 1
-check "返回两层回到首页" "yes" "$(has_text 开始使用)"
+adb_q shell input keyevent BACK; sleep 1
+check "返回三层回到首页" "yes" "$(has_text 开始使用)"
 tap_text "词库"
 tap_text "我的词条"
 check "我的词条页有清空入口" "yes" "$(has_text 清空个人词)"

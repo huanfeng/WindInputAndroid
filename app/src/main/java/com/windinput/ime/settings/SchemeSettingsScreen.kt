@@ -291,10 +291,10 @@ private fun groupSummary(g: SchemeGroup, d: SchemeData, type: String, t9Summary:
     when (g.kind) {
         SchemeGroup.Kind.FORM, SchemeGroup.Kind.AUX -> {
             val n = d.form.changedCount(g.items)
-            val master = g.items.firstOrNull()?.takeIf { it.type == "toggle" }
+            val master = groupMaster(g.items)
             when {
-                g.kind == SchemeGroup.Kind.AUX || master != null && g.items.size > 1 && master.title == g.name ->
-                    (if (master != null && d.form.bool(master)) "已开启" else "未开启") + if (n > 0) " · 已自定义 $n 项" else ""
+                master != null ->
+                    (if (d.form.bool(master)) "已开启" else "未开启") + if (n > 0) " · 已自定义 $n 项" else ""
                 n > 0 -> "已自定义 $n 项"
                 else -> g.items.take(3).joinToString(" · ") { it.title }
             }
@@ -306,6 +306,10 @@ private fun groupSummary(g: SchemeGroup, d: SchemeData, type: String, t9Summary:
             if (d.props.items.firstOrNull { it.key == KEY_SENTENCE }?.value == "true") "已开启" else "未开启"
         SchemeGroup.Kind.MEMBERS -> d.memberNames.joinToString(" · ") { it.second }
     }
+
+/** 组的总开关：打头的开关项，且组里有别的项随它显隐（调频、自动学习、英文候选……） */
+internal fun groupMaster(items: List<SettingItem>): SettingItem? =
+    items.firstOrNull()?.takeIf { head -> head.type == "toggle" && items.any { it.enabledWhen == head.key } }
 
 /** 「本方案预设」：方案文件改过的项（标题 当前值，类型默认值） */
 internal fun presetsLine(builtin: Map<String, Any>, items: List<SettingItem>, values: ItemValues): String? =

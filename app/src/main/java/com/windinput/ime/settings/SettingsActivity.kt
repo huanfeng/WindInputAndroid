@@ -86,6 +86,8 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Slider
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.VerticalDivider
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TopAppBar
@@ -247,8 +249,6 @@ internal const val DICT_ADD = "添加词条"
 internal const val DICT_PHRASES = "命令短语"
 internal const val DICT_STATS = "词库统计"
 
-/** 方案页里代码画的二级页 */
-internal const val SUB_ENABLED_SCHEMAS = "启用的方案"
 
 /** 键盘布局页里代码画的二级页：数字框九宫格左列的符号 */
 internal const val SUB_NUMPAD_SYMBOLS = "数字键盘符号"
@@ -265,12 +265,10 @@ internal const val SUB_PRIVACY = "隐私政策"
 /** 输入页的「快捷输入」组：清单项之后，代码画「快捷候选来源」入口 */
 private const val SECTION_QUICK_INPUT = "快捷输入"
 
-/** 方案设置里的「双拼」组：清单项之外，代码在组页顶上画布局列表 */
-private const val SECTION_SHUANGPIN = "双拼"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
 internal val RESERVED_SUBPAGES =
-    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS, SUB_T9_SYMBOLS, SUB_KEYMAP_EDITOR, SUB_PRIVACY)
+    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_NUMPAD_SYMBOLS, SUB_T9_SYMBOLS, SUB_KEYMAP_EDITOR, SUB_PRIVACY)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -465,7 +463,7 @@ private fun SettingsApp(
             }
             when {
                 page == null -> HomeScreen(setup, manifest, values, schemaState, versionName, actions) { go(Route(it)) }
-                r.sub == null -> PageScreen(manifest, page, values, session, schemaState, versionName) { go(r.copy(sub = it)) }
+                r.sub == null -> PageScreen(manifest, page, values, session, schemaState, versionName, ::openScheme) { go(r.copy(sub = it)) }
                 schemeId != null -> SchemeSettingsScreen(
                     schemeId = schemeId,
                     group = r.detail,
@@ -646,7 +644,7 @@ private fun pageSummary(
     @Suppress("UNUSED_EXPRESSION") values.version // 值变了摘要跟着变
     return when (page.id) {
         "schema" -> schemaState?.slowSwitching?.let { "正在切换到「$it」…" }
-            ?: schemaState?.activeName?.let { "当前：$it" }
+            ?: schemaState?.let { schemaHomeSummary(it.activeName, it.schemas.size) }
             ?: sectionList(manifest, page.id)
         "dict" -> "我的词条 · 添加词条 · 命令短语 · 词库统计"
         "about" -> "版本 $versionName"
@@ -673,10 +671,11 @@ private fun PageScreen(
     session: ImeSession?,
     schemaState: SchemaState?,
     versionName: String,
+    onOpenScheme: (id: String, name: String) -> Unit,
     onOpenSub: (String) -> Unit,
 ) {
     when (page.id) {
-        "schema" -> SchemaSection(schemaState, onOpenSub)
+        "schema" -> SchemaSection(schemaState, onOpenScheme)
         "stats" -> StatsSection()
         "dict" -> DictOverview(session, onOpen = onOpenSub)
         "about" -> AboutSection(versionName, onOpenSub)
@@ -689,7 +688,7 @@ private fun PageScreen(
     if (page.subpages) {
         // 每组一个入口，副标题列出组里前几项，点进去才是开关
         if (sections.isNotEmpty()) {
-            SmallTitle(if (page.id == "schema") "方案设置" else "分类")
+            SmallTitle(if (page.id == "schema") "所有拼音方案共用" else "分类")
             Card(modifier = Modifier.fillMaxWidth()) {
                 for ((name, items) in sections) {
                     NavRow(
@@ -732,9 +731,6 @@ private fun sectionSummary(
         val head = on.take(3).joinToString(" · ") { it.title }
         return if (on.size > 3) "$head 等 ${on.size} 项" else head
     }
-    if (name == SECTION_SHUANGPIN) {
-        schemaState?.layouts?.firstOrNull { it.active }?.let { return "布局：${it.name.ifEmpty { it.id }}" }
-    }
     return items.take(3).joinToString(" · ") { it.title }
 }
 
@@ -760,7 +756,6 @@ private fun SubScreen(
     onOpenSchema: (id: String, name: String) -> Unit,
 ) {
     when {
-        page.id == "schema" && sub == SUB_ENABLED_SCHEMAS -> schemaState?.let { EnabledSchemasSection(it, onOpenSchema) }
         page.id == "dict" && sub == DICT_WORDS -> DictWords(session)
         page.id == "dict" && sub == DICT_ADD -> DictAdd(session)
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
@@ -772,16 +767,12 @@ private fun SubScreen(
         else -> {
             @Suppress("UNUSED_EXPRESSION") values.version
             val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
-            if (page.id == "schema" && sub == SECTION_SHUANGPIN) ShuangpinLayouts(schemaState)
             // 组内再按 card 分卡（模糊音：总开关 / 声母 / 韵母；纠错与提示：总开关 / 纠错规则 / 正确拼音提示）
             for ((card, cardItems) in items.groupBy { it.card }) {
-                val title = card ?: if (sub == SECTION_SHUANGPIN) "选项" else ""
+                val title = card ?: ""
                 if (cardItems.all { it.grid }) ToggleGridCard(title, cardItems, values)
                 else SettingsCard(title, cardItems, values)
             }
-            // 方案的附加词库挂在对应的二级页底下：拼音细胞词库在「拼音」，五笔附加库在「码表」
-            if (page.id == "schema" && sub == "拼音") SchemaDictsSection("细胞词库", listOf("pinyin", "shuangpin"))
-            if (page.id == "schema" && sub == "码表") SchemaDictsSection("五笔附加词库", listOf("wubi86"))
             if (sub == "联想输入") AssocLearningSection()
             if (page.id == SettingsActivity.PAGE_KEYBOARD && sub == KEYMAP_SECTION) KeymapStatusNote()
             if (page.id == "input" && sub == SECTION_QUICK_INPUT) {
@@ -889,7 +880,7 @@ internal fun ItemRow(raw: SettingItem, values: ItemValues) {
  * 以及删掉某个方案后设置页还列着一个选不动的死项。
  */
 @Composable
-private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
+private fun SchemaSection(state: SchemaState?, onOpenScheme: (id: String, name: String) -> Unit) {
     val st = state ?: return
     if (st.schemas.isEmpty()) return
     val context = LocalContext.current
@@ -909,31 +900,93 @@ private fun SchemaSection(state: SchemaState?, onOpenSub: (String) -> Unit) {
     }
     SchemeImportDialogs(importer)
 
-    // 标题固定：切换中的提示只写在那一行里，且慢了才写（见 SchemaState.slowSwitching）
+    var installed by remember { mutableStateOf<List<uniffi.wind_android.InstalledSchemaInfo>>(emptyList()) }
+    var reload by remember { mutableIntStateOf(0) }
+    LaunchedEffect(reload) {
+        installed = withContext(Dispatchers.IO) {
+            runCatching { CoreAccess.obtainCore(context)?.installedSchemas() }.getOrNull().orEmpty()
+        }
+    }
+    val activeId = st.schemas.firstOrNull { it.active }?.id
+
     SmallTitle("输入方案")
     Card(modifier = Modifier.fillMaxWidth()) {
-        for (s in st.schemas) {
+        for (s in installed) {
             val label = s.name.ifEmpty { s.id }
-            ChoiceRow(
+            SchemaListRow(
                 title = label,
-                selected = s.active,
-                summary = if (st.slowSwitching == label) "正在准备词库，首次使用要稍候…" else null,
-                onClick = { st.switchTo(label, EngineCmd.SelectSchema(s.index)) },
+                summary = schemaRowSummary(s, activeId),
+                enabled = s.enabled,
+                onEnabledChange = { on ->
+                    scope.launch {
+                        val error = withContext(Dispatchers.IO) { setSchemaEnabled(context, s.id, on) }
+                        if (error != null) android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_SHORT).show()
+                        reload++
+                        st.refresh()
+                    }
+                },
+                onOpen = { onOpenScheme(s.id, label) },
             )
         }
-        // 启用哪些方案设一次就不大动：收进二级页，入口挂在方案列表末尾
-        NavRow(
-            title = SUB_ENABLED_SCHEMAS,
-            summary = "已启用 ${st.schemas.size} 个方案",
-            icon = SettingsIcons.section(SUB_ENABLED_SCHEMAS),
-        ) { onOpenSub(SUB_ENABLED_SCHEMAS) }
         NavRow(
             title = "导入方案",
             summary = "安装电脑版或文档站分发的方案包（.wpkg / .zip）",
             icon = SettingsIcons.import,
         ) { picker.launch(arrayOf("application/zip", "application/octet-stream")) }
     }
+    if (installed.isNotEmpty()) UserSchemasCard(installed, onChanged = { reload++; scope.launch { st.refresh() } })
 }
+
+/** 启用 / 停用一个方案并重载（后台线程）。英文与最后一个中文方案关不掉，原因由核心给 */
+private fun setSchemaEnabled(context: android.content.Context, id: String, on: Boolean): String? {
+    val core = CoreAccess.obtainCore(context) ?: return "输入法核心未就绪"
+    return try {
+        core.setSchemaEnabled(id, on)
+        core.runCommand(uniffi.wind_android.EngineCommand.ReloadConfig)
+        null
+    } catch (e: uniffi.wind_android.ConfigException) {
+        (e as? uniffi.wind_android.ConfigException.Rejected)?.reason ?: e.toString()
+    } catch (e: Exception) {
+        "操作失败：${e.message ?: e}"
+    }
+}
+
+/**
+ * 方案列表的一行：方案名（副标题写「正在使用」等）　开关 | 齿轮。
+ * 点行或齿轮进该方案的设置页；开关只管启用 / 停用（停用的方案也能设置）。
+ */
+@Composable
+private fun SchemaListRow(
+    title: String,
+    summary: String?,
+    enabled: Boolean,
+    onEnabledChange: (Boolean) -> Unit,
+    onOpen: () -> Unit,
+) {
+    BasicComponent(
+        title = title,
+        summary = summary,
+        onClick = onOpen,
+        endActions = {
+            Switch(checked = enabled, onCheckedChange = onEnabledChange)
+            VerticalDivider(modifier = Modifier.align(Alignment.CenterVertically).padding(horizontal = 10.dp).height(24.dp))
+            IconButton(onClick = onOpen) {
+                Icon(SettingsIcons.schemaSettings, contentDescription = "「$title」的设置")
+            }
+        },
+    )
+}
+
+/** 列表行副标题：当前在用的写「正在使用」，锁定的写原因 */
+internal fun schemaRowSummary(s: uniffi.wind_android.InstalledSchemaInfo, activeId: String?): String? =
+    listOfNotNull(
+        "正在使用".takeIf { s.id == activeId },
+        "中英键切换要用，不能关".takeIf { s.locked },
+    ).joinToString(" · ").ifEmpty { null }
+
+/** 首页「方案」行的摘要 */
+internal fun schemaHomeSummary(activeName: String?, enabledCount: Int): String =
+    listOfNotNull(activeName?.let { "正在使用：$it" }, "已启用 $enabledCount 个").joinToString(" · ")
 
 /** 沿 ContextWrapper 链找宿主 Activity；Compose 的 LocalContext 在某些包装下不是 Activity 本身 */
 private fun android.content.Context.findComponentActivity(): ComponentActivity? {
@@ -943,83 +996,6 @@ private fun android.content.Context.findComponentActivity(): ComponentActivity? 
         c = c.baseContext
     }
     return null
-}
-
-/**
- * 启用的方案：装了的方案里哪些出现在「输入方案」列表、快捷面板与中英键卡片里。
- *
- * 移动端默认装了的全部可用；这里关掉的写进用户层（核心每次重载都按它重算，此前重载会读回
- * 出厂的「五笔 + 五笔拼音」，拼音、双拼就从列表里没了）。英文是中英键切换的目标，关不掉；
- * 最后一个中文方案也关不掉——原因由核心给，Toast 报出来。
- *
- * 每行开关左边一个设置图标，点进该方案的详情页（[SchemaDetailSection]）；停用的方案也能设置。
- */
-@Composable
-private fun EnabledSchemasSection(st: SchemaState, onOpenSchema: (id: String, name: String) -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var installed by remember { mutableStateOf<List<uniffi.wind_android.InstalledSchemaInfo>>(emptyList()) }
-    var reload by remember { mutableIntStateOf(0) }
-    LaunchedEffect(reload) {
-        installed = withContext(Dispatchers.IO) {
-            runCatching { CoreAccess.obtainCore(context)?.installedSchemas() }.getOrNull().orEmpty()
-        }
-    }
-    if (installed.isEmpty()) return
-    UserSchemasCard(installed, onChanged = { reload++; scope.launch { st.refresh() } })
-    SectionTitle("启用")
-    Card(modifier = Modifier.fillMaxWidth()) {
-        for (s in installed) {
-            val label = s.name.ifEmpty { s.id }
-            SwitchPreference(
-                checked = s.enabled,
-                title = label,
-                summary = if (s.locked) "中英键切换要用，不能关" else null,
-                endActions = {
-                    IconButton(onClick = { onOpenSchema(s.id, label) }) {
-                        Icon(SettingsIcons.schemaSettings, contentDescription = "「$label」的设置")
-                    }
-                },
-                onCheckedChange = { on ->
-                    scope.launch {
-                        val error = withContext(Dispatchers.IO) {
-                            val core = CoreAccess.obtainCore(context) ?: return@withContext "输入法核心未就绪"
-                            try {
-                                core.setSchemaEnabled(s.id, on)
-                                core.runCommand(uniffi.wind_android.EngineCommand.ReloadConfig)
-                                null
-                            } catch (e: uniffi.wind_android.ConfigException) {
-                                (e as? uniffi.wind_android.ConfigException.Rejected)?.reason ?: e.toString()
-                            } catch (e: Exception) {
-                                "操作失败：${e.message ?: e}"
-                            }
-                        }
-                        if (error != null) android.widget.Toast.makeText(context, error, android.widget.Toast.LENGTH_SHORT).show()
-                        reload++
-                        st.refresh()
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun ShuangpinLayouts(state: SchemaState?) {
-    val st = state ?: return
-    if (st.layouts.isEmpty()) return
-    SmallTitle("布局")
-    Card(modifier = Modifier.fillMaxWidth()) {
-        for (l in st.layouts) {
-            val label = l.name.ifEmpty { l.id }
-            ChoiceRow(
-                title = label,
-                selected = l.active,
-                summary = if (st.slowSwitching == label) "正在切换…" else null,
-                onClick = { st.switchTo(label, EngineCmd.SetShuangpinLayout(l.id)) },
-            )
-        }
-    }
 }
 
 /** Emoji 候选总开关（附加模块卡片跟着它显示）与它所在的二级页 */

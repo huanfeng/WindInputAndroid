@@ -59,4 +59,11 @@ class SchemeSettingsModelTest {
         assertEquals(SchemeGroup.Kind.FORM, basic.kind)
         assertEquals("schema.pinyin.shuangpin.allow_full_pinyin", basic.items.first().key)
     }
+
+    @Test
+    fun masterIsLeadingToggleOthersDependOn() {
+        val groups = manifest.schemeGroups("pinyin").toMap()
+        assertEquals("schema.pinyin.frequency.enabled", groupMaster(groups.getValue("调频"))?.key)
+        assertEquals(null, groupMaster(groups.getValue("基本")))
+    }
 }

@@ -31,11 +31,20 @@ si_view() {   # 用文件关联打开 files/e2e-schema/<名字>
     sleep 2
 }
 si_user_file_exists() { adb_ shell ls "$SI_USER_SCHEMAS/$1" 2>/dev/null | grep -q "$1" && echo yes || echo no; }
-si_open_enabled_schemas() {   # 设置 → 方案 → 启用的方案
+si_tap_last() {   # 点最后一个文字为 $1 的节点：方案名在上方方案列表与下方「导入的方案」卡里各出现一次，要点卡里那个
+    local node
+    node="$(dump_xml | sed 's/<node/\n<node/g' | grep -F " text=\"$1\"" | tail -1)"
+    [[ "$node" =~ bounds=\"\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]\" ]] || die "找不到文字为「$1」的节点"
+    adb_q shell input tap $(( (BASH_REMATCH[1] + BASH_REMATCH[3]) / 2 )) $(( (BASH_REMATCH[2] + BASH_REMATCH[4]) / 2 ))
+    sleep 0.5
+}
+si_open_enabled_schemas() {   # 设置 → 方案（方案列表：开关 | 齿轮，下方是用户导入的方案），翻到底露出「导入的方案」卡
     adb_q shell am start -f 0x10008000 -n "$PKG/.settings.SettingsActivity"
     sleep 2
     tap_text "方案"
-    tap_text "启用的方案"
+    sleep 1
+    adb_q shell input swipe $(( GEO_W / 2 )) 1900 $(( GEO_W / 2 )) 500 300; sleep 0.6
+    adb_q shell input swipe $(( GEO_W / 2 )) 1900 $(( GEO_W / 2 )) 500 300; sleep 0.8
 }
 
 # 预热核心：刚装完包的第一次冷启动里立刻走文件关联，核心可能还没建好（报「输入法核心未就绪」）
@@ -87,17 +96,13 @@ PY
     check "已装方案列表出现 98 五笔" "yes" "$(si_has_text 五笔98)"
     check "用户导入的方案可删除" "yes" "$(si_has_text '用户导入 · 点此删除')"
     check "只有导入的两个方案有删除入口，自带方案没有" "2" "$(dump_xml | grep -o '点此删除\|点此恢复自带版本' | wc -l | tr -d ' ')"
-    # 启用状态：「输入方案」页的单选列表只列启用的方案
-    adb_q shell input keyevent BACK; sleep 1
-    check "输入方案列表里能选 98 五笔（已启用）" "yes" "$(si_has_text 五笔98)"
-    tap_text "启用的方案"
     # 五笔98 被「五笔98拼音」当主方案引用：先删被依赖的会因共享而保留，所以先删混输方案，再删它
-    tap_text "五笔98拼音"
+    si_tap_last "五笔98拼音"
     check "删除前二次确认" "yes" "$(si_has_text 删除方案)"
     tap_text "删除"
     sleep 2
     check "删混输方案后文件已清掉" "no" "$(si_user_file_exists wubi98_pinyin.schema.toml)"
-    tap_text "五笔98"
+    si_tap_last "五笔98"
     tap_text "删除"
     sleep 2
     check "删除后列表里没有 98 五笔" "no" "$(si_has_text 五笔98)"
@@ -188,7 +193,7 @@ check "用户混输导入完成" "yes" "$(si_has_text 导入完成)"
 tap_text "完成"
 sleep 1
 si_open_enabled_schemas
-tap_text "我的混输"
+si_tap_last "我的混输"
 tap_text "删除"
 sleep 2
 check "删用户混输后混输已清掉" "no" "$(si_user_file_exists mymix.schema.toml)"
