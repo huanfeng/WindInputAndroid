@@ -77,8 +77,8 @@ check "行内注明已自定义及默认值" "yes" "$(dump_xml | grep -q '已自
 back_to_pad
 reset_pad
 # 标点态是方案代际同步的（同 PC：改的是当前方案时，本代际内用户手动切的标点态胜出），切一次才生效
-lang_menu_pick 1; sleep 3
-lang_menu_pick 5; sleep 2
+lang_menu_pick 全拼; sleep 3
+lang_menu_pick 五笔; sleep 2
 tap_key COMMA
 check "五笔下逗号出半角" "," "$(get_pad_text)"
 ss_open_detail 五笔
@@ -89,8 +89,8 @@ sleep 1
 check "选回默认值即删掉覆盖" "no" "$(ss_ov wubi86 | grep -q 'punct' && echo yes || echo no)"
 back_to_pad
 reset_pad
-lang_menu_pick 1; sleep 3
-lang_menu_pick 5; sleep 2
+lang_menu_pick 全拼; sleep 3
+lang_menu_pick 五笔; sleep 2
 tap_key COMMA
 check "恢复后逗号出全角" "，" "$(get_pad_text)"
 

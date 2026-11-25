@@ -1,6 +1,7 @@
 package com.windinput.ime.keyboard
 
 import android.graphics.RectF
+import android.util.Log
 import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
@@ -165,6 +166,9 @@ class KeyPopupManager(private val anchor: View) {
         popup = popupWindow(col, w + 2 * inset, h).also {
             it.showAtLocation(anchor, Gravity.NO_GRAVITY, x, y)
         }
+        // 各项的屏幕纵坐标（行中线）：弹窗不进无障碍树，e2e 据这行按文字选项（行高随方案数会收）
+        val screenTop = y + (loc[1] - win[1]) + inset
+        Log.i(MENU_LOG_TAG, labels.indices.joinToString("|") { "${labels[it]}@${screenTop + rowH * it + rowH / 2}" })
     }
 
     /** [showMenu] 的竖排菜单：顶边（anchor 坐标）、行高；行高为 0 表示当前是横排字符气泡 */
@@ -332,3 +336,6 @@ class KeyPopupManager(private val anchor: View) {
             setStroke((1 * density).toInt(), Palette.current.popupBorder)
         }
 }
+
+/** 竖排菜单弹出时打的日志标签（e2e `lang_menu_pick` 读它） */
+private const val MENU_LOG_TAG = "WindMenu"

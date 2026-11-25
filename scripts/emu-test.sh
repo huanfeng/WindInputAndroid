@@ -587,8 +587,8 @@ COMMENT_OFF='candidate_comment = false # emu-test'
 # 「123」默认先进九宫数字（ui.android.number_page = pad9），而整套用例写的是「123 先进全键盘数字页、
 # 再点「符号」位进九宫」的按法：同样带标记钉成 full，跑完写回
 NUMBER_FULL_CFG='number_page = "full" # emu-test'
-# 九宫格默认只给全拼开（双拼要到方案设置里开）；长按中英键菜单的序号按「全拼、双拼都有九宫格项」
-# 排（共 8 项），同样带标记钉住，跑完写回
+# 九宫格开关（方案设置里按方案拨，默认全拼开、双拼关）：用户自己拨过的会改变键盘列表，
+# 统一钉成全拼、双拼都开，同样带标记，跑完写回
 T9_SCHEMAS_CFG='enabled_schemas = "pinyin,shuangpin" # emu-test'
 write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell sh -c "'mkdir -p $EXT/keyboard && cat > $KB_CFG'"; }
 SUITE_KB_RAW="$(adb_ shell cat "$KB_CFG" 2>/dev/null)"
@@ -1400,26 +1400,39 @@ adb_q shell input keyevent BACK; sleep 1
 restart_pad
 
 section "[39] 长按中英键竖排菜单：上滑选全拼打 ni，再选回五笔；不滑就松手什么都不做"
-# 菜单从中英键上方往上排，左沿对齐键位，行高 44dp，下沿离键顶 8dp。项按核心给的方案列表
-# 再加末项「切换输入法」；能用九宫格的方案（全拼、双拼）各多一项「· 九宫格」紧跟其后：
-# 清风英文 · 全拼 · 全拼·九宫格 · 双拼 · 双拼·九宫格 · 五笔 · 五笔拼音 · 切换输入法（共 8 项）
-lang_menu_pick() {   # 第几项（从 0 起）：按住中英键等菜单弹出，上滑到该项再松手
-    local lx ly ty
+# 菜单从中英键上方往上排，项按核心给的方案列表再加末项「切换输入法」；能用九宫格的方案多一项
+# 「· 九宫格」紧跟其后。项数、行高（方案多时往下收）都会变，所以按**文字**选：菜单弹出时键盘往
+# logcat 打一行 `WindMenu: 文字@屏幕纵坐标|…`（弹窗不进无障碍树），读它找到那一项再滑过去
+menu_log_count() { adb_ logcat -d -s WindMenu:I | grep -c 'WindMenu:'; }
+lang_menu_pick() {   # 菜单项文字（如「全拼」「全拼 · 九宫格」「五笔」）：按住中英键等菜单弹出，上滑到该项再松手
+    local lx ly ty before line
     read -r lx ly <<< "$(key_center LANG)"
-    ty="$(awk -v y="$ly" -v r="$GEO_ROWPX" -v d="$GEO_DENSITY" -v i="$1" \
-        'BEGIN{ printf "%d", y - r / 2 - 8 * d - (8 - i - 0.5) * 44 * d }')"
+    before="$(menu_log_count)"
     adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
+    for ((menu_try = 0; menu_try < 6; menu_try++)); do
+        (( $(menu_log_count) > before )) && break
+        sleep 0.3
+    done
+    line="$(adb_ logcat -d -s WindMenu:I | grep -o 'WindMenu: .*' | tail -1)"
+    line="${line#WindMenu: }"
+    ty="$(printf '%s\n' "$line" | tr '|' '\n' | awk -F@ -v want="$1" '$1 == want { print $2 }' | tr -d '\r')"
+    if [[ -z "$ty" ]] || (( $(menu_log_count) <= before )); then
+        # 原地松手 = 什么都不选
+        adb_q shell input motionevent UP "$lx" "$ly"; sleep 0.6
+        echo "  ${D}长按中英键菜单里没有「$1」：$line${N}"
+        return 1
+    fi
     adb_q shell input motionevent MOVE "$lx" $(( (ly + ty) / 2 )); sleep 0.1
     adb_q shell input motionevent MOVE "$lx" "$ty"; sleep 0.2
     adb_q shell input motionevent UP "$lx" "$ty"; sleep 0.6
 }
 reset_pad
-lang_menu_pick 1       # 全拼
+lang_menu_pick 全拼
 sleep 6                # 模拟器上首次编译拼音词库近 5 秒，期间按键直接上屏字母
 tap_key n; tap_key i; tap_key SPACE
 check "切到全拼后 ni 出「你」" "你" "$(get_pad_text)"
 reset_pad
-lang_menu_pick 5       # 五笔
+lang_menu_pick 五笔
 sleep 2
 tap_key a; tap_key a; tap_key SPACE
 check "切回五笔 aa 出「式」" "式" "$(get_pad_text)"
@@ -1434,11 +1447,21 @@ check "长按中英键不滑松手：不弹卡片、仍是五笔" "式" "$(get_p
 # 选「全拼 · 九宫格」：字母层换成九宫格（有左列节点），等核心切完方案、状态推送过后仍是九宫格
 # （回归：核心忙时 keypadSupported 答 false，曾把刚选的九宫格当成「方案设置里关了」撤掉）
 reset_pad
-lang_menu_pick 2       # 全拼 · 九宫格
+lang_menu_pick "全拼 · 九宫格"
 sleep 6
 t9_on=0; ime_xml | grep -q 'content-desc="左列·' && t9_on=1
 check "选全拼·九宫格后字母层是九宫格" "1" "$t9_on"
-lang_menu_pick 5       # 回五笔
+# 反方向：方案设置里关掉全拼的九宫格（写 disabled_schemas），再弹键盘就退回全键盘，菜单里也没这项了
+write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG" | sed 's/^enabled_schemas = .*/enabled_schemas = "shuangpin" # emu-test\ndisabled_schemas = "pinyin"/')"
+restart_pad
+sleep 2
+t9_on=0; ime_xml | grep -q 'content-desc="左列·' && t9_on=1
+check "关掉全拼九宫格后退回全键盘" "0" "$t9_on"
+no_item=0; lang_menu_pick "全拼 · 九宫格" >/dev/null || no_item=1
+check "关掉后菜单里没有「全拼 · 九宫格」" "1" "$no_item"
+write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
+restart_pad
+lang_menu_pick 五笔
 sleep 2
 
 section "[47] 拼音首单元读法：xian 展开后左栏点 xi，候选换成 xi'an 的（西安）"
@@ -1446,7 +1469,7 @@ section "[47] 拼音首单元读法：xian 展开后左栏点 xi，候选换成 
 # 默认读法 xian 的候选是「先、现、县…」，点 xi 读法后 xi'an 的「西安」才进候选。
 # 判据：点「西安」能上屏——默认读法下它不在首批里就点不到（核心侧另有集成测试守逻辑）。
 reset_pad
-lang_menu_pick 1       # 全拼
+lang_menu_pick 全拼
 sleep 6
 tap_key x; tap_key i; tap_key a; tap_key n
 sleep 0.8
@@ -1458,7 +1481,7 @@ tap_ime 西安
 sleep 0.6
 check "点 xi 读法后选「西安」上屏" "西安" "$(get_pad_text)"
 reset_pad
-lang_menu_pick 5       # 切回五笔，别影响后面的用例
+lang_menu_pick 五笔      # 切回五笔，别影响后面的用例
 sleep 2
 
 section "[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符"
@@ -1500,7 +1523,7 @@ tap_key n; tap_key i; tap_key SPACE
 check "首次卡片里选全拼后 ni 出「你」" "你" "$(get_pad_text)"
 # 切回五笔，并确认第二次弹键盘不再出卡片（出了的话 aa 会被卡片挡住）
 reset_pad
-lang_menu_pick 5       # 五笔
+lang_menu_pick 五笔
 sleep 2
 adb_q shell am force-stop "$PKG"
 restart_pad
