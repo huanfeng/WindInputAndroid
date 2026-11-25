@@ -15,9 +15,9 @@ class SettingsManifestTest {
     fun homeHasThreeSegmentsInDesignOrder() {
         assertEquals(
             listOf("schema", "input", "ui", "stats", "dict", "keyboard", "keys", "toolbar", "advanced", "about"),
-            bundled.pages.map { it.id },
+            bundled.homePages.map { it.id },
         )
-        assertEquals(listOf("shared", "android", "tail"), bundled.pages.map { it.segment }.distinct())
+        assertEquals(listOf("shared", "android", "tail"), bundled.homePages.map { it.segment }.distinct())
     }
 
     /** 键盘项的值只在 K 侧，没有默认值就显示成空 */
@@ -47,7 +47,7 @@ class SettingsManifestTest {
     @Test
     fun sectionsKeepFirstAppearanceOrder() {
         assertEquals(
-            listOf("码表", "拼音", "模糊音", "双拼", "混输", "英文"),
+            listOf("模糊音"),
             bundled.sectionsOf("schema").map { it.first },
         )
     }
@@ -219,5 +219,81 @@ class SettingsManifestTest {
             options = [{ value = "1" }]
             """.trimIndent(),
         )
+    }
+
+    // ── 方案设置表单（scheme_form 页）──────────────────────────────
+
+    private val schemeTypes = setOf("pinyin", "shuangpin", "codetable", "mixed", "english")
+
+    @Test
+    fun schemeFormItemsDeclareSchemes() {
+        val form = bundled.itemsOf(SettingsManifest.SCHEME_FORM_PAGE)
+        assertTrue("表单页不能是空的", form.isNotEmpty())
+        val bad = form.filter { it.schemes.isEmpty() || !schemeTypes.containsAll(it.schemes) }
+        assertTrue("schemes 缺失或取值不对：${bad.map { it.key }}", bad.isEmpty())
+        val stray = bundled.items.filter { it.page != SettingsManifest.SCHEME_FORM_PAGE && it.schemes.isNotEmpty() }
+        assertTrue("别的页不该写 schemes：${stray.map { it.key }}", stray.isEmpty())
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun schemesOutsideFormIsRejected() {
+        SettingsManifest.parse(
+            """
+            [[page]]
+            id = "a"
+            [[item]]
+            page = "a"
+            key = "input.x"
+            source = "engine"
+            schemes = ["pinyin"]
+            """.trimIndent(),
+        )
+    }
+
+    /** 引擎项的键前缀与适用类型一致：给全拼的项就得是 schema.pinyin.*，否则核心按方案写不进去 */
+    @Test
+    fun schemeFormEngineKeysMatchType() {
+        val prefix = mapOf(
+            "pinyin" to "schema.pinyin.", "shuangpin" to "schema.pinyin.", "codetable" to "schema.codetable.",
+            "mixed" to "schema.mix.", "english" to "schema.english.",
+        )
+        val bad = bundled.itemsOf(SettingsManifest.SCHEME_FORM_PAGE)
+            .filter { it.source == SettingSource.ENGINE }
+            .filter { item -> item.schemes.any { !item.key.startsWith(prefix.getValue(it)) } }
+        assertTrue("键前缀与 schemes 不符：${bad.map { it.key }}", bad.isEmpty())
+    }
+
+    @Test
+    fun schemeFormHasNoAdvanced() {
+        val adv = bundled.itemsOf(SettingsManifest.SCHEME_FORM_PAGE).filter { it.advanced }
+        assertTrue("方案表单不折叠：${adv.map { it.key }}", adv.isEmpty())
+    }
+
+    @Test
+    fun pinyinGroupsInOrder() {
+        assertEquals(
+            listOf("基本", "智能组词", "词组补全", "英文候选", "调频", "自动学习", "辅助码"),
+            bundled.schemeGroups("pinyin").map { it.first },
+        )
+        val basic = bundled.schemeGroups("pinyin").first().second.map { it.key }
+        assertTrue("双拼专有项不进全拼", "schema.pinyin.shuangpin.allow_full_pinyin" !in basic)
+        val spBasic = bundled.schemeGroups("shuangpin").first().second.map { it.key }
+        assertEquals("schema.pinyin.shuangpin.allow_full_pinyin", spBasic.first())
+    }
+
+    @Test
+    fun otherTypesHaveGroups() {
+        assertEquals(
+            listOf("上屏", "匹配", "通配与 z 键", "调频", "自动造词", "英文候选"),
+            bundled.schemeGroups("codetable").map { it.first },
+        )
+        assertEquals(listOf("基本", "拼音部分", "英文部分"), bundled.schemeGroups("mixed").map { it.first })
+        assertEquals(listOf("候选", "调频", "自动造词"), bundled.schemeGroups("english").map { it.first })
+    }
+
+    @Test
+    fun schemaPageKeepsOnlyFuzzy() {
+        val keys = bundled.itemsOf("schema").map { it.key }
+        assertTrue("方案页只剩模糊音：$keys", keys.all { it.startsWith("input.fuzzy.") })
     }
 }

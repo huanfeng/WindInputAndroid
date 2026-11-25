@@ -383,7 +383,7 @@ internal fun codetableRows(
     items: List<SchemaSettingItem>,
 ): List<Pair<SettingItem, SchemaSettingItem>> =
     manifest.items
-        .filter { it.page == "schema" && it.section == "码表" && it.key.startsWith(MANIFEST_CODETABLE) }
+        .filter { it.page == SettingsManifest.SCHEME_FORM_PAGE && "codetable" in it.schemes && it.key.startsWith(MANIFEST_CODETABLE) }
         .mapNotNull { m ->
             val key = "engine.codetable." + m.key.removePrefix(MANIFEST_CODETABLE)
             items.firstOrNull { it.key == key && it.group == SchemaSettingGroup.CODE_TABLE }?.let { m to it }

@@ -57,6 +57,8 @@ data class SettingItem(
     val grid: Boolean = false,
     /** 只对实体键盘有意义（触发键、快捷键）：「显示实体键盘设置」打开才显示，免得手机用户翻到一堆用不上的项 */
     val hardware: Boolean = false,
+    /** 方案表单项适用的方案类型（pinyin / shuangpin / codetable / mixed / english）；只在 scheme_form 页写 */
+    val schemes: List<String> = emptyList(),
 )
 
 data class SettingsManifestData(
@@ -68,11 +70,27 @@ data class SettingsManifestData(
     /** 某页的卡片，按清单里首次出现的顺序 */
     fun sectionsOf(page: String): List<Pair<String, List<SettingItem>>> =
         itemsOf(page).groupBy { it.section }.toList()
+
+    /** 首页列出的页（不含 hidden 段：方案表单这类只从别处进的页） */
+    val homePages: List<SettingPage> get() = pages.filter { it.segment != SettingsManifest.HIDDEN_SEGMENT }
+
+    /** 某类方案的设置分组（section = 组名），按清单首次出现的顺序 */
+    fun schemeGroups(engineType: String): List<Pair<String, List<SettingItem>>> =
+        itemsOf(SettingsManifest.SCHEME_FORM_PAGE).filter { engineType in it.schemes }.groupBy { it.section }.toList()
 }
 
 object SettingsManifest {
 
     private const val TAG = "SettingsManifest"
+
+    /** 方案设置表单页：每个方案的设置页按方案类型从这里取项 */
+    const val SCHEME_FORM_PAGE = "scheme_form"
+
+    /** 首页不列的页面段 */
+    const val HIDDEN_SEGMENT = "hidden"
+
+    /** 方案表单项 schemes 的取值 */
+    val SCHEME_TYPES = setOf("pinyin", "shuangpin", "codetable", "mixed", "english")
 
     /** 设置页认识的预览种类 */
     val PREVIEWS = setOf("keyboard_rows", "candidate_text")
@@ -149,7 +167,16 @@ object SettingsManifest {
                 card = t.getString("card"),
                 grid = t.getBoolean("grid") ?: false,
                 hardware = t.getBoolean("hardware") ?: false,
-            )
+                schemes = t.getArray("schemes")?.let { arr -> (0 until arr.size()).map { arr.getString(it) } }.orEmpty(),
+            ).also {
+                if (page == SCHEME_FORM_PAGE) {
+                    require(it.schemes.isNotEmpty() && SCHEME_TYPES.containsAll(it.schemes)) {
+                        "$key：方案表单项的 schemes 必须是 $SCHEME_TYPES 里的值"
+                    }
+                } else {
+                    require(it.schemes.isEmpty()) { "$key：schemes 只能写在方案表单页（$SCHEME_FORM_PAGE）" }
+                }
+            }
         }
         // 引用的键必须是清单里的开关：写错一个字，二选一就变成能同时开、依赖项就永远不显示
         val toggles = items.filter { it.type == "toggle" }.associateBy { it.key }

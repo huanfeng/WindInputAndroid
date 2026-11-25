@@ -40,7 +40,7 @@ class SchemaDetailTest {
         val items = coreCodetableKeys.map { item("engine.codetable.$it") }
         val rows = codetableRows(manifest, items)
         val manifestKeys = manifest.items
-            .filter { it.page == "schema" && it.section == "码表" }
+            .filter { it.page == SettingsManifest.SCHEME_FORM_PAGE && "codetable" in it.schemes }
             .map { it.key.removePrefix("schema.codetable.") }
         // 清单「码表」节的键，核心要么有方案级覆盖（得逐项对上——漏一项就是清单新增了键而核心没跟上），
         // 要么明确列在 globalOnly 里（只有全局值的进阶参数）。新增清单键又不在两边，这里就红

@@ -4,6 +4,7 @@
 #   id       页面标识；schema / stats / dict / about 另有代码画的专属区块
 #   title    标题
 #   segment  首页分段：shared（清风引擎：与电脑版共用的引擎设置）/ android（手机键盘）/ tail（其他）
+#            / hidden（首页不列，只从别处进：方案表单）
 #   icon     首页图标名（见 SettingsIcons.kt；单测核对每个名字都能解析）
 #   subpages true = 页内每个 section 是一个二级入口，点进去才是那一组设置；
 #            false（缺省）= 页内各 section 直接分组列出（项少的页）
@@ -21,6 +22,7 @@
 #   options  select 的选项 [{ value, label }]；value 一律写字符串，写入时按键的类型转换
 #   min / max / step / unit   int 的范围、步长、单位
 #   advanced true = 收进卡片底部的「进阶」折叠区（工程参数）
+#   schemes  方案表单项（page = "scheme_form"）适用的方案类型：pinyin / shuangpin / codetable / mixed / english
 #   exclusive_with  另一个开关键：本项打开时把它关掉（二选一，照电脑版清单）
 #   enabled_when    另一个开关键：它开着时本项才显示（电脑版写 "键 == true"，这里只写键）；
 #            依赖链逐级生效：A 依赖 B、B 依赖 C，C 关着时 A、B 都不显示
@@ -100,378 +102,15 @@ title = "关于"
 segment = "tail"
 icon = "Info"
 
+# 方案设置表单：方案页每个方案的齿轮进来，按方案类型取项（见下方「方案设置表单」）
+[[page]]
+id = "scheme_form"
+title = "方案设置"
+segment = "hidden"
+icon = "Layers"
+
 # ═══ 方案 ═══════════════════════════════════════════════════════
-# 方案列表与双拼布局由代码画在页首；下面是按方案类型的全局值（电脑版的四张卡）。
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.auto_commit_at_full"
-source = "engine"
-type = "toggle"
-title = "全码唯一自动上屏"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.clear_on_empty_max"
-source = "engine"
-type = "toggle"
-title = "满码空码清空"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.top_code_commit"
-source = "engine"
-type = "toggle"
-title = "顶码上屏"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.punct_commit"
-source = "engine"
-type = "toggle"
-title = "标点顶码上屏"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.show_code_hint"
-source = "engine"
-type = "toggle"
-title = "显示编码提示"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.single_char"
-source = "engine"
-type = "toggle"
-title = "单字输入"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.enabled"
-source = "engine"
-type = "toggle"
-title = "词频调整"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.auto_phrase.enabled"
-source = "engine"
-type = "toggle"
-title = "自动造词"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.enable"
-source = "engine"
-type = "toggle"
-title = "英文候选"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.auto_commit_min_len"
-source = "engine"
-type = "select"
-title = "自动上屏最短码长"
-advanced = true
-options = [
-  { value = "0", label = "满码（跟随方案）" },
-  { value = "1", label = "1 码" },
-  { value = "2", label = "2 码" },
-  { value = "3", label = "3 码" },
-  { value = "4", label = "4 码" },
-  { value = "5", label = "5 码" },
-]
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.short_code_yield_level"
-source = "engine"
-type = "select"
-title = "出简让全"
-advanced = true
-options = [
-  { value = "0", label = "关闭" },
-  { value = "2", label = "一、二级简码" },
-  { value = "3", label = "全部简码" },
-]
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.wildcard"
-source = "engine"
-type = "toggle"
-title = "通配输入"
-summary = "组码时通配键代替任意一个码元，如五笔的 z；候选显示完整编码"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.wildcard_key"
-source = "engine"
-type = "select"
-title = "通配键"
-summary = "选字母键会占掉该码元，仅建议用在闲置的键上；符号键在首位也作通配"
-advanced = true
-options = [
-  { value = "z", label = "z" },
-  { value = "?", label = "?" },
-  { value = "*", label = "*" },
-  { value = "`", label = "`" },
-]
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.wildcard_single_only"
-source = "engine"
-type = "toggle"
-title = "通配仅出单字"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.z_key_repeat"
-source = "engine"
-type = "toggle"
-title = "z 键重复上屏"
-summary = "空码时按 z 重复上一次上屏的内容（五笔 z 键）"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.z_key_action"
-source = "engine"
-type = "select"
-title = "z 键功能"
-summary = "z 在本方案没有编码时，按它进入的模式"
-advanced = true
-options = [
-  { value = "", label = "不启用" },
-  { value = "temp_pinyin", label = "临时拼音" },
-  { value = "temp_english", label = "临时英文" },
-]
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.strategy"
-source = "engine"
-type = "select"
-title = "调频策略"
-advanced = true
-options = [
-  { value = "top", label = "置顶" },
-  { value = "step", label = "步进" },
-  { value = "position", label = "位次渐进" },
-]
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.use_smart_compose"
-source = "engine"
-type = "toggle"
-title = "智能组词"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.sentence_count"
-source = "engine"
-type = "int"
-title = "智能组词显示条数"
-summary = "候选里同时列出几种整句解读，1 = 只出一条"
-enabled_when = "schema.pinyin.use_smart_compose"
-advanced = true
-min = 1
-max = 8
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.sentence_max_count"
-source = "engine"
-type = "int"
-title = "智能组词备选条数"
-summary = "一共算几种整句解读；少于显示条数时按显示条数算"
-enabled_when = "schema.pinyin.use_smart_compose"
-advanced = true
-min = 1
-max = 8
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.separator"
-source = "engine"
-type = "select"
-title = "拼音分隔符"
-summary = "消歧用，如输入 xi'an 得到「西安」。自动 = 默认用 '，' 被选择键占用时改用 `"
-advanced = true
-options = [
-  { value = "auto", label = "自动" },
-  { value = "quote", label = "单引号 '" },
-  { value = "backtick", label = "反引号 `" },
-  { value = "none", label = "不使用" },
-]
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.sentence_uses_user_words"
-source = "engine"
-type = "toggle"
-title = "组词时使用自造词"
-summary = "智能组词时把你造过的词也算进去。关闭时整句只用系统词库，自造的词打整句时不认"
-enabled_when = "schema.pinyin.use_smart_compose"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.aux_code.enabled"
-source = "engine"
-type = "toggle"
-title = "辅助码"
-summary = "打出候选后按触发键，用字形码进一步筛选；单个方案可在方案详情里单独开关"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.aux_code.max_phrase_len"
-source = "engine"
-type = "int"
-title = "辅助码参与筛选的最大词长"
-summary = "超过这个字数的词组不参与筛选，0 = 不限；单字始终参与"
-enabled_when = "schema.pinyin.aux_code.enabled"
-advanced = true
-min = 0
-max = 20
-unit = "字"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.aux_code.direct"
-source = "engine"
-type = "toggle"
-title = "直接辅助码"
-summary = "仅双拼：任一音节后直接敲 1～2 位字形码定字，不按引导键（如 gokqk → 国情）。会改变音节后字母的含义，想强制按音节切分可手打 '"
-enabled_when = "schema.pinyin.aux_code.enabled"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.completion.min_syllables"
-source = "engine"
-type = "int"
-title = "词组补全最少音节数"
-summary = "输入达到几个音节才给词组候选，1 = 不限制"
-advanced = true
-min = 1
-max = 6
-unit = "个音节"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.completion.max_extra_syllables"
-source = "engine"
-type = "int"
-title = "词组最多超出音节数"
-summary = "词组最多比已输入的多几个音节，越小越贴近已打的字"
-advanced = true
-min = 0
-max = 10
-unit = "个音节"
-
-# 整句语法模型写移动端覆盖键 mobile.grammar.enabled（手机默认开，电脑版出厂关，各管各的）
-[[item]]
-page = "schema"
-section = "拼音"
-key = "mobile.grammar.enabled"
-source = "engine"
-type = "toggle"
-title = "整句语法模型"
-summary = "按上下文搭配给整句挑更通顺的结果，如 womenzaigongyuanjianmian 出「我们在公园见面」而非「公元」"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.abbrev.enabled"
-source = "engine"
-type = "toggle"
-title = "启用简拼"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.single_char"
-source = "engine"
-type = "toggle"
-title = "单字输入"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.frequency.enabled"
-source = "engine"
-type = "toggle"
-title = "词频调整"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.auto_learn.enabled"
-source = "engine"
-type = "toggle"
-title = "自动学习"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.english_merge.enable"
-source = "engine"
-type = "toggle"
-title = "英文候选"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.english_merge.prefix_complete"
-source = "engine"
-type = "toggle"
-title = "英文前缀补全"
-summary = "有中文候选时也补至多 2 个英文词，但只在打的不是完整拼音时补：至少 5 个字母，且怎么切都切不成完整拼音（templa 补 template，shang 不补）。双拼方案不生效"
-enabled_when = "schema.pinyin.english_merge.enable"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.code_hint_source"
-source = "engine"
-type = "select"
-title = "编码提示来源"
-advanced = true
-options = [
-  { value = "auto", label = "自动" },
-  { value = "codetable", label = "码表反查" },
-  { value = "shuangpin", label = "双拼编码" },
-  { value = "off", label = "不显示" },
-]
+# 方案列表由代码画在页首（每行 开关 | 齿轮，齿轮进该方案的设置页）；这里只剩全局的模糊音。
 
 # 模糊音二级页：总开关一行；拼音对按声母 / 韵母各一张网格卡（card + grid），总开关关着时整组收起；
 # 正确拼音提示单独一张卡。顺序同电脑版拼音对话框的紧凑网格
@@ -627,41 +266,995 @@ type = "toggle"
 title = "eng ↔ ong"
 enabled_when = "input.fuzzy.enabled"
 
+# ═══ 方案设置表单（每个方案的设置页；代码按方案类型取 schemes 匹配的项）═══════════
+# section = 分组（方案设置页里一组一个子页）；schemes = 适用的方案类型
+# （pinyin / shuangpin / codetable / mixed / english）。键是旧全局键名 schema.<类型>.<项>，
+# 值经核心 scheme_form 按方案读写（与电脑版 schema.getSettings 同口径），不走全局配置。
+
 [[item]]
-page = "schema"
-section = "双拼"
+page = "scheme_form"
+section = "基本"
+schemes = ["shuangpin"]
 key = "schema.pinyin.shuangpin.allow_full_pinyin"
 source = "engine"
 type = "toggle"
 title = "双拼时允许全拼输入"
 
 [[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.enable_english"
+page = "scheme_form"
+section = "基本"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.single_char"
 source = "engine"
 type = "toggle"
-title = "启用英文候选"
+title = "单字输入"
 
 [[item]]
-page = "schema"
-section = "混输"
+page = "scheme_form"
+section = "基本"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.abbrev.enabled"
+source = "engine"
+type = "toggle"
+title = "启用简拼"
+
+[[item]]
+page = "scheme_form"
+section = "基本"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.separator"
+source = "engine"
+type = "select"
+title = "拼音分隔符"
+summary = "消歧用，如输入 xi'an 得到「西安」。自动 = 默认用 '，' 被选择键占用时改用 `"
+options = [
+  { value = "auto", label = "自动" },
+  { value = "quote", label = "单引号 '" },
+  { value = "backtick", label = "反引号 `" },
+  { value = "none", label = "不使用" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "基本"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.code_hint_source"
+source = "engine"
+type = "select"
+title = "编码提示来源"
+options = [
+  { value = "auto", label = "自动" },
+  { value = "codetable", label = "码表反查" },
+  { value = "shuangpin", label = "双拼编码" },
+  { value = "off", label = "不显示" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "智能组词"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.use_smart_compose"
+source = "engine"
+type = "toggle"
+title = "智能组词"
+
+[[item]]
+page = "scheme_form"
+section = "智能组词"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.sentence_uses_user_words"
+source = "engine"
+type = "toggle"
+title = "组词时使用自造词"
+summary = "智能组词时把你造过的词也算进去。关闭时整句只用系统词库，自造的词打整句时不认"
+enabled_when = "schema.pinyin.use_smart_compose"
+
+[[item]]
+page = "scheme_form"
+section = "智能组词"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.sentence_count"
+source = "engine"
+type = "int"
+title = "智能组词显示条数"
+summary = "候选里同时列出几种整句解读，1 = 只出一条"
+enabled_when = "schema.pinyin.use_smart_compose"
+min = 1
+max = 8
+
+[[item]]
+page = "scheme_form"
+section = "智能组词"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.sentence_max_count"
+source = "engine"
+type = "int"
+title = "智能组词备选条数"
+summary = "一共算几种整句解读；少于显示条数时按显示条数算"
+enabled_when = "schema.pinyin.use_smart_compose"
+min = 1
+max = 8
+
+[[item]]
+page = "scheme_form"
+section = "智能组词"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.grammar.enabled"
+source = "engine"
+type = "toggle"
+title = "整句语法模型"
+summary = "按上下文搭配给整句挑更通顺的结果，如 womenzaigongyuanjianmian 出「我们在公园见面」而非「公元」"
+
+[[item]]
+page = "scheme_form"
+section = "词组补全"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.completion.min_syllables"
+source = "engine"
+type = "int"
+title = "词组补全最少音节数"
+summary = "输入达到几个音节才给词组候选，1 = 不限制"
+min = 1
+max = 6
+unit = "个音节"
+
+[[item]]
+page = "scheme_form"
+section = "词组补全"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.completion.max_extra_syllables"
+source = "engine"
+type = "int"
+title = "词组最多超出音节数"
+summary = "词组最多比已输入的多几个音节，越小越贴近已打的字"
+min = 0
+max = 10
+unit = "个音节"
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.english_merge.enable"
+source = "engine"
+type = "toggle"
+title = "英文候选"
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.english_merge.prefix_complete"
+source = "engine"
+type = "toggle"
+title = "英文前缀补全"
+summary = "有中文候选时也补至多 2 个英文词，但只在打的不是完整拼音时补：至少 5 个字母，且怎么切都切不成完整拼音（templa 补 template，shang 不补）。双拼方案不生效"
+enabled_when = "schema.pinyin.english_merge.enable"
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.english_merge.min_length"
+source = "engine"
+type = "int"
+title = "英文最小触发长度"
+summary = "有中文候选时，编码达到此长度才查英文（0 = 默认 3）；中文候选为空时不受本项约束，2 码起就给英文补全"
+enabled_when = "schema.pinyin.english_merge.enable"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.english_merge.complete_min_length"
+source = "engine"
+type = "int"
+title = "英文补全最小码长"
+summary = "有中文候选时，输入达到此长度也按前缀补全英文（建议 5），但只在打的不是完整拼音时补：怎么切都切不成完整拼音（templa 补 template，shang 不补）；0 = 只在没有中文候选时补全。双拼方案不生效"
+enabled_when = "schema.pinyin.english_merge.enable"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.english_merge.exact_position"
+source = "engine"
+type = "int"
+title = "英文单词最前位置"
+summary = "整串恰好是英文单词时，英文最靠前排在第几位；0 = 按方案自动：全拼 1、双拼 2。仍先让过开头的完整匹配中文，只会更靠后"
+enabled_when = "schema.pinyin.english_merge.enable"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.english_merge.complete_position"
+source = "engine"
+type = "int"
+title = "英文补全最前位置"
+summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
+enabled_when = "schema.pinyin.english_merge.enable"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.english_merge.max_count"
+source = "engine"
+type = "int"
+title = "英文最多条数"
+summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
+enabled_when = "schema.pinyin.english_merge.enable"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.frequency.enabled"
+source = "engine"
+type = "toggle"
+title = "词频调整"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.frequency.record_always"
+source = "engine"
+type = "toggle"
+title = "仅记录次数"
+summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.frequency.promote_prefix"
+source = "engine"
+type = "select"
+title = "补全词参与调频"
+summary = "只打半个音时（如 d），补全出的候选是否也参与调频。「仅单字」让「的/得」这类单字上浮，但不让「东西」这类词组跑到单字前面"
+enabled_when = "schema.pinyin.frequency.enabled"
+options = [
+  { value = "none", label = "不参与" },
+  { value = "single", label = "仅单字/单词" },
+  { value = "all", label = "全部" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.frequency.half_life"
+source = "engine"
+type = "int"
+title = "热度衰减半衰期"
+summary = "使用记录衰减到一半所需的时间。0 = 默认 72 小时"
+enabled_when = "schema.pinyin.frequency.enabled"
+min = 0
+max = 8760
+step = 12
+unit = "小时"
+
+[[item]]
+page = "scheme_form"
+section = "自动学习"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.auto_learn.enabled"
+source = "engine"
+type = "toggle"
+title = "自动学习"
+
+[[item]]
+page = "scheme_form"
+section = "自动学习"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.auto_learn.promote_count"
+source = "engine"
+type = "int"
+title = "转入用户词库次数"
+summary = "用满几次后永久收录进用户词库；0 = 不收录，一直留在临时词库"
+enabled_when = "schema.pinyin.auto_learn.enabled"
+min = 0
+max = 20
+
+[[item]]
+page = "scheme_form"
+section = "自动学习"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.auto_learn.min_word_length"
+source = "engine"
+type = "int"
+title = "最短学习词长"
+summary = "至少几个字的词组才记录"
+enabled_when = "schema.pinyin.auto_learn.enabled"
+min = 2
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "自动学习"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.auto_learn.max_word_length"
+source = "engine"
+type = "int"
+title = "最长学习词长"
+summary = "超过这个字数就不记录；智能组句的长句主要受它约束"
+enabled_when = "schema.pinyin.auto_learn.enabled"
+min = 2
+max = 20
+
+[[item]]
+page = "scheme_form"
+section = "辅助码"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.aux_code.enabled"
+source = "engine"
+type = "toggle"
+title = "辅助码"
+summary = "打出候选后按触发键，用字形码进一步筛选；单个方案可在方案详情里单独开关"
+
+[[item]]
+page = "scheme_form"
+section = "辅助码"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.aux_code.direct"
+source = "engine"
+type = "toggle"
+title = "直接辅助码"
+summary = "仅双拼：任一音节后直接敲 1～2 位字形码定字，不按引导键（如 gokqk → 国情）。会改变音节后字母的含义，想强制按音节切分可手打 '"
+enabled_when = "schema.pinyin.aux_code.enabled"
+
+[[item]]
+page = "scheme_form"
+section = "辅助码"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.aux_code.continuous"
+source = "engine"
+type = "toggle"
+title = "连续辅助码"
+summary = "开：字形码可打在任一音节后，适合长句；关：只在整串末尾敲 1～2 位，词组任一字命中，适合单次打词组（uidu 后敲 pl → 释读）"
+enabled_when = "schema.pinyin.aux_code.direct"
+
+[[item]]
+page = "scheme_form"
+section = "辅助码"
+schemes = ["pinyin", "shuangpin"]
+key = "schema.pinyin.aux_code.max_phrase_len"
+source = "engine"
+type = "int"
+title = "辅助码参与筛选的最大词长"
+summary = "超过这个字数的词组不参与筛选，0 = 不限；单字始终参与"
+enabled_when = "schema.pinyin.aux_code.enabled"
+min = 0
+max = 20
+unit = "字"
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.auto_commit_at_full"
+source = "engine"
+type = "toggle"
+title = "全码唯一自动上屏"
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.auto_commit_min_len"
+source = "engine"
+type = "select"
+title = "自动上屏最短码长"
+options = [
+  { value = "0", label = "满码（跟随方案）" },
+  { value = "1", label = "1 码" },
+  { value = "2", label = "2 码" },
+  { value = "3", label = "3 码" },
+  { value = "4", label = "4 码" },
+  { value = "5", label = "5 码" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.clear_on_empty_max"
+source = "engine"
+type = "toggle"
+title = "满码空码清空"
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.top_code_commit"
+source = "engine"
+type = "toggle"
+title = "顶码上屏"
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.punct_commit"
+source = "engine"
+type = "toggle"
+title = "标点顶码上屏"
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.short_code_yield_level"
+source = "engine"
+type = "select"
+title = "出简让全"
+options = [
+  { value = "0", label = "关闭" },
+  { value = "2", label = "一、二级简码" },
+  { value = "3", label = "全部简码" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.single_char"
+source = "engine"
+type = "toggle"
+title = "单字输入"
+
+[[item]]
+page = "scheme_form"
+section = "上屏"
+schemes = ["codetable"]
+key = "schema.codetable.show_code_hint"
+source = "engine"
+type = "toggle"
+title = "显示编码提示"
+
+[[item]]
+page = "scheme_form"
+section = "匹配"
+schemes = ["codetable"]
+key = "schema.codetable.single_code_input"
+source = "engine"
+type = "toggle"
+title = "精确匹配模式"
+summary = "仅显示精确匹配的候选，不显示前缀匹配"
+
+[[item]]
+page = "scheme_form"
+section = "匹配"
+schemes = ["codetable"]
+key = "schema.codetable.single_code_complete"
+source = "engine"
+type = "toggle"
+title = "精确匹配空码补全"
+summary = "精确匹配模式下无候选时，自动从更长编码中取首个候选"
+enabled_when = "schema.codetable.single_code_input"
+
+[[item]]
+page = "scheme_form"
+section = "通配与 z 键"
+schemes = ["codetable"]
+key = "schema.codetable.wildcard"
+source = "engine"
+type = "toggle"
+title = "通配输入"
+summary = "组码时通配键代替任意一个码元，如五笔的 z；候选显示完整编码"
+
+[[item]]
+page = "scheme_form"
+section = "通配与 z 键"
+schemes = ["codetable"]
+key = "schema.codetable.wildcard_key"
+source = "engine"
+type = "select"
+title = "通配键"
+summary = "选字母键会占掉该码元，仅建议用在闲置的键上；符号键在首位也作通配"
+options = [
+  { value = "z", label = "z" },
+  { value = "?", label = "?" },
+  { value = "*", label = "*" },
+  { value = "`", label = "`" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "通配与 z 键"
+schemes = ["codetable"]
+key = "schema.codetable.wildcard_single_only"
+source = "engine"
+type = "toggle"
+title = "通配仅出单字"
+
+[[item]]
+page = "scheme_form"
+section = "通配与 z 键"
+schemes = ["codetable"]
+key = "schema.codetable.z_key_repeat"
+source = "engine"
+type = "toggle"
+title = "z 键重复上屏"
+summary = "空码时按 z 重复上一次上屏的内容（五笔 z 键）"
+
+[[item]]
+page = "scheme_form"
+section = "通配与 z 键"
+schemes = ["codetable"]
+key = "schema.codetable.z_key_action"
+source = "engine"
+type = "select"
+title = "z 键功能"
+summary = "z 在本方案没有编码时，按它进入的模式"
+options = [
+  { value = "", label = "不启用" },
+  { value = "temp_pinyin", label = "临时拼音" },
+  { value = "temp_english", label = "临时英文" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.enabled"
+source = "engine"
+type = "toggle"
+title = "词频调整"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.strategy"
+source = "engine"
+type = "select"
+title = "调频策略"
+options = [
+  { value = "top", label = "置顶" },
+  { value = "step", label = "步进" },
+  { value = "position", label = "位次渐进" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.record_always"
+source = "engine"
+type = "toggle"
+title = "仅记录次数"
+summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.promote_prefix"
+source = "engine"
+type = "select"
+title = "补全词参与调频"
+summary = "仅「位次渐进」策略下生效。英文等以前缀匹配为主的方案建议选「全部」"
+enabled_when = "schema.codetable.frequency.enabled"
+options = [
+  { value = "none", label = "不参与" },
+  { value = "single", label = "仅单字/单词" },
+  { value = "all", label = "全部" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.half_life"
+source = "engine"
+type = "int"
+title = "热度衰减半衰期"
+summary = "使用记录衰减到一半所需的时间，仅「位次渐进」策略下生效。0 = 默认 72 小时"
+enabled_when = "schema.codetable.frequency.enabled"
+min = 0
+max = 8760
+step = 12
+unit = "小时"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.protect_top_n_len1"
+source = "engine"
+type = "int"
+title = "一简位保护前 N 项"
+summary = "只输入 1 个编码时（如五笔一简），词典前 N 项不参与调频。一简每个编码通常只有两个字，误选一次就会永久换掉首选，故默认保护"
+enabled_when = "schema.codetable.frequency.enabled"
+min = 0
+max = 100
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.protect_top_n_len2"
+source = "engine"
+type = "int"
+title = "二简位保护前 N 项"
+summary = "输入 2 个编码时，词典前 N 项不参与调频（0 = 不保护）"
+enabled_when = "schema.codetable.frequency.enabled"
+min = 0
+max = 100
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.protect_top_n_len3"
+source = "engine"
+type = "int"
+title = "三简位保护前 N 项"
+summary = "输入 3 个编码时，词典前 N 项不参与调频。默认不保护——三简的固定程度弱于一二简"
+enabled_when = "schema.codetable.frequency.enabled"
+min = 0
+max = 100
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["codetable"]
+key = "schema.codetable.frequency.protect_top_n"
+source = "engine"
+type = "int"
+title = "全码位保护前 N 项"
+summary = "输入 4 个及以上编码时，词典前 N 项不参与调频。默认 0 = 不保护，让调频在全码位正常起作用"
+enabled_when = "schema.codetable.frequency.enabled"
+min = 0
+max = 100
+
+[[item]]
+page = "scheme_form"
+section = "自动造词"
+schemes = ["codetable"]
+key = "schema.codetable.auto_phrase.enabled"
+source = "engine"
+type = "toggle"
+title = "自动造词"
+
+[[item]]
+page = "scheme_form"
+section = "自动造词"
+schemes = ["codetable"]
+key = "schema.codetable.auto_phrase.promote_count"
+source = "engine"
+type = "int"
+title = "转入用户词库次数"
+summary = "用满几次后永久收录进用户词库；0 = 不收录，一直留在临时词库"
+enabled_when = "schema.codetable.auto_phrase.enabled"
+min = 0
+max = 20
+
+[[item]]
+page = "scheme_form"
+section = "自动造词"
+schemes = ["codetable"]
+key = "schema.codetable.auto_phrase.min_phrase_len"
+source = "engine"
+type = "int"
+title = "最短造词长度"
+summary = "至少连续选几个字才记为词组"
+enabled_when = "schema.codetable.auto_phrase.enabled"
+min = 2
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "自动造词"
+schemes = ["codetable"]
+key = "schema.codetable.auto_phrase.max_phrase_len"
+source = "engine"
+type = "int"
+title = "最长造词长度"
+summary = "最多记录几个字的词组"
+enabled_when = "schema.codetable.auto_phrase.enabled"
+min = 2
+max = 20
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.enable"
+source = "engine"
+type = "toggle"
+title = "英文候选"
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.min_length"
+source = "engine"
+type = "int"
+title = "英文最小触发长度"
+summary = "有中文候选时，编码达到此长度才查英文（0 = 默认 3）；中文候选为空时不受本项约束，2 码起就给英文补全"
+enabled_when = "schema.codetable.english_merge.enable"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.complete_min_length"
+source = "engine"
+type = "int"
+title = "英文补全最小码长"
+summary = "有中文候选时，编码达到此长度也按前缀补全英文（如设 4，打 gith 出 github）；0 = 只在没有中文候选时补全"
+enabled_when = "schema.codetable.english_merge.enable"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.exact_position"
+source = "engine"
+type = "int"
+title = "英文单词最前位置"
+summary = "整串恰好是英文单词时，英文最靠前排在第几位；仍先让过开头的完整匹配中文，只会更靠后（1 = 不另加限制）"
+enabled_when = "schema.codetable.english_merge.enable"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.complete_position"
+source = "engine"
+type = "int"
+title = "英文补全最前位置"
+summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
+enabled_when = "schema.codetable.english_merge.enable"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.max_count"
+source = "engine"
+type = "int"
+title = "英文最多条数"
+summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
+enabled_when = "schema.codetable.english_merge.enable"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.block_commit"
+source = "engine"
+type = "toggle"
+title = "有英文候选时否决上屏"
+summary = "满码自动上屏与顶码上屏前，只要有英文词以当前编码开头就不自动上屏（打 gith 时 github 还没出现也算）；关掉的话打 github 到第 4 键就被顶出中文。开启时已涵盖下一项"
+enabled_when = "schema.codetable.english_merge.enable"
+
+[[item]]
+page = "scheme_form"
+section = "英文候选"
+schemes = ["codetable"]
+key = "schema.codetable.english_merge.block_commit_on_word"
+source = "engine"
+type = "toggle"
+title = "整串是英文单词时否决上屏"
+summary = "整串恰好是一个英文单词时不自动上屏、不顶码，保留英文供选择；只是英文词开头的编码照常上屏。上一项开启时本项无需单独开"
+enabled_when = "schema.codetable.english_merge.enable"
+
+[[item]]
+page = "scheme_form"
+section = "基本"
+schemes = ["mixed"]
 key = "schema.mix.show_source_hint"
 source = "engine"
 type = "toggle"
 title = "显示候选来源标记"
 
 [[item]]
-page = "schema"
-section = "混输"
+page = "scheme_form"
+section = "基本"
+schemes = ["mixed"]
+key = "schema.mix.top_code_override_pinyin"
+source = "engine"
+type = "toggle"
+title = "顶码优先（覆盖拼音）"
+summary = "顶码上屏时优先选择码表词条而非拼音候选"
+
+[[item]]
+page = "scheme_form"
+section = "拼音部分"
+schemes = ["mixed"]
 key = "schema.mix.enable_pinyin_abbrev"
 source = "engine"
 type = "toggle"
 title = "启用拼音简拼"
 
 [[item]]
-page = "schema"
-section = "英文"
+page = "scheme_form"
+section = "拼音部分"
+schemes = ["mixed"]
+key = "schema.mix.min_pinyin_length"
+source = "engine"
+type = "int"
+title = "拼音最小触发长度"
+summary = "编码达到此长度才开始查拼音候选（0 表示跟随方案默认值 2）"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "拼音部分"
+schemes = ["mixed"]
+key = "schema.mix.pinyin_partial_candidates"
+source = "engine"
+type = "toggle"
+title = "显示拼音前缀匹配"
+summary = "只有编码开头能读成拼音时（gedw 的 ge），显示这些读不完整的候选"
+
+[[item]]
+page = "scheme_form"
+section = "拼音部分"
+schemes = ["mixed"]
+key = "schema.mix.pinyin_partial_candidates_overflow"
+source = "engine"
+type = "toggle"
+title = "超码长时显示拼音前缀匹配"
+summary = "编码超过最大码长后同上；开着可先选前半段上屏，剩余接着打"
+
+[[item]]
+page = "scheme_form"
+section = "拼音部分"
+schemes = ["mixed"]
+key = "schema.mix.pinyin_only_overflow"
+source = "engine"
+type = "toggle"
+title = "超码长时仅查拼音"
+summary = "编码超过最大码长时只显示拼音候选，不再查码表"
+
+[[item]]
+page = "scheme_form"
+section = "拼音部分"
+schemes = ["mixed"]
+key = "schema.mix.auto_commit_block_on_pinyin"
+source = "engine"
+type = "toggle"
+title = "有拼音候选时否决上屏"
+summary = "满码自动上屏与顶码上屏前，若整串仍能查出拼音候选则不自动上屏（不看拼音是否成词）；「顶码优先」开启时无视本项。本项同时管「满码无候选清空」：开启时有拼音候选或拼音还没打完都不清空，关闭则满码无匹配即清空"
+
+[[item]]
+page = "scheme_form"
+section = "拼音部分"
+schemes = ["mixed"]
+key = "schema.mix.block_commit_on_pinyin_word"
+source = "engine"
+type = "toggle"
+title = "整串是拼音词时否决上屏"
+summary = "整串是完整拼音且拼音首选为真实词（如 wangba→网吧）时，不自动/顶码上屏五笔，保留拼音词供选择；aipu→落实 等无强词的仍正常上屏"
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.enable_english"
+source = "engine"
+type = "toggle"
+title = "启用英文候选"
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.min_english_length"
+source = "engine"
+type = "int"
+title = "英文最小触发长度"
+summary = "编码达到此长度才开始查英文候选（0 表示跟随默认值 3，即 2 字符以内不查）"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.english_complete_min_length"
+source = "engine"
+type = "int"
+title = "英文补全最小码长"
+summary = "有中文候选时，编码达到此长度也按前缀补全英文（如设 4，打 gith 出 github）；0 = 只在没有中文候选时补全"
+enabled_when = "schema.mix.enable_english"
+min = 0
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.english_exact_position"
+source = "engine"
+type = "int"
+title = "英文单词最前位置"
+summary = "整串恰好是英文单词时，英文最靠前排在第几位；仍先让过开头的完整匹配中文，只会更靠后（1 = 不另加限制）"
+enabled_when = "schema.mix.enable_english"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.english_complete_position"
+source = "engine"
+type = "int"
+title = "英文补全最前位置"
+summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
+enabled_when = "schema.mix.enable_english"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.english_max_count"
+source = "engine"
+type = "int"
+title = "英文最多条数"
+summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
+enabled_when = "schema.mix.enable_english"
+min = 1
+max = 10
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.auto_commit_block_on_english"
+source = "engine"
+type = "toggle"
+title = "有英文候选时否决上屏"
+summary = "满码自动上屏与顶码上屏前，只要有英文词以当前编码开头就不自动上屏（打 gith 时 github 还没出现也算）。开启时已涵盖下一项"
+enabled_when = "schema.mix.enable_english"
+
+[[item]]
+page = "scheme_form"
+section = "英文部分"
+schemes = ["mixed"]
+key = "schema.mix.block_commit_on_english_word"
+source = "engine"
+type = "toggle"
+title = "整串是英文单词时否决上屏"
+summary = "整串恰好是一个英文单词时不自动上屏、不顶码，保留英文供选择；只是英文词开头的编码照常上屏。上一项开启时本项无需单独开"
+enabled_when = "schema.mix.enable_english"
+
+[[item]]
+page = "scheme_form"
+section = "候选"
+schemes = ["english"]
 key = "schema.english.raw_candidate"
 source = "engine"
 type = "select"
@@ -673,35 +1266,173 @@ options = [
 ]
 
 [[item]]
-page = "schema"
-section = "英文"
+page = "scheme_form"
+section = "候选"
+schemes = ["english"]
 key = "schema.english.case_variants"
 source = "engine"
 type = "toggle"
 title = "生成大小写变形候选"
 
+[[item]]
+page = "scheme_form"
+section = "候选"
+schemes = ["english"]
+key = "schema.english.case_follow_input"
+source = "engine"
+type = "toggle"
+title = "候选跟随输入的大小写"
+summary = "打 Hi 出 Hill，打 WoW 出 WoWed；只跟大写，打小写时 China、iPhone 这类词保持词库原样"
+
+[[item]]
+page = "scheme_form"
+section = "候选"
+schemes = ["english"]
+key = "schema.english.phrase_seg"
+source = "engine"
+type = "toggle"
+title = "用 ' 分词打英文词组"
+summary = "各段只打前缀：bue'air 出 Buenos Aires，ip'max 出 iPhone 15 Pro Max。可跳词，ip'pro 也能打出 iPhone 15 Pro。开启后 ' 不再是第三候选键，改用数字 3。只管英文方案；临时英文与快捷输入里的英文另设"
+
+[[item]]
+page = "scheme_form"
+section = "候选"
+schemes = ["english"]
+key = "schema.english.commit_space"
+source = "engine"
+type = "toggle"
+title = "上屏后自动加空格"
+summary = "上屏英文词后补一个空格，连续打词不必手动按；回车上屏不补"
+
 # 英文卡里手机才有的三项（键盘侧开关）。引擎的 schema.english.commit_space 不放进来：
 # 触摸键盘的补空格由核心触摸层做（wind-mobile touch.rs，还会把空格挪到句末标点后面），
 # 开关就是下面的 ui.android.auto_space（Service 经 setAutoSpace 下发）；两边都开就是两个空格。
 [[item]]
-page = "schema"
-section = "英文"
+page = "scheme_form"
+section = "候选"
+schemes = ["english"]
 key = "ui.android.auto_cap"
 source = "android"
 type = "toggle"
 title = "句首自动大写"
-summary = "在句首、输入框开头自动切大写（输入框要求大写时才生效，密码 / 网址 / 邮箱框不生效）"
+summary = "在句首、输入框开头自动切大写（输入框要求大写时才生效，密码 / 网址 / 邮箱框不生效）（所有英文方案共用）"
 default = true
 
 [[item]]
-page = "schema"
-section = "英文"
+page = "scheme_form"
+section = "候选"
+schemes = ["english"]
 key = "ui.android.auto_space"
 source = "android"
 type = "toggle"
 title = "选词后自动加空格"
-summary = "上屏一个英文词后自动补空格；紧接着打句末标点时，空格挪到标点后面"
+summary = "上屏一个英文词后自动补空格；紧接着打句末标点时，空格挪到标点后面（所有英文方案共用）"
 default = true
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["english"]
+key = "schema.english.frequency.enabled"
+source = "engine"
+type = "toggle"
+title = "词频调整"
+summary = "按使用频率调整英文候选顺序"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["english"]
+key = "schema.english.frequency.record_always"
+source = "engine"
+type = "toggle"
+title = "仅记录次数"
+summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["english"]
+key = "schema.english.frequency.strategy"
+source = "engine"
+type = "select"
+title = "调频策略"
+summary = "位次渐进：每用一次前移一半，久不用回落；一次到顶 / 逐次提升：用过即排到未用过的之前"
+enabled_when = "schema.english.frequency.enabled"
+options = [
+  { value = "position", label = "位次渐进" },
+  { value = "top", label = "一次到顶" },
+  { value = "step", label = "逐次提升" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["english"]
+key = "schema.english.frequency.promote_prefix"
+source = "engine"
+type = "select"
+title = "补全词参与调频"
+summary = "打 hel 选中 hello 这类前缀补全的候选是否参与调频，仅「位次渐进」策略下生效"
+enabled_when = "schema.english.frequency.enabled"
+options = [
+  { value = "all", label = "全部" },
+  { value = "single", label = "仅单词" },
+  { value = "none", label = "不参与" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["english"]
+key = "schema.english.frequency.half_life"
+source = "engine"
+type = "int"
+title = "热度衰减半衰期"
+summary = "使用记录衰减到一半所需的时间，仅「位次渐进」策略下生效。0 = 默认 72 小时"
+enabled_when = "schema.english.frequency.enabled"
+min = 0
+max = 8760
+step = 12
+unit = "小时"
+
+[[item]]
+page = "scheme_form"
+section = "调频"
+schemes = ["english"]
+key = "schema.english.frequency.code_scope"
+source = "engine"
+type = "select"
+title = "调频记账方式"
+summary = "按整词：打 hel 选过 hello 后，打 he 也受益；按编码：各前缀独立学习"
+enabled_when = "schema.english.frequency.enabled"
+options = [
+  { value = "candidate", label = "按整词" },
+  { value = "input", label = "按编码" },
+]
+
+[[item]]
+page = "scheme_form"
+section = "自动造词"
+schemes = ["english"]
+key = "schema.english.auto_learn.enabled"
+source = "engine"
+type = "toggle"
+title = "自动造词"
+summary = "上屏了词库里没有的原文就记下来（选中原文候选、回车或空格上屏原码、标点顶屏原文都算），先存入临时词库，用够次数再转入用户词库。英文方案与临时英文共用此开关；快捷输入里的英文不在此列（那里有快捷输入历史）"
+
+[[item]]
+page = "scheme_form"
+section = "自动造词"
+schemes = ["english"]
+key = "schema.english.auto_learn.promote_count"
+source = "engine"
+type = "int"
+title = "转入用户词库次数"
+summary = "用满几次后永久收录进用户词库（含记下的那一次）；0 = 不收录，一直留在临时词库"
+enabled_when = "schema.english.auto_learn.enabled"
+min = 0
+max = 20
 
 # ═══ 输入 ═══════════════════════════════════════════════════════
 
@@ -1910,684 +2641,6 @@ options = [
 ]
 
 # ── 高级特性（对照电脑版补齐，全部收在各卡的「进阶」里；特殊输入模式的开关除外）──
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.single_code_input"
-source = "engine"
-type = "toggle"
-title = "精确匹配模式"
-summary = "仅显示精确匹配的候选，不显示前缀匹配"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.single_code_complete"
-source = "engine"
-type = "toggle"
-title = "精确匹配空码补全"
-summary = "精确匹配模式下无候选时，自动从更长编码中取首个候选"
-enabled_when = "schema.codetable.single_code_input"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.record_always"
-source = "engine"
-type = "toggle"
-title = "仅记录次数"
-summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.promote_prefix"
-source = "engine"
-type = "select"
-title = "补全词参与调频"
-summary = "仅「位次渐进」策略下生效。英文等以前缀匹配为主的方案建议选「全部」"
-enabled_when = "schema.codetable.frequency.enabled"
-advanced = true
-options = [
-  { value = "none", label = "不参与" },
-  { value = "single", label = "仅单字/单词" },
-  { value = "all", label = "全部" },
-]
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.half_life"
-source = "engine"
-type = "int"
-title = "热度衰减半衰期"
-summary = "使用记录衰减到一半所需的时间，仅「位次渐进」策略下生效。0 = 默认 72 小时"
-enabled_when = "schema.codetable.frequency.enabled"
-advanced = true
-min = 0
-max = 8760
-step = 12
-unit = "小时"
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.protect_top_n_len1"
-source = "engine"
-type = "int"
-title = "一简位保护前 N 项"
-summary = "只输入 1 个编码时（如五笔一简），词典前 N 项不参与调频。一简每个编码通常只有两个字，误选一次就会永久换掉首选，故默认保护"
-enabled_when = "schema.codetable.frequency.enabled"
-advanced = true
-min = 0
-max = 100
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.protect_top_n_len2"
-source = "engine"
-type = "int"
-title = "二简位保护前 N 项"
-summary = "输入 2 个编码时，词典前 N 项不参与调频（0 = 不保护）"
-enabled_when = "schema.codetable.frequency.enabled"
-advanced = true
-min = 0
-max = 100
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.protect_top_n_len3"
-source = "engine"
-type = "int"
-title = "三简位保护前 N 项"
-summary = "输入 3 个编码时，词典前 N 项不参与调频。默认不保护——三简的固定程度弱于一二简"
-enabled_when = "schema.codetable.frequency.enabled"
-advanced = true
-min = 0
-max = 100
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.frequency.protect_top_n"
-source = "engine"
-type = "int"
-title = "全码位保护前 N 项"
-summary = "输入 4 个及以上编码时，词典前 N 项不参与调频。默认 0 = 不保护，让调频在全码位正常起作用"
-enabled_when = "schema.codetable.frequency.enabled"
-advanced = true
-min = 0
-max = 100
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.auto_phrase.promote_count"
-source = "engine"
-type = "int"
-title = "转入用户词库次数"
-summary = "用满几次后永久收录进用户词库；0 = 不收录，一直留在临时词库"
-enabled_when = "schema.codetable.auto_phrase.enabled"
-advanced = true
-min = 0
-max = 20
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.auto_phrase.min_phrase_len"
-source = "engine"
-type = "int"
-title = "最短造词长度"
-summary = "至少连续选几个字才记为词组"
-enabled_when = "schema.codetable.auto_phrase.enabled"
-advanced = true
-min = 2
-max = 10
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.auto_phrase.max_phrase_len"
-source = "engine"
-type = "int"
-title = "最长造词长度"
-summary = "最多记录几个字的词组"
-enabled_when = "schema.codetable.auto_phrase.enabled"
-advanced = true
-min = 2
-max = 20
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.min_length"
-source = "engine"
-type = "int"
-title = "英文最小触发长度"
-summary = "有中文候选时，编码达到此长度才查英文（0 = 默认 3）；中文候选为空时不受本项约束，2 码起就给英文补全"
-enabled_when = "schema.codetable.english_merge.enable"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.complete_min_length"
-source = "engine"
-type = "int"
-title = "英文补全最小码长"
-summary = "有中文候选时，编码达到此长度也按前缀补全英文（如设 4，打 gith 出 github）；0 = 只在没有中文候选时补全"
-enabled_when = "schema.codetable.english_merge.enable"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.exact_position"
-source = "engine"
-type = "int"
-title = "英文单词最前位置"
-summary = "整串恰好是英文单词时，英文最靠前排在第几位；仍先让过开头的完整匹配中文，只会更靠后（1 = 不另加限制）"
-enabled_when = "schema.codetable.english_merge.enable"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.complete_position"
-source = "engine"
-type = "int"
-title = "英文补全最前位置"
-summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
-enabled_when = "schema.codetable.english_merge.enable"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.max_count"
-source = "engine"
-type = "int"
-title = "英文最多条数"
-summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
-enabled_when = "schema.codetable.english_merge.enable"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.block_commit"
-source = "engine"
-type = "toggle"
-title = "有英文候选时否决上屏"
-summary = "满码自动上屏与顶码上屏前，只要有英文词以当前编码开头就不自动上屏（打 gith 时 github 还没出现也算）；关掉的话打 github 到第 4 键就被顶出中文。开启时已涵盖下一项"
-enabled_when = "schema.codetable.english_merge.enable"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "码表"
-key = "schema.codetable.english_merge.block_commit_on_word"
-source = "engine"
-type = "toggle"
-title = "整串是英文单词时否决上屏"
-summary = "整串恰好是一个英文单词时不自动上屏、不顶码，保留英文供选择；只是英文词开头的编码照常上屏。上一项开启时本项无需单独开"
-enabled_when = "schema.codetable.english_merge.enable"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.frequency.record_always"
-source = "engine"
-type = "toggle"
-title = "仅记录次数"
-summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.frequency.promote_prefix"
-source = "engine"
-type = "select"
-title = "补全词参与调频"
-summary = "只打半个音时（如 d），补全出的候选是否也参与调频。「仅单字」让「的/得」这类单字上浮，但不让「东西」这类词组跑到单字前面"
-enabled_when = "schema.pinyin.frequency.enabled"
-advanced = true
-options = [
-  { value = "none", label = "不参与" },
-  { value = "single", label = "仅单字/单词" },
-  { value = "all", label = "全部" },
-]
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.frequency.half_life"
-source = "engine"
-type = "int"
-title = "热度衰减半衰期"
-summary = "使用记录衰减到一半所需的时间。0 = 默认 72 小时"
-enabled_when = "schema.pinyin.frequency.enabled"
-advanced = true
-min = 0
-max = 8760
-step = 12
-unit = "小时"
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.auto_learn.promote_count"
-source = "engine"
-type = "int"
-title = "转入用户词库次数"
-summary = "用满几次后永久收录进用户词库；0 = 不收录，一直留在临时词库"
-enabled_when = "schema.pinyin.auto_learn.enabled"
-advanced = true
-min = 0
-max = 20
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.auto_learn.min_word_length"
-source = "engine"
-type = "int"
-title = "最短学习词长"
-summary = "至少几个字的词组才记录"
-enabled_when = "schema.pinyin.auto_learn.enabled"
-advanced = true
-min = 2
-max = 10
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.auto_learn.max_word_length"
-source = "engine"
-type = "int"
-title = "最长学习词长"
-summary = "超过这个字数就不记录；智能组句的长句主要受它约束"
-enabled_when = "schema.pinyin.auto_learn.enabled"
-advanced = true
-min = 2
-max = 20
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.english_merge.min_length"
-source = "engine"
-type = "int"
-title = "英文最小触发长度"
-summary = "有中文候选时，编码达到此长度才查英文（0 = 默认 3）；中文候选为空时不受本项约束，2 码起就给英文补全"
-enabled_when = "schema.pinyin.english_merge.enable"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.english_merge.complete_min_length"
-source = "engine"
-type = "int"
-title = "英文补全最小码长"
-summary = "有中文候选时，输入达到此长度也按前缀补全英文（建议 5），但只在打的不是完整拼音时补：怎么切都切不成完整拼音（templa 补 template，shang 不补）；0 = 只在没有中文候选时补全。双拼方案不生效"
-enabled_when = "schema.pinyin.english_merge.enable"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.english_merge.exact_position"
-source = "engine"
-type = "int"
-title = "英文单词最前位置"
-summary = "整串恰好是英文单词时，英文最靠前排在第几位；0 = 按方案自动：全拼 1、双拼 2。仍先让过开头的完整匹配中文，只会更靠后"
-enabled_when = "schema.pinyin.english_merge.enable"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.english_merge.complete_position"
-source = "engine"
-type = "int"
-title = "英文补全最前位置"
-summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
-enabled_when = "schema.pinyin.english_merge.enable"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "拼音"
-key = "schema.pinyin.english_merge.max_count"
-source = "engine"
-type = "int"
-title = "英文最多条数"
-summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
-enabled_when = "schema.pinyin.english_merge.enable"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.min_english_length"
-source = "engine"
-type = "int"
-title = "英文最小触发长度"
-summary = "编码达到此长度才开始查英文候选（0 表示跟随默认值 3，即 2 字符以内不查）"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.english_complete_min_length"
-source = "engine"
-type = "int"
-title = "英文补全最小码长"
-summary = "有中文候选时，编码达到此长度也按前缀补全英文（如设 4，打 gith 出 github）；0 = 只在没有中文候选时补全"
-enabled_when = "schema.mix.enable_english"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.english_exact_position"
-source = "engine"
-type = "int"
-title = "英文单词最前位置"
-summary = "整串恰好是英文单词时，英文最靠前排在第几位；仍先让过开头的完整匹配中文，只会更靠后（1 = 不另加限制）"
-enabled_when = "schema.mix.enable_english"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.english_complete_position"
-source = "engine"
-type = "int"
-title = "英文补全最前位置"
-summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
-enabled_when = "schema.mix.enable_english"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.english_max_count"
-source = "engine"
-type = "int"
-title = "英文最多条数"
-summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
-enabled_when = "schema.mix.enable_english"
-advanced = true
-min = 1
-max = 10
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.auto_commit_block_on_english"
-source = "engine"
-type = "toggle"
-title = "有英文候选时否决上屏"
-summary = "满码自动上屏与顶码上屏前，只要有英文词以当前编码开头就不自动上屏（打 gith 时 github 还没出现也算）。开启时已涵盖下一项"
-enabled_when = "schema.mix.enable_english"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.block_commit_on_english_word"
-source = "engine"
-type = "toggle"
-title = "整串是英文单词时否决上屏"
-summary = "整串恰好是一个英文单词时不自动上屏、不顶码，保留英文供选择；只是英文词开头的编码照常上屏。上一项开启时本项无需单独开"
-enabled_when = "schema.mix.enable_english"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.min_pinyin_length"
-source = "engine"
-type = "int"
-title = "拼音最小触发长度"
-summary = "编码达到此长度才开始查拼音候选（0 表示跟随方案默认值 2）"
-advanced = true
-min = 0
-max = 10
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.pinyin_partial_candidates"
-source = "engine"
-type = "toggle"
-title = "显示拼音前缀匹配"
-summary = "只有编码开头能读成拼音时（gedw 的 ge），显示这些读不完整的候选"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.pinyin_partial_candidates_overflow"
-source = "engine"
-type = "toggle"
-title = "超码长时显示拼音前缀匹配"
-summary = "编码超过最大码长后同上；开着可先选前半段上屏，剩余接着打"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.pinyin_only_overflow"
-source = "engine"
-type = "toggle"
-title = "超码长时仅查拼音"
-summary = "编码超过最大码长时只显示拼音候选，不再查码表"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.auto_commit_block_on_pinyin"
-source = "engine"
-type = "toggle"
-title = "有拼音候选时否决上屏"
-summary = "满码自动上屏与顶码上屏前，若整串仍能查出拼音候选则不自动上屏（不看拼音是否成词）；「顶码优先」开启时无视本项。本项同时管「满码无候选清空」：开启时有拼音候选或拼音还没打完都不清空，关闭则满码无匹配即清空"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.block_commit_on_pinyin_word"
-source = "engine"
-type = "toggle"
-title = "整串是拼音词时否决上屏"
-summary = "整串是完整拼音且拼音首选为真实词（如 wangba→网吧）时，不自动/顶码上屏五笔，保留拼音词供选择；aipu→落实 等无强词的仍正常上屏"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "混输"
-key = "schema.mix.top_code_override_pinyin"
-source = "engine"
-type = "toggle"
-title = "顶码优先（覆盖拼音）"
-summary = "顶码上屏时优先选择码表词条而非拼音候选"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.case_follow_input"
-source = "engine"
-type = "toggle"
-title = "候选跟随输入的大小写"
-summary = "打 Hi 出 Hill，打 WoW 出 WoWed；只跟大写，打小写时 China、iPhone 这类词保持词库原样"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.phrase_seg"
-source = "engine"
-type = "toggle"
-title = "用 ' 分词打英文词组"
-summary = "各段只打前缀：bue'air 出 Buenos Aires，ip'max 出 iPhone 15 Pro Max。可跳词，ip'pro 也能打出 iPhone 15 Pro。开启后 ' 不再是第三候选键，改用数字 3。只管英文方案；临时英文与快捷输入里的英文另设"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.commit_space"
-source = "engine"
-type = "toggle"
-title = "上屏后自动加空格"
-summary = "上屏英文词后补一个空格，连续打词不必手动按；回车上屏不补"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.frequency.enabled"
-source = "engine"
-type = "toggle"
-title = "词频调整"
-summary = "按使用频率调整英文候选顺序"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.frequency.record_always"
-source = "engine"
-type = "toggle"
-title = "仅记录次数"
-summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.frequency.strategy"
-source = "engine"
-type = "select"
-title = "调频策略"
-summary = "位次渐进：每用一次前移一半，久不用回落；一次到顶 / 逐次提升：用过即排到未用过的之前"
-enabled_when = "schema.english.frequency.enabled"
-advanced = true
-options = [
-  { value = "position", label = "位次渐进" },
-  { value = "top", label = "一次到顶" },
-  { value = "step", label = "逐次提升" },
-]
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.frequency.promote_prefix"
-source = "engine"
-type = "select"
-title = "补全词参与调频"
-summary = "打 hel 选中 hello 这类前缀补全的候选是否参与调频，仅「位次渐进」策略下生效"
-enabled_when = "schema.english.frequency.enabled"
-advanced = true
-options = [
-  { value = "all", label = "全部" },
-  { value = "single", label = "仅单词" },
-  { value = "none", label = "不参与" },
-]
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.frequency.half_life"
-source = "engine"
-type = "int"
-title = "热度衰减半衰期"
-summary = "使用记录衰减到一半所需的时间，仅「位次渐进」策略下生效。0 = 默认 72 小时"
-enabled_when = "schema.english.frequency.enabled"
-advanced = true
-min = 0
-max = 8760
-step = 12
-unit = "小时"
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.frequency.code_scope"
-source = "engine"
-type = "select"
-title = "调频记账方式"
-summary = "按整词：打 hel 选过 hello 后，打 he 也受益；按编码：各前缀独立学习"
-enabled_when = "schema.english.frequency.enabled"
-advanced = true
-options = [
-  { value = "candidate", label = "按整词" },
-  { value = "input", label = "按编码" },
-]
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.auto_learn.enabled"
-source = "engine"
-type = "toggle"
-title = "自动造词"
-summary = "上屏了词库里没有的原文就记下来（选中原文候选、回车或空格上屏原码、标点顶屏原文都算），先存入临时词库，用够次数再转入用户词库。英文方案与临时英文共用此开关；快捷输入里的英文不在此列（那里有快捷输入历史）"
-advanced = true
-
-[[item]]
-page = "schema"
-section = "英文"
-key = "schema.english.auto_learn.promote_count"
-source = "engine"
-type = "int"
-title = "转入用户词库次数"
-summary = "用满几次后永久收录进用户词库（含记下的那一次）；0 = 不收录，一直留在临时词库"
-enabled_when = "schema.english.auto_learn.enabled"
-advanced = true
-min = 0
-max = 20
 
 [[item]]
 page = "input"
