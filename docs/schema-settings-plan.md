@@ -45,8 +45,8 @@
   标题与选项文字**取设置清单**（`settings_manifest.toml` 的 `schema.codetable.*`），Rust 只给值，不重复一份文案。
   `auto_phrase.*` 核心 `CodeTableSpec` 没有方案级段，不列（同 PC `visible_keys`）。
 - 整句输入只给码表方案（PC `sentence_input_seed`：混输配着拼音子引擎，开了不生效）。
-- 辅助码：PC 判据是 `files` 非空；手机加一条「声明的来源至少一个已装」（`aux_code_source_options`）。出厂 APK 不带
-  `stroke` 方案和 `aux_code/` 码表，按 PC 判据会给一个开了没反应的开关。
+- 辅助码：PC 判据是 `files` 非空；手机加一条「声明的来源至少一个已装」（`aux_code_source_options`）。出厂 APK 现已随包
+  `stroke` 方案和 `aux_code/` 码表（小鹤/自然码/首右），判据仍保留：用户删了来源时不给开了没反应的开关。
 
 ## 3. FFI（`rust/wind-android`，经 `wind-mobile` 门面）
 

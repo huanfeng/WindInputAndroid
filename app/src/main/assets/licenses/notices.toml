@@ -55,6 +55,27 @@ url = "https://github.com/gaboolic/rime-frost"
 
 [[notice]]
 group = "词库与数据"
+name = "笔画码表（rime-stroke）"
+usage = "辅助码的笔画字形码（全拼）与「笔画」方案词库；按常用字集裁剪，码未改，权重取白霜单字字频"
+license = "LGPL-3.0"
+url = "https://github.com/rime/rime-stroke"
+
+[[notice]]
+group = "词库与数据"
+name = "小鹤 / 自然码形码（rime-lua-aux-code）"
+usage = "辅助码的字形码表（双拼），逐行原样，仅补元数据头"
+license = "MIT"
+url = "https://github.com/HowcanoeWang/rime-lua-aux-code"
+
+[[notice]]
+group = "词库与数据"
+name = "首右形码（首右辅助码 2.0 / Plus）"
+usage = "辅助码的字形码表（双拼），来自首右输入法交流群，已获作者许可随本项目分发"
+license = "未声明"
+url = "https://github.com/huanfeng/WindInput/blob/main/NOTICE.md"
+
+[[notice]]
+group = "词库与数据"
 name = "pinyin-data"
 usage = "汉字普通话读音，生成拼音映射"
 license = "MIT"
