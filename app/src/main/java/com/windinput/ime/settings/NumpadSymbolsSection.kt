@@ -38,6 +38,7 @@ import androidx.compose.ui.zIndex
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.UserConfig
 import com.windinput.ime.keyboard.NumberSideSymbols
+import com.windinput.ime.keyboard.T9SideSymbols
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -64,8 +65,18 @@ private val ROW_HEIGHT = 56.dp
 private val writeLock = Mutex()
 private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+/** 键盘布局 →「数字键盘符号」：数字框九宫格左列的符号（`ui.android.number_side_symbols`）。 */
+@Composable
+internal fun NumpadSymbolsSection() =
+    SideSymbolsEditor(NumberSideSymbols.CONFIG_KEY, NumberSideSymbols.DEFAULTS)
+
+/** 键盘布局 →「九宫格标点」：九宫格拼音不打字时左栏的标点（`ui.android.t9.side_symbols`）。 */
+@Composable
+internal fun T9SymbolsSection() =
+    SideSymbolsEditor(T9SideSymbols.CONFIG_KEY, T9SideSymbols.DEFAULTS)
+
 /**
- * 键盘布局 →「数字键盘符号」：数字框九宫格左列的符号（`ui.android.number_side_symbols`）。
+ * 九宫格左列符号表的编辑页（数字键盘与九宫格拼音共用，[configKey] / [defaults] 区分）。
  *
  * 每行一个符号：右侧手柄按住上下拖动排序（越过半行即换位，抬手保存）、垃圾桶删除；
  * 底下添加（去空白、重复拒绝、最多 4 个字符）与恢复默认（点两下确认，同「清空个人词」）。
@@ -73,13 +84,13 @@ private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
  * 键盘左列最底下的「自定义」格直接跳到这一页。
  */
 @Composable
-internal fun NumpadSymbolsSection() {
+private fun SideSymbolsEditor(configKey: String, defaults: List<String>) {
     val context = LocalContext.current
     val config = remember {
         UserConfig((context.applicationContext as WindInputApp).dataDirs.keyboardConfigFile)
     }
     var symbols by remember {
-        mutableStateOf(NumberSideSymbols.parse(config.readAll()[NumberSideSymbols.CONFIG_KEY] as? String))
+        mutableStateOf(NumberSideSymbols.parse(config.readAll()[configKey] as? String, defaults))
     }
     var input by remember { mutableStateOf("") }
     var message by remember { mutableStateOf<String?>(null) }
@@ -92,7 +103,7 @@ internal fun NumpadSymbolsSection() {
     fun save(list: List<String>) {
         symbols = list
         writeScope.launch {
-            writeLock.withLock { config.put(NumberSideSymbols.CONFIG_KEY, NumberSideSymbols.format(symbols)) }
+            writeLock.withLock { config.put(configKey, NumberSideSymbols.format(symbols)) }
         }
     }
 
@@ -207,7 +218,7 @@ internal fun NumpadSymbolsSection() {
     Card(modifier = Modifier.fillMaxWidth()) {
         NavRow(
             if (confirmRestore) "再点一次确认恢复" else "恢复默认",
-            if (confirmRestore) "列表回到出厂的 ${NumberSideSymbols.DEFAULTS.size} 个符号" else NumberSideSymbols.DEFAULTS.joinToString(" "),
+            if (confirmRestore) "列表回到出厂的 ${defaults.size} 个符号" else defaults.joinToString(" "),
             icon = SettingsIcons.clear,
             highlight = confirmRestore,
         ) {
@@ -218,7 +229,7 @@ internal fun NumpadSymbolsSection() {
             } else if (now - confirmAt >= CONFIRM_MIN_GAP_MS) {
                 confirmRestore = false
                 message = null
-                save(NumberSideSymbols.DEFAULTS)
+                save(defaults)
             }
         }
     }
@@ -262,5 +273,23 @@ internal fun NumpadSymbolsEntry(onOpen: () -> Unit) {
     SectionTitle("数字键盘")
     Card(modifier = Modifier.fillMaxWidth()) {
         NavRow(SUB_NUMPAD_SYMBOLS, summary, null, onClick = onOpen)
+    }
+}
+
+/** 键盘布局页「九宫格」组下的入口：摘要列出当前列表的前几个 */
+@Composable
+internal fun T9SymbolsEntry(onOpen: () -> Unit) {
+    val context = LocalContext.current
+    val config = remember {
+        UserConfig((context.applicationContext as WindInputApp).dataDirs.keyboardConfigFile)
+    }
+    val symbols = T9SideSymbols.parse(config.readAll()[T9SideSymbols.CONFIG_KEY] as? String)
+    val summary = when {
+        symbols.isEmpty() -> "不打字时左栏：已清空"
+        symbols.size > 6 -> "不打字时左栏：${symbols.take(6).joinToString(" ")} …"
+        else -> "不打字时左栏：${symbols.joinToString(" ")}"
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow(SUB_T9_SYMBOLS, summary, null, onClick = onOpen)
     }
 }

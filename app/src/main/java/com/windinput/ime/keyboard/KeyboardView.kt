@@ -81,8 +81,11 @@ class KeyboardView(context: Context) : View(context) {
         /** 菜单抬手：[index] 是手指停住的那项；停在初始项或没滑进菜单为 null（作罢） */
         fun onLongPressOption(action: KeyAction, index: Int?) = Unit
 
-        /** 点了九宫格左列最底下的「自定义」格（见 [sideCustomize]） */
-        fun onSideCustomize() = Unit
+        /**
+         * 点了左列最底下的「自定义」格（见 [sideCustomize] / [letterSideCustomize]）。
+         * [t9] = 九宫格拼音的标点列（否则是数字键盘那一列）。
+         */
+        fun onSideCustomize(t9: Boolean) = Unit
     }
 
     /** 长按菜单的内容：[selected] 为初始选中（通常是当前状态，如当前方案） */
@@ -252,8 +255,17 @@ class KeyboardView(context: Context) : View(context) {
         else -> sideSymbols
     }
 
-    /** 「自定义」格只属于数字键盘那一列 */
-    private val sideCustomizeOn get() = sideCustomize && layer != KeyboardLayer.LETTERS
+    /** 「自定义」格：数字键盘那一列看 [sideCustomize]，九宫格拼音的标点列看 [letterSideCustomize]（列读法时不带） */
+    private val sideCustomizeOn get() =
+        if (layer == KeyboardLayer.LETTERS) letterSideCustomize && !showingReadings else sideCustomize
+
+    /** 九宫格拼音的标点列最底下是否带「自定义」格 */
+    var letterSideCustomize = false
+        set(value) {
+            if (field == value) return
+            field = value
+            resetSideScroll()
+        }
 
     /** 左列最底下是否带一格「自定义」（齿轮，点开设置页；数字框带，电话框不带） */
     var sideCustomize = false
@@ -735,7 +747,7 @@ class KeyboardView(context: Context) : View(context) {
         if (sym != null) {
             listener?.onKeyAction(KeyAction.Commit(sym), shifted = false)
         } else if (sideCustomizeOn && index == sideItems.size) {
-            listener?.onSideCustomize()
+            listener?.onSideCustomize(t9 = layer == KeyboardLayer.LETTERS)
         }
     }
 

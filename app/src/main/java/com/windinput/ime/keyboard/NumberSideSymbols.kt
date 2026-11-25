@@ -17,9 +17,12 @@ object NumberSideSymbols {
     /** 出厂列表：算式和常见分隔符 */
     val DEFAULTS = listOf("+", "-", "*", "/", "%", "=", ",", ":", "@", "#", "(", ")")
 
-    /** 配置值 → 列表。手改配置写坏的项（空白、超长、重复）跳过，不让整列失效 */
-    fun parse(raw: String?): List<String> {
-        if (raw == null) return DEFAULTS
+    /**
+     * 配置值 → 列表。手改配置写坏的项（空白、超长、重复）跳过，不让整列失效。
+     * [defaults] 是键不存在时的出厂列表（九宫格拼音左栏另有一套，见 [T9SideSymbols]）。
+     */
+    fun parse(raw: String?, defaults: List<String> = DEFAULTS): List<String> {
+        if (raw == null) return defaults
         val out = mutableListOf<String>()
         for (part in raw.split('\n')) {
             val item = clean(part)

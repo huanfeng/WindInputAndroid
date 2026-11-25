@@ -52,6 +52,7 @@ import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
 import com.windinput.ime.keyboard.NumberSideSymbols
+import com.windinput.ime.keyboard.T9SideSymbols
 import com.windinput.ime.keyboard.T9_SEPARATOR
 import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.panels.ClipboardWindow
@@ -67,6 +68,7 @@ import com.windinput.ime.panels.TextEditingWindow
 import com.windinput.ime.settings.SettingsActivity
 import com.windinput.ime.settings.SUB_ENABLED_SCHEMAS
 import com.windinput.ime.settings.SUB_NUMPAD_SYMBOLS
+import com.windinput.ime.settings.SUB_T9_SYMBOLS
 import java.io.File
 
 /**
@@ -349,6 +351,7 @@ class WindInputImeService :
         /** 单手模式：off / left / right；last 记着上次用的那一侧，快捷面板重新打开时回到它 */
         const val KEY_ONE_HAND = "ui.android.one_hand"
         const val KEY_SECOND_CANDIDATE_SWIPE = "ui.android.second_candidate_swipe"
+        const val KEY_T9_SIDE_READINGS = "ui.android.t9.side_readings"
 
         /** 用九宫格布局的方案 id 集合（statePrefs）：布局按方案记，键盘列表里选哪格就记哪种 */
         const val KEY_T9_SCHEMAS = "t9_schemas"
@@ -362,8 +365,6 @@ class WindInputImeService :
             "(", ")", "[", "]", "{", "}", "<", ">", "《", "》", "【", "】", "·",
         )
 
-        /** 九宫格拼音左列的标点（可上下滚动，点选原样上屏，有编码时先顶首选） */
-        val T9_SIDE_SYMBOLS = listOf("，", "。", "？", "！", "、", "：", "；", "…", "～", "“", "”", "@")
         const val KEY_ONE_HAND_LAST = "ui.android.one_hand_last"
 
         const val TAG = "WindIme"
@@ -930,7 +931,12 @@ class WindInputImeService :
         t9Layout = layout
         // 左列每次都设（视图可能刚重建过，setter 自己去重），键位只在形态变了时重取
         keyboardWindow?.keyboardView?.let { kv ->
-            kv.letterSideSymbols = if (layout) T9_SIDE_SYMBOLS else emptyList()
+            kv.letterSideSymbols = if (layout) {
+                T9SideSymbols.parse(userConfig.readAll()[T9SideSymbols.CONFIG_KEY] as? String)
+            } else {
+                emptyList()
+            }
+            kv.letterSideCustomize = layout
             if (changed) kv.refreshLayout()
         }
         refreshT9Readings()
@@ -944,7 +950,9 @@ class WindInputImeService :
      * 时为空，左列回到标点。每次候选更新都重拉：锁定、续打、选词后段落都会变。
      */
     private fun refreshT9Readings() {
-        t9Readings = if (t9Layout && composing) session.leadingReadings() else emptyList()
+        // 设置「打字时左栏列拼音读法」关掉时左栏一直是标点（不锁音节，直接翻候选）
+        val on = t9Layout && composing && userConfig.getBoolean(KEY_T9_SIDE_READINGS, true)
+        t9Readings = if (on) session.leadingReadings() else emptyList()
         keyboardWindow?.keyboardView?.sideReadings = t9Readings.map { it.label }
     }
 
@@ -1891,8 +1899,8 @@ class WindInputImeService :
 
     override fun onOpenSettings() = openSettings()
 
-    override fun onSideCustomize() =
-        openSettings(SettingsActivity.PAGE_KEYBOARD, SUB_NUMPAD_SYMBOLS)
+    override fun onSideCustomize(t9: Boolean) =
+        openSettings(SettingsActivity.PAGE_KEYBOARD, if (t9) SUB_T9_SYMBOLS else SUB_NUMPAD_SYMBOLS)
 
     // ── 工具栏常驻按钮（快捷面板「编辑工具栏」里挑）──────────────────
 

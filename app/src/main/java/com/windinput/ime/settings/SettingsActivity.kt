@@ -253,6 +253,12 @@ internal const val SUB_ENABLED_SCHEMAS = "启用的方案"
 /** 键盘布局页里代码画的二级页：数字框九宫格左列的符号 */
 internal const val SUB_NUMPAD_SYMBOLS = "数字键盘符号"
 
+/** 键盘布局页里代码画的二级页：九宫格拼音左栏的标点 */
+internal const val SUB_T9_SYMBOLS = "九宫格标点"
+
+/** 键盘布局页的「九宫格」组：清单项之后，代码画「九宫格标点」入口 */
+private const val SECTION_T9 = "九宫格"
+
 /** 关于页里代码画的二级页 */
 internal const val SUB_PRIVACY = "隐私政策"
 
@@ -264,7 +270,7 @@ private const val SECTION_SHUANGPIN = "双拼"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
 internal val RESERVED_SUBPAGES =
-    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS, SUB_KEYMAP_EDITOR, SUB_PRIVACY)
+    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_ENABLED_SCHEMAS, SUB_NUMPAD_SYMBOLS, SUB_T9_SYMBOLS, SUB_KEYMAP_EDITOR, SUB_PRIVACY)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -665,7 +671,10 @@ private fun PageScreen(
             }
         }
     } else {
-        for ((name, items) in sections) SettingsCard(name, items, values)
+        for ((name, items) in sections) {
+            SettingsCard(name, items, values)
+            if (page.id == SettingsActivity.PAGE_KEYBOARD && name == SECTION_T9) T9SymbolsEntry { onOpenSub(SUB_T9_SYMBOLS) }
+        }
         // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
         if (page.id == "ui") SkinSection()
         if (page.id == "ui") TooltipSectionsSection()
@@ -727,6 +736,7 @@ private fun SubScreen(
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
         page.id == "dict" && sub == DICT_STATS -> DictStatsSection(session)
         page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_NUMPAD_SYMBOLS -> NumpadSymbolsSection()
+        page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_T9_SYMBOLS -> T9SymbolsSection()
         page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_KEYMAP_EDITOR -> KeymapEditorSection()
         page.id == "about" && sub == SUB_PRIVACY -> PrivacySection()
         else -> {
