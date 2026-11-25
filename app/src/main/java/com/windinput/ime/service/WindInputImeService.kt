@@ -933,6 +933,25 @@ class WindInputImeService :
             kv.letterSideSymbols = if (layout) T9_SIDE_SYMBOLS else emptyList()
             if (changed) kv.refreshLayout()
         }
+        refreshT9Readings()
+    }
+
+    /** 九宫格左列此刻列的读法（与键盘视图的 `sideReadings` 一一对应） */
+    private var t9Readings: List<LeadingReading> = emptyList()
+
+    /**
+     * 九宫格打字时左列列下一段的拼音读法（逐段选拼音）；不打字 / 不是九宫格 / 双拼（核心不给）
+     * 时为空，左列回到标点。每次候选更新都重拉：锁定、续打、选词后段落都会变。
+     */
+    private fun refreshT9Readings() {
+        t9Readings = if (t9Layout && composing) session.leadingReadings() else emptyList()
+        keyboardWindow?.keyboardView?.sideReadings = t9Readings.map { it.label }
+    }
+
+    override fun onSideReading(index: Int) {
+        val reading = t9Readings.getOrNull(index) ?: return
+        // 核心按锁定后的读法重算并推一帧候选，左列随之换成下一段
+        session.setLeadingReading(reading)
     }
 
     // ── 会话事件 → 编辑器/候选条 ───────────────────────────────────
@@ -968,6 +987,7 @@ class WindInputImeService :
                     // 分隔符键随设置（五笔整句开关、分隔符策略）变，开始打字时现问一次
                     if (composingChanged && composing && !latinInput) kv.splitChar = session.separatorKey()
                 }
+                refreshT9Readings()
                 // 打完一个词（编码清空）后再判一次句首大写：上屏回调可能早于这一帧
                 updateAutoCaps()
 

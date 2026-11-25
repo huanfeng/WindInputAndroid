@@ -63,6 +63,9 @@ class KeyboardView(context: Context) : View(context) {
         /** 用户键位覆盖里的功能动作（下滑 / 上滑绑定 select_all、paste 等，名字见 KeymapMerge） */
         fun onKeyFunc(name: String) = Unit
 
+        /** 九宫格左列第 [index] 条读法被点（锁定这一段的拼音） */
+        fun onSideReading(index: Int) = Unit
+
         /** 用户键位覆盖里的短语（keymap.toml 的 phrase = 命令短语的编码）；宿主查短语库后上屏 */
         fun onKeyPhrase(code: String) = Unit
 
@@ -224,8 +227,30 @@ class KeyboardView(context: Context) : View(context) {
             resetSideScroll()
         }
 
-    /** 此刻左列画哪一份：字母层（九宫格拼音）用 [letterSideSymbols]，其余用 [sideSymbols] */
-    private val sideItems get() = if (layer == KeyboardLayer.LETTERS) letterSideSymbols else sideSymbols
+    /**
+     * 九宫格打字时左列改列拼音读法（逐段选拼音，核心 `leading_readings` 给的 label）。非空时
+     * 盖过 [letterSideSymbols]，点一格回调 [Listener.onSideReading]；不打字时宿主置空，列回标点。
+     */
+    var sideReadings: List<String> = emptyList()
+        set(value) {
+            if (field == value) return
+            field = value
+            resetSideScroll()
+            invalidate()
+        }
+
+    /** 左列此刻列的是读法（不是符号） */
+    private val showingReadings get() = layer == KeyboardLayer.LETTERS && sideReadings.isNotEmpty()
+
+    /**
+     * 此刻左列画哪一份：九宫格打字时是读法，字母层（九宫格拼音）其余时候用 [letterSideSymbols]，
+     * 其余层用 [sideSymbols]
+     */
+    private val sideItems get() = when {
+        showingReadings -> sideReadings
+        layer == KeyboardLayer.LETTERS -> letterSideSymbols
+        else -> sideSymbols
+    }
 
     /** 「自定义」格只属于数字键盘那一列 */
     private val sideCustomizeOn get() = sideCustomize && layer != KeyboardLayer.LETTERS
@@ -619,6 +644,11 @@ class KeyboardView(context: Context) : View(context) {
             }
             val sym = sideItems.getOrNull(i)
             if (sym != null) {
+                // 读法可能长到 6 个字母（zhuang），放不下就按列宽缩字号
+                textPaint.textSize = 18 * density
+                val room = cell.width() - 4 * inset
+                val w = textPaint.measureText(sym)
+                if (w > room && w > 0f) textPaint.textSize *= room / w
                 drawCentered(canvas, sym, cell, textPaint)
             } else {
                 glyphPainter.draw(canvas, PanelIcon.Glyph.SETTINGS, cell.centerX(), cell.centerY(), 20 * density, palette.icon)
@@ -697,6 +727,10 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 左列第 [index] 格被点（手指或读屏）：符号原样上屏，「自定义」格开设置页 */
     private fun clickSide(index: Int) {
+        if (showingReadings) {
+            if (index in sideReadings.indices) listener?.onSideReading(index)
+            return
+        }
         val sym = sideItems.getOrNull(index)
         if (sym != null) {
             listener?.onKeyAction(KeyAction.Commit(sym), shifted = false)
