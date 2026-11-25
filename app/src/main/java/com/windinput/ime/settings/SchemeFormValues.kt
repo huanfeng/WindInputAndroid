@@ -101,11 +101,21 @@ class SchemeFormValues(
     @Synchronized
     override fun set(item: SettingItem, value: Any): String? {
         if (android(item)) return global.let { if (it == null) "设置未就绪" else it.set(item, value) }
-        val toDefault = item.key in defaults && RawValue.choice(defaults[item.key]) == value.toString()
+        val toDefault = item.key in defaults && sameValue(typeOf(item.key), defaults[item.key], value)
         return write(
             sets = if (toDefault) emptyList() else listOf(SchemeFormSet(item.key, configValueOf(typeOf(item.key), value))),
             resets = if (toDefault) listOf(item.key) else emptyList(),
         )
+    }
+
+    /**
+     * 界面值与方案默认按核心类型比：数值按数比（清单的整数滑块写 30，浮点键默认给 30.0），
+     * 其余按下拉 / 文本形态比
+     */
+    private fun sameValue(type: String?, default: Any?, value: Any): Boolean = when (type) {
+        "int", "float" -> (default as? Number)?.toDouble() == value.toString().toDoubleOrNull()
+        "bool" -> RawValue.bool(default) == (value == true || value == "true")
+        else -> RawValue.choice(default) == value.toString()
     }
 
     /** [items] 里改过的项数（「全部恢复默认」的计数只数看得见的） */

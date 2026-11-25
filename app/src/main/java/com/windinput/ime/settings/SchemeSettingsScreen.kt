@@ -128,8 +128,6 @@ private class SchemeData(
     val t9Capable: Boolean,
     /** 「启用九宫格键盘布局」此刻开着 */
     var t9Enabled: Boolean,
-    /** 能用九宫格的已装方案 id → 类型（第一次拨开关时据它落默认） */
-    val t9CapableAll: Map<String, String>,
 )
 
 private sealed interface SchemeLoad {
@@ -144,22 +142,24 @@ private fun loadScheme(context: android.content.Context, schemeId: String, globa
         form.load()?.let { return SchemeLoad.Failed(it) }
         val installed = core.installedSchemas()
         val name = { id: String -> installed.firstOrNull { it.id == id }?.name?.ifEmpty { id } ?: id }
-        val t9All = installed.map { it.id }
-            .filter { runCatching { core.keypadSupported(it) }.getOrDefault(false) }
-            .mapNotNull { id -> runCatching { core.schemaSettings(id).engineType }.getOrNull()?.let { id to it } }
-            .toMap()
+        val props = core.schemaSettings(schemeId)
+        val keyboard = global.keyboardValues()
         SchemeLoad.Ok(
             SchemeData(
                 form = form,
                 global = global,
-                props = core.schemaSettings(schemeId),
+                props = props,
                 installed = installed.firstOrNull { it.id == schemeId },
                 layoutNames = core.shuangpinLayouts().associate { it.id to it.name.ifEmpty { it.id } },
                 memberNames = form.members.map { it to name(it) },
                 hasDicts = runCatching { core.schemaDicts(schemeId).isNotEmpty() }.getOrDefault(false),
-                t9Capable = t9All.containsKey(schemeId),
-                t9Enabled = T9Availability.enabled(global.keyboardValue(T9Availability.KEY) as? String, schemeId, t9All[schemeId]),
-                t9CapableAll = t9All,
+                t9Capable = runCatching { core.keypadSupported(schemeId) }.getOrDefault(false),
+                t9Enabled = T9Availability.enabled(
+                    keyboard[T9Availability.KEY_ON] as? String,
+                    keyboard[T9Availability.KEY_OFF] as? String,
+                    schemeId,
+                    props.engineType,
+                ),
             ),
         )
     } catch (e: ConfigException) {
@@ -428,9 +428,18 @@ private fun T9GroupScreen(d: SchemeData, g: SchemeGroup) {
             on = v
             d.t9Enabled = v
             scope.launch {
+                // 读改写整段在配置锁里做：连点「开 → 关」不会两次都基于同一份旧值
                 withContext(Dispatchers.IO) {
-                    val raw = d.global.keyboardValue(T9Availability.KEY) as? String
-                    d.global.putKeyboardValue(T9Availability.KEY, T9Availability.toggled(raw, d.t9CapableAll, d.props.id, v))
+                    d.global.editKeyboard { m ->
+                        val (on, off) = T9Availability.toggled(
+                            m[T9Availability.KEY_ON] as? String,
+                            m[T9Availability.KEY_OFF] as? String,
+                            d.props.id,
+                            v,
+                        )
+                        m[T9Availability.KEY_ON] = on
+                        m[T9Availability.KEY_OFF] = off
+                    }
                 }
             }
         }

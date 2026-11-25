@@ -73,6 +73,14 @@ class UserConfig(private val file: File) {
         cache[file.path] = Snapshot(file.lastModified(), file.length(), all)
     }
 
+    /** 在锁里读全量 → [block] 改 → 写回：几个键要一起按旧值改时用（避免锁外读改写互相覆盖） */
+    fun edit(block: (MutableMap<String, Any>) -> Unit) = synchronized(cache) {
+        val all = readAll().toMutableMap()
+        block(all)
+        write(all)
+        cache[file.path] = Snapshot(file.lastModified(), file.length(), all)
+    }
+
     /**
      * 删掉满足 [predicate] 的键（「恢复键盘设置」用），返回删了几个；一个都没删就不动文件。
      */

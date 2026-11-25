@@ -589,7 +589,7 @@ COMMENT_OFF='candidate_comment = false # emu-test'
 NUMBER_FULL_CFG='number_page = "full" # emu-test'
 # 九宫格默认只给全拼开（双拼要到方案设置里开）；长按中英键菜单的序号按「全拼、双拼都有九宫格项」
 # 排（共 8 项），同样带标记钉住，跑完写回
-T9_SCHEMAS_CFG='schemas = "pinyin,shuangpin" # emu-test'
+T9_SCHEMAS_CFG='enabled_schemas = "pinyin,shuangpin" # emu-test'
 write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell sh -c "'mkdir -p $EXT/keyboard && cat > $KB_CFG'"; }
 SUITE_KB_RAW="$(adb_ shell cat "$KB_CFG" 2>/dev/null)"
 SUITE_KB_EXISTED=1
@@ -601,8 +601,8 @@ with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段�
     # one_hand 同理剥掉：[43] 中途断掉留下单手模式的话，后面按全宽几何点键的用例全会点偏；
     # number_side_symbols 同理：[65]–[67] 中途断掉留下改过的左列，[24] 按出厂列表点「*」就点错
     # number_page 同理：用户设成什么都先剥掉，统一钉成 full（见 NUMBER_FULL_CFG）
-    # schemas（九宫格开着的方案）同理，键名只有 [ui.android.t9] 段里有
-    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand|number_side_symbols|number_page|schemas)[[:space:]]*=')"
+    # enabled_schemas / disabled_schemas（方案设置里的九宫格开关）同理，钉成全拼、双拼都开
+    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand|number_side_symbols|number_page|enabled_schemas|disabled_schemas)[[:space:]]*=')"
     # 段头允许带空白与行尾注释（`[ui.android]  # 键盘`）；认不出就会再补一段，TOML 里是重复段
     if printf '%s\n' "$body" | grep -qE '^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$'; then
         body="$(printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" -v num="$NUMBER_FULL_CFG" \
@@ -1431,6 +1431,15 @@ adb_q shell input motionevent MOVE $(( lx + 3 )) $(( ly + 2 )); sleep 0.2
 adb_q shell input motionevent UP $(( lx + 3 )) $(( ly + 2 )); sleep 0.8
 tap_key a; tap_key a; tap_key SPACE
 check "长按中英键不滑松手：不弹卡片、仍是五笔" "式" "$(get_pad_text)"
+# 选「全拼 · 九宫格」：字母层换成九宫格（有左列节点），等核心切完方案、状态推送过后仍是九宫格
+# （回归：核心忙时 keypadSupported 答 false，曾把刚选的九宫格当成「方案设置里关了」撤掉）
+reset_pad
+lang_menu_pick 2       # 全拼 · 九宫格
+sleep 6
+t9_on=0; ime_xml | grep -q 'content-desc="左列·' && t9_on=1
+check "选全拼·九宫格后字母层是九宫格" "1" "$t9_on"
+lang_menu_pick 5       # 回五笔
+sleep 2
 
 section "[47] 拼音首单元读法：xian 展开后左栏点 xi，候选换成 xi'an 的（西安）"
 # 展开页左栏列最前面那个单元的几种读法（xian / xi / x）；点一项候选按它重算，编码不动。

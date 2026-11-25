@@ -52,12 +52,12 @@ class SettingsValues(
 
     val engineReady: Boolean get() = core != null && types.isNotEmpty()
 
-    /** 键盘配置里一个键的原值（不经清单）；没写过为 null */
-    fun keyboardValue(key: String): Any? = userConfig.readAll()[key]
+    /** 键盘配置的原值（不经清单） */
+    fun keyboardValues(): Map<String, Any> = userConfig.readAll()
 
-    /** 直接写键盘配置的一个键（方案设置页的九宫格开关这类不在清单里的值） */
-    fun putKeyboardValue(key: String, value: Any) {
-        userConfig.put(key, value)
+    /** 在配置锁里读改写键盘配置（方案设置页的九宫格开关这类不在清单里的值） */
+    fun editKeyboard(block: (MutableMap<String, Any>) -> Unit) {
+        userConfig.edit(block)
         version++
     }
 

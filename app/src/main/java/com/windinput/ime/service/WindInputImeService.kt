@@ -910,9 +910,17 @@ class WindInputImeService :
      * 这个方案提不提供九宫格：核心判定能用（全拼、纯字母双拼），且方案设置里「启用九宫格键盘布局」开着
      * （见 [T9Availability]）。
      */
-    private fun t9Allowed(id: String): Boolean =
-        id != ENGLISH_SCHEMA_ID && session.keypadSupported(id) &&
-            T9Availability.enabled(userConfig.readAll()[T9Availability.KEY] as? String, id, schemeType(id))
+    private fun t9Allowed(id: String): Boolean {
+        if (id == ENGLISH_SCHEMA_ID || !session.keypadSupported(id)) return false
+        val cfg = userConfig.readAll()
+        return T9Availability.enabled(cfg[T9Availability.KEY_ON] as? String, cfg[T9Availability.KEY_OFF] as? String, id, schemeType(id))
+    }
+
+    /** 方案设置里确定关了九宫格（核心忙、类型读不到时不算） */
+    private fun t9Disabled(id: String): Boolean {
+        val cfg = userConfig.readAll()
+        return T9Availability.disabled(cfg[T9Availability.KEY_ON] as? String, cfg[T9Availability.KEY_OFF] as? String, id, schemeType(id))
+    }
 
     /** 提供九宫格的方案 */
     private fun t9Capable(schemas: List<SchemaEntry>): Set<String> =
@@ -935,8 +943,9 @@ class WindInputImeService :
      * 真正生效），字母层跟着核心的判定在九宫格与 26 键之间换。英文（方案或系统英文模式）一律 26 键。
      */
     private fun syncT9(english: Boolean, activeId: String?) {
-        // 方案设置里关掉了九宫格：记着的布局作废，退回全键盘
-        if (activeId != null && activeId in t9SchemaSet() && !t9Allowed(activeId)) setT9For(activeId, false)
+        // 方案设置里关掉了九宫格：记着的布局作废，退回全键盘。只认配置里确定的「关」——不能问核心
+        // （切方案 / 重载期间核心忙，keypadSupported 一律答 false，会把刚选的九宫格撤掉）
+        if (activeId != null && activeId in t9SchemaSet() && t9Disabled(activeId)) setT9For(activeId, false)
         val want = !english && activeId != null && activeId in t9SchemaSet()
         if (want != t9Requested) {
             t9Requested = want

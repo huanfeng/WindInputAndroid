@@ -21,6 +21,7 @@ class SchemeFormValuesTest {
                 is ConfigValue.Bool -> v.v.toString()
                 is ConfigValue.Int -> v.v.toString()
                 is ConfigValue.Str -> "\"${v.v}\""
+                is ConfigValue.Float -> v.v.toString()
                 else -> error("unexpected")
             }
             for (k in resets) eff[k] = defaults.getValue(k)
@@ -32,6 +33,7 @@ class SchemeFormValuesTest {
         "schema.pinyin.frequency.enabled" to "bool",
         "schema.pinyin.sentence_count" to "int",
         "schema.pinyin.separator" to "enum",
+        "schema.pinyin.frequency.half_life" to "float",
     )
 
     private fun item(key: String, type: String, options: List<Pair<String, String>> = emptyList(), source: SettingSource = SettingSource.ENGINE) =
@@ -52,6 +54,15 @@ class SchemeFormValuesTest {
         assertNull(v.set(freq, true))
         assertEquals(listOf(emptyList<SchemeFormSet>() to listOf(freq.key)), io.calls)
         assertTrue(v.bool(freq))
+    }
+
+    /** 清单按整数滑块写（Int 30），方案默认是浮点（30.0）：按值相等，仍是恢复 */
+    @Test
+    fun floatDefaultMatchesIntValue() {
+        val half = item("schema.pinyin.frequency.half_life", "int")
+        val (v, io) = values(mapOf(half.key to "45.0"), mapOf(half.key to "30.0"))
+        assertNull(v.set(half, 30))
+        assertEquals(listOf(emptyList<SchemeFormSet>() to listOf(half.key)), io.calls)
     }
 
     @Test
