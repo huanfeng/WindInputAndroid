@@ -40,6 +40,8 @@ tracing-android = "0.2"
 [dev-dependencies]
 # 方案包测试在代码里现打 zip / 建临时目录，不往仓库塞二进制样例。
 tempfile = "3"
+# 方案表单测试解析核心给的 TOML 文本
+toml = "0.8"
 
 [lints]
 workspace = true

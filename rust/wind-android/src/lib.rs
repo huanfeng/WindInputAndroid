@@ -274,12 +274,17 @@ impl From<KeySource> for CoreKeySource {
 /// `Char.ch` 取首个字符；空串或多字符视为不接（`press` 返回未吃键、无编辑指令）。
 #[derive(Debug, Clone, uniffi::Enum)]
 pub enum PressKey {
-    Char { ch: String, shifted: bool },
+    Char {
+        ch: String,
+        shifted: bool,
+    },
     Space,
     Backspace,
     Enter,
     /// 九宫格编码键（`2`-`9`、分词键 `'`）。`key` 取首个字符，规则同 `Char`。
-    Keypad { key: String },
+    Keypad {
+        key: String,
+    },
 }
 
 /// 候选全量的一个窗口（滚动候选栏 / 展开面板的数据源）。
@@ -812,6 +817,34 @@ impl WindCore {
     /// 全部恢复默认：删掉详情页管理的全部键。扩展词库开关等覆盖层里的其它内容保留。
     pub fn reset_schema_settings(&self, schema_id: String) -> Result<(), ConfigError> {
         self.write_schema_settings(|core| core.reset_schema_settings(&schema_id))
+    }
+
+    // ── 设置页：方案的完整设置表单（方案设置页的分组子页） ────────────────
+
+    /// 方案的完整设置表单：生效值 / 方案默认 / 方案预设三张表（TOML 文本，顶层键为
+    /// `schema.<类型>.<项>`），混输另给成员。与电脑版 `schema.getSettings` 同口径。
+    pub fn scheme_form(&self, schema_id: String) -> Result<SchemeFormInfo, ConfigError> {
+        self.core
+            .scheme_form(&schema_id)
+            .map(|f| SchemeFormInfo {
+                effective: f.effective,
+                default_values: f.default,
+                builtin: f.builtin,
+                members: f.members,
+            })
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 改方案的表单项：`sets` 写入、`resets` 恢复方案默认；一项不合格整批不写。写完重载配置。
+    /// 与 [`Self::set_schema_setting`] 共用覆盖文件锁。
+    pub fn apply_scheme_form(
+        &self,
+        schema_id: String,
+        sets: Vec<SchemeFormSet>,
+        resets: Vec<String>,
+    ) -> Result<(), ConfigError> {
+        let sets = sets.into_iter().map(|s| (s.key, s.value.into())).collect();
+        self.write_schema_settings(|core| core.scheme_form_apply(&schema_id, sets, resets))
     }
 
     /// emoji 附加模块（内置 + 用户放进 `emoji/` 的表）及当前开关。
@@ -1423,6 +1456,26 @@ pub struct SchemaSettingItem {
     /// 用户覆盖层里有这个键
     pub overridden: bool,
     pub options: Vec<String>,
+}
+
+/// 方案的完整设置表单。三张表都是 TOML 文本，顶层键为完整点分键。
+#[derive(Debug, uniffi::Record)]
+pub struct SchemeFormInfo {
+    /// 生效值
+    pub effective: String,
+    /// 方案默认值（恢复默认后的值）
+    pub default_values: String,
+    /// 方案文件改过的项在类型内置默认里的值
+    pub builtin: String,
+    /// 混输：`[主成员, 次成员]`；其它方案为空
+    pub members: Vec<String>,
+}
+
+/// 表单的一项写入。
+#[derive(Debug, uniffi::Record)]
+pub struct SchemeFormSet {
+    pub key: String,
+    pub value: ConfigValue,
 }
 
 /// 方案信息头 + 设置项。`engine_type` ∈ pinyin / shuangpin / codetable / mixed / english。
