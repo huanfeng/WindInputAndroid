@@ -862,6 +862,16 @@ class WindInputImeService :
         updateAutoCaps()
     }
 
+    /**
+     * 切方案 / 中英前收拾正在组的编码。全键盘：上屏字母原文（有编码时回车就是「上屏原文」，
+     * 直接复用）。九宫格：直接清掉——缓冲是数字，换了方案或布局就没有意义，上屏数字或半截
+     * 拼音都不是用户要的（那是电脑端「切换即上屏原码」的习惯）。
+     */
+    private fun settleBeforeSwitch() {
+        if (!composing || directInput) return
+        if (t9Layout) session.reset() else session.keyPressed(KeyAction.Enter, false)
+    }
+
     /** 上次下发给核心的九宫格开关；只在变了时下发（下发会清掉正在组的编码） */
     private var t9Requested = false
 
@@ -1386,8 +1396,8 @@ class WindInputImeService :
      */
     private fun toggleLanguage() {
         // 有编码时先把字母原文上屏再切（两家相同）：用户在中文里打了半截想改打英文，
-        // 码不该被吞掉。有编码时回车就是「上屏原文」（见回车键「确定」），直接复用。
-        if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
+        // 码不该被吞掉。九宫格例外，见 [settleBeforeSwitch]。
+        settleBeforeSwitch()
         val schemas = session.schemas()
         val active = schemas.firstOrNull { it.active }
         if (latinInput) {
@@ -1579,8 +1589,8 @@ class WindInputImeService :
             schemas.firstOrNull { it.active && it.id != ENGLISH_SCHEMA_ID }
                 ?.let { statePrefs.edit().putString(KEY_LAST_CHINESE, it.id).apply() }
         }
-        // 与单击中英键一致：有编码先上屏字母原文再切，打了半截的码不吞掉
-        if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
+        // 与单击中英键一致：有编码先上屏字母原文再切，打了半截的码不吞掉（九宫格例外）
+        settleBeforeSwitch()
         session.runCommand(EngineCmd.SelectSchema(target.index))
         // 同一方案换布局时引擎不推状态，这里直接同步；换了方案的，状态推送到了还会再同步一次
         syncT9(target.id == ENGLISH_SCHEMA_ID, target.id)
