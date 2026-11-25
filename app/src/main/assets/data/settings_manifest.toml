@@ -329,6 +329,19 @@ options = [
   { value = "off", label = "不显示" },
 ]
 
+# 九宫格键盘组：「启用九宫格键盘布局」开关与九宫格标点由代码画（键盘配置 ui.android.t9.*，不按方案存），
+# 下面这项随开关显示；双拼没有读法栏，只给全拼
+[[item]]
+page = "scheme_form"
+section = "九宫格键盘"
+schemes = ["pinyin"]
+key = "ui.android.t9.side_readings"
+source = "android"
+type = "toggle"
+title = "打字时左栏列拼音读法"
+summary = "打字时左栏换成当前这几个键能读成的拼音，点一个先定下这一段的读音。关掉则左栏一直是标点，直接翻候选（所有全拼方案共用）"
+default = true
+
 [[item]]
 page = "scheme_form"
 section = "智能组词"
@@ -2482,16 +2495,6 @@ source = "android"
 type = "toggle"
 title = "字母键显示上滑符号"
 summary = "在字母键顶上用小字标出上滑能输入的数字或符号"
-default = true
-
-[[item]]
-page = "keyboard"
-section = "九宫格"
-key = "ui.android.t9.side_readings"
-source = "android"
-type = "toggle"
-title = "打字时左栏列拼音读法"
-summary = "打字时左栏换成当前这几个键能读成的拼音，点一个先定下这一段的读音。关掉则左栏一直是标点，直接翻候选。全拼九宫格有效"
 default = true
 
 # ═══ 按键与手势 ═════════════════════════════════════════════════

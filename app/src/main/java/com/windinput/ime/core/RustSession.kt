@@ -216,6 +216,16 @@ class RustSession(
     override fun keypadSupported(schemaId: String): Boolean =
         guard.run("keypadSupported", false) { core.keypadSupported(schemaId) }
 
+    override fun schemeEngineType(schemaId: String): String? =
+        guard.run<String?>("schemeEngineType", null) {
+            // 未知方案是正常情况（刚删掉），不当核心出错
+            try {
+                core.schemaSettings(schemaId).engineType
+            } catch (e: uniffi.wind_android.ConfigException) {
+                null
+            }
+        }
+
     /**
      * 软键/物理键 → 核心 `press`：翻译 VK、英文自动空格、标点换位都在核心里，这里只执行返回的编辑指令。
      * 前置条件见 [ImeSession.keyPressed]：直出（密码框）时不得调用。

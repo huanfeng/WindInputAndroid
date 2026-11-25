@@ -70,7 +70,7 @@ private val writeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 internal fun NumpadSymbolsSection() =
     SideSymbolsEditor(NumberSideSymbols.CONFIG_KEY, NumberSideSymbols.DEFAULTS)
 
-/** 键盘布局 →「九宫格标点」：九宫格拼音不打字时左栏的标点（`ui.android.t9.side_symbols`）。 */
+/** 方案设置 → 九宫格键盘：九宫格拼音不打字时左栏的标点（`ui.android.t9.side_symbols`），内嵌在组页里。 */
 @Composable
 internal fun T9SymbolsSection() =
     SideSymbolsEditor(T9SideSymbols.CONFIG_KEY, T9SideSymbols.DEFAULTS)
@@ -273,23 +273,5 @@ internal fun NumpadSymbolsEntry(onOpen: () -> Unit) {
     SectionTitle("数字键盘")
     Card(modifier = Modifier.fillMaxWidth()) {
         NavRow(SUB_NUMPAD_SYMBOLS, summary, null, onClick = onOpen)
-    }
-}
-
-/** 键盘布局页「九宫格」组下的入口：摘要列出当前列表的前几个 */
-@Composable
-internal fun T9SymbolsEntry(onOpen: () -> Unit) {
-    val context = LocalContext.current
-    val config = remember {
-        UserConfig((context.applicationContext as WindInputApp).dataDirs.keyboardConfigFile)
-    }
-    val symbols = T9SideSymbols.parse(config.readAll()[T9SideSymbols.CONFIG_KEY] as? String)
-    val summary = when {
-        symbols.isEmpty() -> "不打字时左栏：已清空"
-        symbols.size > 6 -> "不打字时左栏：${symbols.take(6).joinToString(" ")} …"
-        else -> "不打字时左栏：${symbols.joinToString(" ")}"
-    }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow(SUB_T9_SYMBOLS, summary, null, onClick = onOpen)
     }
 }

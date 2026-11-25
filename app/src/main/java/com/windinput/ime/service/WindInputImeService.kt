@@ -52,6 +52,7 @@ import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
 import com.windinput.ime.keyboard.NumberSideSymbols
+import com.windinput.ime.keyboard.T9Availability
 import com.windinput.ime.keyboard.T9SideSymbols
 import com.windinput.ime.keyboard.T9_SEPARATOR
 import com.windinput.ime.keyboard.Palette
@@ -67,7 +68,8 @@ import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
 import com.windinput.ime.settings.SettingsActivity
 import com.windinput.ime.settings.SUB_NUMPAD_SYMBOLS
-import com.windinput.ime.settings.SUB_T9_SYMBOLS
+import com.windinput.ime.settings.GROUP_T9
+import com.windinput.ime.settings.schemeSub
 import java.io.File
 
 /**
@@ -899,9 +901,22 @@ class WindInputImeService :
         if (next != cur) statePrefs.edit().putStringSet(KEY_T9_SCHEMAS, next).apply()
     }
 
-    /** 能用九宫格的方案（问核心：全拼、纯字母双拼） */
+    /** 方案类型缓存（九宫格默认开关按类型给）；方案增删后类型不变，id 换了自然重取 */
+    private val schemeTypes = HashMap<String, String?>()
+
+    private fun schemeType(id: String): String? = schemeTypes.getOrPut(id) { session.schemeEngineType(id) }
+
+    /**
+     * 这个方案提不提供九宫格：核心判定能用（全拼、纯字母双拼），且方案设置里「启用九宫格键盘布局」开着
+     * （见 [T9Availability]）。
+     */
+    private fun t9Allowed(id: String): Boolean =
+        id != ENGLISH_SCHEMA_ID && session.keypadSupported(id) &&
+            T9Availability.enabled(userConfig.readAll()[T9Availability.KEY] as? String, id, schemeType(id))
+
+    /** 提供九宫格的方案 */
     private fun t9Capable(schemas: List<SchemaEntry>): Set<String> =
-        schemas.filter { it.id != ENGLISH_SCHEMA_ID && session.keypadSupported(it.id) }.map { it.id }.toSet()
+        schemas.filter { t9Allowed(it.id) }.map { it.id }.toSet()
 
     /** 键盘列表的展开项：方案 × 布局（能用九宫格的方案多一项九宫格） */
     private fun keyboardEntries(schemas: List<SchemaEntry>): List<Pair<SchemaEntry, Boolean>> =
@@ -920,6 +935,8 @@ class WindInputImeService :
      * 真正生效），字母层跟着核心的判定在九宫格与 26 键之间换。英文（方案或系统英文模式）一律 26 键。
      */
     private fun syncT9(english: Boolean, activeId: String?) {
+        // 方案设置里关掉了九宫格：记着的布局作废，退回全键盘
+        if (activeId != null && activeId in t9SchemaSet() && !t9Allowed(activeId)) setT9For(activeId, false)
         val want = !english && activeId != null && activeId in t9SchemaSet()
         if (want != t9Requested) {
             t9Requested = want
@@ -1898,8 +1915,15 @@ class WindInputImeService :
 
     override fun onOpenSettings() = openSettings()
 
-    override fun onSideCustomize(t9: Boolean) =
-        openSettings(SettingsActivity.PAGE_KEYBOARD, if (t9) SUB_T9_SYMBOLS else SUB_NUMPAD_SYMBOLS)
+    override fun onSideCustomize(t9: Boolean) {
+        // 九宫格左栏的齿轮：打开当前方案设置里的「九宫格键盘」组（标点在那里改）
+        val active = session.schemas().firstOrNull { it.active }?.id
+        if (t9 && active != null) {
+            openSettings(SettingsActivity.PAGE_SCHEMA, schemeSub(active), GROUP_T9)
+        } else {
+            openSettings(SettingsActivity.PAGE_KEYBOARD, SUB_NUMPAD_SYMBOLS)
+        }
+    }
 
     // ── 工具栏常驻按钮（快捷面板「编辑工具栏」里挑）──────────────────
 
@@ -2036,7 +2060,7 @@ class WindInputImeService :
      * 给了 [page] / [sub] 就直接进那一页：另加 `CLEAR_TASK` 新开一个设置页，已开着的设置页
      * 停在别处时也落到这一页（路由只在创建时从 intent 读）。
      */
-    private fun openSettings(page: String? = null, sub: String? = null) {
+    private fun openSettings(page: String? = null, sub: String? = null, detail: String? = null) {
         requestHideSelf(0)
         val intent = android.content.Intent(this, SettingsActivity::class.java)
             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -2044,6 +2068,7 @@ class WindInputImeService :
             intent.addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 .putExtra(SettingsActivity.EXTRA_PAGE, page)
                 .putExtra(SettingsActivity.EXTRA_SUB, sub)
+                .putExtra(SettingsActivity.EXTRA_DETAIL, detail)
         }
         startActivity(intent)
     }

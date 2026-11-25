@@ -61,6 +61,16 @@ class SchemeSettingsModelTest {
     }
 
     @Test
+    fun shuangpinT9GroupHasNoReadings() {
+        val sp = schemeGroups("shuangpin", manifest, behavior, true, false, false)
+        assertEquals("九宫格键盘", sp[1].name)
+        assertTrue("双拼没有读法栏", sp[1].items.isEmpty())
+        val py = schemeGroups("pinyin", manifest, behavior, true, false, false)
+        assertEquals(listOf("ui.android.t9.side_readings"), py[1].items.map { it.key })
+        assertTrue("不可用时没有九宫格组", "九宫格键盘" !in schemeGroups("pinyin", manifest, behavior, false, false, false).map { it.name })
+    }
+
+    @Test
     fun masterIsLeadingToggleOthersDependOn() {
         val groups = manifest.schemeGroups("pinyin").toMap()
         assertEquals("schema.pinyin.frequency.enabled", groupMaster(groups.getValue("调频"))?.key)

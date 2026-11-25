@@ -272,7 +272,7 @@ class SettingsManifestTest {
     @Test
     fun pinyinGroupsInOrder() {
         assertEquals(
-            listOf("基本", "智能组词", "词组补全", "英文候选", "调频", "自动学习", "辅助码"),
+            listOf("基本", "九宫格键盘", "智能组词", "词组补全", "英文候选", "调频", "自动学习", "辅助码"),
             bundled.schemeGroups("pinyin").map { it.first },
         )
         val basic = bundled.schemeGroups("pinyin").first().second.map { it.key }

@@ -125,9 +125,11 @@ class SettingsActivity : ComponentActivity() {
 
         /** 同上：一级页下的二级页名（可缺） */
         const val EXTRA_SUB = "sub"
+        const val EXTRA_DETAIL = "detail"
 
         /** 「键盘布局」页的 id（设置清单） */
         const val PAGE_KEYBOARD = "keyboard"
+        const val PAGE_SCHEMA = "schema"
     }
 
     /**
@@ -176,7 +178,11 @@ class SettingsActivity : ComponentActivity() {
                     manifest = manifest,
                     userConfig = userConfig,
                     versionName = versionName,
-                    initialRoute = Route(intent.getStringExtra(EXTRA_PAGE), intent.getStringExtra(EXTRA_SUB)),
+                    initialRoute = Route(
+                        intent.getStringExtra(EXTRA_PAGE),
+                        intent.getStringExtra(EXTRA_SUB),
+                        intent.getStringExtra(EXTRA_DETAIL),
+                    ),
                     actions = SettingsActions(
                         enableIme = { startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS)) },
                         // 国内系统把「切换输入法」藏得很深（导航栏没有键盘图标，要进好几层设置），
@@ -253,11 +259,6 @@ internal const val DICT_STATS = "词库统计"
 /** 键盘布局页里代码画的二级页：数字框九宫格左列的符号 */
 internal const val SUB_NUMPAD_SYMBOLS = "数字键盘符号"
 
-/** 键盘布局页里代码画的二级页：九宫格拼音左栏的标点 */
-internal const val SUB_T9_SYMBOLS = "九宫格标点"
-
-/** 键盘布局页的「九宫格」组：清单项之后，代码画「九宫格标点」入口 */
-private const val SECTION_T9 = "九宫格"
 
 /** 关于页里代码画的二级页 */
 internal const val SUB_PRIVACY = "隐私政策"
@@ -268,7 +269,7 @@ private const val SECTION_QUICK_INPUT = "快捷输入"
 
 /** 代码画的二级页名：清单里的 section 不能叫这些，否则会被遮住（SettingsManifestTest 核对） */
 internal val RESERVED_SUBPAGES =
-    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_NUMPAD_SYMBOLS, SUB_T9_SYMBOLS, SUB_KEYMAP_EDITOR, SUB_PRIVACY)
+    setOf(DICT_WORDS, DICT_ADD, DICT_PHRASES, DICT_STATS, SUB_NUMPAD_SYMBOLS, SUB_KEYMAP_EDITOR, SUB_PRIVACY)
 
 /**
  * 方案与双拼布局的显示态，挂在设置页顶层（不随某一页的组合进出而丢）。
@@ -339,7 +340,7 @@ private fun SettingsApp(
     // 起始路由来自 intent（输入法里直达某页）；只在首次创建时用，转屏 / 重建后按保存的走
     var routePage by rememberSaveable { mutableStateOf(initialRoute.page) }
     var routeSub by rememberSaveable { mutableStateOf(initialRoute.sub) }
-    var routeDetail by rememberSaveable { mutableStateOf<String?>(null) }
+    var routeDetail by rememberSaveable { mutableStateOf(initialRoute.detail) }
     val route = Route(routePage, routeSub, routeDetail)
     // 详情页标题（方案名）：进页前由入口填上，页内读到核心的方案名后再校正；转屏丢了就先显示 id
     val detailTitles = remember { androidx.compose.runtime.mutableStateMapOf<String, String>() }
@@ -459,7 +460,7 @@ private fun SettingsApp(
             val schemeId = schemeIdOf(r.sub)
             fun openScheme(id: String, name: String) {
                 detailTitles[schemeSub(id)] = name
-                go(Route(SCHEMA_PAGE, schemeSub(id)))
+                go(Route(SettingsActivity.PAGE_SCHEMA, schemeSub(id)))
             }
             when {
                 page == null -> HomeScreen(setup, manifest, values, schemaState, versionName, actions) { go(Route(it)) }
@@ -469,8 +470,6 @@ private fun SettingsApp(
                     group = r.detail,
                     manifest = manifest,
                     global = values,
-                    t9Group = { _, _ -> },
-                    t9Summary = { _, _ -> "" },
                     onOpenGroup = { go(r.copy(detail = it)) },
                     onOpenScheme = ::openScheme,
                     onLoaded = { detailTitles[schemeSub(schemeId)] = it },
@@ -494,8 +493,6 @@ private fun screenTitle(manifest: SettingsManifestData, r: Route, titles: Map<St
     r.sub?.let { sub -> titles[sub] ?: schemeIdOf(sub) ?: sub }
         ?: manifest.pages.firstOrNull { it.id == r.page }?.title ?: "清风输入法"
 
-/** 方案页的页 id */
-private const val SCHEMA_PAGE = "schema"
 
 /** 方案设置页的路由：`Route(page = "schema", sub = "scheme:<方案 id>", detail = <组名>)` */
 private const val SCHEME_SUB_PREFIX = "scheme:"
@@ -700,10 +697,7 @@ private fun PageScreen(
             }
         }
     } else {
-        for ((name, items) in sections) {
-            SettingsCard(name, items, values)
-            if (page.id == SettingsActivity.PAGE_KEYBOARD && name == SECTION_T9) T9SymbolsEntry { onOpenSub(SUB_T9_SYMBOLS) }
-        }
+        for ((name, items) in sections) SettingsCard(name, items, values)
         // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
         if (page.id == "ui") SkinSection()
         if (page.id == "ui") TooltipSectionsSection()
@@ -761,7 +755,6 @@ private fun SubScreen(
         page.id == "dict" && sub == DICT_PHRASES -> PhrasesSection()
         page.id == "dict" && sub == DICT_STATS -> DictStatsSection(session)
         page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_NUMPAD_SYMBOLS -> NumpadSymbolsSection()
-        page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_T9_SYMBOLS -> T9SymbolsSection()
         page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_KEYMAP_EDITOR -> KeymapEditorSection()
         page.id == "about" && sub == SUB_PRIVACY -> PrivacySection()
         else -> {

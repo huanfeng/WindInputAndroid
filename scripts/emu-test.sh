@@ -587,24 +587,34 @@ COMMENT_OFF='candidate_comment = false # emu-test'
 # 「123」默认先进九宫数字（ui.android.number_page = pad9），而整套用例写的是「123 先进全键盘数字页、
 # 再点「符号」位进九宫」的按法：同样带标记钉成 full，跑完写回
 NUMBER_FULL_CFG='number_page = "full" # emu-test'
+# 九宫格默认只给全拼开（双拼要到方案设置里开）；长按中英键菜单的序号按「全拼、双拼都有九宫格项」
+# 排（共 8 项），同样带标记钉住，跑完写回
+T9_SCHEMAS_CFG='schemas = "pinyin,shuangpin" # emu-test'
 write_kb_cfg() { printf '%s\n' "$1" | "$ADB" -s "$SERIAL" shell sh -c "'mkdir -p $EXT/keyboard && cat > $KB_CFG'"; }
 SUITE_KB_RAW="$(adb_ shell cat "$KB_CFG" 2>/dev/null)"
 SUITE_KB_EXISTED=1
 [[ "$SUITE_KB_RAW" == *"No such file"* ]] && { SUITE_KB_EXISTED=0; SUITE_KB_RAW=""; }
-SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF -e "$COMMENT_OFF" -e "$NUMBER_FULL_CFG")"
+SUITE_KB_ORIG="$(printf '%s\n' "$SUITE_KB_RAW" | grep -vxF -e "$COMMENT_OFF" -e "$NUMBER_FULL_CFG" -e "$T9_SCHEMAS_CFG")"
 with_comment_off() {   # 在 [ui.android] 段头后插一行；没有这一段就补一段
     # 用户自己写过的 candidate_comment 先去掉：留着就是重复键（TOML 错误、取值看解析器心情）
     local body
     # one_hand 同理剥掉：[43] 中途断掉留下单手模式的话，后面按全宽几何点键的用例全会点偏；
     # number_side_symbols 同理：[65]–[67] 中途断掉留下改过的左列，[24] 按出厂列表点「*」就点错
     # number_page 同理：用户设成什么都先剥掉，统一钉成 full（见 NUMBER_FULL_CFG）
-    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand|number_side_symbols|number_page)[[:space:]]*=')"
+    # schemas（九宫格开着的方案）同理，键名只有 [ui.android.t9] 段里有
+    body="$(printf '%s\n' "$1" | grep -vE '^[[:space:]]*(candidate_comment|one_hand|number_side_symbols|number_page|schemas)[[:space:]]*=')"
     # 段头允许带空白与行尾注释（`[ui.android]  # 键盘`）；认不出就会再补一段，TOML 里是重复段
     if printf '%s\n' "$body" | grep -qE '^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$'; then
-        printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" -v num="$NUMBER_FULL_CFG" \
-            '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print line; print num }'
+        body="$(printf '%s\n' "$body" | awk -v line="$COMMENT_OFF" -v num="$NUMBER_FULL_CFG" \
+            '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print line; print num }')"
     else
-        printf '%s\n\n[ui.android]\n%s\n%s\n' "$body" "$COMMENT_OFF" "$NUMBER_FULL_CFG"
+        body="$(printf '%s\n\n[ui.android]\n%s\n%s\n' "$body" "$COMMENT_OFF" "$NUMBER_FULL_CFG")"
+    fi
+    if printf '%s\n' "$body" | grep -qE '^[[:space:]]*\[ui\.android\.t9\][[:space:]]*(#.*)?$'; then
+        printf '%s\n' "$body" | awk -v line="$T9_SCHEMAS_CFG" \
+            '{ print } /^[[:space:]]*\[ui\.android\.t9\][[:space:]]*(#.*)?$/ { print line }'
+    else
+        printf '%s\n\n[ui.android.t9]\n%s\n' "$body" "$T9_SCHEMAS_CFG"
     fi
 }
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"

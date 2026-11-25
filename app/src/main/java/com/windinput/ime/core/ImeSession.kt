@@ -297,6 +297,9 @@ interface ImeSession {
 
     /** 指定方案能否用九宫格（全拼、纯字母双拼）；键盘列表据此给不给九宫格那一项 */
     fun keypadSupported(schemaId: String): Boolean = false
+
+    /** 方案的界面类型（pinyin / shuangpin / codetable / mixed / english）；读不到为 null */
+    fun schemeEngineType(schemaId: String): String? = null
 }
 
 /**

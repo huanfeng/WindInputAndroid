@@ -37,6 +37,7 @@ import uniffi.wind_android.InstalledSchemaInfo
 import uniffi.wind_android.SchemaSettingItem
 import uniffi.wind_android.SchemaSettingKind
 import uniffi.wind_android.SchemaSettingsInfo
+import com.windinput.ime.keyboard.T9Availability
 
 /**
  * 方案设置页：方案页每行的齿轮进来。第一屏是方案信息与分组入口，每组一个子页（[SchemeGroupScreen]），
@@ -98,12 +99,15 @@ internal fun schemeGroups(
     val auxUsable = props.any { it.key == KEY_AUX_ENABLED }
     val out = mutableListOf<SchemeGroup>()
     for ((name, items) in manifest.schemeGroups(engineType)) {
-        if (name == GROUP_AUX) {
-            if (auxUsable) out += SchemeGroup(name, SchemeGroup.Kind.AUX, items)
-            continue
+        when (name) {
+            GROUP_AUX -> if (auxUsable) out += SchemeGroup(name, SchemeGroup.Kind.AUX, items)
+            // 清单里九宫格组只有随开关显示的项（全拼的读法栏）；组本身由代码定位在「基本」之后
+            GROUP_T9 -> Unit
+            else -> out += SchemeGroup(name, SchemeGroup.Kind.FORM, items)
         }
-        out += SchemeGroup(name, SchemeGroup.Kind.FORM, items)
-        if (out.size == 1 && t9Capable) out += SchemeGroup(GROUP_T9, SchemeGroup.Kind.T9)
+        if (out.size == 1 && t9Capable && out.none { it.kind == SchemeGroup.Kind.T9 }) {
+            out += SchemeGroup(GROUP_T9, SchemeGroup.Kind.T9, manifest.schemeGroups(engineType).toMap()[GROUP_T9].orEmpty())
+        }
     }
     if (props.any { it.key == KEY_SENTENCE }) out += SchemeGroup(GROUP_SENTENCE, SchemeGroup.Kind.SENTENCE)
     if (hasDicts) out += SchemeGroup(GROUP_DICTS, SchemeGroup.Kind.DICTS)
@@ -115,12 +119,17 @@ internal fun schemeGroups(
 /** 方案设置页读到的全部东西（后台线程装好） */
 private class SchemeData(
     val form: SchemeFormValues,
+    val global: SettingsValues,
     val props: SchemaSettingsInfo,
     val installed: InstalledSchemaInfo?,
     val layoutNames: Map<String, String>,
     val memberNames: List<Pair<String, String>>,
     val hasDicts: Boolean,
     val t9Capable: Boolean,
+    /** 「启用九宫格键盘布局」此刻开着 */
+    var t9Enabled: Boolean,
+    /** 能用九宫格的已装方案 id → 类型（第一次拨开关时据它落默认） */
+    val t9CapableAll: Map<String, String>,
 )
 
 private sealed interface SchemeLoad {
@@ -135,15 +144,22 @@ private fun loadScheme(context: android.content.Context, schemeId: String, globa
         form.load()?.let { return SchemeLoad.Failed(it) }
         val installed = core.installedSchemas()
         val name = { id: String -> installed.firstOrNull { it.id == id }?.name?.ifEmpty { id } ?: id }
+        val t9All = installed.map { it.id }
+            .filter { runCatching { core.keypadSupported(it) }.getOrDefault(false) }
+            .mapNotNull { id -> runCatching { core.schemaSettings(id).engineType }.getOrNull()?.let { id to it } }
+            .toMap()
         SchemeLoad.Ok(
             SchemeData(
                 form = form,
+                global = global,
                 props = core.schemaSettings(schemeId),
                 installed = installed.firstOrNull { it.id == schemeId },
                 layoutNames = core.shuangpinLayouts().associate { it.id to it.name.ifEmpty { it.id } },
                 memberNames = form.members.map { it to name(it) },
                 hasDicts = runCatching { core.schemaDicts(schemeId).isNotEmpty() }.getOrDefault(false),
-                t9Capable = runCatching { core.keypadSupported(schemeId) }.getOrDefault(false),
+                t9Capable = t9All.containsKey(schemeId),
+                t9Enabled = T9Availability.enabled(global.keyboardValue(T9Availability.KEY) as? String, schemeId, t9All[schemeId]),
+                t9CapableAll = t9All,
             ),
         )
     } catch (e: ConfigException) {
@@ -163,8 +179,6 @@ internal fun SchemeSettingsScreen(
     group: String?,
     manifest: SettingsManifestData,
     global: SettingsValues,
-    t9Group: @Composable (schemeId: String, engineType: String) -> Unit,
-    t9Summary: (schemeId: String, engineType: String) -> String,
     onOpenGroup: (String) -> Unit,
     onOpenScheme: (id: String, name: String) -> Unit,
     onLoaded: (String) -> Unit,
@@ -219,10 +233,10 @@ internal fun SchemeSettingsScreen(
     val type = d.props.engineType
     val groups = schemeGroups(type, manifest, d.props.items, d.t9Capable, d.hasDicts, d.memberNames.isNotEmpty())
     if (group == null) {
-        SchemeFirstScreen(d, type, groups, manifest, t9Summary, onOpenGroup, ::writeProp) { reload++ }
+        SchemeFirstScreen(d, type, groups, manifest, onOpenGroup, ::writeProp) { reload++ }
     } else {
         val g = groups.firstOrNull { it.name == group } ?: return
-        SchemeGroupScreen(d, schemeId, type, g, t9Group, onOpenScheme, ::writeProp)
+        SchemeGroupScreen(d, schemeId, g, onOpenScheme, ::writeProp)
     }
 }
 
@@ -232,7 +246,6 @@ private fun SchemeFirstScreen(
     type: String,
     groups: List<SchemeGroup>,
     manifest: SettingsManifestData,
-    t9Summary: (String, String) -> String,
     onOpenGroup: (String) -> Unit,
     writeProp: (SchemaWrite) -> Unit,
     onReloaded: () -> Unit,
@@ -248,7 +261,7 @@ private fun SchemeFirstScreen(
     SectionTitle("设置")
     Card(modifier = Modifier.fillMaxWidth()) {
         for (g in groups) {
-            NavRow(title = g.name, summary = groupSummary(g, d, type, t9Summary)) { onOpenGroup(g.name) }
+            NavRow(title = g.name, summary = groupSummary(g, d)) { onOpenGroup(g.name) }
         }
     }
 
@@ -287,7 +300,7 @@ private fun SchemeFirstScreen(
 }
 
 /** 第一屏每组一行的副标题 */
-private fun groupSummary(g: SchemeGroup, d: SchemeData, type: String, t9Summary: (String, String) -> String): String =
+private fun groupSummary(g: SchemeGroup, d: SchemeData): String =
     when (g.kind) {
         SchemeGroup.Kind.FORM, SchemeGroup.Kind.AUX -> {
             val n = d.form.changedCount(g.items)
@@ -299,7 +312,7 @@ private fun groupSummary(g: SchemeGroup, d: SchemeData, type: String, t9Summary:
                 else -> g.items.take(3).joinToString(" · ") { it.title }
             }
         }
-        SchemeGroup.Kind.T9 -> t9Summary(d.props.id, type)
+        SchemeGroup.Kind.T9 -> if (d.t9Enabled) "已开启：键盘列表里有「${d.props.name.ifEmpty { d.props.id }} · 九宫格」" else "未开启"
         SchemeGroup.Kind.DICTS -> "本方案的扩展词库开关"
         SchemeGroup.Kind.BEHAVIOR -> "标点、命令短语"
         SchemeGroup.Kind.SENTENCE ->
@@ -329,9 +342,7 @@ internal fun presetsLine(builtin: Map<String, Any>, items: List<SettingItem>, va
 private fun SchemeGroupScreen(
     d: SchemeData,
     schemeId: String,
-    type: String,
     g: SchemeGroup,
-    t9Group: @Composable (String, String) -> Unit,
     onOpenScheme: (String, String) -> Unit,
     writeProp: (SchemaWrite) -> Unit,
 ) {
@@ -358,7 +369,7 @@ private fun SchemeGroupScreen(
                 FormCard(rest, d.form, g.items)
             }
         }
-        SchemeGroup.Kind.T9 -> t9Group(schemeId, type)
+        SchemeGroup.Kind.T9 -> T9GroupScreen(d, g)
         SchemeGroup.Kind.DICTS -> SchemaDictsSection("扩展词库", listOf(schemeId))
         SchemeGroup.Kind.BEHAVIOR -> Card(modifier = Modifier.fillMaxWidth()) {
             for (item in d.props.items.filter { it.key in BEHAVIOR_ROWS }) {
@@ -397,3 +408,35 @@ private fun FormCard(items: List<SettingItem>, values: SchemeFormValues, all: Li
 
 /** 表单里辅助码总开关的键（`engine.aux_code.enabled` 的别名） */
 internal const val AUX_FORM_ENABLED = "schema.pinyin.aux_code.enabled"
+
+/**
+ * 「九宫格键盘」组：启用开关（键盘配置，按方案记）；开着时列出随开关的清单项（全拼的读法栏）与
+ * 九宫格标点编辑（全拼、双拼共用一份）。关掉后键盘列表不再有这个方案的九宫格项，
+ * 正在用九宫格的话下次弹出键盘退回全键盘。
+ */
+@Composable
+private fun T9GroupScreen(d: SchemeData, g: SchemeGroup) {
+    val scope = rememberCoroutineScope()
+    var on by remember { mutableStateOf(d.t9Enabled) }
+    val name = d.props.name.ifEmpty { d.props.id }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        ToggleLine(
+            "启用九宫格键盘布局",
+            "开启后键盘选择、长按中英键菜单里多出「$name · 九宫格」",
+            on,
+        ) { v ->
+            on = v
+            d.t9Enabled = v
+            scope.launch {
+                withContext(Dispatchers.IO) {
+                    val raw = d.global.keyboardValue(T9Availability.KEY) as? String
+                    d.global.putKeyboardValue(T9Availability.KEY, T9Availability.toggled(raw, d.t9CapableAll, d.props.id, v))
+                }
+            }
+        }
+    }
+    if (!on) return
+    FormCard(g.items, d.form)
+    SectionTitle("九宫格标点（所有方案共用）")
+    T9SymbolsSection()
+}
