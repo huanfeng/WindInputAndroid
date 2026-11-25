@@ -47,4 +47,25 @@ class BundledSchemasTest {
             assertTrue("误读表与主仓不一致，从 ${upstream.path} 拷过来", upstream.readBytes().contentEquals(bundled.readBytes()))
         }
     }
+
+    /**
+     * 辅助码来源：方案声明的 `[engine.aux_code] files` 都得在包里。
+     * 缺了核心的设置页判据会把「辅助码」开关整个藏掉（见 docs/schema-settings-plan.md），
+     * 用户看不到功能也不知道缺了什么。码表不入主仓版本库，靠构建产物拷进来（NOTICE.md）。
+     */
+    @Test
+    fun auxCodeSourcesAreBundled() {
+        val missing = mutableListOf<String>()
+        for (f in schemaDir.listFiles { f -> f.name.endsWith(".schema.toml") }.orEmpty()) {
+            val files = Toml.parse(f.readText()).getArray("engine.aux_code.files") ?: continue
+            for (i in 0 until files.size()) {
+                val src = files.getString(i)
+                val ok = if (src.startsWith("schema:")) {
+                    File(schemaDir, src.removePrefix("schema:") + ".schema.toml").isFile
+                } else File(schemaDir, src).isFile
+                if (!ok) missing += "${f.name}: $src"
+            }
+        }
+        assertTrue("辅助码来源没随包：$missing", missing.isEmpty())
+    }
 }

@@ -368,7 +368,7 @@ key = "schema.pinyin.aux_code.direct"
 source = "engine"
 type = "toggle"
 title = "直接辅助码"
-summary = "仅双拼：音节后直接敲字形码筛选，不按引导键"
+summary = "仅双拼：任一音节后直接敲 1～2 位字形码定字，不按引导键（如 gokqk → 国情）。会改变音节后字母的含义，想强制按音节切分可手打 '"
 enabled_when = "schema.pinyin.aux_code.enabled"
 advanced = true
 

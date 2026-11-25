@@ -77,6 +77,19 @@ class SchemaDetailTest {
     }
 
     @Test
+    fun auxSourceChoiceShowsFriendlyNamesAndResetsToDefault() {
+        val src = item(
+            KEY_AUX_FILES, SchemaSettingKind.CHOICE, "aux_code/ZRM-wanxiang.txt", "aux_code/flypy_full.txt",
+            group = SchemaSettingGroup.AUX_CODE, overridden = true,
+        ).copy(options = listOf("aux_code/flypy_full.txt", "aux_code/ZRM-wanxiang.txt", "schema:stroke", "aux_code/x.txt"))
+        val (values, names) = choiceEntries(src, AUX_SOURCE_LABELS)
+        assertEquals(src.options, values)
+        assertEquals(listOf("小鹤形码", "自然码形码", "笔画（码表方案）", "aux_code/x.txt"), names)
+        assertEquals(SchemaWrite.Reset(KEY_AUX_FILES), writeFor(src, "aux_code/flypy_full.txt"))
+        assertEquals(SchemaWrite.Set(KEY_AUX_FILES, "schema:stroke"), writeFor(src, "schema:stroke"))
+    }
+
+    @Test
     fun summaryNamesTheDefaultOnlyWhenChanged() {
         val punct = item("punct.mode", SchemaSettingKind.CHOICE, "english", "follow", group = SchemaSettingGroup.BEHAVIOR)
         assertEquals("说明", rowSummary("说明", punct, PUNCT_LABELS))

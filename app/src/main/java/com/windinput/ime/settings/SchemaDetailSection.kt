@@ -142,7 +142,13 @@ internal fun SchemaDetailSection(schemaId: String, manifest: SettingsManifestDat
 
     s.items.firstOrNull { it.key == KEY_AUX_ENABLED }?.let { aux ->
         SectionTitle("辅助码")
-        Card(modifier = Modifier.fillMaxWidth()) { AuxSettingRow(aux) { write(it) } }
+        Card(modifier = Modifier.fillMaxWidth()) {
+            AuxSettingRow(aux) { write(it) }
+            // 来源下拉：只有装了不止一张码表时核心才给这一项
+            s.items.firstOrNull { it.key == KEY_AUX_FILES }?.let { src ->
+                ChoiceSettingRow("辅助码来源", "用哪张字形码表筛选；双拼多为小鹤 / 自然码 / 首右，全拼多为笔画", src, AUX_SOURCE_LABELS) { write(it) }
+            }
+        }
     }
 
     s.items.firstOrNull { it.key == KEY_SENTENCE }?.let { sentence ->
@@ -273,6 +279,18 @@ private fun AuxSettingRow(item: SchemaSettingItem, onWrite: (SchemaWrite) -> Uni
 
 internal const val KEY_SHUANGPIN_LAYOUT = "engine.pinyin.shuangpin.layout"
 internal const val KEY_AUX_ENABLED = "engine.aux_code.enabled"
+internal const val KEY_AUX_FILES = "engine.aux_code.files"
+
+/** 辅助码来源的显示名：键是核心给的值（码表文件相对路径，或 `schema:<方案 id>`）；没列的显示原值 */
+internal val AUX_SOURCE_LABELS = mapOf(
+    "aux_code/flypy_full.txt" to "小鹤形码",
+    "aux_code/ZRM-wanxiang.txt" to "自然码形码",
+    "aux_code/shouyou.txt" to "首右辅助码 2.0",
+    "aux_code/shouyou_plus.txt" to "首右 Plus 辅助码",
+    "aux_code/stroke.txt" to "笔画码表",
+    "schema:stroke" to "笔画（码表方案）",
+    "schema:wubi86" to "五笔 86（码表方案）",
+)
 internal const val KEY_SENTENCE = "engine.codetable.sentence_input"
 
 /**
