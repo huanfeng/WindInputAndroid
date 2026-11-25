@@ -59,6 +59,7 @@ import com.windinput.ime.panels.SymbolPages
 import com.windinput.ime.panels.SymbolWindow
 import com.windinput.ime.core.LeadingReading
 import com.windinput.ime.panels.ExpandedCandidatesWindow
+import com.windinput.ime.panels.KeyboardChoices
 import com.windinput.ime.panels.KeyboardSelectWindow
 import com.windinput.ime.panels.QuickPanelWindow
 import com.windinput.ime.panels.TextEditingWindow
@@ -348,8 +349,8 @@ class WindInputImeService :
         const val KEY_ONE_HAND = "ui.android.one_hand"
         const val KEY_SECOND_CANDIDATE_SWIPE = "ui.android.second_candidate_swipe"
 
-        /** 拼音用九宫格键盘（全拼与纯字母双拼生效，由核心判；其余方案仍是 26 键） */
-        const val KEY_T9_PINYIN = "ui.android.t9_pinyin"
+        /** 用九宫格布局的方案 id 集合（statePrefs）：布局按方案记，键盘列表里选哪格就记哪种 */
+        const val KEY_T9_SCHEMAS = "t9_schemas"
 
         /** 九宫格拼音左列的标点（可上下滚动，点选原样上屏，有编码时先顶首选） */
         val T9_SIDE_SYMBOLS = listOf("，", "。", "？", "！", "、", "：", "；", "…", "～", "“", "”", "@")
@@ -857,7 +858,7 @@ class WindInputImeService :
             kv.spaceLabel = if (english) "英文" else active?.name.orEmpty()
             kv.splitChar = if (english) null else session.separatorKey()
         }
-        syncT9(english)
+        syncT9(english, active?.id)
         updateAutoCaps()
     }
 
@@ -867,17 +868,44 @@ class WindInputImeService :
     /** 字母层此刻画的是不是九宫格（[layoutProvider] 读它） */
     private var t9Layout = false
 
+    /** 记着用九宫格布局的方案 */
+    private fun t9SchemaSet(): Set<String> =
+        statePrefs.getStringSet(KEY_T9_SCHEMAS, null)?.toSet() ?: emptySet()
+
+    /** 记下方案 [id] 用不用九宫格 */
+    private fun setT9For(id: String, on: Boolean) {
+        val cur = t9SchemaSet()
+        val next = if (on) cur + id else cur - id
+        if (next != cur) statePrefs.edit().putStringSet(KEY_T9_SCHEMAS, next).apply()
+    }
+
+    /** 能用九宫格的方案（问核心：全拼、纯字母双拼） */
+    private fun t9Capable(schemas: List<SchemaEntry>): Set<String> =
+        schemas.filter { it.id != ENGLISH_SCHEMA_ID && session.keypadSupported(it.id) }.map { it.id }.toSet()
+
+    /** 键盘列表的展开项：方案 × 布局（能用九宫格的方案多一项九宫格） */
+    private fun keyboardEntries(schemas: List<SchemaEntry>): List<Pair<SchemaEntry, Boolean>> =
+        KeyboardChoices.expand(schemas, t9Capable(schemas))
+
+    /** 展开项里「当前」那项：方案按 [currentSchemaIndex]，布局按这个方案记着的布局 */
+    private fun currentEntryIndex(schemas: List<SchemaEntry>, entries: List<Pair<SchemaEntry, Boolean>>): Int {
+        val cur = schemas.getOrNull(currentSchemaIndex(schemas)) ?: return -1
+        val t9 = cur.id in t9SchemaSet()
+        return entries.indexOfFirst { (s, form) -> s.id == cur.id && form == t9 }
+            .takeIf { it >= 0 } ?: entries.indexOfFirst { it.first.id == cur.id }
+    }
+
     /**
-     * 九宫格拼音的形态同步：设置开着就让核心按九宫格解码（核心只在全拼方案下真正生效），
-     * 字母层跟着核心的判定在九宫格与 26 键之间换。英文（方案或系统英文模式）一律 26 键。
+     * 九宫格的形态同步：当前方案记着用九宫格，就让核心按九宫格解码（核心只在支持的方案下
+     * 真正生效），字母层跟着核心的判定在九宫格与 26 键之间换。英文（方案或系统英文模式）一律 26 键。
      */
-    private fun syncT9(english: Boolean) {
-        val want = userConfig.getBoolean(KEY_T9_PINYIN, false)
+    private fun syncT9(english: Boolean, activeId: String?) {
+        val want = !english && activeId != null && activeId in t9SchemaSet()
         if (want != t9Requested) {
             t9Requested = want
             session.setKeypad(want)
         }
-        val layout = want && !english && session.keypadActive()
+        val layout = want && session.keypadActive()
         val changed = layout != t9Layout
         t9Layout = layout
         // 左列每次都设（视图可能刚重建过，setter 自己去重），键位只在形态变了时重取
@@ -1506,11 +1534,12 @@ class WindInputImeService :
         if (bar.width <= 0) return false
         val schemas = session.schemas()
         if (schemas.isEmpty()) return false
-        val current = currentSchemaIndex(schemas)
-        val entries = schemas.mapIndexed { i, s ->
+        val choices = keyboardEntries(schemas)
+        val current = currentEntryIndex(schemas, choices)
+        val entries = choices.mapIndexed { i, (s, t9) ->
             com.windinput.ime.core.CandidateMenuEntry(
-                label = s.name.ifEmpty { s.id },
-                action = s.index.toString(),
+                label = KeyboardChoices.menuLabelOf(s, t9),
+                action = i.toString(),
                 enabled = i != current,
                 current = i == current,
             )
@@ -1523,7 +1552,8 @@ class WindInputImeService :
                     onSwitchInputMethod()
                     return@show
                 }
-                schemas.firstOrNull { it.index.toString() == entry.action }?.let { selectSchemaFromKey(schemas, it) }
+                entry.action.toIntOrNull()?.let(choices::getOrNull)
+                    ?.let { (s, t9) -> selectSchemaFromKey(schemas, s, t9) }
             }
         }
         return schemaPicker?.isShowing == true
@@ -1537,8 +1567,12 @@ class WindInputImeService :
         }
     }
 
-    /** 从中英键（卡片或长按菜单）或键盘选择面板选中一个方案 */
-    private fun selectSchemaFromKey(schemas: List<SchemaEntry>, target: SchemaEntry) {
+    /**
+     * 从中英键（卡片或长按菜单）或键盘选择面板选中一个方案。[t9] 非 null 时一并记下这个方案的
+     * 布局（九宫格 / 全键盘）；null = 沿用这个方案记着的布局（系统子类型切换）。
+     */
+    private fun selectSchemaFromKey(schemas: List<SchemaEntry>, target: SchemaEntry, t9: Boolean? = null) {
+        if (t9 != null && target.id != ENGLISH_SCHEMA_ID) setT9For(target.id, t9)
         if (target.id != ENGLISH_SCHEMA_ID) {
             statePrefs.edit().putString(KEY_LAST_CHINESE, target.id).apply()
         } else {
@@ -1548,6 +1582,8 @@ class WindInputImeService :
         // 与单击中英键一致：有编码先上屏字母原文再切，打了半截的码不吞掉
         if (composing && !directInput) session.keyPressed(KeyAction.Enter, false)
         session.runCommand(EngineCmd.SelectSchema(target.index))
+        // 同一方案换布局时引擎不推状态，这里直接同步；换了方案的，状态推送到了还会再同步一次
+        syncT9(target.id == ENGLISH_SCHEMA_ID, target.id)
     }
 
     /**
@@ -1558,9 +1594,10 @@ class WindInputImeService :
         if (action != KeyAction.SwitchLang) return null
         val schemas = session.schemas()
         if (schemas.isEmpty()) return null
+        val entries = keyboardEntries(schemas)
         return KeyboardView.KeyOptions(
-            labels = schemas.map { it.name.ifEmpty { it.id } } + SWITCH_IME_LABEL,
-            selected = currentSchemaIndex(schemas).coerceAtLeast(0),
+            labels = entries.map { (s, t9) -> KeyboardChoices.menuLabelOf(s, t9) } + SWITCH_IME_LABEL,
+            selected = currentEntryIndex(schemas, entries).coerceAtLeast(0),
         )
     }
 
@@ -1571,12 +1608,13 @@ class WindInputImeService :
     override fun onLongPressOption(action: KeyAction, index: Int?) {
         if (action != KeyAction.SwitchLang || index == null) return
         val schemas = session.schemas()
+        val entries = keyboardEntries(schemas)
         when {
-            index >= schemas.size -> {
+            index >= entries.size -> {
                 abandonComposition()
                 onSwitchInputMethod()
             }
-            else -> selectSchemaFromKey(schemas, schemas[index])
+            else -> entries[index].let { (s, t9) -> selectSchemaFromKey(schemas, s, t9) }
         }
     }
 
@@ -1784,10 +1822,14 @@ class WindInputImeService :
 
     // ── 键盘选择面板 ─────────────────────────────────────────────
 
-    override fun onKeyboardSelectSchema(index: Int) {
+    override fun onKeyboardSelectSchema(index: Int, t9: Boolean) {
         val schemas = session.schemas()
-        schemas.firstOrNull { it.index == index }?.let { selectSchemaFromKey(schemas, it) }
+        schemas.firstOrNull { it.index == index }?.let { selectSchemaFromKey(schemas, it, t9) }
     }
+
+    override fun t9CapableSchemas(schemas: List<SchemaEntry>): Set<String> = t9Capable(schemas)
+
+    override fun t9Schemas(): Set<String> = t9SchemaSet()
 
     override fun onKeyboardManage() = openSettings("schema", SUB_ENABLED_SCHEMAS)
 

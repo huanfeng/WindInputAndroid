@@ -548,6 +548,11 @@ impl WindCore {
         self.core.set_keypad(on).into()
     }
 
+    /// 指定方案能否用九宫格输入（全拼；双拼限纯字母布局）。键盘列表据此给不给九宫格那一格。
+    pub fn keypad_supported(&self, schema_id: String) -> bool {
+        self.core.keypad_supported(&schema_id)
+    }
+
     /// 九宫格解码此刻是否生效（开了且活跃方案是拼音类）。
     pub fn keypad_active(&self) -> bool {
         self.core.keypad_active()

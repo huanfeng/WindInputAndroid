@@ -294,6 +294,9 @@ interface ImeSession {
 
     /** 九宫格解码此刻是否生效（开了且活跃方案支持：全拼、纯字母双拼）；宿主据此决定字母层画九宫格还是 26 键 */
     fun keypadActive(): Boolean = false
+
+    /** 指定方案能否用九宫格（全拼、纯字母双拼）；键盘列表据此给不给九宫格那一项 */
+    fun keypadSupported(schemaId: String): Boolean = false
 }
 
 /**

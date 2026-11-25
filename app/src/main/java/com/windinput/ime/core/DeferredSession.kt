@@ -249,4 +249,7 @@ class DeferredSession(
     }
 
     override fun keypadActive(): Boolean = if (busy) false else delegate?.keypadActive() ?: false
+
+    override fun keypadSupported(schemaId: String): Boolean =
+        if (busy) false else delegate?.keypadSupported(schemaId) ?: false
 }

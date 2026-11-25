@@ -1388,12 +1388,13 @@ restart_pad
 
 section "[39] 长按中英键竖排菜单：上滑选全拼打 ni，再选回五笔；不滑就松手什么都不做"
 # 菜单从中英键上方往上排，左沿对齐键位，行高 44dp，下沿离键顶 8dp。项按核心给的方案列表
-# 再加末项「切换输入法」：清风英文 · 全拼 · 双拼 · 五笔 · 五笔拼音 · 切换输入法（共 6 项）
+# 再加末项「切换输入法」；能用九宫格的方案（全拼、双拼）各多一项「· 九宫格」紧跟其后：
+# 清风英文 · 全拼 · 全拼·九宫格 · 双拼 · 双拼·九宫格 · 五笔 · 五笔拼音 · 切换输入法（共 8 项）
 lang_menu_pick() {   # 第几项（从 0 起）：按住中英键等菜单弹出，上滑到该项再松手
     local lx ly ty
     read -r lx ly <<< "$(key_center LANG)"
     ty="$(awk -v y="$ly" -v r="$GEO_ROWPX" -v d="$GEO_DENSITY" -v i="$1" \
-        'BEGIN{ printf "%d", y - r / 2 - 8 * d - (6 - i - 0.5) * 44 * d }')"
+        'BEGIN{ printf "%d", y - r / 2 - 8 * d - (8 - i - 0.5) * 44 * d }')"
     adb_q shell input motionevent DOWN "$lx" "$ly"; sleep 0.8
     adb_q shell input motionevent MOVE "$lx" $(( (ly + ty) / 2 )); sleep 0.1
     adb_q shell input motionevent MOVE "$lx" "$ty"; sleep 0.2
@@ -1405,7 +1406,7 @@ sleep 6                # 模拟器上首次编译拼音词库近 5 秒，期间�
 tap_key n; tap_key i; tap_key SPACE
 check "切到全拼后 ni 出「你」" "你" "$(get_pad_text)"
 reset_pad
-lang_menu_pick 3       # 五笔
+lang_menu_pick 5       # 五笔
 sleep 2
 tap_key a; tap_key a; tap_key SPACE
 check "切回五笔 aa 出「式」" "式" "$(get_pad_text)"
@@ -1435,7 +1436,7 @@ tap_ime 西安
 sleep 0.6
 check "点 xi 读法后选「西安」上屏" "西安" "$(get_pad_text)"
 reset_pad
-lang_menu_pick 3       # 切回五笔，别影响后面的用例
+lang_menu_pick 5       # 切回五笔，别影响后面的用例
 sleep 2
 
 section "[40] 开着「编码也显示在输入框里」：上屏后输入框不留占位符"
@@ -1477,7 +1478,7 @@ tap_key n; tap_key i; tap_key SPACE
 check "首次卡片里选全拼后 ni 出「你」" "你" "$(get_pad_text)"
 # 切回五笔，并确认第二次弹键盘不再出卡片（出了的话 aa 会被卡片挡住）
 reset_pad
-lang_menu_pick 3       # 五笔
+lang_menu_pick 5       # 五笔
 sleep 2
 adb_q shell am force-stop "$PKG"
 restart_pad

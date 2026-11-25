@@ -35,8 +35,17 @@ class KeyboardSelectWindow(
 
         fun onBackToKeyboard()
 
-        /** 切到第 [index] 个方案（与中英键选方案同一路径：记下切走前的中文方案，中英键才切得回来） */
-        fun onKeyboardSelectSchema(index: Int)
+        /**
+         * 切到第 [index] 个方案并用 [t9] 指定的布局（与中英键选方案同一路径：记下切走前的中文方案，
+         * 中英键才切得回来）
+         */
+        fun onKeyboardSelectSchema(index: Int, t9: Boolean)
+
+        /** [schemas] 里能用九宫格的方案 id（全拼、纯字母双拼） */
+        fun t9CapableSchemas(schemas: List<SchemaEntry>): Set<String> = emptySet()
+
+        /** 记着用九宫格布局的方案 id */
+        fun t9Schemas(): Set<String> = emptySet()
 
         /** 打开设置里的「启用的方案」页 */
         fun onKeyboardManage()
@@ -89,7 +98,13 @@ class KeyboardSelectWindow(
         val g = grid ?: return
         g.removeAllViews()
         val density = context.resources.displayMetrics.density
-        val choices = KeyboardChoices.build(listener.quickSchemas(), status?.chineseMode ?: true)
+        val schemas = listener.quickSchemas()
+        val choices = KeyboardChoices.build(
+            schemas,
+            status?.chineseMode ?: true,
+            t9Capable = listener.t9CapableSchemas(schemas),
+            t9Schemas = listener.t9Schemas(),
+        )
         for (c in choices) {
             g.addView(
                 tile(context, c) { onChoice(c.action) },
@@ -106,7 +121,7 @@ class KeyboardSelectWindow(
     private fun onChoice(action: KeyboardChoices.Action) {
         when (action) {
             is KeyboardChoices.Action.Schema -> {
-                listener.onKeyboardSelectSchema(action.index)
+                listener.onKeyboardSelectSchema(action.index, action.t9)
                 listener.onBackToKeyboard()
             }
             KeyboardChoices.Action.English -> {

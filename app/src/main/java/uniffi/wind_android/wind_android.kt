@@ -765,6 +765,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_keypad_active(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_keypad_supported(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_leading_readings(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_phrase_add(
@@ -931,6 +933,8 @@ internal object UniffiLib {
     external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,`modifiers`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_keypad_active(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
+    external fun uniffi_wind_android_fn_method_windcore_keypad_supported(`ptr`: Long,`schemaId`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): Byte
     external fun uniffi_wind_android_fn_method_windcore_leading_readings(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1213,6 +1217,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_keypad_active() != 52999) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_keypad_supported() != 48360) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_leading_readings() != 47407) {
@@ -2399,6 +2406,11 @@ public interface WindCoreInterface {
     fun `keypadActive`(): kotlin.Boolean
     
     /**
+     * 指定方案能否用九宫格输入（全拼；双拼限纯字母布局）。键盘列表据此给不给九宫格那一格。
+     */
+    fun `keypadSupported`(`schemaId`: kotlin.String): kotlin.Boolean
+    
+    /**
      * 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分、模糊音兄弟、只取声母。
      * 没得选 / 非全拼 / 无编码时为空。不改编码，只影响候选。
      */
@@ -3136,6 +3148,23 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     UniffiLib.uniffi_wind_android_fn_method_windcore_keypad_active(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 指定方案能否用九宫格输入（全拼；双拼限纯字母布局）。键盘列表据此给不给九宫格那一格。
+     */override fun `keypadSupported`(`schemaId`: kotlin.String): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_keypad_supported(
+        it,
+        
+        FfiConverterString.lower(`schemaId`),_status)
 }
     }
     )

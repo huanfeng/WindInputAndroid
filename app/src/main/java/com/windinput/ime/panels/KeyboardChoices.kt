@@ -8,6 +8,9 @@ import com.windinput.ime.core.SchemaEntry
  * 照微信「键盘选择」：每个启用的方案一格（方框字徽章 + 「全键盘拼音」「五笔键盘」这类标签），
  * 英文方案（清风英文，带补全候选）也是普通方案格；再加「英文直输」（引擎的英文模式：字母直出、
  * 无候选）与最后的「键盘管理」。
+ *
+ * 九宫格是键盘布局，不是方案：能用九宫格的方案（全拼、纯字母双拼）出两格，全键盘一格、
+ * 九宫格一格（「九宫格拼音」「九宫格双拼」），选哪格就是「这个方案 + 这种布局」。
  */
 object KeyboardChoices {
 
@@ -15,8 +18,8 @@ object KeyboardChoices {
     const val ENGLISH_SCHEMA_ID = "english"
 
     sealed class Action {
-        /** 切到第 [index] 个方案（[SchemaEntry.index]） */
-        data class Schema(val index: Int) : Action()
+        /** 切到第 [index] 个方案（[SchemaEntry.index]），[t9] = 用九宫格布局 */
+        data class Schema(val index: Int, val t9: Boolean = false) : Action()
 
         /** 英文直输：走引擎的英文命令（系统英文模式，字母直出、无候选），不按方案下标切 */
         data object English : Action()
@@ -35,6 +38,27 @@ object KeyboardChoices {
     const val DIRECT_ENGLISH_BADGE = "A"
     const val DIRECT_ENGLISH_LABEL = "英文直输"
     const val MANAGE_LABEL = "键盘管理"
+
+    /** 九宫格格子的方框字 */
+    const val T9_BADGE = "九"
+
+    /** 方案的九宫格格子标签：拼音「九宫格拼音」、双拼「九宫格双拼」，其余「方案名九宫格」 */
+    fun t9LabelOf(id: String, name: String): String = when (typeOf(id)) {
+        Type.PINYIN -> "九宫格拼音"
+        Type.SHUANGPIN -> "九宫格双拼"
+        else -> displayName(id, name) + "九宫格"
+    }
+
+    /** 竖排菜单（长按中英键、方案卡片）里的一项：方案名，九宫格的加「· 九宫格」 */
+    fun menuLabelOf(s: SchemaEntry, t9: Boolean): String =
+        displayName(s.id, s.name) + if (t9) " · 九宫格" else ""
+
+    /**
+     * 方案按布局展开：能用九宫格的方案（[t9Capable]）紧跟着多出一项九宫格，其余一项。
+     * 顺序同 [schemas]。键盘选择面板、长按中英键菜单、方案卡片共用，几处才对得上。
+     */
+    fun expand(schemas: List<SchemaEntry>, t9Capable: Set<String>): List<Pair<SchemaEntry, Boolean>> =
+        schemas.flatMap { s -> if (s.id in t9Capable) listOf(s to false, s to true) else listOf(s to false) }
 
     /** 方案 → 格子标签：认得出类型的按类型起名，认不出的用方案名 */
     fun labelOf(id: String, name: String): String = when (typeOf(id)) {
@@ -61,12 +85,23 @@ object KeyboardChoices {
      * 选中态与引擎一致：英文模式（[chineseMode] 为 false，含密码框强制英文）高亮「英文直输」，
      * 否则高亮当前方案（英文方案也算方案：`SelectSchema` 会把 chineseMode 设回 true）。
      */
-    fun build(schemas: List<SchemaEntry>, chineseMode: Boolean): List<Choice> {
+    fun build(
+        schemas: List<SchemaEntry>,
+        chineseMode: Boolean,
+        t9Capable: Set<String> = emptySet(),
+        t9Schemas: Set<String> = emptySet(),
+    ): List<Choice> {
         val out = mutableListOf<Choice>()
         // 英文方案排在中文方案之后：方案按文件名排序，english 会夹在中间
         val ordered = schemas.filter { it.id != ENGLISH_SCHEMA_ID } + schemas.filter { it.id == ENGLISH_SCHEMA_ID }
-        for (s in ordered) {
-            out += Choice(badgeOf(s.id, s.name), labelOf(s.id, s.name), chineseMode && s.active, Action.Schema(s.index))
+        for ((s, t9) in expand(ordered, t9Capable)) {
+            // 选中：方案对，且布局与这个方案记着的布局一致
+            val selected = chineseMode && s.active && t9 == (s.id in t9Schemas && s.id in t9Capable)
+            out += if (t9) {
+                Choice(T9_BADGE, t9LabelOf(s.id, s.name), selected, Action.Schema(s.index, t9 = true))
+            } else {
+                Choice(badgeOf(s.id, s.name), labelOf(s.id, s.name), selected, Action.Schema(s.index))
+            }
         }
         out += Choice(DIRECT_ENGLISH_BADGE, DIRECT_ENGLISH_LABEL, !chineseMode, Action.English)
         out += Choice(null, MANAGE_LABEL, false, Action.Manage)

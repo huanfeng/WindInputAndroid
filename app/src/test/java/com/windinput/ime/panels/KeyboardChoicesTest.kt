@@ -107,4 +107,51 @@ class KeyboardChoicesTest {
     fun manageTileUsesIconNotBadge() {
         assertNull(KeyboardChoices.build(schemas, chineseMode = true).last().badge)
     }
+
+    // ── 九宫格：键盘布局，不是方案 ──
+
+    private val t9Capable = setOf("pinyin", "shuangpin")
+
+    /** 能用九宫格的方案紧跟着多出一格九宫格，其余方案只有一格 */
+    @Test
+    fun t9CapableSchemasGetSecondTile() {
+        val labels = KeyboardChoices.build(schemas, chineseMode = true, t9Capable = t9Capable).map { it.label }
+        assertEquals(
+            listOf("全键盘拼音", "九宫格拼音", "双拼键盘", "九宫格双拼", "五笔键盘", "清风英文",
+                KeyboardChoices.DIRECT_ENGLISH_LABEL, KeyboardChoices.MANAGE_LABEL),
+            labels,
+        )
+    }
+
+    /** 九宫格那格带布局标记，选中它 = 这个方案 + 九宫格 */
+    @Test
+    fun t9TileCarriesLayout() {
+        val choices = KeyboardChoices.build(schemas, chineseMode = true, t9Capable = t9Capable)
+        assertEquals(Action.Schema(0, t9 = true), choices[1].action)
+        assertEquals(KeyboardChoices.T9_BADGE, choices[1].badge)
+        assertEquals(Action.Schema(0), choices[0].action)
+    }
+
+    /** 当前方案记着用九宫格时高亮九宫格那格，否则高亮全键盘那格 */
+    @Test
+    fun selectionFollowsRememberedLayout() {
+        val pinyinActive = listOf(entry(0, "pinyin", "全拼", active = true), entry(1, "wubi86", "五笔"))
+        fun selected(t9: Set<String>) = KeyboardChoices
+            .build(pinyinActive, chineseMode = true, t9Capable = t9Capable, t9Schemas = t9)
+            .filter { it.selected }.map { it.label }
+        assertEquals(listOf("九宫格拼音"), selected(setOf("pinyin")))
+        assertEquals(listOf("全键盘拼音"), selected(emptySet()))
+    }
+
+    /** 菜单（长按中英键、方案卡片）里九宫格项加后缀 */
+    @Test
+    fun menuLabelMarksT9() {
+        val pinyin = entry(0, "pinyin", "全拼")
+        assertEquals("全拼", KeyboardChoices.menuLabelOf(pinyin, false))
+        assertEquals("全拼 · 九宫格", KeyboardChoices.menuLabelOf(pinyin, true))
+        assertEquals(
+            listOf(pinyin to false, pinyin to true),
+            KeyboardChoices.expand(listOf(pinyin), setOf("pinyin")),
+        )
+    }
 }
