@@ -52,6 +52,7 @@ import com.windinput.ime.keyboard.KeyboardView
 import com.windinput.ime.keyboard.KeyboardWindow
 import com.windinput.ime.keyboard.LayoutRepository
 import com.windinput.ime.keyboard.NumberSideSymbols
+import com.windinput.ime.keyboard.T9_SEPARATOR
 import com.windinput.ime.keyboard.Palette
 import com.windinput.ime.panels.ClipboardWindow
 import com.windinput.ime.panels.EmojiWindow
@@ -351,6 +352,11 @@ class WindInputImeService :
 
         /** 用九宫格布局的方案 id 集合（statePrefs）：布局按方案记，键盘列表里选哪格就记哪种 */
         const val KEY_T9_SCHEMAS = "t9_schemas"
+
+        /** 九宫格「分词」键空闲时候选栏列出的常用标点 */
+        val T9_BAR_SYMBOLS = listOf(
+            "，", "。", "？", "！", "、", "：", "；", "“", "”", "…", "～", "（", "）", "《", "》", "@", "#", "%", "&", "*",
+        )
 
         /** 九宫格拼音左列的标点（可上下滚动，点选原样上屏，有编码时先顶首选） */
         val T9_SIDE_SYMBOLS = listOf("，", "。", "？", "！", "、", "：", "；", "…", "～", "“", "”", "@")
@@ -936,6 +942,7 @@ class WindInputImeService :
             is UiEvent.Candidates -> {
                 // 引擎推来真候选：条区不再是符号页的历史
                 symbolHistoryInBar = false
+                t9SymbolsInBar = false
                 // 推送帧只用来画编码栏（编码/短称/页码）；候选列表另行**拉取**——
                 // 帧里的是当页 6~9 条，装不下一条可滚动的长列表。
                 val page = if (!event.hasCandidates) {
@@ -1143,6 +1150,13 @@ class WindInputImeService :
     }
 
     private fun performKeyAction(action: KeyAction, shifted: Boolean) {
+        // 九宫格「分词」键空闲时不进引擎：候选栏列出常用标点（主流九键的 1 键）。组码时才是分词
+        if (action == KeyAction.Keypad(T9_SEPARATOR) && !composing) {
+            showT9Symbols()
+            return
+        }
+        // 候选栏正摆着九宫格标点时按了别的键：先收起，键照常处理
+        if (t9SymbolsInBar) hideT9Symbols()
         // 中英切换 / 表情键是宿主侧动作，不走引擎按键路径
         if (action == KeyAction.SwitchLang) {
             toggleLanguage()
@@ -1316,6 +1330,14 @@ class WindInputImeService :
     }
 
     override fun onCandidateSelected(index: Int) {
+        if (t9SymbolsInBar) {
+            loadedCandidates.getOrNull(index)?.let {
+                hideT9Symbols()
+                recentSymbolStore.record(it)
+                commitDirect(it)
+            }
+            return
+        }
         if (symbolHistoryInBar) {
             loadedCandidates.getOrNull(index)?.let {
                 recentSymbolStore.record(it)
@@ -2168,6 +2190,25 @@ class WindInputImeService :
 
     /** 符号页开着时条区候选行放最近用过的符号（点了直接上屏）；为 false 时条区照常 */
     private var symbolHistoryInBar = false
+
+    /** 候选栏正摆着九宫格「分词」键（空闲时）列出的常用标点；点一个原样上屏 */
+    private var t9SymbolsInBar = false
+
+    private fun showT9Symbols() {
+        t9SymbolsInBar = true
+        loadedCandidates = T9_BAR_SYMBOLS
+        loadedComments = emptyList()
+        loadedSegments = emptyList()
+        candidateTotal = T9_BAR_SYMBOLS.size
+        barView?.setCandidateFrame(T9_BAR_SYMBOLS, preedit = "", modeLabel = "", page = 1, totalPages = 1)
+    }
+
+    private fun hideT9Symbols() {
+        t9SymbolsInBar = false
+        loadedCandidates = emptyList()
+        candidateTotal = 0
+        barView?.setCandidateFrame(emptyList(), preedit = "", modeLabel = "", page = 1, totalPages = 1)
+    }
 
     /**
      * 符号页打开：没在打字时，把最近用过的符号摆进条区的候选行，一眼就看得到、不用翻页

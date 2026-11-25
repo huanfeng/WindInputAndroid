@@ -156,6 +156,7 @@ object LayoutParser {
                         entry.getString("label") ?: commit,
                         KeyAction.Commit(commit),
                         width,
+                        isSpecial = entry.getBoolean("special") ?: false,
                         enText = entry.getString("en_text")?.firstOrNull(),
                         rowSpan = rowSpan,
                         id = entry.getString("id") ?: "",
@@ -172,6 +173,7 @@ object LayoutParser {
                         KeyAction.Keypad(keypad.first()),
                         width,
                         swipeUp = swipeUp,
+                        longPress = longPress,
                         id = entry.getString("id") ?: "",
                     ),
                 )

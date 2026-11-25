@@ -315,25 +315,34 @@ object KeyboardLayouts {
         ),
     ))
 
-    private fun keypad(key: Char, label: String, digit: Char) =
-        KeyDef(label, KeyAction.Keypad(key), widthWeight = 1.4f, swipeUp = digit)
+    /** 九宫格编码键：上滑出数字；长按气泡是「数字、小写字母、大写字母」，选中即原样上屏 */
+    private fun keypad(key: Char, label: String, digit: Char) = KeyDef(
+        label,
+        KeyAction.Keypad(key),
+        widthWeight = 1.4f,
+        swipeUp = digit,
+        longPress = digit + label.lowercase() + label.uppercase(),
+    )
 
     /**
-     * 九宫格拼音（中文拼音方案、设置里开了九宫格时代替字母层）。左列同数字键盘是占位空白，
-     * 视图在那里画可滚动的标点列；`2`-`9` 上滑出数字，「分词」上滑出 1。
+     * 九宫格拼音（中文拼音方案在键盘列表里选了九宫格时代替字母层），按主流九键排布：
+     * 左列同数字键盘是占位空白，视图在那里画可滚动的标点列；右列 ⌫、重输、0，右下角是换行；
+     * 底行 符号、123、空格、中英、换行。`2`-`9` 上滑出数字；「分词」组码时切音节，空闲时在
+     * 候选栏列出常用标点。
      */
     val t9: List<List<KeyDef>> = LayoutIds.assign(listOf(
-        listOf(sideSpacer, keypad('\'', "分词", '1'), keypad('2', "ABC", '2'), keypad('3', "DEF", '3'),
-            KeyDef("⌫", KeyAction.Backspace, isSpecial = true)),
+        listOf(sideSpacer, keypad('\'', "分词", '1').copy(longPress = "1"), keypad('2', "ABC", '2'),
+            keypad('3', "DEF", '3'), KeyDef("⌫", KeyAction.Backspace, isSpecial = true)),
         listOf(sideSpacer, keypad('4', "GHI", '4'), keypad('5', "JKL", '5'), keypad('6', "MNO", '6'),
             KeyDef("重输", KeyAction.ClearInput, isSpecial = true)),
         listOf(sideSpacer, keypad('7', "PQRS", '7'), keypad('8', "TUV", '8'), keypad('9', "WXYZ", '9'),
-            KeyDef("换行", KeyAction.Enter, isSpecial = true)),
+            KeyDef("0", KeyAction.Commit("0"), isSpecial = true)),
         listOf(
             KeyDef("符号", KeyAction.SymbolPage, isSpecial = true),
-            KeyDef("123", KeyAction.SwitchSymbols, widthWeight = 1.4f, isSpecial = true),
-            KeyDef("空格", KeyAction.Space, widthWeight = 2.8f),
+            KeyDef("123", KeyAction.SwitchSymbols, isSpecial = true),
+            KeyDef("空格", KeyAction.Space, widthWeight = 2.2f),
             KeyDef("中英", KeyAction.SwitchLang, isSpecial = true),
+            KeyDef("换行", KeyAction.Enter, isSpecial = true),
         ),
     ))
 

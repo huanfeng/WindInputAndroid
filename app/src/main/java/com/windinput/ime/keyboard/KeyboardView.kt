@@ -821,6 +821,8 @@ class KeyboardView(context: Context) : View(context) {
             if (splitMode) return "分词"
             if (shiftLocked) return "⇪"
         }
+        // 九宫格的分词键：组码时切音节，空闲时是常用标点（候选栏列出来选）
+        if (key.action == KeyAction.Keypad(T9_SEPARATOR) && !composing) return T9_SYMBOL_LABEL
         val action = key.action
         val ch = key.textFor(englishMode)
         // 标点键：键面随模式显示中英形态（布局里写的是 ASCII）
@@ -1120,6 +1122,11 @@ class KeyboardView(context: Context) : View(context) {
                 resetSingleShift(key)
             }
             wasSpaceSwipe -> Unit
+            // 九宫格编码键的长按气泡（数字、大小写字母）：选中的就是要的那个字，原样上屏，
+            // 不能再进编码（字母进缓冲会变成锁定字母）
+            popupChoice != null && key?.action is KeyAction.Keypad -> {
+                listener?.onKeyAction(KeyAction.Commit(popupChoice.toString()), shifted = false)
+            }
             // 大写字母按「Shift + 小写」发：与 ⇧ 单次态走同一条路（直接上屏大写）
             popupChoice != null && popupChoice.isUpperCase() -> {
                 listener?.onKeyAction(KeyAction.Text(popupChoice.lowercaseChar()), shifted = true)
@@ -1457,6 +1464,12 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 }
+
+/** 九宫格分词键上报的键字符（与核心的分词符一致） */
+const val T9_SEPARATOR = '\''
+
+/** 九宫格分词键空闲时的键面 */
+const val T9_SYMBOL_LABEL = "，。?!"
 
 /**
  * 上滑 / 长按气泡符号 → 动作。ASCII 走引擎；非 ASCII 字面字符引擎翻不出 VK，直接上屏。

@@ -134,7 +134,12 @@ class LayoutParserTest {
         val two = keys.first { (it.action as? KeyAction.Keypad)?.key == '2' }
         assertEquals("ABC", two.label)
         assertEquals('2', two.swipeUp)
+        // 长按气泡：数字、小写、大写
+        assertEquals("2abcABC", two.popupChars(english = false))
         assertTrue(keys.any { it.action == KeyAction.ClearInput })
+        // 右下角是换行，右列第三格是 0
+        assertEquals(KeyAction.Enter, KeyboardLayouts.t9.last().last().action)
+        assertEquals(KeyAction.Commit("0"), KeyboardLayouts.t9[2].last().action)
     }
 
     @Test
