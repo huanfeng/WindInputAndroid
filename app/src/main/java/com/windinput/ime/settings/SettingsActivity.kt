@@ -477,12 +477,8 @@ private fun SettingsApp(
                 r.detail == DETAIL_QUICK_SOURCES -> QuickSourcesSection(values)
                 moreSectionOf(r.detail) != null -> MoreScreen(manifest, page, moreSectionOf(r.detail)!!, values)
                 else -> SubScreen(manifest, page, r.sub, values, session, schemaState) { id, name ->
-                    if (id == DETAIL_QUICK_SOURCES || moreSectionOf(id) != null) {
-                        detailTitles[id] = name
-                        go(r.copy(detail = id))
-                    } else {
-                        openScheme(id, name)
-                    }
+                    detailTitles[id] = name
+                    go(r.copy(detail = id))
                 }
             }
         }
@@ -763,7 +759,8 @@ private fun SubScreen(
     values: SettingsValues,
     session: ImeSession?,
     schemaState: SchemaState?,
-    onOpenSchema: (id: String, name: String) -> Unit,
+    /** 打开本组下的第三层页面（[DETAIL_QUICK_SOURCES]、「更多设置」），name 作标题 */
+    onOpenDetail: (id: String, name: String) -> Unit,
 ) {
     when {
         page.id == "dict" && sub == DICT_WORDS -> DictWords(session)
@@ -786,7 +783,7 @@ private fun SubScreen(
             if (sub == "联想输入") AssocLearningSection()
             if (page.id == SettingsActivity.PAGE_KEYBOARD && sub == KEYMAP_SECTION) KeymapStatusNote()
             if (page.id == "input" && sub == SECTION_QUICK_INPUT) {
-                QuickSourcesEntry { onOpenSchema(DETAIL_QUICK_SOURCES, DETAIL_QUICK_SOURCES) }
+                QuickSourcesEntry { onOpenDetail(DETAIL_QUICK_SOURCES, DETAIL_QUICK_SOURCES) }
             }
             // Emoji 开着才列附加模块（同电脑版的 enabled_when）
             if (sub == EMOJI_SECTION &&
@@ -794,7 +791,7 @@ private fun SubScreen(
             ) {
                 EmojiModulesSection()
             }
-            if (more.isNotEmpty()) MoreSettingsEntry(more) { onOpenSchema(moreDetail(sub), MORE_TITLE) }
+            if (more.isNotEmpty()) MoreSettingsEntry(more) { onOpenDetail(moreDetail(sub), MORE_TITLE) }
         }
     }
 }

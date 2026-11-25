@@ -579,6 +579,8 @@ class WindInputImeService :
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        // 方案在设置页可能被删掉后以同 id 换类型重新导入：每次弹出键盘重取类型
+        schemeTypes.clear()
         // 诊断：只记包名与输入类型位，不含输入框里的文字 / 提示 / 标签
         UiTrace.add(
             UiTrace.INPUT,
@@ -901,7 +903,7 @@ class WindInputImeService :
         if (next != cur) statePrefs.edit().putStringSet(KEY_T9_SCHEMAS, next).apply()
     }
 
-    /** 方案类型缓存（九宫格默认开关按类型给）；方案增删后类型不变，id 换了自然重取 */
+    /** 方案类型缓存（九宫格默认开关按类型给）；每次弹出键盘清空（[onStartInputView]） */
     private val schemeTypes = HashMap<String, String?>()
 
     private fun schemeType(id: String): String? = schemeTypes.getOrPut(id) { session.schemeEngineType(id) }

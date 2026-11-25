@@ -24,15 +24,16 @@ import top.yukonga.miuix.kmp.basic.Card
 import uniffi.wind_android.EngineCommand
 import java.io.File
 
-/** 两档恢复（哪些键属于哪档见 [SettingsReset]） */
+/** 三档恢复（键盘 / 输入两档的键见 [SettingsReset]；方案一档见 [SchemesReset]） */
 private enum class ResetTier(val title: String, val summary: String) {
     KEYBOARD("恢复键盘设置", "键盘高度、振动与按键音、手势、工具栏等键盘侧设置回到出厂值"),
-    ENGINE("恢复输入设置", "方案页、输入页、外观等输入设置回到出厂值；当前方案与启用的方案保留"),
+    ENGINE("恢复输入设置", "输入页、外观、模糊音等全局输入设置回到出厂值；各方案自己的设置不动"),
+    SCHEMES("恢复所有方案设置", "每个方案的设置回到方案默认；启用的方案、扩展词库保留"),
 }
 
 /**
  * 「高级」页底部的恢复默认设置。用户把配置改乱了，此前只能清数据，词库也跟着丢。
- * 两档分开恢复，都不动词库、方案覆盖、扩展词库与导入的方案。确认方式同「清空个人词」：点两下。
+ * 三档分开恢复，都不动词库、扩展词库开关与导入的方案。确认方式同「清空个人词」：点两下。
  */
 @Composable
 internal fun ResetSection(values: SettingsValues) {
@@ -88,6 +89,14 @@ private fun runReset(context: android.content.Context, tier: ResetTier, values: 
             values.load()
             values.touch()
             if (n == 0) "输入设置已是出厂值" else "已恢复 $n 项输入设置"
+        }
+        ResetTier.SCHEMES -> {
+            val core = CoreAccess.obtainCore(context) ?: return "输入法核心还没启动，稍后再试"
+            val ids = core.installedSchemas().map { it.id }
+            // 每次写入核心都会重载配置，不用另发 ReloadConfig
+            val n = SchemesReset.resetAll(ids, CoreSchemeFormIo(core)) { core.resetSchemaSettings(it) }
+            values.touch()
+            if (n == 0) "各方案设置已是方案默认" else "已恢复 $n 个方案的设置"
         }
     }
 } catch (e: Exception) {

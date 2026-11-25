@@ -232,10 +232,11 @@ internal fun SchemeSettingsScreen(
 
     val type = d.props.engineType
     val groups = schemeGroups(type, manifest, d.props.items, d.t9Capable, d.hasDicts, d.memberNames.isNotEmpty())
-    if (group == null) {
+    // 组不在（直达链接指向的组，此方案没有，如关了九宫格能力的方案）：显示方案首页，不留空白页
+    val g = group?.let { name -> groups.firstOrNull { it.name == name } }
+    if (g == null) {
         SchemeFirstScreen(d, type, groups, manifest, onOpenGroup, ::writeProp) { reload++ }
     } else {
-        val g = groups.firstOrNull { it.name == group } ?: return
         SchemeGroupScreen(d, schemeId, g, onOpenScheme, ::writeProp)
     }
 }
@@ -251,6 +252,7 @@ private fun SchemeFirstScreen(
     onReloaded: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     @Suppress("UNUSED_EXPRESSION") d.form.version
     Card(modifier = Modifier.fillMaxWidth()) {
         BasicComponent(title = d.props.name.ifEmpty { d.props.id }, summary = infoSummary(d.props, d.installed))
@@ -288,7 +290,8 @@ private fun SchemeFirstScreen(
                         TextButton(text = "恢复", onClick = {
                             confirm = false
                             scope.launch {
-                                withContext(Dispatchers.IO) { d.form.resetAll(formItems) }
+                                val err = withContext(Dispatchers.IO) { d.form.resetAll(formItems) }
+                                if (err != null) Toast.makeText(context, "恢复失败：$err", Toast.LENGTH_SHORT).show()
                                 if (d.props.items.any { it.overridden }) writeProp(SchemaWrite.ResetAll) else onReloaded()
                             }
                         })

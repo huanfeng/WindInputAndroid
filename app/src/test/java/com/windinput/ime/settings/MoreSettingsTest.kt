@@ -34,4 +34,13 @@ class MoreSettingsTest {
         val stray = bundled.items.filter { it.advanced && pages[it.page]?.subpages != true }
         assertEquals(emptyList<String>(), stray.map { "${it.page}/${it.key}" })
     }
+
+    /** 组名不能撞路由前缀：sub = "scheme:…" 会被当成方案设置页，detail = "more:…" 会被当成更多设置页 */
+    @Test
+    fun sectionNamesAvoidRoutePrefixes() {
+        val bad = bundled.items.map { it.section }.distinct()
+            .filter { it.startsWith("scheme:") || it.startsWith("more:") }
+        assertEquals(emptyList<String>(), bad)
+        assertNull(schemeIdOf("临时英文"))
+    }
 }

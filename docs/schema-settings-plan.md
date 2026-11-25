@@ -108,5 +108,6 @@ effective_codetable / followed_codetable / aux_code_source_options / shuangpin_l
   读法栏开关（仅全拼）与九宫格标点仍是所有方案共用。
 - **不折叠**：全应用去掉「进阶」折叠；全局设置的进阶项放进分组页底部「更多设置」的下一层（`detail = "more:<组名>"`）。
 - **笔画**：`role = "aux"` 的方案装了默认不启用（核心 `config_api::set_default_off_schemas`）。
-- 已知缺口：「恢复默认设置」只清 `config.toml`，不清 `schema_overrides/`。
+- 恢复默认：「高级」页第三档「恢复所有方案设置」——每个方案的表单项回方案默认、自定义行为清空，
+  扩展词库开关与启用的方案保留（`SchemesReset`）；「恢复输入设置」只管全局设置。
 
