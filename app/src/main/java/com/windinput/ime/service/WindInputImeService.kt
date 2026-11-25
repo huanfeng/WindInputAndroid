@@ -286,7 +286,9 @@ class WindInputImeService :
 
         keyboardWindow = KeyboardWindow(
             listener = this,
-            layoutProvider = { layer ->
+            layoutProvider = provider@{ layer ->
+                // 九宫格拼音代替字母层：不套底行改写与键位覆盖（那两样按 26 键的键位认）
+                if (layer == KeyboardLayer.LETTERS && t9Layout) return@provider layoutRepository.t9Rows()
                 // 用户键位覆盖放在 LayoutTweaks 之后：底行改写会产生新键（合一键 merged_punct），覆盖按 id 认
                 val merged = keymapRepository.apply(
                     LayoutTweaks.apply(
@@ -345,6 +347,12 @@ class WindInputImeService :
         /** 单手模式：off / left / right；last 记着上次用的那一侧，快捷面板重新打开时回到它 */
         const val KEY_ONE_HAND = "ui.android.one_hand"
         const val KEY_SECOND_CANDIDATE_SWIPE = "ui.android.second_candidate_swipe"
+
+        /** 拼音用九宫格键盘（全拼与纯字母双拼生效，由核心判；其余方案仍是 26 键） */
+        const val KEY_T9_PINYIN = "ui.android.t9_pinyin"
+
+        /** 九宫格拼音左列的标点（可上下滚动，点选原样上屏，有编码时先顶首选） */
+        val T9_SIDE_SYMBOLS = listOf("，", "。", "？", "！", "、", "：", "；", "…", "～", "“", "”", "@")
         const val KEY_ONE_HAND_LAST = "ui.android.one_hand_last"
 
         const val TAG = "WindIme"
@@ -849,7 +857,34 @@ class WindInputImeService :
             kv.spaceLabel = if (english) "英文" else active?.name.orEmpty()
             kv.splitChar = if (english) null else session.separatorKey()
         }
+        syncT9(english)
         updateAutoCaps()
+    }
+
+    /** 上次下发给核心的九宫格开关；只在变了时下发（下发会清掉正在组的编码） */
+    private var t9Requested = false
+
+    /** 字母层此刻画的是不是九宫格（[layoutProvider] 读它） */
+    private var t9Layout = false
+
+    /**
+     * 九宫格拼音的形态同步：设置开着就让核心按九宫格解码（核心只在全拼方案下真正生效），
+     * 字母层跟着核心的判定在九宫格与 26 键之间换。英文（方案或系统英文模式）一律 26 键。
+     */
+    private fun syncT9(english: Boolean) {
+        val want = userConfig.getBoolean(KEY_T9_PINYIN, false)
+        if (want != t9Requested) {
+            t9Requested = want
+            session.setKeypad(want)
+        }
+        val layout = want && !english && session.keypadActive()
+        val changed = layout != t9Layout
+        t9Layout = layout
+        // 左列每次都设（视图可能刚重建过，setter 自己去重），键位只在形态变了时重取
+        keyboardWindow?.keyboardView?.let { kv ->
+            kv.letterSideSymbols = if (layout) T9_SIDE_SYMBOLS else emptyList()
+            if (changed) kv.refreshLayout()
+        }
     }
 
     // ── 会话事件 → 编辑器/候选条 ───────────────────────────────────

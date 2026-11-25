@@ -213,6 +213,23 @@ class KeyboardView(context: Context) : View(context) {
             resetSideScroll()
         }
 
+    /**
+     * 九宫格拼音（字母层换成九宫格时）左列的标点。与 [sideSymbols] 分开：数字键盘那一列是
+     * 数字框的符号（可配），这一列是中文常用标点，两层来回切时各显示各的。
+     */
+    var letterSideSymbols: List<String> = emptyList()
+        set(value) {
+            if (field == value) return
+            field = value
+            resetSideScroll()
+        }
+
+    /** 此刻左列画哪一份：字母层（九宫格拼音）用 [letterSideSymbols]，其余用 [sideSymbols] */
+    private val sideItems get() = if (layer == KeyboardLayer.LETTERS) letterSideSymbols else sideSymbols
+
+    /** 「自定义」格只属于数字键盘那一列 */
+    private val sideCustomizeOn get() = sideCustomize && layer != KeyboardLayer.LETTERS
+
     /** 左列最底下是否带一格「自定义」（齿轮，点开设置页；数字框带，电话框不带） */
     var sideCustomize = false
         set(value) {
@@ -315,7 +332,7 @@ class KeyboardView(context: Context) : View(context) {
     private var sidePressed = -1
 
     /** 左列的格数：符号 + 末尾的「自定义」格 */
-    private val sideCount get() = sideSymbols.size + if (sideCustomize) 1 else 0
+    private val sideCount get() = sideItems.size + if (sideCustomizeOn) 1 else 0
 
     /** 左列的惯性滑行：抬手按速度 fling，[computeScroll] 逐帧推进；不越界、不回弹 */
     private val sideScroller = OverScroller(context)
@@ -600,7 +617,7 @@ class KeyboardView(context: Context) : View(context) {
                     keyRadiusPx, keyRadiusPx, keyPaint,
                 )
             }
-            val sym = sideSymbols.getOrNull(i)
+            val sym = sideItems.getOrNull(i)
             if (sym != null) {
                 drawCentered(canvas, sym, cell, textPaint)
             } else {
@@ -680,10 +697,10 @@ class KeyboardView(context: Context) : View(context) {
 
     /** 左列第 [index] 格被点（手指或读屏）：符号原样上屏，「自定义」格开设置页 */
     private fun clickSide(index: Int) {
-        val sym = sideSymbols.getOrNull(index)
+        val sym = sideItems.getOrNull(index)
         if (sym != null) {
             listener?.onKeyAction(KeyAction.Commit(sym), shifted = false)
-        } else if (sideCustomize && index == sideSymbols.size) {
+        } else if (sideCustomizeOn && index == sideItems.size) {
             listener?.onSideCustomize()
         }
     }
@@ -1094,6 +1111,10 @@ class KeyboardView(context: Context) : View(context) {
                 performOutput(swipeOutput)
                 resetSingleShift(key)
             }
+            // 九宫格编码键上滑出的是真数字：原样上屏（有编码先顶首选），不能再当编码键
+            swipeChar != null && key?.action is KeyAction.Keypad -> {
+                listener?.onKeyAction(KeyAction.Commit(swipeChar.toString()), shifted = false)
+            }
             swipeChar != null -> {
                 listener?.onKeyAction(symbolAction(swipeChar), shifted = false)
                 resetSingleShift(key)
@@ -1239,6 +1260,7 @@ class KeyboardView(context: Context) : View(context) {
         if (newLayer == KeyboardLayer.NUMBER) numberReturnLayer = returnTo
         if (layer == newLayer) return
         layer = newLayer
+        resetSideScroll()
         shifted = false
         shiftLocked = false
         autoShifted = false
@@ -1328,8 +1350,8 @@ class KeyboardView(context: Context) : View(context) {
     private fun populateSideNode(i: Int, node: androidx.core.view.accessibility.AccessibilityNodeInfoCompat) {
         val side = sideRect
         val label = when {
-            i in sideSymbols.indices -> "左列·${sideSymbols[i]}"
-            sideCustomize && i == sideSymbols.size -> "自定义"
+            i in sideItems.indices -> "左列·${sideItems[i]}"
+            sideCustomizeOn && i == sideItems.size -> "自定义"
             else -> null
         }
         if (side == null || label == null) {
@@ -1365,6 +1387,8 @@ class KeyboardView(context: Context) : View(context) {
         KeyAction.Emoji -> "表情"
         KeyAction.SymbolPage -> "符号"
         KeyAction.NumberPad -> "数字键盘"
+        KeyAction.ClearInput -> "重输"
+        is KeyAction.Keypad -> if (key.action.key == '\'') "分词" else "${key.action.key} ${key.label}"
         else -> displayLabel(key)
     }
 

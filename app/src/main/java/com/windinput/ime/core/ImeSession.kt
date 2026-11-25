@@ -285,6 +285,15 @@ interface ImeSession {
 
     /** 触摸键盘的 `;` 是否进快捷输入（设置项 ui.android.touch_quick_input，默认关）；物理键盘不受影响 */
     fun setTouchQuickTrigger(on: Boolean) = Unit
+
+    /**
+     * 九宫格拼音形态开关（字母层换成 / 换离九宫格时调）。正在组的编码由核心先清掉，
+     * 清空产生的编辑指令经 listener 推回。
+     */
+    fun setKeypad(on: Boolean) = Unit
+
+    /** 九宫格解码此刻是否生效（开了且活跃方案支持：全拼、纯字母双拼）；宿主据此决定字母层画九宫格还是 26 键 */
+    fun keypadActive(): Boolean = false
 }
 
 /**

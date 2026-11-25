@@ -763,6 +763,8 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_key_down(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_keypad_active(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_leading_readings(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_phrase_add(
@@ -808,6 +810,8 @@ internal object IntegrityCheckingUniffiLib {
     external fun uniffi_wind_android_checksum_method_windcore_set_auto_space(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_emoji_module(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_set_keypad(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_set_leading_reading(
     ): Int
@@ -926,6 +930,8 @@ internal object UniffiLib {
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_key_down(`ptr`: Long,`vk`: Int,`modifiers`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_keypad_active(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): Byte
     external fun uniffi_wind_android_fn_method_windcore_leading_readings(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_phrase_add(`ptr`: Long,`code`: RustBuffer.ByValue,`text`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
@@ -972,6 +978,8 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_set_emoji_module(`ptr`: Long,`id`: RustBuffer.ByValue,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
     ): Unit
+    external fun uniffi_wind_android_fn_method_windcore_set_keypad(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_set_leading_reading(`ptr`: Long,`head`: RustBuffer.ByValue,`origLen`: Int,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_set_learning_suspended(`ptr`: Long,`on`: Byte,uniffi_out_err: UniffiRustCallStatus, 
@@ -1204,6 +1212,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_key_down() != 7962) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_keypad_active() != 52999) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_leading_readings() != 47407) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
@@ -1271,6 +1282,9 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_emoji_module() != 22141) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_set_keypad() != 36752) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_set_leading_reading() != 10411) {
@@ -2380,6 +2394,11 @@ public interface WindCoreInterface {
     fun `keyDown`(`vk`: kotlin.UInt, `modifiers`: kotlin.UInt): KeyResult
     
     /**
+     * 九宫格解码此刻是否生效（开了且活跃方案是拼音类）。
+     */
+    fun `keypadActive`(): kotlin.Boolean
+    
+    /**
      * 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分、模糊音兄弟、只取声母。
      * 没得选 / 非全拼 / 无编码时为空。不改编码，只影响候选。
      */
@@ -2514,6 +2533,12 @@ public interface WindCoreInterface {
      * 打开 / 关闭一个 emoji 附加模块。只写盘，生效要另发 [`EngineCommand::ReloadConfig`]。
      */
     fun `setEmojiModule`(`id`: kotlin.String, `on`: kotlin.Boolean)
+    
+    /**
+     * 切换九宫格形态（换到 / 换离九宫格布局时调用）。正在组的编码先清掉，
+     * 返回清空产生的编辑指令（无编码时为空）。
+     */
+    fun `setKeypad`(`on`: kotlin.Boolean): KeyResult
     
     /**
      * 选定首单元的一种读法，候选按它重算。读法已过期（编码变了）时返回空。
@@ -3103,6 +3128,22 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 九宫格解码此刻是否生效（开了且活跃方案是拼音类）。
+     */override fun `keypadActive`(): kotlin.Boolean {
+            return FfiConverterBoolean.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_keypad_active(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 首单元的几种读法（展开页左栏画它）：同一串字母的不同切分、模糊音兄弟、只取声母。
      * 没得选 / 非全拼 / 无编码时为空。不改编码，只影响候选。
      */override fun `leadingReadings`(): List<LeadingReadingInfo> {
@@ -3516,6 +3557,24 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 }
     }
     
+    
+
+    
+    /**
+     * 切换九宫格形态（换到 / 换离九宫格布局时调用）。正在组的编码先清掉，
+     * 返回清空产生的编辑指令（无编码时为空）。
+     */override fun `setKeypad`(`on`: kotlin.Boolean): KeyResult {
+            return FfiConverterTypeKeyResult.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_set_keypad(
+        it,
+        
+        FfiConverterBoolean.lower(`on`),_status)
+}
+    }
+    )
+    }
     
 
     
@@ -6132,6 +6191,18 @@ sealed class PressKey {
     object Enter : PressKey()
     
     
+    /**
+     * 九宫格编码键（`2`-`9`、分词键 `'`）。`key` 取首个字符，规则同 `Char`。
+     */
+    data class Keypad(
+        val `key`: kotlin.String) : PressKey()
+        
+    {
+        
+
+        companion object
+    }
+    
 
     
 
@@ -6155,6 +6226,9 @@ public object FfiConverterTypePressKey : FfiConverterRustBuffer<PressKey>{
             2 -> PressKey.Space
             3 -> PressKey.Backspace
             4 -> PressKey.Enter
+            5 -> PressKey.Keypad(
+                FfiConverterString.read(buf),
+                )
             else -> throw RuntimeException("invalid enum value, something is very wrong!!")
         }
     }
@@ -6186,6 +6260,13 @@ public object FfiConverterTypePressKey : FfiConverterRustBuffer<PressKey>{
                 4UL
             )
         }
+        is PressKey.Keypad -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4UL
+                + FfiConverterString.allocationSize(value.`key`)
+            )
+        }
     }
 
     override fun write(value: PressKey, buf: ByteBuffer) {
@@ -6206,6 +6287,11 @@ public object FfiConverterTypePressKey : FfiConverterRustBuffer<PressKey>{
             }
             is PressKey.Enter -> {
                 buf.putInt(4)
+                Unit
+            }
+            is PressKey.Keypad -> {
+                buf.putInt(5)
+                FfiConverterString.write(value.`key`, buf)
                 Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }

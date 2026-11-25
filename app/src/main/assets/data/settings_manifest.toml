@@ -1735,6 +1735,16 @@ default = false
 
 [[item]]
 page = "keyboard"
+section = "键位"
+key = "ui.android.t9_pinyin"
+source = "android"
+type = "toggle"
+title = "拼音用九宫格键盘"
+summary = "全拼、双拼方案的字母页换成九宫格（2–9 键打拼音，左列是标点，「分词」键切开音节，键上滑出数字）。双拼只支持纯字母方案（如小鹤），微软、搜狗、紫光双拼和五笔、英文仍是 26 键；默认关闭"
+default = false
+
+[[item]]
+page = "keyboard"
 section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"

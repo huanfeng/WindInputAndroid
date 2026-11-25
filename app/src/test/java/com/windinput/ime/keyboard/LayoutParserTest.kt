@@ -122,6 +122,22 @@ class LayoutParserTest {
     fun bundledNumberMatchesBuiltin() = assertBundledMatchesBuiltin("number.toml", KeyboardLayouts.number)
 
     @Test
+    fun bundledT9MatchesBuiltin() = assertBundledMatchesBuiltin("t9.toml", KeyboardLayouts.t9)
+
+    /** 九宫格编码键：`keypad` 是上报的键字符，分词键是 `'`，上滑是真数字 */
+    @Test
+    fun t9KeypadKeysCarryKeyAndDigit() {
+        val keys = KeyboardLayouts.t9.flatten()
+        val sep = keys.first { (it.action as? KeyAction.Keypad)?.key == '\'' }
+        assertEquals('1', sep.swipeUp)
+        assertEquals("kp_separator", sep.id)
+        val two = keys.first { (it.action as? KeyAction.Keypad)?.key == '2' }
+        assertEquals("ABC", two.label)
+        assertEquals('2', two.swipeUp)
+        assertTrue(keys.any { it.action == KeyAction.ClearInput })
+    }
+
+    @Test
     fun commitKeyBypassesEngineAndCanSwitchInEnglish() {
         val key = LayoutParser.parse("[[rows]]\nkey = [ { commit = \".\", en_text = \";\" } ]")[0][0]
         assertEquals(KeyAction.Commit("."), key.action)

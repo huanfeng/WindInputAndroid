@@ -44,6 +44,15 @@ sealed interface KeyAction {
     data object NumberPad : KeyAction
 
     /**
+     * 九宫格拼音的编码键：[key] 是上报给核心的键字符（`2`-`9`，分词键是 `'`），
+     * 进编码缓冲，不是数字。上滑出的真数字走 [Commit]（见 KeyboardView 上滑分支）。
+     */
+    data class Keypad(val key: Char) : KeyAction
+
+    /** 重输：清掉正在组的编码（九宫格右列） */
+    data object ClearInput : KeyAction
+
+    /**
      * 占位空白：不绘制、不响应。用于第 2 行两侧各缩进半个键（大众布局）。
      * 落在空白里的触点归最近的键（见 KeyboardView.findBounds），边缘不会点空。
      */
@@ -303,6 +312,28 @@ object KeyboardLayouts {
             digit('0'),
             KeyDef(".", KeyAction.Commit("."), widthWeight = 1.4f),
             sideSpacer,
+        ),
+    ))
+
+    private fun keypad(key: Char, label: String, digit: Char) =
+        KeyDef(label, KeyAction.Keypad(key), widthWeight = 1.4f, swipeUp = digit)
+
+    /**
+     * 九宫格拼音（中文拼音方案、设置里开了九宫格时代替字母层）。左列同数字键盘是占位空白，
+     * 视图在那里画可滚动的标点列；`2`-`9` 上滑出数字，「分词」上滑出 1。
+     */
+    val t9: List<List<KeyDef>> = LayoutIds.assign(listOf(
+        listOf(sideSpacer, keypad('\'', "分词", '1'), keypad('2', "ABC", '2'), keypad('3', "DEF", '3'),
+            KeyDef("⌫", KeyAction.Backspace, isSpecial = true)),
+        listOf(sideSpacer, keypad('4', "GHI", '4'), keypad('5', "JKL", '5'), keypad('6', "MNO", '6'),
+            KeyDef("重输", KeyAction.ClearInput, isSpecial = true)),
+        listOf(sideSpacer, keypad('7', "PQRS", '7'), keypad('8', "TUV", '8'), keypad('9', "WXYZ", '9'),
+            KeyDef("换行", KeyAction.Enter, isSpecial = true)),
+        listOf(
+            KeyDef("符号", KeyAction.SymbolPage, isSpecial = true),
+            KeyDef("123", KeyAction.SwitchSymbols, widthWeight = 1.4f, isSpecial = true),
+            KeyDef("空格", KeyAction.Space, widthWeight = 2.8f),
+            KeyDef("中英", KeyAction.SwitchLang, isSpecial = true),
         ),
     ))
 

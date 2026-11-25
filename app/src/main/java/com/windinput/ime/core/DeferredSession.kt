@@ -132,6 +132,7 @@ class DeferredSession(
                 session.setLearningSuspended(learningSuspended)
                 session.setAutoSpace(autoSpace)
                 session.setTouchQuickTrigger(touchQuickTrigger)
+                session.setKeypad(keypad)
                 session.candidateComments = candidateComments
                 delegate = session
                 Log.i(TAG, "核心就绪，耗时 ${cost}ms")
@@ -238,4 +239,14 @@ class DeferredSession(
         touchQuickTrigger = on
         call("setTouchQuickTrigger") { it.setTouchQuickTrigger(on) }
     }
+
+    @Volatile
+    private var keypad = false
+
+    override fun setKeypad(on: Boolean) {
+        keypad = on
+        call("setKeypad") { it.setKeypad(on) }
+    }
+
+    override fun keypadActive(): Boolean = if (busy) false else delegate?.keypadActive() ?: false
 }

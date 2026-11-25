@@ -278,6 +278,8 @@ pub enum PressKey {
     Space,
     Backspace,
     Enter,
+    /// 九宫格编码键（`2`-`9`、分词键 `'`）。`key` 取首个字符，规则同 `Char`。
+    Keypad { key: String },
 }
 
 /// 候选全量的一个窗口（滚动候选栏 / 展开面板的数据源）。
@@ -529,8 +531,26 @@ impl WindCore {
             PressKey::Space => CorePressKey::Space,
             PressKey::Backspace => CorePressKey::Backspace,
             PressKey::Enter => CorePressKey::Enter,
+            PressKey::Keypad { key } => {
+                let mut it = key.chars();
+                match (it.next(), it.next()) {
+                    (Some(key), None) => CorePressKey::Keypad { key },
+                    _ => return KeyResult::default(),
+                }
+            }
         };
         self.core.press(key, source.into()).into()
+    }
+
+    /// 切换九宫格形态（换到 / 换离九宫格布局时调用）。正在组的编码先清掉，
+    /// 返回清空产生的编辑指令（无编码时为空）。
+    pub fn set_keypad(&self, on: bool) -> KeyResult {
+        self.core.set_keypad(on).into()
+    }
+
+    /// 九宫格解码此刻是否生效（开了且活跃方案是拼音类）。
+    pub fn keypad_active(&self) -> bool {
+        self.core.keypad_active()
     }
 
     /// 「原样上屏」键（九宫数字页的数字、句点、左列符号等）：快捷输入等文本缓冲模式下

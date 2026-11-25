@@ -68,6 +68,8 @@ object LayoutIds {
         KeyAction.SymbolPage -> "symbol_page"
         KeyAction.NumberPad -> "number_pad"
         KeyAction.Spacer -> "spacer"
+        is KeyAction.Keypad -> if (a.key == '\'') "kp_separator" else "kp_" + a.key
+        KeyAction.ClearInput -> "clear_input"
     }
 
     private fun charName(c: Char): String = when {

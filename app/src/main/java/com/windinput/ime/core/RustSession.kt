@@ -205,6 +205,14 @@ class RustSession(
         guard.run("setTouchQuickTrigger", Unit) { core.setTouchQuickTrigger(on) }
     }
 
+    override fun setKeypad(on: Boolean) {
+        val t0 = SystemClock.elapsedRealtimeNanos()
+        val result = guard.run("setKeypad", null) { core.setKeypad(on) } ?: return
+        deliver(result, "setKeypad", t0)
+    }
+
+    override fun keypadActive(): Boolean = guard.run("keypadActive", false) { core.keypadActive() }
+
     /**
      * 软键/物理键 → 核心 `press`：翻译 VK、英文自动空格、标点换位都在核心里，这里只执行返回的编辑指令。
      * 前置条件见 [ImeSession.keyPressed]：直出（密码框）时不得调用。
@@ -218,6 +226,11 @@ class RustSession(
         }
         val key = when (action) {
             is KeyAction.Text -> uniffi.wind_android.PressKey.Char(action.char.toString(), shifted)
+            is KeyAction.Keypad -> uniffi.wind_android.PressKey.Keypad(action.key.toString())
+            KeyAction.ClearInput -> {
+                reset()
+                return true
+            }
             KeyAction.Space -> uniffi.wind_android.PressKey.Space
             KeyAction.Backspace -> uniffi.wind_android.PressKey.Backspace
             KeyAction.Enter -> uniffi.wind_android.PressKey.Enter

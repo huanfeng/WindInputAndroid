@@ -33,30 +33,39 @@ class LayoutRepository(private val resolve: (String) -> File?) {
      */
     private class Parsed(val path: String?, val modified: Long, val length: Long, val rows: List<List<KeyDef>>)
 
-    private val cache = HashMap<KeyboardLayer, Parsed>()
+    private val cache = HashMap<String, Parsed>()
+
+    /** 九宫格拼音布局的文件 id（不是独立的层：开了九宫格时代替字母层，见 [t9Rows]） */
+    private val t9Id = "t9"
 
     /**
      * 某一层的键位。解析结果按层缓存：此前每次调用都读盘 + 整份 TOML 解析（tomlj 走 ANTLR，
      * 首次还要加载一大批类），首次弹键盘就在主线程上花去一百多毫秒，之后每切一次层（123、
      * 数字键盘、回字母）再解析一遍。
      */
+    fun rows(layer: KeyboardLayer): List<List<KeyDef>> =
+        rowsOf(layerToId.getValue(layer)) { KeyboardLayouts.rows(layer) }
+
+    /** 九宫格拼音的键位（`layouts/t9.toml`，缺失或解析失败回落到内置） */
+    fun t9Rows(): List<List<KeyDef>> = rowsOf(t9Id) { KeyboardLayouts.t9 }
+
     @Synchronized
-    fun rows(layer: KeyboardLayer): List<List<KeyDef>> {
-        val file = resolve("layouts/${layerToId.getValue(layer)}.toml")
+    private fun rowsOf(id: String, builtin: () -> List<List<KeyDef>>): List<List<KeyDef>> {
+        val file = resolve("layouts/$id.toml")
         val modified = file?.lastModified() ?: 0L
         val length = file?.length() ?: 0L
-        cache[layer]?.takeIf { it.path == file?.path && it.modified == modified && it.length == length }
+        cache[id]?.takeIf { it.path == file?.path && it.modified == modified && it.length == length }
             ?.let { return it.rows }
-        return load(layer, file).also { cache[layer] = Parsed(file?.path, modified, length, it) }
+        return load(id, file, builtin).also { cache[id] = Parsed(file?.path, modified, length, it) }
     }
 
     /** 把三层都解析进缓存（服务启动时在后台线程调，首次弹键盘就不用在主线程解析） */
     fun prewarm() {
         for (layer in KeyboardLayer.entries) rows(layer)
+        t9Rows()
     }
 
-    private fun load(layer: KeyboardLayer, file: File?): List<List<KeyDef>> {
-        val id = layerToId.getValue(layer)
+    private fun load(id: String, file: File?, builtin: () -> List<List<KeyDef>>): List<List<KeyDef>> {
         if (file != null) {
             try {
                 val parsed = LayoutParser.parse(file.readText()) { Log.w(TAG, "layout $id: $it") }
@@ -66,7 +75,7 @@ class LayoutRepository(private val resolve: (String) -> File?) {
                 Log.w(TAG, "layout $id parse failed, fallback to builtin", e)
             }
         }
-        return KeyboardLayouts.rows(layer)
+        return builtin()
     }
 }
 
@@ -155,6 +164,20 @@ object LayoutParser {
                 continue
             }
 
+            val keypad = entry.getString("keypad")
+            if (keypad != null) {
+                add(
+                    KeyDef(
+                        entry.getString("label") ?: keypad,
+                        KeyAction.Keypad(keypad.first()),
+                        width,
+                        swipeUp = swipeUp,
+                        id = entry.getString("id") ?: "",
+                    ),
+                )
+                continue
+            }
+
             val text = entry.getString("text")
             if (text != null) {
                 val ch = text.first()
@@ -183,6 +206,7 @@ object LayoutParser {
                 "emoji" -> KeyAction.Emoji
                 "symbol_page" -> KeyAction.SymbolPage
                 "number_pad" -> KeyAction.NumberPad
+                "clear_input" -> KeyAction.ClearInput
                 else -> throw IllegalArgumentException("未知 action: $name")
             }
             val label = entry.getString("label")
