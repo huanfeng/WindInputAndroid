@@ -454,18 +454,37 @@ private fun SettingsApp(
         stateHolder.SaveableStateProvider(r.key) {
         Screen(
             route = r,
-            title = r.detail?.let { detailTitles[it] ?: it } ?: screenTitle(manifest, r),
+            title = r.detail?.let { detailTitles[it] ?: it } ?: screenTitle(manifest, r, detailTitles),
             onBack = if (r.depth > 0) ({ go(r.up()) }) else null,
         ) {
             val page = manifest.pages.firstOrNull { it.id == r.page }
+            val schemeId = schemeIdOf(r.sub)
+            fun openScheme(id: String, name: String) {
+                detailTitles[schemeSub(id)] = name
+                go(Route(SCHEMA_PAGE, schemeSub(id)))
+            }
             when {
                 page == null -> HomeScreen(setup, manifest, values, schemaState, versionName, actions) { go(Route(it)) }
                 r.sub == null -> PageScreen(manifest, page, values, session, schemaState, versionName) { go(r.copy(sub = it)) }
+                schemeId != null -> SchemeSettingsScreen(
+                    schemeId = schemeId,
+                    group = r.detail,
+                    manifest = manifest,
+                    global = values,
+                    t9Group = { _, _ -> },
+                    t9Summary = { _, _ -> "" },
+                    onOpenGroup = { go(r.copy(detail = it)) },
+                    onOpenScheme = ::openScheme,
+                    onLoaded = { detailTitles[schemeSub(schemeId)] = it },
+                )
                 r.detail == DETAIL_QUICK_SOURCES -> QuickSourcesSection(values)
-                r.detail != null -> SchemaDetailSection(r.detail, manifest) { detailTitles[r.detail] = it }
                 else -> SubScreen(manifest, page, r.sub, values, session, schemaState) { id, name ->
-                    detailTitles[id] = name
-                    go(r.copy(detail = id))
+                    if (id == DETAIL_QUICK_SOURCES) {
+                        detailTitles[id] = name
+                        go(r.copy(detail = id))
+                    } else {
+                        openScheme(id, name)
+                    }
                 }
             }
         }
@@ -473,8 +492,19 @@ private fun SettingsApp(
     }
 }
 
-private fun screenTitle(manifest: SettingsManifestData, r: Route): String =
-    r.sub ?: manifest.pages.firstOrNull { it.id == r.page }?.title ?: "清风输入法"
+private fun screenTitle(manifest: SettingsManifestData, r: Route, titles: Map<String, String>): String =
+    r.sub?.let { sub -> titles[sub] ?: schemeIdOf(sub) ?: sub }
+        ?: manifest.pages.firstOrNull { it.id == r.page }?.title ?: "清风输入法"
+
+/** 方案页的页 id */
+private const val SCHEMA_PAGE = "schema"
+
+/** 方案设置页的路由：`Route(page = "schema", sub = "scheme:<方案 id>", detail = <组名>)` */
+private const val SCHEME_SUB_PREFIX = "scheme:"
+
+internal fun schemeSub(id: String) = SCHEME_SUB_PREFIX + id
+
+internal fun schemeIdOf(sub: String?): String? = sub?.takeIf { it.startsWith(SCHEME_SUB_PREFIX) }?.removePrefix(SCHEME_SUB_PREFIX)
 
 /**
  * 一屏：miuix 大标题栏（随滚动收成小标题）+ 可滚动内容。内容画到导航栏下（edge-to-edge），
