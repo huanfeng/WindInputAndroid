@@ -91,4 +91,18 @@ class SchemeSettingsModelTest {
         assertEquals("schema.pinyin.frequency.enabled", groupMaster(groups.getValue("调频"))?.key)
         assertEquals(null, groupMaster(groups.getValue("基本")))
     }
+
+    /** 标题栏「恢复默认」：分组页连带恢复画在本组的方案属性；九宫格 / 扩展词库 / 成员方案没有恢复 */
+    @Test
+    fun groupResetCoversPropsDrawnOnThatGroup() {
+        assertEquals(setOf(KEY_SENTENCE), groupPropKeys(SchemeGroup(GROUP_SENTENCE, SchemeGroup.Kind.SENTENCE)))
+        assertEquals(setOf(KEY_AUX_FILES), groupPropKeys(SchemeGroup(GROUP_AUX, SchemeGroup.Kind.AUX)))
+        assertEquals(setOf(KEY_SHUANGPIN_LAYOUT), groupPropKeys(SchemeGroup("基本", SchemeGroup.Kind.FORM)))
+        assertEquals(emptySet<String>(), groupPropKeys(SchemeGroup("调频", SchemeGroup.Kind.FORM)))
+        assertEquals(BEHAVIOR_ROWS.keys, groupPropKeys(SchemeGroup("自定义行为", SchemeGroup.Kind.BEHAVIOR)))
+        assertTrue(groupResettable("调频"))
+        assertTrue(!groupResettable(GROUP_T9))
+        assertTrue(!groupResettable("扩展词库"))
+        assertTrue(!groupResettable("成员方案"))
+    }
 }

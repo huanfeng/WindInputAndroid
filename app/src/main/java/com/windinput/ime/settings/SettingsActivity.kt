@@ -1,5 +1,6 @@
 package com.windinput.ime.settings
 
+import android.widget.Toast
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
@@ -38,11 +39,11 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -527,6 +528,7 @@ private fun Screen(
     content: @Composable () -> Unit,
 ) {
     val scrollBehavior = MiuixScrollBehavior()
+    val titleActions = remember { TitleActions() }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -540,6 +542,13 @@ private fun Screen(
                         }
                     }
                 },
+                actions = {
+                    titleActions.reset?.let { reset ->
+                        IconButton(onClick = reset, modifier = Modifier.padding(end = 12.dp)) {
+                            Icon(SettingsIcons.reset, contentDescription = "恢复默认")
+                        }
+                    }
+                },
             )
         },
     ) { padding ->
@@ -550,13 +559,13 @@ private fun Screen(
                     .overScrollVertical()
                     .nestedScroll(scrollBehavior.nestedScrollConnection)
                     .padding(top = padding.calculateTopPadding())
-                    .verticalScroll(rememberScrollState())
+                    .verticalScroll(rememberRestoringScrollState())
                     // 「添加词条」等有输入框的页：软键盘弹起时内容让出来，按钮不被挡
                     .imePadding()
                     .padding(horizontal = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                content()
+                CompositionLocalProvider(LocalTitleActions provides titleActions) { content() }
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
             }
         }
@@ -710,6 +719,9 @@ private fun PageScreen(
             }
         }
     } else {
+        if (manifest.itemsOf(page.id).isNotEmpty()) {
+            PageResetInTitle(values) { manifest.sectionsOf(page.id).flatMap { it.second } }
+        }
         for ((name, items) in sections) SettingsCard(name, items, values)
         // 长按候选的提示卡显示哪几段：与候选显示相关，接在外观页「候选字体」之后
         if (page.id == "ui") SkinSection()
@@ -772,6 +784,8 @@ private fun SubScreen(
         page.id == SettingsActivity.PAGE_KEYBOARD && sub == SUB_KEYMAP_EDITOR -> KeymapEditorSection()
         page.id == "about" && sub == SUB_PRIVACY -> PrivacySection()
         else -> {
+            // 恢复本组看得见的这层（进阶项归「更多设置」页）；随开关收起的项也算在内
+            PageResetInTitle(values) { sectionItems(manifest, page.id, sub).filterNot { it.advanced } }
             @Suppress("UNUSED_EXPRESSION") values.version
             val all = visibleSections(manifest, page.id, values).firstOrNull { it.first == sub }?.second.orEmpty()
             val (more, items) = all.partition { it.advanced }
@@ -800,10 +814,52 @@ private fun SubScreen(
 /** 「更多设置」页：一个分组的进阶项 */
 @Composable
 private fun MoreScreen(manifest: SettingsManifestData, page: SettingPage, section: String, values: SettingsValues) {
+    PageResetInTitle(values) { sectionItems(manifest, page.id, section).filter { it.advanced } }
     @Suppress("UNUSED_EXPRESSION") values.version
     val items = visibleSections(manifest, page.id, values).firstOrNull { it.first == section }?.second.orEmpty()
         .filter { it.advanced }
     SettingsCard("", items, values)
+}
+
+/** 一组的全部清单项（不看依赖开关，看不看得见都算） */
+private fun sectionItems(manifest: SettingsManifestData, pageId: String, section: String): List<SettingItem> =
+    manifest.sectionsOf(pageId).firstOrNull { it.first == section }?.second.orEmpty()
+
+/** 本页恢复默认时最多列出几项的名字 */
+private const val RESET_LIST_MAX = 5
+
+/**
+ * 全局设置页的标题栏「恢复默认」：[items] 里改过的项回到出厂值。点了先数改过几项，
+ * 一项没改直接提示，否则确认后恢复。
+ */
+@Composable
+private fun PageResetInTitle(values: SettingsValues, items: () -> List<SettingItem>) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var ask by remember { mutableStateOf<List<SettingItem>?>(null) }
+    ResetInTitle {
+        scope.launch {
+            val changed = withContext(Dispatchers.IO) { values.customized(items().filter { values.available(it) }) }
+            if (changed.isEmpty()) Toast.makeText(context, "本页都是默认设置", Toast.LENGTH_SHORT).show() else ask = changed
+        }
+    }
+    ask?.let { changed ->
+        val names = changed.take(RESET_LIST_MAX).joinToString("、") { it.title } +
+            if (changed.size > RESET_LIST_MAX) " 等" else ""
+        ConfirmDialog(
+            title = "恢复默认",
+            text = "本页改过的 ${changed.size} 项回到默认值：$names。",
+            confirmText = "恢复",
+            onDismiss = { ask = null },
+            onConfirm = {
+                ask = null
+                scope.launch {
+                    val err = withContext(Dispatchers.IO) { values.reset(changed) }
+                    if (err != null) Toast.makeText(context, "恢复失败：$err", Toast.LENGTH_SHORT).show()
+                }
+            },
+        )
+    }
 }
 
 /** 一张卡片：逐行列出（进阶项不在这里画，见 [MoreSettingsEntry]） */

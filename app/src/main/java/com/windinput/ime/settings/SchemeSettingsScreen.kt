@@ -1,13 +1,7 @@
 package com.windinput.ime.settings
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -19,10 +13,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -30,8 +20,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
 import uniffi.wind_android.ConfigException
 import uniffi.wind_android.InstalledSchemaInfo
 import uniffi.wind_android.SchemaSettingItem
@@ -211,6 +199,15 @@ internal fun SchemeSettingsScreen(
             }
         }
     }
+    // 标题栏「恢复默认」：第一屏管整个方案，分组页管这一组。读数据之前就挂上，图标不随加载晚出现
+    var resetAsk by remember { mutableStateOf<ResetScope?>(null) }
+    if (group == null || groupResettable(group)) {
+        ResetInTitle {
+            val cur = data ?: return@ResetInTitle
+            val sc = resetScope(cur, manifest, group)
+            if (sc.count == 0) Toast.makeText(context, "本页都是默认设置", Toast.LENGTH_SHORT).show() else resetAsk = sc
+        }
+    }
     error?.let {
         Card(modifier = Modifier.fillMaxWidth()) { BasicComponent(title = "读不到方案设置", summary = it) }
         return
@@ -242,14 +239,73 @@ internal fun SchemeSettingsScreen(
         }
     }
 
+    resetAsk?.let { sc ->
+        ConfirmDialog(
+            title = "恢复默认",
+            text = sc.message,
+            confirmText = "恢复",
+            onDismiss = { resetAsk = null },
+            onConfirm = {
+                resetAsk = null
+                scope.launch {
+                    val err = withContext(Dispatchers.IO) { d.form.reset(sc.formItems) }
+                    if (err != null) Toast.makeText(context, "恢复失败：$err", Toast.LENGTH_SHORT).show()
+                    when {
+                        sc.wholeScheme && sc.props.isNotEmpty() -> writeProp(SchemaWrite.ResetAll)
+                        sc.props.isNotEmpty() -> sc.props.forEach { writeProp(SchemaWrite.Reset(it)) }
+                        else -> reload++
+                    }
+                }
+            },
+        )
+    }
+
     val type = d.props.engineType
     val groups = schemeGroups(type, manifest, d.props.items, d.t9Capable, d.hasDicts, d.memberNames.isNotEmpty())
     // 组不在（直达链接指向的组，此方案没有，如关了九宫格能力的方案）：显示方案首页，不留空白页
     val g = group?.let { name -> groups.firstOrNull { it.name == name } }
     if (g == null) {
-        SchemeFirstScreen(d, type, groups, manifest, onOpenGroup, ::writeProp) { reload++ }
+        SchemeFirstScreen(d, type, groups, manifest, onOpenGroup)
     } else {
         SchemeGroupScreen(d, schemeId, g, onOpenScheme, ::writeProp)
+    }
+}
+
+/** 标题栏「恢复默认」管的范围：表单项 + 改过的方案属性键 */
+private class ResetScope(
+    val formItems: List<SettingItem>,
+    val props: List<String>,
+    val count: Int,
+    val wholeScheme: Boolean,
+    val message: String,
+)
+
+/** 这些组没有「恢复默认」：九宫格开关是键盘配置、扩展词库与成员方案不是可恢复的设置 */
+internal fun groupResettable(name: String): Boolean = name !in setOf(GROUP_T9, GROUP_DICTS, GROUP_MEMBERS)
+
+/** 一组「恢复默认」顺带恢复的方案属性（不在清单表单里、画在这组页上的那几行） */
+internal fun groupPropKeys(g: SchemeGroup): Set<String> = when (g.kind) {
+    SchemeGroup.Kind.FORM -> if (g.name == GROUP_BASIC) setOf(KEY_SHUANGPIN_LAYOUT) else emptySet()
+    SchemeGroup.Kind.AUX -> setOf(KEY_AUX_FILES)
+    SchemeGroup.Kind.SENTENCE -> setOf(KEY_SENTENCE)
+    SchemeGroup.Kind.BEHAVIOR -> BEHAVIOR_ROWS.keys
+    else -> emptySet()
+}
+
+private fun resetScope(d: SchemeData, manifest: SettingsManifestData, group: String?): ResetScope {
+    val type = d.props.engineType
+    val groups = schemeGroups(type, manifest, d.props.items, d.t9Capable, d.hasDicts, d.memberNames.isNotEmpty())
+    val g = group?.let { name -> groups.firstOrNull { it.name == name } }
+    val overridden = d.props.items.filter { it.overridden }.map { it.key }
+    return if (g == null) {
+        val items = manifest.schemeGroups(type).flatMap { it.second }
+        val n = d.form.customized(items).size + overridden.size
+        ResetScope(items, overridden, n, true, "本方案改过的 $n 项设置回到方案默认。扩展词库开关不受影响。")
+    } else {
+        val keys = groupPropKeys(g)
+        val props = overridden.filter { it in keys }
+        val n = d.form.customized(g.items).size + props.size
+        ResetScope(g.items, props, n, false, "「${g.name}」里改过的 $n 项回到方案默认。")
     }
 }
 
@@ -260,10 +316,7 @@ private fun SchemeFirstScreen(
     groups: List<SchemeGroup>,
     manifest: SettingsManifestData,
     onOpenGroup: (String) -> Unit,
-    writeProp: (SchemaWrite) -> Unit,
-    onReloaded: () -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
     val context = LocalContext.current
     @Suppress("UNUSED_EXPRESSION") d.form.version
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -279,23 +332,15 @@ private fun SchemeFirstScreen(
         }
     }
 
-    val formItems = manifest.schemeGroups(type).flatMap { it.second }
-    val changed = d.form.changedCount(formItems) + d.props.items.count { it.overridden }
-    var confirm by remember { mutableStateOf(false) }
     var copying by remember { mutableStateOf(false) }
     val copyBlocks = remember(type) { SchemeCopy.blocks(type, manifest) }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        if (d.copyTargets.isNotEmpty() && copyBlocks.isNotEmpty()) {
+    if (d.copyTargets.isNotEmpty() && copyBlocks.isNotEmpty()) {
+        Card(modifier = Modifier.fillMaxWidth()) {
             NavRow(
                 title = "复制到其它方案",
                 summary = "把本方案的设置一次性写给同类方案（${d.copyTargets.joinToString("、") { it.name }}）",
             ) { copying = true }
         }
-        NavRow(
-            title = "全部恢复默认",
-            summary = if (changed > 0) "已自定义 $changed 项" else "没有自定义的项",
-            onClick = if (changed > 0) ({ confirm = true }) else null,
-        )
     }
     if (copying) {
         SchemeCopyDialog(
@@ -313,52 +358,24 @@ private fun SchemeFirstScreen(
             onDismiss = { copying = false },
         )
     }
-    if (confirm) {
-        Dialog(onDismissRequest = { confirm = false }) {
-            Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
-                Column(Modifier.padding(20.dp)) {
-                    Text("全部恢复默认", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
-                    Text("本方案自定义过的 $changed 项回到方案默认。扩展词库开关不受影响。")
-                    Spacer(Modifier.height(12.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(text = "取消", onClick = { confirm = false })
-                        TextButton(text = "恢复", onClick = {
-                            confirm = false
-                            scope.launch {
-                                val err = withContext(Dispatchers.IO) { d.form.resetAll(formItems) }
-                                if (err != null) Toast.makeText(context, "恢复失败：$err", Toast.LENGTH_SHORT).show()
-                                if (d.props.items.any { it.overridden }) writeProp(SchemaWrite.ResetAll) else onReloaded()
-                            }
-                        })
-                    }
-                }
-            }
-        }
-    }
 }
 
 /** 第一屏每组一行的副标题 */
 private fun groupSummary(g: SchemeGroup, d: SchemeData): String =
     when (g.kind) {
         SchemeGroup.Kind.FORM, SchemeGroup.Kind.AUX -> {
-            val n = d.form.changedCount(g.items)
             val master = groupMaster(g.items)
-            when {
-                master != null ->
-                    (if (d.form.bool(master)) "已开启" else "未开启") + if (n > 0) " · 已自定义 $n 项" else ""
-                n > 0 -> "已自定义 $n 项"
-                else -> g.items.take(3).joinToString(" · ") { it.title }
+            if (master != null) {
+                if (d.form.bool(master)) "已开启" else "未开启"
+            } else {
+                g.items.take(3).joinToString(" · ") { it.title }
             }
         }
         SchemeGroup.Kind.T9 -> if (d.t9Enabled) "已开启：键盘列表里有「${d.props.name.ifEmpty { d.props.id }} · 九宫格」" else "未开启"
         SchemeGroup.Kind.DICTS -> "本方案的扩展词库开关"
         SchemeGroup.Kind.BEHAVIOR -> "标点、命令短语"
-        SchemeGroup.Kind.SENTENCE -> {
-            val n = d.form.changedCount(g.items)
-            (if (d.props.items.firstOrNull { it.key == KEY_SENTENCE }?.value == "true") "已开启" else "未开启") +
-                if (n > 0) " · 已自定义 $n 项" else ""
-        }
+        SchemeGroup.Kind.SENTENCE ->
+            if (d.props.items.firstOrNull { it.key == KEY_SENTENCE }?.value == "true") "已开启" else "未开启"
         SchemeGroup.Kind.MEMBERS -> d.memberNames.joinToString(" · ") { it.second }
     }
 
@@ -456,6 +473,9 @@ private fun FormCard(
     all: List<SettingItem> = items,
     enabled: Boolean = true,
 ) {
+    // 自己读版本号：参数是同一个对象时 Compose 会跳过本函数，只重组各行，
+    // 开关一变依赖项的灰显就算不出来（要退出再进才对）
+    @Suppress("UNUSED_EXPRESSION") values.version
     val shown = items.filter { values.available(it) }
     if (shown.isEmpty()) return
     Card(modifier = Modifier.fillMaxWidth()) {

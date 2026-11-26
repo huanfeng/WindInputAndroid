@@ -84,19 +84,9 @@ class SchemeFormValues(
     fun overridden(item: SettingItem): Boolean =
         !android(item) && item.key in defaults && effective[item.key] != defaults[item.key]
 
-    override fun summary(item: SettingItem): String? {
-        if (android(item)) return global?.summary(item) ?: item.summary
-        if (!overridden(item)) return item.summary
-        val changed = "已自定义 · 默认：${label(item, defaults[item.key])}"
-        return listOfNotNull(item.summary, changed).joinToString("\n")
-    }
-
-    private fun label(item: SettingItem, v: Any?): String = when (item.type) {
-        "toggle" -> if (RawValue.bool(v)) "开" else "关"
-        "select" -> RawValue.choice(v).let { c -> item.options.firstOrNull { it.first == c }?.second ?: c }
-        "int" -> RawValue.int(v).let { if (item.unit != null) "$it ${item.unit}" else it.toString() }
-        else -> RawValue.text(v)
-    }
+    /** 不在行里标「已自定义」：行高随值变、界面抖；改没改过由标题栏的「恢复默认」统一处理 */
+    override fun summary(item: SettingItem): String? =
+        if (android(item)) global?.summary(item) ?: item.summary else item.summary
 
     @Synchronized
     override fun set(item: SettingItem, value: Any): String? {
@@ -118,12 +108,12 @@ class SchemeFormValues(
         else -> RawValue.choice(default) == value.toString()
     }
 
-    /** [items] 里改过的项数（「全部恢复默认」的计数只数看得见的） */
-    fun changedCount(items: List<SettingItem>): Int = items.count { overridden(it) }
+    /** [items] 里与方案默认不同的项（键盘自己的项不按方案存，不算） */
+    override fun customized(items: List<SettingItem>): List<SettingItem> = items.filter { overridden(it) }
 
     /** 把 [items] 里改过的项全部恢复方案默认 */
     @Synchronized
-    fun resetAll(items: List<SettingItem>): String? {
+    override fun reset(items: List<SettingItem>): String? {
         val keys = items.filter { overridden(it) }.map { it.key }
         return if (keys.isEmpty()) null else write(emptyList(), keys)
     }

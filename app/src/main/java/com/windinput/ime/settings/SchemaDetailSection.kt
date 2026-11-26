@@ -4,7 +4,6 @@ import androidx.compose.runtime.Composable
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import uniffi.wind_android.InstalledSchemaInfo
 import uniffi.wind_android.SchemaSettingItem
-import uniffi.wind_android.SchemaSettingKind
 import uniffi.wind_android.SchemaSettingsInfo
 
 /**
@@ -16,7 +15,7 @@ import uniffi.wind_android.SchemaSettingsInfo
 /** 开关项：拨回默认值 = 恢复 */
 @Composable
 internal fun BoolSettingRow(title: String, summary: String?, item: SchemaSettingItem, onWrite: (SchemaWrite) -> Unit) {
-    ToggleLine(title, rowSummary(summary, item, emptyMap()), item.value == "true") { on ->
+    ToggleLine(title, summary, item.value == "true") { on ->
         onWrite(writeFor(item, on.toString()))
     }
 }
@@ -37,7 +36,7 @@ internal fun ChoiceSettingRow(
         items = names,
         selectedIndex = selected,
         title = title,
-        summary = rowSummary(summary, item, labels),
+        summary = summary,
         // 点回当前项不写：否则 PC 钉住、恰等于默认值的覆盖会被当成「选回默认」删掉
         onSelectedIndexChange = { i ->
             if (i != selected) values.getOrNull(i)?.let { onWrite(writeFor(item, it)) }
@@ -100,18 +99,6 @@ internal sealed interface SchemaWrite {
 /** 选回默认值就是恢复（删覆盖、回到跟随），否则写新值 */
 internal fun writeFor(item: SchemaSettingItem, value: String): SchemaWrite =
     if (value == item.defaultValue) SchemaWrite.Reset(item.key) else SchemaWrite.Set(item.key, value)
-
-/** 行摘要：说明 + 改过时注明默认值 */
-internal fun rowSummary(description: String?, item: SchemaSettingItem, labels: Map<String, String>): String? {
-    val changed = if (item.overridden) "已自定义 · 默认：${valueLabel(item, item.defaultValue, labels)}" else null
-    return listOfNotNull(description, changed).joinToString("\n").ifEmpty { null }
-}
-
-internal fun valueLabel(item: SchemaSettingItem, value: String, labels: Map<String, String>): String =
-    when (item.kind) {
-        SchemaSettingKind.BOOL -> if (value == "true") "开" else "关"
-        else -> labels[value] ?: value
-    }
 
 internal fun infoSummary(s: SchemaSettingsInfo, installed: InstalledSchemaInfo?): String {
     val facts = listOfNotNull(

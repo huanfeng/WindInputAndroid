@@ -1,9 +1,7 @@
 package com.windinput.ime.settings
 
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -81,7 +79,8 @@ internal fun SchemeCopyDialog(
                         )
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), horizontalArrangement = Arrangement.End) {
+                Spacer(Modifier.height(12.dp))
+                DialogButtons(Modifier.padding(horizontal = 20.dp)) {
                     TextButton(text = "取消", onClick = onDismiss, enabled = !busy)
                     TextButton(
                         text = "复制",

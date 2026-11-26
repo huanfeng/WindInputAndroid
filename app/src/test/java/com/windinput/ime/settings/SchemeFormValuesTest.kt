@@ -74,14 +74,15 @@ class SchemeFormValuesTest {
     }
 
     @Test
-    fun summaryNamesDefaultWhenChanged() {
+    fun summaryStaysPlainWhenChanged() {
         val (v, _) = values(
             mapOf(sep.key to "\"'\"", freq.key to "true", count.key to "3"),
             mapOf(sep.key to "\"auto\"", freq.key to "true", count.key to "5"),
         )
-        assertEquals("说明\n已自定义 · 默认：自动", v.summary(sep))
+        // 改过也不在行里加字：行高不随值变
+        assertEquals("说明", v.summary(sep))
         assertEquals("说明", v.summary(freq))
-        assertEquals("说明\n已自定义 · 默认：5", v.summary(count))
+        assertEquals("说明", v.summary(count))
         assertEquals("'", v.choice(sep))
     }
 
@@ -91,10 +92,10 @@ class SchemeFormValuesTest {
             mapOf(freq.key to "false", count.key to "3"),
             mapOf(freq.key to "true", count.key to "3"),
         )
-        assertEquals(1, v.changedCount(listOf(freq, count)))
-        assertNull(v.resetAll(listOf(freq, count)))
+        assertEquals(listOf(freq), v.customized(listOf(freq, count)))
+        assertNull(v.reset(listOf(freq, count)))
         assertEquals(listOf(freq.key), io.calls.single().second)
-        assertEquals(0, v.changedCount(listOf(freq, count)))
+        assertEquals(emptyList<SettingItem>(), v.customized(listOf(freq, count)))
     }
 
     @Test
@@ -117,6 +118,8 @@ class SchemeFormValuesTest {
             override fun choice(item: SettingItem) = ""
             override fun summary(item: SettingItem) = "全局"
             override fun set(item: SettingItem, value: Any): String? { written += value; return null }
+            override fun customized(items: List<SettingItem>) = items
+            override fun reset(items: List<SettingItem>): String? = null
         }
         val io = FakeIo(emptyMap(), emptyMap())
         val v = SchemeFormValues("english", io, types::get, global).also { it.load() }

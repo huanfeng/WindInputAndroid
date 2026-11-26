@@ -55,7 +55,8 @@ check "码表方案有「上屏」组" "yes" "$(row_y_of 上屏 >/dev/null && ec
 check "码表方案有「整句输入（实验性）」组" "yes" "$(row_y_of 整句输入（实验性） >/dev/null && echo yes || echo no)"
 ss_open_group 调频
 check "调频组列出全部参数（不折叠）" "yes" "$(has_text 调频策略)"
-check "未改时没有「已自定义」" "no" "$(dump_xml | grep -q '已自定义' && echo yes || echo no)"
+check "标题栏有「恢复默认」" "yes" "$(dump_xml | grep -q 'content-desc="恢复默认"' && echo yes || echo no)"
+check "行内不标「已自定义」" "no" "$(dump_xml | grep -q '已自定义' && echo yes || echo no)"
 ss_back
 ss_back
 check "返回回到方案列表" "yes" "$(has_text 导入方案)"
@@ -73,7 +74,7 @@ ss_tap_row 标点
 tap_text 英文标点
 sleep 1
 check "覆盖文件写了 [punct] mode = english" "yes" "$(ss_ov wubi86 | grep -q '^mode = "english"' && echo yes || echo no)"
-check "行内注明已自定义及默认值" "yes" "$(dump_xml | grep -q '已自定义 · 默认：跟随全局' && echo yes || echo no)"
+check "改了也不在行里加「已自定义」（行高不变）" "no" "$(dump_xml | grep -q '已自定义' && echo yes || echo no)"
 back_to_pad
 reset_pad
 # 标点态是方案代际同步的（同 PC：改的是当前方案时，本代际内用户手动切的标点态胜出），切一次才生效
@@ -119,7 +120,7 @@ check "恢复后行为翻回来：wynb 不按空格" "$([[ $ac_on == yes ]] || e
 [[ -n "$got" ]] || tap_key SPACE
 reset_pad
 
-section "[61] 方案设置页：全部恢复默认清掉本方案的设置，扩展词库开关不受影响"
+section "[61] 方案设置页：标题栏恢复默认——分组页只清本组，第一屏清整个方案，扩展词库开关不受影响"
 ss_open_detail 五笔
 ss_open_group 扩展词库
 ss_tap_row 行政区域   # 扩展词库开关：与方案设置写同一个覆盖文件
@@ -134,16 +135,25 @@ ss_open_group 整句输入（实验性）
 ss_tap_row 启用整句输入
 ss_back
 check "两项都写进了覆盖文件" "yes" "$(ov="$(ss_ov wubi86)"; grep -q 'mode = "english"' <<< "$ov" && grep -q 'sentence_input = true' <<< "$ov" && echo yes || echo no)"
-y="$(row_y_of 全部恢复默认)" || die "详情页找不到「全部恢复默认」"
-check "计数：已自定义 2 项" "yes" "$(dump_xml | grep -q '已自定义 2 项' && echo yes || echo no)"
-adb_q shell input tap $(( GEO_W / 2 )) "$y"; sleep 1.2
-check "全部恢复先确认" "yes" "$(has_text 恢复)"
+ss_open_group 自定义行为
+ss_tap_desc 恢复默认
+check "分组页恢复先确认，写明本组" "yes" "$(dump_xml | grep -q '「自定义行为」里改过的 1 项' && echo yes || echo no)"
 tap_text 恢复
 sleep 1.5
 ov="$(ss_ov wubi86)"
-check "全部恢复后本页的键清掉" "no" "$(grep -qE 'punct|sentence_input' <<< "$ov" && echo yes || echo no)"
+check "分组恢复：本组的标点清掉" "no" "$(grep -q 'punct' <<< "$ov" && echo yes || echo no)"
+check "分组恢复：别组的整句开关仍在" "yes" "$(grep -q 'sentence_input = true' <<< "$ov" && echo yes || echo no)"
+ss_tap_desc 恢复默认
+check "本组已无改动时直接提示、不弹确认" "no" "$(dump_xml | grep -q 'text="恢复"' && echo yes || echo no)"
+ss_back
+ss_tap_desc 恢复默认
+check "第一屏恢复先确认，写明整个方案" "yes" "$(dump_xml | grep -q '本方案改过的 1 项设置' && echo yes || echo no)"
+tap_text 恢复
+sleep 1.5
+ov="$(ss_ov wubi86)"
+check "全部恢复后整句开关清掉" "no" "$(grep -q 'sentence_input' <<< "$ov" && echo yes || echo no)"
 check "全部恢复后扩展词库开关仍在" "yes" "$(grep -q 'dictionaries' <<< "$ov" && echo yes || echo no)"
-check "全部恢复后显示没有自定义的项" "yes" "$(has_text 没有自定义的项)"
+check "第一屏不再有「全部恢复默认」行" "no" "$(dump_xml | grep -q '全部恢复默认' && echo yes || echo no)"
 
 # 还原五笔覆盖文件（别的用例 / 用户留下的扩展词库开关等）
 if [[ -n "$SS_OV_WUBI" ]]; then

@@ -46,6 +46,10 @@ class SettingsValues(
     @Volatile
     private var engine: Map<String, Any> = emptyMap()
 
+    /** 出厂默认（摊平）：页面「恢复默认」的比较基准与写回值 */
+    @Volatile
+    private var defaults: Map<String, Any> = emptyMap()
+
     /** 核心注册表：键 → 类型（bool / int / float / str / enum …） */
     @Volatile
     private var types: Map<String, String> = emptyMap()
@@ -70,6 +74,9 @@ class SettingsValues(
         types = c.configRegistry().associate { it.key to it.ty }
         engine = runCatching { ConfigSnapshot.flatten(c.configSnapshot()) }
             .onFailure { Log.w(TAG, "配置快照解析失败", it) }
+            .getOrDefault(emptyMap())
+        defaults = runCatching { ConfigSnapshot.flatten(c.configDefaults()) }
+            .onFailure { Log.w(TAG, "出厂默认解析失败", it) }
             .getOrDefault(emptyMap())
         version++
     }
@@ -134,6 +141,47 @@ class SettingsValues(
             SettingSource.ANDROID -> {
                 userConfig.put(item.key, androidValue(item, value))
                 null
+            }
+        }
+        version++
+        return err
+    }
+
+    override fun customized(items: List<SettingItem>): List<SettingItem> {
+        val kb = userConfig.readAll()
+        return items.filter { item ->
+            when (item.source) {
+                SettingSource.ENGINE -> item.key in defaults && item.key in engine && engine[item.key] != defaults[item.key]
+                SettingSource.ANDROID -> item.key in kb && kb[item.key].toString() != item.defaultValue.toString()
+            }
+        }
+    }
+
+    /**
+     * 恢复默认：引擎项把出厂值写回（核心写入等于出厂值时直接删键，与电脑版「恢复默认」同效），
+     * 一次重载；键盘项删键。
+     */
+    @Synchronized
+    override fun reset(items: List<SettingItem>): String? {
+        val changed = customized(items)
+        val (engineItems, kbItems) = changed.partition { it.source == SettingSource.ENGINE }
+        val kbKeys = kbItems.map { it.key }.toSet()
+        if (kbKeys.isNotEmpty()) userConfig.removeIf { it in kbKeys }
+        var err: String? = null
+        if (engineItems.isNotEmpty()) {
+            val c = core
+            err = if (c == null) "输入法核心未就绪" else try {
+                for (item in engineItems) c.configSet(item.key, rawConfigValue(types[item.key], defaults.getValue(item.key)))
+                null
+            } catch (e: ConfigException) {
+                Log.w(TAG, "恢复默认失败", e)
+                (e as? ConfigException.Rejected)?.reason ?: e.toString()
+            } finally {
+                // 成败都重载、重读：写了一半时界面也要与文件对得上
+                runCatching {
+                    c.runCommand(EngineCommand.ReloadConfig)
+                    engine = ConfigSnapshot.flatten(c.configSnapshot())
+                }
             }
         }
         version++

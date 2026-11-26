@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -493,7 +492,7 @@ private fun Panel(
                 Spacer(Modifier.height(12.dp))
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) { content() }
                 Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { buttons() }
+                DialogButtons(content = buttons)
             }
         }
     }

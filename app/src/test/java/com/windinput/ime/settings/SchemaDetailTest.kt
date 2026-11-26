@@ -45,16 +45,6 @@ class SchemaDetailTest {
     }
 
     @Test
-    fun summaryNamesTheDefaultOnlyWhenChanged() {
-        val punct = item("punct.mode", SchemaSettingKind.CHOICE, "english", "follow", group = SchemaSettingGroup.BEHAVIOR)
-        assertEquals("说明", rowSummary("说明", punct, PUNCT_LABELS))
-        assertNull(rowSummary(null, punct, PUNCT_LABELS))
-        assertEquals("说明\n已自定义 · 默认：跟随全局", rowSummary("说明", punct.copy(overridden = true), PUNCT_LABELS))
-        val bool = item("phrases.enabled", value = "false", default = "true", overridden = true)
-        assertEquals("已自定义 · 默认：开", rowSummary(null, bool, emptyMap()))
-    }
-
-    @Test
     fun infoSummaryJoinsFactsThenDescription() {
         val s = SchemaSettingsInfo("wubi86", "五笔", "codetable", "1.0", "内置", "五笔86版输入方案", emptyList())
         val builtin = InstalledSchemaInfo("wubi86", "五笔", true, false, false, true)

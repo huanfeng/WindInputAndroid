@@ -17,11 +17,17 @@ interface ItemValues {
     fun text(item: SettingItem): String
     fun choice(item: SettingItem): String
 
-    /** 行副标题：清单 summary；按方案设置的值改过时追加「已自定义 · 默认：x」 */
+    /** 行副标题（清单 summary） */
     fun summary(item: SettingItem): String?
 
     /** 写入。返回错误说明（成功为 null） */
     fun set(item: SettingItem, value: Any): String?
+
+    /** [items] 里改过（与默认不同）的项：页面「恢复默认」据此计数 */
+    fun customized(items: List<SettingItem>): List<SettingItem>
+
+    /** 把 [items] 里改过的项恢复默认。返回错误说明（成功为 null） */
+    fun reset(items: List<SettingItem>): String?
 }
 
 /** 列表型配置在文本框 / 下拉值里的分隔：空白或逗号（配对字符、键名里都不会出现这两种） */
@@ -35,6 +41,19 @@ internal fun configValueOf(type: String?, value: Any): ConfigValue = when (type)
     // 触发键类（trigger_keys）：下拉里一项 = 逗号分隔的一组键名，空串 = 一个都不绑
     "str_list" -> ConfigValue.StrList(value.toString().split(LIST_SEPARATOR).filter { it.isNotBlank() })
     else -> ConfigValue.Str(value.toString())
+}
+
+/**
+ * 出厂快照里摊平后的值（Boolean / Long / Double / String / List）按注册表类型转成写入值，
+ * 页面「恢复默认」用它把出厂值写回（核心写入等于出厂值时会直接删键）
+ */
+internal fun rawConfigValue(type: String?, raw: Any): ConfigValue = when {
+    raw is List<*> -> ConfigValue.StrList(raw.map { it.toString() })
+    type == "bool" -> ConfigValue.Bool(RawValue.bool(raw))
+    type == "int" -> ConfigValue.Int((raw as? Number)?.toLong() ?: raw.toString().toLong())
+    type == "float" -> ConfigValue.Float((raw as? Number)?.toDouble() ?: raw.toString().toDouble())
+    raw is Boolean -> ConfigValue.Bool(raw)
+    else -> ConfigValue.Str(raw.toString())
 }
 
 /** 摊平后的配置值（Boolean / Long / Double / String / List）按设置项形态读出来，两种值来源共用 */
