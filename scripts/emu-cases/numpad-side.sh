@@ -93,7 +93,7 @@ check "键盘左列按新列表排" "/ - * %" "$(ns_side | cut -d' ' -f1-4)"
 tap_ime "左列·/"
 check "点左列新的第 1 格上屏" "/" "$(get_pad_text)"
 
-section "[66] 数字键盘符号：添加（重复拒绝、排到末尾）；恢复默认要点两下"
+section "[66] 数字键盘符号：添加（重复拒绝、排到末尾）；恢复默认弹框确认"
 ns_open
 ns_type_one
 tap_text "添加"
@@ -104,9 +104,9 @@ check "重复的拒绝并提示" "yes" "$(has_text '已有「1」')"
 check "重复的不写进配置" '/|-|*|%|=|,|:|@|#|(|)|1' "$(ns_cfg)"
 y="$(row_y_of 恢复默认)" || die "找不到「恢复默认」"
 adb_q shell input tap $(( GEO_W / 2 )) "$y"; sleep 1
-check "恢复默认点一下只是待确认" "yes|/|-|*|%|=|,|:|@|#|(|)|1" "$(has_text 再点一次确认恢复)|$(ns_cfg)"
-adb_q shell input tap $(( GEO_W / 2 )) "$y"; sleep 1
-check "再点一下写回出厂列表" "$NS_DEFAULTS" "$(ns_cfg)"
+check "恢复默认先弹确认框、不动配置" "yes|/|-|*|%|=|,|:|@|#|(|)|1" "$(has_text 恢复)|$(ns_cfg)"
+tap_text 恢复; sleep 1
+check "确认后写回出厂列表" "$NS_DEFAULTS" "$(ns_cfg)"
 
 section "[67] 键盘左列：惯性滑到底露出「自定义」，点开直达设置页"
 ns_numpad

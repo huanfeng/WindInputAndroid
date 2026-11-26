@@ -1,7 +1,6 @@
 package com.windinput.ime.settings
 
 import android.content.Context
-import android.os.SystemClock
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,7 +14,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -45,12 +43,6 @@ private const val PAGE_SIZE = 50u
 
 /** 搜索防抖 */
 private const val SEARCH_DEBOUNCE_MS = 250L
-
-/** 清空确认：第二下至少隔这么久（挡误触双击） */
-internal const val CONFIRM_MIN_GAP_MS = 600L
-
-/** 清空确认：这么久没点第二下就复位 */
-internal const val CONFIRM_RESET_MS = 5000L
 
 /**
  * 词库页：当前方案的个人词（自己加的、打字时学到的）。
@@ -105,7 +97,6 @@ private fun DictContent(
     var reload by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<UserWordInfo?>(null) }
     var confirmClear by remember { mutableStateOf(false) }
-    var confirmAt by remember { mutableLongStateOf(0L) }
     var newCode by remember { mutableStateOf("") }
     var newText by remember { mutableStateOf("") }
 
@@ -235,30 +226,21 @@ private fun DictContent(
     }
 
     if (mode != DictMode.WORDS) return
-    // 二次确认：第二下要隔开一点（误触双击不算），过一阵没点就复位（几分钟后再点不能直接清）
     if (confirmClear) {
-        LaunchedEffect(confirmAt) {
-            delay(CONFIRM_RESET_MS)
-            confirmClear = false
-        }
+        ConfirmDialog(
+            title = "清空个人词",
+            text = "「${schema.name}」的个人词全部删除，不能恢复。",
+            confirmText = "清空",
+            onConfirm = {
+                confirmClear = false
+                write("已清空") { it.userWordsClear(schema.id) }
+            },
+            onDismiss = { confirmClear = false },
+        )
     }
     SectionTitle("数据")
     Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow(
-            if (confirmClear) "再点一次确认清空" else "清空个人词",
-            if (confirmClear) "「${schema.name}」的个人词全部删除，不能恢复" else "删除当前方案的全部个人词",
-            icon = SettingsIcons.clear,
-            highlight = confirmClear,
-        ) {
-            val now = SystemClock.uptimeMillis()
-            if (!confirmClear) {
-                confirmClear = true
-                confirmAt = now
-            } else if (now - confirmAt >= CONFIRM_MIN_GAP_MS) {
-                confirmClear = false
-                write("已清空") { it.userWordsClear(schema.id) }
-            }
-        }
+        NavRow("清空个人词", "删除当前方案的全部个人词", icon = SettingsIcons.clear) { confirmClear = true }
     }
 }
 

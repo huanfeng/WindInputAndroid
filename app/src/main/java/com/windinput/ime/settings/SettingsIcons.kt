@@ -28,7 +28,6 @@ import top.yukonga.miuix.kmp.icon.extended.Paste
 import top.yukonga.miuix.kmp.icon.extended.Refresh
 import top.yukonga.miuix.kmp.icon.extended.Replace
 import top.yukonga.miuix.kmp.icon.extended.Report
-import top.yukonga.miuix.kmp.icon.extended.Reset
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Share
@@ -116,7 +115,8 @@ object SettingsIcons {
     val website: ImageVector get() = MiuixIcons.Link
     val feedback: ImageVector get() = MiuixIcons.Report
     val diagnostics: ImageVector get() = MiuixIcons.Send
-    val reset: ImageVector get() = MiuixIcons.Reset
+    // 恢复默认的行用循环箭头：MiuixIcons.Reset 是一个回转箭头，放在行首像「返回」
+    val reset: ImageVector get() = MiuixIcons.Refresh
     val fallback: ImageVector get() = MiuixIcons.Settings
 
     /** 「启用的方案」每行进方案详情页的按钮 */

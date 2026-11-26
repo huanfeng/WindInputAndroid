@@ -1,6 +1,5 @@
 package com.windinput.ime.settings
 
-import android.os.SystemClock
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -16,7 +15,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -33,7 +31,6 @@ import androidx.compose.ui.zIndex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -93,7 +90,7 @@ internal fun QuickSourcesEntry(onOpen: () -> Unit) {
  * 输入 → 快捷输入 →「快捷候选来源」：快捷输入模式下出哪些候选。
  *
  * 每行一个来源：开关决定有无，右侧手柄按住上下拖动排序（越过相邻行的一半即换位，抬手保存），
- * 列表顺序即候选优先级。底下恢复默认（点两下确认）。写的是核心 `schema.mix_modes` 里 quick_mix 的
+ * 列表顺序即候选优先级。底下恢复默认（弹框确认）。写的是核心 `schema.mix_modes` 里 quick_mix 的
  * members（电脑版设置「快捷候选来源」同一份），写完 ReloadConfig 即时生效。
  */
 @Composable
@@ -107,7 +104,6 @@ internal fun QuickSourcesSection(values: SettingsValues) {
     var dragOffset by remember { mutableFloatStateOf(0f) }
     val heights = remember { mutableStateMapOf<String, Float>() }
     var confirmRestore by remember { mutableStateOf(false) }
-    var confirmAt by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(Unit) {
         val (c, d) = loadMembers(context)
@@ -230,31 +226,19 @@ internal fun QuickSourcesSection(values: SettingsValues) {
     }
 
     if (confirmRestore) {
-        LaunchedEffect(confirmAt) {
-            delay(CONFIRM_RESET_MS)
-            confirmRestore = false
-        }
-    }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow(
-            if (confirmRestore) "再点一次确认恢复" else "恢复默认",
-            if (confirmRestore) {
-                "候选来源与顺序回到出厂设置"
-            } else {
-                QuickSources.summary(defaults)
-            },
-            icon = SettingsIcons.clear,
-            highlight = confirmRestore,
-        ) {
-            val now = SystemClock.uptimeMillis()
-            if (!confirmRestore) {
-                confirmRestore = true
-                confirmAt = now
-            } else if (now - confirmAt >= CONFIRM_MIN_GAP_MS) {
+        ConfirmDialog(
+            title = "恢复默认",
+            text = "候选来源与顺序回到出厂设置：${QuickSources.summary(defaults)}",
+            confirmText = "恢复",
+            onConfirm = {
                 confirmRestore = false
                 rows = QuickSources.rows(defaults)
                 save(defaults)
-            }
-        }
+            },
+            onDismiss = { confirmRestore = false },
+        )
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow("恢复默认", QuickSources.summary(defaults), icon = SettingsIcons.reset) { confirmRestore = true }
     }
 }

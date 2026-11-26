@@ -1,6 +1,5 @@
 package com.windinput.ime.settings
 
-import android.os.SystemClock
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
@@ -15,11 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -42,7 +39,6 @@ import com.windinput.ime.keyboard.T9SideSymbols
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -79,7 +75,7 @@ internal fun T9SymbolsSection() =
  * 九宫格左列符号表的编辑页（数字键盘与九宫格拼音共用，[configKey] / [defaults] 区分）。
  *
  * 每行一个符号：右侧手柄按住上下拖动排序（越过半行即换位，抬手保存）、垃圾桶删除；
- * 底下添加（去空白、重复拒绝、最多 4 个字符）与恢复默认（点两下确认，同「清空个人词」）。
+ * 底下添加（去空白、重复拒绝、最多 4 个字符）与恢复默认（弹框确认）。
  * 列表可以删空，键盘左列就只剩「自定义」格。输入法每次弹出键盘时重读，改完回去就生效。
  * 键盘左列最底下的「自定义」格直接跳到这一页。
  */
@@ -97,7 +93,6 @@ private fun SideSymbolsEditor(configKey: String, defaults: List<String>) {
     var dragging by remember { mutableStateOf<String?>(null) }
     var dragOffset by remember { mutableFloatStateOf(0f) }
     var confirmRestore by remember { mutableStateOf(false) }
-    var confirmAt by remember { mutableLongStateOf(0L) }
     val rowPx = with(LocalDensity.current) { ROW_HEIGHT.toPx() }
 
     fun save(list: List<String>) {
@@ -208,30 +203,21 @@ private fun SideSymbolsEditor(configKey: String, defaults: List<String>) {
         }
     }
 
-    // 二次确认：第二下要隔开一点（误触双击不算），过一阵没点就复位
     if (confirmRestore) {
-        LaunchedEffect(confirmAt) {
-            delay(CONFIRM_RESET_MS)
-            confirmRestore = false
-        }
-    }
-    Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow(
-            if (confirmRestore) "再点一次确认恢复" else "恢复默认",
-            if (confirmRestore) "列表回到出厂的 ${defaults.size} 个符号" else defaults.joinToString(" "),
-            icon = SettingsIcons.clear,
-            highlight = confirmRestore,
-        ) {
-            val now = SystemClock.uptimeMillis()
-            if (!confirmRestore) {
-                confirmRestore = true
-                confirmAt = now
-            } else if (now - confirmAt >= CONFIRM_MIN_GAP_MS) {
+        ConfirmDialog(
+            title = "恢复默认",
+            text = "符号列表回到出厂的 ${defaults.size} 个：${defaults.joinToString(" ")}",
+            confirmText = "恢复",
+            onConfirm = {
                 confirmRestore = false
                 message = null
                 save(defaults)
-            }
-        }
+            },
+            onDismiss = { confirmRestore = false },
+        )
+    }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow("恢复默认", defaults.joinToString(" "), icon = SettingsIcons.reset) { confirmRestore = true }
     }
 }
 

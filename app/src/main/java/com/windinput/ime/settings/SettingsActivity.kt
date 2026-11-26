@@ -543,11 +543,7 @@ private fun Screen(
                     }
                 },
                 actions = {
-                    titleActions.reset?.let { reset ->
-                        IconButton(onClick = reset, modifier = Modifier.padding(end = 12.dp)) {
-                            Icon(SettingsIcons.reset, contentDescription = "恢复默认")
-                        }
-                    }
+                    titleActions.reset?.let { reset -> TitleTextAction("恢复默认", reset) }
                 },
             )
         },

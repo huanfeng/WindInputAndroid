@@ -1,6 +1,8 @@
 package com.windinput.ime.settings
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,6 +25,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -32,6 +35,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 设置页的外框零件：标题栏的「恢复默认」、对话框按钮行、返回后恢复滚动位置。
@@ -56,6 +60,21 @@ internal fun ResetInTitle(onReset: () -> Unit) {
         holder.reset = { latest() }
         onDispose { holder.reset = null }
     }
+}
+
+/** 标题栏右侧的文字按钮：图标（回转箭头）容易被看成「返回」，直接写字 */
+@Composable
+internal fun TitleTextAction(text: String, onClick: () -> Unit) {
+    Text(
+        text,
+        modifier = Modifier
+            .padding(end = 12.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        color = MiuixTheme.colorScheme.primary,
+        fontSize = 16.sp,
+    )
 }
 
 /** 对话框底部按钮行：靠右，按钮之间留空（miuix 按钮自带底色，贴在一起像一整块） */

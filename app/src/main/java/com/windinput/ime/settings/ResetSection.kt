@@ -1,13 +1,10 @@
 package com.windinput.ime.settings
 
-import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -17,7 +14,6 @@ import androidx.compose.ui.platform.LocalContext
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.core.UserConfig
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
@@ -33,44 +29,34 @@ private enum class ResetTier(val title: String, val summary: String) {
 
 /**
  * 「高级」页底部的恢复默认设置。用户把配置改乱了，此前只能清数据，词库也跟着丢。
- * 三档分开恢复，都不动词库、扩展词库开关与导入的方案。确认方式同「清空个人词」：点两下。
+ * 三档分开恢复，都不动词库、扩展词库开关与导入的方案。点了先弹确认框。
  */
 @Composable
 internal fun ResetSection(values: SettingsValues) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var confirming by remember { mutableStateOf<ResetTier?>(null) }
-    var confirmAt by remember { mutableLongStateOf(0L) }
-    confirming?.let {
-        LaunchedEffect(it, confirmAt) {
-            delay(CONFIRM_RESET_MS)
-            confirming = null
-        }
-    }
 
-    SectionTitle("恢复默认")
-    Card(modifier = Modifier.fillMaxWidth()) {
-        for (tier in ResetTier.entries) {
-            val armed = confirming == tier
-            NavRow(
-                if (armed) "再点一次确认${tier.title}" else tier.title,
-                if (armed) "${tier.summary}。词库不受影响" else tier.summary,
-                icon = SettingsIcons.reset,
-                highlight = armed,
-            ) {
-                val now = SystemClock.uptimeMillis()
-                if (!armed) {
-                    confirming = tier
-                    confirmAt = now
-                    return@NavRow
-                }
-                if (now - confirmAt < CONFIRM_MIN_GAP_MS) return@NavRow
+    confirming?.let { tier ->
+        ConfirmDialog(
+            title = tier.title,
+            text = "${tier.summary}。词库不受影响。",
+            confirmText = "恢复",
+            onConfirm = {
                 confirming = null
                 scope.launch {
                     val message = withContext(Dispatchers.IO) { runReset(context, tier, values) }
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
-            }
+            },
+            onDismiss = { confirming = null },
+        )
+    }
+
+    SectionTitle("恢复默认")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        for (tier in ResetTier.entries) {
+            NavRow(tier.title, tier.summary, icon = SettingsIcons.reset) { confirming = tier }
         }
     }
 }

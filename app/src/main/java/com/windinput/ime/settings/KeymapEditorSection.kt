@@ -1,6 +1,5 @@
 package com.windinput.ime.settings
 
-import android.os.SystemClock
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -16,9 +15,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -43,7 +40,6 @@ import com.windinput.ime.keyboard.keymap.KeyOutput
 import com.windinput.ime.keyboard.keymap.KeymapMerge
 import com.windinput.ime.keyboard.keymap.KeymapParser
 import com.windinput.ime.keyboard.keymap.KeymapWriter
-import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -102,7 +98,6 @@ internal fun KeymapEditorSection() {
     // 不用 state：登记发生在事件里（输入框获得焦点），读取发生在点快捷符号时，都不该触发重组
     val quickTarget = remember { arrayOfNulls<(String) -> Unit>(1) }
     var confirmAll by remember { mutableStateOf(false) }
-    var confirmAt by remember { mutableLongStateOf(0L) }
 
     // 离开本页才落盘（最新的 edits 通过 rememberUpdatedState 之外的引用取：用 holder）
     val holder = remember { arrayOf(edits) }
@@ -182,28 +177,20 @@ internal fun KeymapEditorSection() {
     }
 
     if (confirmAll) {
-        LaunchedEffect(confirmAt) {
-            delay(CONFIRM_RESET_MS)
-            confirmAll = false
-        }
+        ConfirmDialog(
+            title = "全部恢复默认",
+            text = "本页自定义的 ${edits.size} 个键都回到出厂 / 预设。手写的 keymap.toml 不受影响。",
+            confirmText = "恢复",
+            onConfirm = {
+                confirmAll = false
+                edits = emptyMap()
+            },
+            onDismiss = { confirmAll = false },
+        )
     }
     if (edits.isNotEmpty()) {
         Card(modifier = Modifier.fillMaxWidth()) {
-            NavRow(
-                if (confirmAll) "再点一次确认全部恢复" else "全部恢复默认",
-                if (confirmAll) "本页自定义的 ${edits.size} 个键都回到出厂 / 预设（手写的 keymap.toml 不受影响）" else "清掉本页做过的所有自定义",
-                icon = SettingsIcons.clear,
-                highlight = confirmAll,
-            ) {
-                val now = SystemClock.uptimeMillis()
-                if (!confirmAll) {
-                    confirmAll = true
-                    confirmAt = now
-                } else if (now - confirmAt >= CONFIRM_MIN_GAP_MS) {
-                    confirmAll = false
-                    edits = emptyMap()
-                }
-            }
+            NavRow("全部恢复默认", "清掉本页做过的所有自定义", icon = SettingsIcons.reset) { confirmAll = true }
         }
     }
 }

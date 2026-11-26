@@ -1667,7 +1667,8 @@ phrases_restore_defaults() {
     scroll_top   # 「恢复默认」在系统短语列表之前
     local y
     y="$(row_y_of '系统短语恢复默认')" || die "找不到「系统短语恢复默认」"
-    adb_q shell input tap $(( GEO_W / 2 )) "$y"; sleep 1.5
+    adb_q shell input tap $(( GEO_W / 2 )) "$y"; sleep 1
+    tap_text 恢复; sleep 1.5   # 确认框
 }
 # 先恢复默认：上一次运行若中途断掉，tmts 可能还开着，下面「点一下开关」就成了关掉它
 phrases_restore_defaults

@@ -55,7 +55,7 @@ check "码表方案有「上屏」组" "yes" "$(row_y_of 上屏 >/dev/null && ec
 check "码表方案有「整句输入（实验性）」组" "yes" "$(row_y_of 整句输入（实验性） >/dev/null && echo yes || echo no)"
 ss_open_group 调频
 check "调频组列出全部参数（不折叠）" "yes" "$(has_text 调频策略)"
-check "标题栏有「恢复默认」" "yes" "$(dump_xml | grep -q 'content-desc="恢复默认"' && echo yes || echo no)"
+check "标题栏有「恢复默认」" "yes" "$(has_text 恢复默认)"
 check "行内不标「已自定义」" "no" "$(dump_xml | grep -q '已自定义' && echo yes || echo no)"
 ss_back
 ss_back
@@ -136,17 +136,17 @@ ss_tap_row 启用整句输入
 ss_back
 check "两项都写进了覆盖文件" "yes" "$(ov="$(ss_ov wubi86)"; grep -q 'mode = "english"' <<< "$ov" && grep -q 'sentence_input = true' <<< "$ov" && echo yes || echo no)"
 ss_open_group 自定义行为
-ss_tap_desc 恢复默认
+tap_text 恢复默认
 check "分组页恢复先确认，写明本组" "yes" "$(dump_xml | grep -q '「自定义行为」里改过的 1 项' && echo yes || echo no)"
 tap_text 恢复
 sleep 1.5
 ov="$(ss_ov wubi86)"
 check "分组恢复：本组的标点清掉" "no" "$(grep -q 'punct' <<< "$ov" && echo yes || echo no)"
 check "分组恢复：别组的整句开关仍在" "yes" "$(grep -q 'sentence_input = true' <<< "$ov" && echo yes || echo no)"
-ss_tap_desc 恢复默认
+tap_text 恢复默认
 check "本组已无改动时直接提示、不弹确认" "no" "$(dump_xml | grep -q 'text="恢复"' && echo yes || echo no)"
 ss_back
-ss_tap_desc 恢复默认
+tap_text 恢复默认
 check "第一屏恢复先确认，写明整个方案" "yes" "$(dump_xml | grep -q '本方案改过的 1 项设置' && echo yes || echo no)"
 tap_text 恢复
 sleep 1.5

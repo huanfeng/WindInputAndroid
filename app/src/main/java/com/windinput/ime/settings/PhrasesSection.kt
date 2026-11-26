@@ -52,6 +52,7 @@ internal fun PhrasesSection() {
     var newCode by remember { mutableStateOf("") }
     var newText by remember { mutableStateOf("") }
     var selected by remember { mutableStateOf<PhraseInfo?>(null) }
+    var confirmRestore by remember { mutableStateOf(false) }
 
     LaunchedEffect(reload) {
         val result = withContext(Dispatchers.IO) {
@@ -152,10 +153,20 @@ internal fun PhrasesSection() {
     SectionTitle("系统短语 · ${system.size} 条")
     // 恢复默认放在列表前：系统短语七十多条、每条两三行，放在末尾要翻到底才找得到
     Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow("系统短语恢复默认", "开关回到出厂设定（出厂关闭的仍关闭），自己加的不动") {
-            // 核心同步系统短语失败时只记日志、返回 0（成功时是系统短语条数，不会是 0）
-            write("已恢复默认") { if (it.phrasesRestoreDefaults() == 0uL) "恢复失败，系统短语没有改动" else null }
-        }
+        NavRow("系统短语恢复默认", "开关回到出厂设定（出厂关闭的仍关闭），自己加的不动") { confirmRestore = true }
+    }
+    if (confirmRestore) {
+        ConfirmDialog(
+            title = "系统短语恢复默认",
+            text = "${system.size} 条系统短语的开关回到出厂设定，出厂关闭的仍关闭。自己加的短语不动。",
+            confirmText = "恢复",
+            onConfirm = {
+                confirmRestore = false
+                // 核心同步系统短语失败时只记日志、返回 0（成功时是系统短语条数，不会是 0）
+                write("已恢复默认") { if (it.phrasesRestoreDefaults() == 0uL) "恢复失败，系统短语没有改动" else null }
+            },
+            onDismiss = { confirmRestore = false },
+        )
     }
     Card(modifier = Modifier.fillMaxWidth()) {
         if (system.isEmpty()) NavRow("没有找到", null, null)

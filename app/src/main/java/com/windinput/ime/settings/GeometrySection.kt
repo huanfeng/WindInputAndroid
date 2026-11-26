@@ -50,6 +50,7 @@ internal fun GeometrySection() {
     val store = remember { dirs.skinStore() }
     val rowHeightDp = remember { UserConfig(dirs.keyboardConfigFile).getInt("ui.android.row_height_portrait", 60) }
     var adjust by remember { mutableStateOf(store.geometryAdjust()) }
+    var confirmAll by remember { mutableStateOf(false) }
     val base = remember { SkinGeometry() }
 
     fun save(a: GeometryAdjust) {
@@ -108,7 +109,19 @@ internal fun GeometrySection() {
             onFinish = { save(adjust) },
             onReset = { save(adjust.copy(labelScale = null)) },
         )
-        NavRow("全部恢复默认", "四项都回到出厂值") { save(GeometryAdjust()) }
+        NavRow("全部恢复默认", "四项都回到出厂值") { confirmAll = true }
+    }
+    if (confirmAll) {
+        ConfirmDialog(
+            title = "全部恢复默认",
+            text = "键间距、行间距、键帽圆角、键面字号四项都回到出厂值。",
+            confirmText = "恢复",
+            onConfirm = {
+                confirmAll = false
+                save(GeometryAdjust())
+            },
+            onDismiss = { confirmAll = false },
+        )
     }
 }
 

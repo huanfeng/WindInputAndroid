@@ -208,14 +208,14 @@ check "关掉英文后候选里没有 man" "no" "$(qs_has_man)"
 tap_key SPACE; sleep 0.5
 check_match "空格上屏汉字" '^[\x{4e00}-\x{9fa5}]+$' "$(get_pad_text)"
 
-section "[90] 快捷候选来源：恢复默认（点两下）回到出厂来源与顺序"
+section "[90] 快捷候选来源：恢复默认（弹框确认）回到出厂来源与顺序"
 qs_open
 # 恢复默认在列表底下：先滚到底
 adb_q shell input swipe 540 1900 540 500 300; sleep 0.6
 adb_q shell input swipe 540 1900 540 500 300; sleep 0.8
 tap_text "恢复默认"
 sleep 0.4
-tap_text "再点一次确认恢复"
+tap_text "恢复"
 sleep 1.2
 check "与出厂一致：用户层不留 members" "" "$(qs_members)"
 qs_type_man

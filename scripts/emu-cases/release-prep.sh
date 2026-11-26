@@ -64,7 +64,7 @@ adb_q shell input keyevent BACK
 sleep 1
 rp_back_to_pad
 
-section "[78] 高级：恢复键盘设置清掉 ui.android.*（点两下确认），词库与输入设置不动"
+section "[78] 高级：恢复键盘设置清掉 ui.android.*（弹框确认），词库与输入设置不动"
 # 基线配置 + 一项改过的键盘设置；恢复后 [ui.android] 里一项都不剩
 write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG" | grep -vE '^[[:space:]]*haptic[[:space:]]*=' |
     awk '{ print } /^[[:space:]]*\[ui\.android\][[:space:]]*(#.*)?$/ { print "haptic = false" }')"
@@ -74,9 +74,8 @@ core_before="$(read_core_cfg)"
 rp_settings advanced
 read -r rx ry <<< "$(rp_center 恢复键盘设置)" || true
 if [[ -n "${ry:-}" ]]; then
-    # 两下之间要隔 0.6 秒以上（挡误触双击），又不能超过 5 秒（自动复位）：按坐标点，不在中间再 dump
-    adb_q shell input tap "$rx" "$ry"; sleep 1.2
-    adb_q shell input tap "$rx" "$ry"; sleep 2
+    adb_q shell input tap "$rx" "$ry"; sleep 1
+    tap_text 恢复; sleep 2   # 确认框
 fi
 kb_after="$(adb_ shell cat "$KB_CFG")"
 check "恢复后 haptic / candidate_comment 都清掉了" "no no" \
