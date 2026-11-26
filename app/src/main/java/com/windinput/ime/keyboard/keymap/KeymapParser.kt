@@ -29,7 +29,7 @@ object KeymapParser {
      */
     val FUNC_WHITELIST = setOf(
         "punct_toggle", "one_hand", "undo", "redo", "symbol_page", "clipboard",
-        "select_all", "cut", "copy", "paste", "history", "para_start", "para_end", "candidate_2",
+        "select_all", "cut", "copy", "paste", "history", "para_start", "para_end", "candidate_2", "candidate_3",
     )
 
     private val OUTPUT_FIELDS = setOf("char", "text", "template", "phrase", "func")

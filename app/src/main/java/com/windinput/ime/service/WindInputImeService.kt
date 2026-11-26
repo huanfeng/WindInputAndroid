@@ -303,9 +303,11 @@ class WindInputImeService :
                     ),
                     layer,
                 )
-                // R7：开关（默认关）打开时，空格 / 中英键的空上滑槽在预编辑时选第二候选；用户绑过的不碰
-                if (layer != KeyboardLayer.NUMBER && userConfig.getBoolean(KEY_SECOND_CANDIDATE_SWIPE, false)) {
-                    KeymapMerge.fillSecondCandidate(merged)
+                // R7：开关（默认关）打开时，空格上滑选第二候选、中英键上滑选第三候选；用户绑过的不碰
+                val space = userConfig.getBoolean(KEY_SECOND_CANDIDATE_SWIPE, false)
+                val lang = userConfig.getBoolean(KEY_THIRD_CANDIDATE_SWIPE, false)
+                if (layer != KeyboardLayer.NUMBER && (space || lang)) {
+                    KeymapMerge.fillCandidateSwipes(merged, space = space, lang = lang)
                 } else {
                     merged
                 }
@@ -352,6 +354,7 @@ class WindInputImeService :
         /** 单手模式：off / left / right；last 记着上次用的那一侧，快捷面板重新打开时回到它 */
         const val KEY_ONE_HAND = "ui.android.one_hand"
         const val KEY_SECOND_CANDIDATE_SWIPE = "ui.android.second_candidate_swipe"
+        const val KEY_THIRD_CANDIDATE_SWIPE = "ui.android.third_candidate_swipe"
         const val KEY_T9_SIDE_READINGS = "ui.android.t9.side_readings"
 
         /** 用九宫格布局的方案 id 集合（statePrefs）：布局按方案记，键盘列表里选哪格就记哪种 */
@@ -1178,8 +1181,9 @@ class WindInputImeService :
             "symbol_page" -> onKeyAction(KeyAction.SymbolPage, shifted = false)
             "punct_toggle" -> session.runCommand(EngineCmd.TogglePunct)
             "one_hand" -> onToggleOneHand()
-            // R7：预编辑时选第二候选；没有编码 / 候选不足时什么也不做
+            // R7：预编辑时选第二 / 第三候选；没有编码 / 候选不足时什么也不做
             "candidate_2" -> if (composing && loadedCandidates.size > 1) onCandidateSelected(1)
+            "candidate_3" -> if (composing && loadedCandidates.size > 2) onCandidateSelected(2)
         }
     }
 

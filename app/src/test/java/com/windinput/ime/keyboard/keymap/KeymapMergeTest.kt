@@ -126,23 +126,40 @@ class KeymapMergeTest {
     }
 
     @Test
-    fun secondCandidateFillsOnlyEmptySlotsOfSpaceAndLangKey() {
-        val filled = KeymapMerge.fillSecondCandidate(rows)
-        val special = filled.flatten().filter { it.action == KeyAction.Space || it.action == KeyAction.SwitchLang }
-        assertTrue(special.isNotEmpty())
-        assertTrue(special.all { it.upOut == KeyOutput.Func("candidate_2") })
+    fun spaceSwipePicksSecondAndLangSwipePicksThird() {
+        val filled = KeymapMerge.fillCandidateSwipes(rows, space = true, lang = true).flatten()
+        val spaces = filled.filter { it.action == KeyAction.Space }
+        val langs = filled.filter { it.action == KeyAction.SwitchLang }
+        assertTrue(spaces.isNotEmpty() && langs.isNotEmpty())
+        assertTrue(spaces.all { it.upOut == KeyOutput.Func("candidate_2") })
+        assertTrue(langs.all { it.upOut == KeyOutput.Func("candidate_3") })
         // 其余键一个字节都不变
         val others = { l: List<List<KeyDef>> -> l.flatten().filter { it.action != KeyAction.Space && it.action != KeyAction.SwitchLang } }
-        assertEquals(others(rows), others(filled))
+        assertEquals(others(rows), others(KeymapMerge.fillCandidateSwipes(rows, space = true, lang = true)))
     }
 
     @Test
-    fun secondCandidateKeepsUserBoundSlot() {
+    fun eachSwipeSwitchIsIndependent() {
+        val onlySpace = KeymapMerge.fillCandidateSwipes(rows, space = true, lang = false).flatten()
+        assertTrue(onlySpace.filter { it.action == KeyAction.SwitchLang }.all { it.upOut == null })
+        val onlyLang = KeymapMerge.fillCandidateSwipes(rows, space = false, lang = true).flatten()
+        assertTrue(onlyLang.filter { it.action == KeyAction.Space }.all { it.upOut == null })
+        assertTrue(onlyLang.filter { it.action == KeyAction.SwitchLang }.all { it.upOut == KeyOutput.Func("candidate_3") })
+    }
+
+    @Test
+    fun candidateSwipeKeepsUserBoundSlot() {
         val bound = merge("[layer.letters.key.space]\nswipe_up = { func = \"paste\" }")
         val space = bound.flatten().first { it.action == KeyAction.Space }
         assertEquals(KeyOutput.Func("paste"), space.upOut)
-        val filled = KeymapMerge.fillSecondCandidate(bound).flatten().first { it.action == KeyAction.Space }
+        val filled = KeymapMerge.fillCandidateSwipes(bound, space = true, lang = true).flatten().first { it.action == KeyAction.Space }
         assertEquals(KeyOutput.Func("paste"), filled.upOut)
+    }
+
+    @Test
+    fun thirdCandidateIsAnImplementedFunc() {
+        assertTrue("candidate_3" in KeymapMerge.IMPLEMENTED_FUNCS)
+        assertEquals("三选", KeymapMerge.outputLabel(KeyOutput.Func("candidate_3")))
     }
 
     @Test

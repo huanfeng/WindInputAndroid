@@ -25,7 +25,7 @@ internal object KeymapEdit {
     /** 功能下拉的可选项（= 已实现的白名单，按常用次序） */
     val FUNC_CHOICES = listOf(
         "select_all", "cut", "copy", "paste", "undo", "redo", "para_start", "para_end",
-        "clipboard", "symbol_page", "punct_toggle", "one_hand", "candidate_2",
+        "clipboard", "symbol_page", "punct_toggle", "one_hand", "candidate_2", "candidate_3",
     ).also { check(KeymapMerge.IMPLEMENTED_FUNCS.containsAll(it)) }
 
     /** 模板的常用写法（输入框里也可以自己拼，如 `今天是{date_cn}`） */

@@ -64,3 +64,28 @@ check "z 上滑：上屏设备当天日期" "$(adb_ shell date +%Y-%m-%d | tr -d
 adb_q shell rm -f "$KM_DIR/keymap.toml"
 restart_pad
 reset_pad
+
+# ── [97] R7：空格上滑选第二候选、中英键上滑选第三候选（两个开关各管各的）─────────────────
+section "[97] 有编码时空格上滑选第二候选、中英键上滑选第三候选"
+write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG" | sed 's/^candidate_comment = false # emu-test$/&\nsecond_candidate_swipe = true # emu-test\nthird_candidate_swipe = true # emu-test/')"
+restart_pad
+[[ -n "$(wait_chinese)" ]] || die "开候选上滑后起不来中文"
+reset_pad
+tap_key a; tap_key a; tap_key SPACE
+r7_first="$(get_pad_text)"
+reset_pad
+tap_key a; tap_key a; km_swipe SPACE -3
+r7_second="$(get_pad_text)"
+reset_pad
+tap_key a; tap_key a; km_swipe LANG -3
+r7_third="$(get_pad_text)"
+check_match "空格上滑上屏一个汉字候选" '^[\x{4e00}-\x{9fa5}]+$' "$r7_second"
+check_match "中英键上滑上屏一个汉字候选" '^[\x{4e00}-\x{9fa5}]+$' "$r7_third"
+check "三者互不相同（首选 / 第二 / 第三）" "yes" \
+    "$([[ "$r7_first" != "$r7_second" && "$r7_first" != "$r7_third" && "$r7_second" != "$r7_third" ]] && echo yes || echo "no: $r7_first $r7_second $r7_third")"
+reset_pad
+km_swipe SPACE -3
+check "没有编码时空格上滑什么也不出" "" "$(get_pad_text)"
+write_kb_cfg "$(with_comment_off "$SUITE_KB_ORIG")"
+restart_pad
+reset_pad

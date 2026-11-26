@@ -811,7 +811,7 @@ class KeyboardView(context: Context) : View(context) {
             textPaint.textSize = labelSizePx(label)
             val isLetter = (key.action as? KeyAction.Text)?.char?.isLetter() == true
             // 预编辑次选（R7）的上滑藏着：空格 / 中英键上常驻一个「次选」角标没意义（没编码时它什么也不做）
-            val hint = if (isLetter && !showSwipeHints || (key.upOut as? KeyOutput.Func)?.name == "candidate_2") null else upLabelOf(key)
+            val hint = if (isLetter && !showSwipeHints || (key.upOut as? KeyOutput.Func)?.name in CANDIDATE_SWIPES) null else upLabelOf(key)
             val downHint = if (isLetter && !showSwipeHints) null else downLabelOf(key)
             // 有角标的字母键：主字下移一点，给顶上居中的角标让出位置（豆包的排法）
             val shiftDown = if (hint != null && isLetter) 4 * density else 0f
@@ -1526,3 +1526,6 @@ internal fun symbolActionFor(c: Char, chinesePunct: Boolean): KeyAction = when {
     c == '”' || c == '“' -> if (chinesePunct) KeyAction.Commit(c.toString()) else KeyAction.Text('"')
     else -> KeyAction.Commit(c.toString())
 }
+
+/** 选候选的上滑（R7）：不画角标——空格 / 中英键上本来就没有字可写，画个「次选」反而像要上屏的字 */
+private val CANDIDATE_SWIPES = setOf("candidate_2", "candidate_3")

@@ -23,7 +23,7 @@ object KeymapMerge {
     /** 阶段 1 已实现的功能动作；白名单里其余名字（punct_toggle / one_hand / history）等阶段 2 */
     val IMPLEMENTED_FUNCS = setOf(
         "select_all", "cut", "copy", "paste", "undo", "redo", "para_start", "para_end", "clipboard", "symbol_page",
-        "punct_toggle", "one_hand", "candidate_2",
+        "punct_toggle", "one_hand", "candidate_2", "candidate_3",
     )
     // history（输入历史）没有现成的键盘侧入口（核心的「快捷输入历史」是候选来源，不是面板），仍留在白名单里但跳过并告警
 
@@ -42,6 +42,7 @@ object KeymapMerge {
         "punct_toggle" -> "标点"
         "one_hand" -> "单手"
         "candidate_2" -> "次选"
+        "candidate_3" -> "三选"
         "history" -> "历史"
         else -> name
     }
@@ -127,16 +128,18 @@ object KeymapMerge {
     }
 
     /**
-     * R7（开关打开时由 Service 调用）：空格 / 中英切换键的上滑本来是空槽，在预编辑时拿它选第二候选。
+     * R7（开关打开时由 Service 调用）：空格 / 中英切换键的上滑本来是空槽，在预编辑时拿来选候选——
+     * [space] 空格上滑选第二候选，[lang] 中英键上滑选第三候选，两个开关各管各的。
      * **只填空槽**：用户在 keymap.toml 里绑过的、或本来就有上滑字符的键不碰；没有编码时 Service 侧什么也不做。
      */
-    fun fillSecondCandidate(rows: List<List<KeyDef>>): List<List<KeyDef>> = rows.map { row ->
+    fun fillCandidateSwipes(rows: List<List<KeyDef>>, space: Boolean, lang: Boolean): List<List<KeyDef>> = rows.map { row ->
         row.map { k ->
-            if ((k.action == KeyAction.Space || k.action == KeyAction.SwitchLang) && k.upOut == null && k.swipeUp == null) {
-                k.copy(upOut = KeyOutput.Func("candidate_2"))
-            } else {
-                k
+            val func = when {
+                space && k.action == KeyAction.Space -> "candidate_2"
+                lang && k.action == KeyAction.SwitchLang -> "candidate_3"
+                else -> null
             }
+            if (func != null && k.upOut == null && k.swipeUp == null) k.copy(upOut = KeyOutput.Func(func)) else k
         }
     }
 
