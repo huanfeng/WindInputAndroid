@@ -296,4 +296,62 @@ class SettingsManifestTest {
         val keys = bundled.itemsOf("schema").map { it.key }
         assertTrue("方案页只剩模糊音：$keys", keys.all { it.startsWith("input.fuzzy.") })
     }
+
+    // ── 文案：短说明常驻一行，长的放进 ⓘ（docs/mobile-ux-reference.md「设置说明」）──────────
+
+    /** 汉字算 1，ASCII 算半个：手机一行大约放得下 20 个汉字 */
+    private fun width(s: String) = s.sumOf { if (it.code < 256) 0.5 else 1.0 }
+
+    @Test
+    fun summariesFitOneLine() {
+        val long = bundled.items.filter { (it.summary?.let(::width) ?: 0.0) > SUMMARY_MAX }
+        assertTrue("短说明超过 $SUMMARY_MAX 字（长的挪进 detail）：${long.map { it.key to it.summary }}", long.isEmpty())
+        val period = bundled.items.filter { it.summary?.endsWith("。") == true }
+        assertTrue("短说明不加句号：${period.map { it.key }}", period.isEmpty())
+    }
+
+    @Test
+    fun detailsStayShortAndAddSomething() {
+        val long = bundled.items.filter { (it.detail?.let(::width) ?: 0.0) > DETAIL_MAX }
+        assertTrue("详细说明超过 $DETAIL_MAX 字：${long.map { it.key }}", long.isEmpty())
+        val same = bundled.items.filter { it.detail != null && it.detail == it.summary }
+        assertTrue("详细说明与短说明重复：${same.map { it.key }}", same.isEmpty())
+    }
+
+    @Test
+    fun detailIsParsedAndBlankMeansNone() {
+        val m = SettingsManifest.parse(
+            """
+            [[page]]
+            id = "a"
+            [[item]]
+            page = "a"
+            key = "input.x"
+            source = "engine"
+            title = "X"
+            summary = "短"
+            detail = "长说明"
+            [[item]]
+            page = "a"
+            key = "input.y"
+            source = "engine"
+            title = "Y"
+            detail = ""
+            """.trimIndent(),
+        )
+        assertEquals("长说明", m.items[0].detail)
+        assertEquals(null, m.items[1].detail)
+    }
+
+    /** 核心已退役或根本没注册的键：写了也不起作用，不能出现在清单里 */
+    @Test
+    fun deadEngineKeysAreGone() {
+        val dead = setOf("schema.pinyin.code_hint_source", "schema.pinyin.english_merge.prefix_complete")
+        assertTrue(bundled.items.none { it.key in dead })
+    }
+
+    private companion object {
+        const val SUMMARY_MAX = 20.0
+        const val DETAIL_MAX = 100.0
+    }
 }

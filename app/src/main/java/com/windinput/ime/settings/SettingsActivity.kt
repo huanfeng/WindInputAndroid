@@ -68,6 +68,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModelProvider
@@ -935,7 +936,7 @@ internal fun ItemRow(raw: SettingItem, values: ItemValues, enabled: Boolean = tr
         scope.launch { withContext(Dispatchers.IO) { values.set(raw, v) } }
     }
     when (item.type) {
-        "toggle" -> ToggleLine(item.title, item.summary, values.bool(item), enabled) { write(it) }
+        "toggle" -> ToggleLine(item.title, item.summary, values.bool(item), enabled, item.detail) { write(it) }
         "int" -> IntRow(item, values.int(item), enabled) { write(it) }
         "select" -> SelectRow(item, values.choice(item), enabled) { write(it) }
         "text" -> TextRow(item, values.text(item)) { v ->
@@ -1233,14 +1234,19 @@ private fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit, sum
 private fun SelectRow(item: SettingItem, value: String, enabled: Boolean = true, onValueChange: (String) -> Unit) {
     val labels = item.options.map { it.second }
     val index = item.options.indexOfFirst { it.first == value }.coerceAtLeast(0)
-    WindowDropdownPreference(
-        items = labels,
-        selectedIndex = index,
-        title = item.title,
-        summary = item.summary,
-        enabled = enabled,
-        onSelectedIndexChange = { i -> item.options.getOrNull(i)?.let { onValueChange(it.first) } },
-    )
+    // 下拉组件没有尾部插槽，ⓘ 只能挨在它右边（当前值与箭头之后）
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        WindowDropdownPreference(
+            items = labels,
+            selectedIndex = index,
+            title = item.title,
+            summary = item.summary,
+            modifier = Modifier.weight(1f),
+            enabled = enabled,
+            onSelectedIndexChange = { i -> item.options.getOrNull(i)?.let { onValueChange(it.first) } },
+        )
+        item.detail?.let { Box(Modifier.padding(end = 8.dp)) { InfoButton(item.title, it) } }
+    }
 }
 
 /**
@@ -1257,11 +1263,11 @@ private fun IntRow(item: SettingItem, value: Int, enabled: Boolean = true, onVal
     Column(modifier = Modifier.fillMaxWidth().padding(16.dp).alpha(if (enabled) 1f else DISABLED_ALPHA)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = item.title)
+                TitleWithInfo(item)
                 item.summary?.let {
                     Text(
                         text = it,
-                        modifier = Modifier.padding(top = 2.dp),
+                        style = MiuixTheme.textStyles.body2,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     )
                 }
@@ -1339,6 +1345,7 @@ internal fun ToggleLine(
     summary: String?,
     checked: Boolean,
     enabled: Boolean = true,
+    detail: String? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     SwitchPreference(
@@ -1346,8 +1353,20 @@ internal fun ToggleLine(
         onCheckedChange = onCheckedChange,
         title = title,
         summary = summary,
+        // ⓘ 放在开关左边：点它只看说明，不会顺带拨动开关
+        endActions = { detail?.let { InfoButton(title, it) } },
         enabled = enabled,
     )
+}
+
+/** 自己画标题的行（数值、文本框）：标题后面紧跟 ⓘ */
+@Composable
+internal fun TitleWithInfo(item: SettingItem) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        // 字体照 miuix 的 BasicComponent（标题 headline1 + Medium、说明 body2），与开关行、下拉行一致
+        Text(text = item.title, style = MiuixTheme.textStyles.headline1, fontWeight = FontWeight.Medium)
+        item.detail?.let { InfoButton(item.title, it) }
+    }
 }
 
 /** 不可用行（数值行自己画，没有组件自带的灰态）的透明度 */

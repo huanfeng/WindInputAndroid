@@ -34,6 +34,7 @@ data class SettingItem(
     /** toggle / select / int */
     val type: String,
     val title: String,
+    /** 短说明：常驻在标题下一行，一句话（≤ 20 字） */
     val summary: String?,
     /** 仅 android 项；引擎项的值来自核心 */
     val defaultValue: Any?,
@@ -59,6 +60,8 @@ data class SettingItem(
     val hardware: Boolean = false,
     /** 方案表单项适用的方案类型（pinyin / shuangpin / codetable / mixed / english）；只在 scheme_form 页写 */
     val schemes: List<String> = emptyList(),
+    /** 详细说明：行尾 ⓘ 点开才看（原理、例子、例外、默认值）；null = 不画 ⓘ */
+    val detail: String? = null,
 )
 
 data class SettingsManifestData(
@@ -146,6 +149,7 @@ object SettingsManifest {
                 type = t.getString("type") ?: "toggle",
                 title = t.getString("title") ?: "",
                 summary = t.getString("summary"),
+                detail = t.getString("detail")?.ifBlank { null },
                 defaultValue = t.get("default"),
                 min = t.getLong("min")?.toInt(),
                 max = t.getLong("max")?.toInt(),

@@ -36,9 +36,9 @@ internal fun TextRow(item: SettingItem, value: String, onCommit: suspend (String
         modifier = Modifier.fillMaxWidth().padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(text = item.title)
+        TitleWithInfo(item)
         item.summary?.let {
-            Text(text = it, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+            Text(text = it, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
         }
         TextField(
             value = draft,

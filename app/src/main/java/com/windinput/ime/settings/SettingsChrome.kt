@@ -2,6 +2,7 @@ package com.windinput.ime.settings
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -33,8 +35,11 @@ import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Info
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -107,6 +112,42 @@ internal fun ConfirmDialog(
                     TextButton(text = "取消", onClick = onDismiss)
                     TextButton(text = confirmText, onClick = onConfirm)
                 }
+            }
+        }
+    }
+}
+
+/**
+ * 设置项的 ⓘ：短说明常驻一行，原理、例子、例外这些放进来，点开才看（与电脑版悬停看完整说明对应）。
+ * 图标小、颜色跟说明文字一样淡，不跟开关抢眼；点按区域仍有 36dp。
+ */
+@Composable
+internal fun InfoButton(title: String, detail: String) {
+    var open by remember { mutableStateOf(false) }
+    Icon(
+        imageVector = MiuixIcons.Info,
+        contentDescription = "$title 的说明",
+        modifier = Modifier
+            .clip(CircleShape)
+            .clickable { open = true }
+            .padding(8.dp)
+            .size(20.dp),
+        tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+    )
+    if (open) InfoDialog(title, detail) { open = false }
+}
+
+/** 只读说明框：一个「知道了」 */
+@Composable
+internal fun InfoDialog(title: String, text: String, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(Modifier.padding(horizontal = 20.dp).fillMaxWidth()) {
+            Column(Modifier.padding(20.dp)) {
+                Text(title, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(12.dp))
+                Text(text)
+                Spacer(Modifier.height(16.dp))
+                DialogButtons { TextButton(text = "知道了", onClick = onDismiss) }
             }
         }
     }

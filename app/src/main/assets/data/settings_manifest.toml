@@ -122,7 +122,8 @@ key = "input.fuzzy.enabled"
 source = "engine"
 type = "toggle"
 title = "模糊音"
-summary = "打开后勾选要互不区分的拼音对"
+summary = "下方勾选的拼音对互不区分，打错也能出字"
+detail = "适合分不清平翘舌、前后鼻音等口音。只对拼音生效，勾选的每一对都是双向互通。"
 
 [[item]]
 page = "schema"
@@ -280,6 +281,8 @@ key = "schema.pinyin.shuangpin.allow_full_pinyin"
 source = "engine"
 type = "toggle"
 title = "双拼时允许全拼输入"
+summary = "双拼方案下也能按全拼打字"
+detail = "如打 zaijian 出「再见」。"
 
 [[item]]
 page = "scheme_form"
@@ -289,6 +292,7 @@ key = "schema.pinyin.single_char"
 source = "engine"
 type = "toggle"
 title = "单字输入"
+summary = "候选只出单字，不出词组"
 
 [[item]]
 page = "scheme_form"
@@ -298,6 +302,8 @@ key = "schema.pinyin.abbrev.enabled"
 source = "engine"
 type = "toggle"
 title = "启用简拼"
+summary = "只打声母也能出词"
+detail = "如 nh → 你好、bzd → 不知道，也可与全拼混打（nhao）。"
 
 [[item]]
 page = "scheme_form"
@@ -307,27 +313,13 @@ key = "schema.pinyin.separator"
 source = "engine"
 type = "select"
 title = "拼音分隔符"
-summary = "消歧用，如输入 xi'an 得到「西安」。自动 = 默认用 '，' 被选择键占用时改用 `"
+summary = "手动切开音节用的符号"
+detail = "如输入 xi'an 得到「西安」。「自动」默认用 '，' 被选择键占用时改用 `。"
 options = [
   { value = "auto", label = "自动" },
   { value = "quote", label = "单引号 '" },
   { value = "backtick", label = "反引号 `" },
   { value = "none", label = "不使用" },
-]
-
-[[item]]
-page = "scheme_form"
-section = "基本"
-schemes = ["pinyin", "shuangpin"]
-key = "schema.pinyin.code_hint_source"
-source = "engine"
-type = "select"
-title = "编码提示来源"
-options = [
-  { value = "auto", label = "自动" },
-  { value = "codetable", label = "码表反查" },
-  { value = "shuangpin", label = "双拼编码" },
-  { value = "off", label = "不显示" },
 ]
 
 # 九宫格键盘组：「启用九宫格键盘布局」开关与九宫格标点由代码画（键盘配置 ui.android.t9.*，不按方案存），
@@ -340,7 +332,8 @@ key = "ui.android.t9.side_readings"
 source = "android"
 type = "toggle"
 title = "打字时左栏列拼音读法"
-summary = "打字时左栏换成当前这几个键能读成的拼音，点一个先定下这一段的读音。关掉则左栏一直是标点，直接翻候选（所有全拼方案共用）"
+summary = "左栏列出按键能拼成的读音"
+detail = "点一个读音先定下这一段，再选候选。关掉则左栏一直是标点。所有全拼方案共用。"
 default = true
 
 [[item]]
@@ -351,6 +344,7 @@ key = "schema.pinyin.use_smart_compose"
 source = "engine"
 type = "toggle"
 title = "智能组词"
+summary = "连打一串拼音时拼出整句候选"
 
 [[item]]
 page = "scheme_form"
@@ -360,7 +354,8 @@ key = "schema.pinyin.sentence_uses_user_words"
 source = "engine"
 type = "toggle"
 title = "组词时使用自造词"
-summary = "智能组词时把你造过的词也算进去。关闭时整句只用系统词库，自造的词打整句时不认"
+summary = "整句里也认你造过的词"
+detail = "关闭时整句只用系统词库，自造词单独打得出，打整句时会被拆开。"
 enabled_when = "schema.pinyin.use_smart_compose"
 
 [[item]]
@@ -371,7 +366,8 @@ key = "schema.pinyin.sentence_count"
 source = "engine"
 type = "int"
 title = "智能组词显示条数"
-summary = "候选里同时列出几种整句解读，1 = 只出一条"
+summary = "候选里同时列出几种整句"
+detail = "1 = 只出一条。调大后次优的整句也排在前面，便于比较。"
 enabled_when = "schema.pinyin.use_smart_compose"
 min = 1
 max = 8
@@ -384,7 +380,8 @@ key = "schema.pinyin.sentence_max_count"
 source = "engine"
 type = "int"
 title = "智能组词备选条数"
-summary = "一共算几种整句解读；少于显示条数时按显示条数算"
+summary = "整句切换键可轮换的总条数"
+detail = "一共算几种整句解读。少于显示条数时按显示条数算。"
 enabled_when = "schema.pinyin.use_smart_compose"
 min = 1
 max = 8
@@ -397,7 +394,8 @@ key = "schema.pinyin.grammar.enabled"
 source = "engine"
 type = "toggle"
 title = "整句语法模型"
-summary = "按上下文搭配给整句挑更通顺的结果，如 womenzaigongyuanjianmian 出「我们在公园见面」而非「公元」"
+summary = "按上下文搭配挑选更通顺的整句"
+detail = "如 womenzaigongyuanjianmian 出「我们在公园见面」而非「公元」。实测整句首选准确率约高 5 个百分点。"
 
 [[item]]
 page = "scheme_form"
@@ -406,8 +404,9 @@ schemes = ["pinyin", "shuangpin"]
 key = "schema.pinyin.completion.min_syllables"
 source = "engine"
 type = "int"
-title = "词组补全最少音节数"
-summary = "输入达到几个音节才给词组候选，1 = 不限制"
+title = "最少音节数"
+summary = "打够几个音节才给词组候选"
+detail = "1 = 不限制，单个字母也给。"
 min = 1
 max = 6
 unit = "个音节"
@@ -419,8 +418,9 @@ schemes = ["pinyin", "shuangpin"]
 key = "schema.pinyin.completion.max_extra_syllables"
 source = "engine"
 type = "int"
-title = "词组最多超出音节数"
-summary = "词组最多比已输入的多几个音节，越小越贴近已打的字"
+title = "最多超出音节数"
+summary = "词组最多比已打的多几个音节"
+detail = "数值越小，候选越贴近已打的字。"
 min = 0
 max = 10
 unit = "个音节"
@@ -433,17 +433,8 @@ key = "schema.pinyin.english_merge.enable"
 source = "engine"
 type = "toggle"
 title = "英文候选"
-
-[[item]]
-page = "scheme_form"
-section = "英文候选"
-schemes = ["pinyin", "shuangpin"]
-key = "schema.pinyin.english_merge.prefix_complete"
-source = "engine"
-type = "toggle"
-title = "英文前缀补全"
-summary = "有中文候选时也补至多 2 个英文词，但只在打的不是完整拼音时补：至少 5 个字母，且怎么切都切不成完整拼音（templa 补 template，shang 不补）。双拼方案不生效"
-enabled_when = "schema.pinyin.english_merge.enable"
+summary = "拼音候选里混入英文单词"
+detail = "整串恰好是英文词时给出它（打 hello 出 hello）；没有中文候选时按前缀补全英文。"
 
 [[item]]
 page = "scheme_form"
@@ -453,7 +444,8 @@ key = "schema.pinyin.english_merge.min_length"
 source = "engine"
 type = "int"
 title = "英文最小触发长度"
-summary = "有中文候选时，编码达到此长度才查英文（0 = 默认 3）；中文候选为空时不受本项约束，2 码起就给英文补全"
+summary = "有中文候选时，打够几码才查英文"
+detail = "0 = 默认 3。没有中文候选时不受此限，2 码起就补全英文。"
 enabled_when = "schema.pinyin.english_merge.enable"
 min = 0
 max = 10
@@ -466,7 +458,8 @@ key = "schema.pinyin.english_merge.complete_min_length"
 source = "engine"
 type = "int"
 title = "英文补全最小码长"
-summary = "有中文候选时，输入达到此长度也按前缀补全英文（建议 5），但只在打的不是完整拼音时补：怎么切都切不成完整拼音（templa 补 template，shang 不补）；0 = 只在没有中文候选时补全。双拼方案不生效"
+summary = "有中文候选时，打够几码补全英文"
+detail = "只在怎么切都切不成完整拼音时补（templa 补 template，shang 不补），建议 5。0 = 只在没有中文候选时补全。双拼方案不生效。"
 enabled_when = "schema.pinyin.english_merge.enable"
 min = 0
 max = 10
@@ -479,7 +472,8 @@ key = "schema.pinyin.english_merge.exact_position"
 source = "engine"
 type = "int"
 title = "英文单词最前位置"
-summary = "整串恰好是英文单词时，英文最靠前排在第几位；0 = 按方案自动：全拼 1、双拼 2。仍先让过开头的完整匹配中文，只会更靠后"
+summary = "整串是英文单词时最靠前排第几"
+detail = "0 = 按方案自动：全拼 1、双拼 2。开头完整匹配的中文仍排在它前面。"
 enabled_when = "schema.pinyin.english_merge.enable"
 min = 0
 max = 10
@@ -492,7 +486,8 @@ key = "schema.pinyin.english_merge.complete_position"
 source = "engine"
 type = "int"
 title = "英文补全最前位置"
-summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
+summary = "补全出的英文最靠前排第几"
+detail = "开头完整匹配的中文仍排在它前面，且总在英文单词之后。"
 enabled_when = "schema.pinyin.english_merge.enable"
 min = 1
 max = 10
@@ -505,7 +500,8 @@ key = "schema.pinyin.english_merge.max_count"
 source = "engine"
 type = "int"
 title = "英文最多条数"
-summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
+summary = "有中文候选时英文最多显示几条"
+detail = "完整单词优先，再补前缀补全。没有中文候选时不受此限。"
 enabled_when = "schema.pinyin.english_merge.enable"
 min = 1
 max = 10
@@ -518,6 +514,7 @@ key = "schema.pinyin.frequency.enabled"
 source = "engine"
 type = "toggle"
 title = "词频调整"
+summary = "按使用次数调整候选顺序"
 
 [[item]]
 page = "scheme_form"
@@ -527,7 +524,8 @@ key = "schema.pinyin.frequency.record_always"
 source = "engine"
 type = "toggle"
 title = "仅记录次数"
-summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
+summary = "不改候选顺序，只记上屏次数"
+detail = "次数可在词库管理的「词频」中查看和导出。之后开启词频调整，已记的次数立刻参与排序。"
 
 [[item]]
 page = "scheme_form"
@@ -537,7 +535,8 @@ key = "schema.pinyin.frequency.promote_prefix"
 source = "engine"
 type = "select"
 title = "补全词参与调频"
-summary = "只打半个音时（如 d），补全出的候选是否也参与调频。「仅单字」让「的/得」这类单字上浮，但不让「东西」这类词组跑到单字前面"
+summary = "只打半个音时补全的候选是否调频"
+detail = "如只打 d 时。「仅单字」让「的/得」这类单字上浮，又不让「东西」这类词组排到单字前面。"
 enabled_when = "schema.pinyin.frequency.enabled"
 options = [
   { value = "none", label = "不参与" },
@@ -553,7 +552,8 @@ key = "schema.pinyin.frequency.half_life"
 source = "engine"
 type = "int"
 title = "热度衰减半衰期"
-summary = "使用记录衰减到一半所需的时间。0 = 默认 72 小时"
+summary = "多久不用，使用记录的分量减半"
+detail = "0 = 默认 72 小时。"
 enabled_when = "schema.pinyin.frequency.enabled"
 min = 0
 max = 8760
@@ -568,6 +568,8 @@ key = "schema.pinyin.auto_learn.enabled"
 source = "engine"
 type = "toggle"
 title = "自动学习"
+summary = "连续选词后自动组成新词"
+detail = "新词先存入临时词库，立即可用。"
 
 [[item]]
 page = "scheme_form"
@@ -577,7 +579,8 @@ key = "schema.pinyin.auto_learn.promote_count"
 source = "engine"
 type = "int"
 title = "转入用户词库次数"
-summary = "用满几次后永久收录进用户词库；0 = 不收录，一直留在临时词库"
+summary = "用满几次后永久收进用户词库"
+detail = "0 = 不收录，一直留在临时词库。"
 enabled_when = "schema.pinyin.auto_learn.enabled"
 min = 0
 max = 20
@@ -603,7 +606,8 @@ key = "schema.pinyin.auto_learn.max_word_length"
 source = "engine"
 type = "int"
 title = "最长学习词长"
-summary = "超过这个字数就不记录；智能组句的长句主要受它约束"
+summary = "超过这个字数就不记录"
+detail = "整句一次上屏时，长句记不记主要看它。"
 enabled_when = "schema.pinyin.auto_learn.enabled"
 min = 2
 max = 20
@@ -616,7 +620,8 @@ key = "schema.pinyin.aux_code.enabled"
 source = "engine"
 type = "toggle"
 title = "辅助码"
-summary = "打出候选后按触发键，用字形码进一步筛选；单个方案可在方案详情里单独开关"
+summary = "按触发键后用字形码筛选候选"
+detail = "触发键在按键设置里另配。单个方案可在方案详情里单独开关。"
 
 [[item]]
 page = "scheme_form"
@@ -626,7 +631,8 @@ key = "schema.pinyin.aux_code.direct"
 source = "engine"
 type = "toggle"
 title = "直接辅助码"
-summary = "仅双拼：任一音节后直接敲 1～2 位字形码定字，不按引导键（如 gokqk → 国情）。会改变音节后字母的含义，想强制按音节切分可手打 '"
+summary = "拼音后直接敲字形码定字"
+detail = "仅双拼：不按引导键，在拼音后直接敲 1～2 位字形码（如 gokqk → 国情）。会改变音节后字母的含义，想强制按音节切分可手打 '。"
 enabled_when = "schema.pinyin.aux_code.enabled"
 
 [[item]]
@@ -637,7 +643,8 @@ key = "schema.pinyin.aux_code.continuous"
 source = "engine"
 type = "toggle"
 title = "连续辅助码"
-summary = "开：字形码可打在任一音节后，适合长句；关：只在整串末尾敲 1～2 位，词组任一字命中，适合单次打词组（uidu 后敲 pl → 释读）"
+summary = "字形码可打在任一音节后"
+detail = "适合长句。关闭时只在整串末尾敲 1～2 位，词组任一字命中即可，适合打单个词组（uidu 后敲 pl → 释读）。需先开直接辅助码。"
 enabled_when = "schema.pinyin.aux_code.direct"
 
 [[item]]
@@ -647,8 +654,9 @@ schemes = ["pinyin", "shuangpin"]
 key = "schema.pinyin.aux_code.max_phrase_len"
 source = "engine"
 type = "int"
-title = "辅助码参与筛选的最大词长"
-summary = "超过这个字数的词组不参与筛选，0 = 不限；单字始终参与"
+title = "参与筛选的最大词长"
+summary = "超过这个字数的词组不参与筛选"
+detail = "0 = 不限。单字始终参与。"
 enabled_when = "schema.pinyin.aux_code.enabled"
 min = 0
 max = 20
@@ -662,6 +670,8 @@ key = "schema.codetable.auto_commit_at_full"
 source = "engine"
 type = "toggle"
 title = "全码唯一自动上屏"
+summary = "打满码且候选唯一时直接上屏"
+detail = "还有更长编码可接时不上屏。"
 
 [[item]]
 page = "scheme_form"
@@ -671,6 +681,8 @@ key = "schema.codetable.auto_commit_min_len"
 source = "engine"
 type = "select"
 title = "自动上屏最短码长"
+summary = "打够几码，唯一候选就自动上屏"
+detail = "「满码」即跟随方案自己的全码长。"
 options = [
   { value = "0", label = "满码（跟随方案）" },
   { value = "1", label = "1 码" },
@@ -688,6 +700,7 @@ key = "schema.codetable.clear_on_empty_max"
 source = "engine"
 type = "toggle"
 title = "满码空码清空"
+summary = "打满码仍无候选时自动清空编码"
 
 [[item]]
 page = "scheme_form"
@@ -697,6 +710,7 @@ key = "schema.codetable.top_code_commit"
 source = "engine"
 type = "toggle"
 title = "顶码上屏"
+summary = "超出码长时首选自动上屏"
 
 [[item]]
 page = "scheme_form"
@@ -706,6 +720,7 @@ key = "schema.codetable.punct_commit"
 source = "engine"
 type = "toggle"
 title = "标点顶码上屏"
+summary = "打标点时先上屏首选"
 
 [[item]]
 page = "scheme_form"
@@ -715,6 +730,8 @@ key = "schema.codetable.short_code_yield_level"
 source = "engine"
 type = "select"
 title = "出简让全"
+summary = "有简码的字在长码上让出首选"
+detail = "把首选让给词组，自己排到候选末尾。如「路」的三简是 kht，打 khtk 时首选给「路上」这类词。"
 options = [
   { value = "0", label = "关闭" },
   { value = "2", label = "一、二级简码" },
@@ -729,6 +746,7 @@ key = "schema.codetable.single_char"
 source = "engine"
 type = "toggle"
 title = "单字输入"
+summary = "候选只出单字，不出词组"
 
 [[item]]
 page = "scheme_form"
@@ -738,6 +756,8 @@ key = "schema.codetable.show_code_hint"
 source = "engine"
 type = "toggle"
 title = "显示编码提示"
+summary = "候选旁显示还要打的编码"
+detail = "显示格式在外观的「候选注释」里设置。"
 
 [[item]]
 page = "scheme_form"
@@ -747,7 +767,8 @@ key = "schema.codetable.single_code_input"
 source = "engine"
 type = "toggle"
 title = "精确匹配模式"
-summary = "仅显示精确匹配的候选，不显示前缀匹配"
+summary = "只出编码完全相同的候选"
+detail = "不显示以当前编码开头的更长编码候选。"
 
 [[item]]
 page = "scheme_form"
@@ -757,7 +778,7 @@ key = "schema.codetable.single_code_complete"
 source = "engine"
 type = "toggle"
 title = "精确匹配空码补全"
-summary = "精确匹配模式下无候选时，自动从更长编码中取首个候选"
+summary = "没有候选时取更长编码的首个候选"
 enabled_when = "schema.codetable.single_code_input"
 
 [[item]]
@@ -768,7 +789,8 @@ key = "schema.codetable.wildcard"
 source = "engine"
 type = "toggle"
 title = "通配输入"
-summary = "组码时通配键代替任意一个码元，如五笔的 z；候选显示完整编码"
+summary = "用通配键代替任意一个码元"
+detail = "候选旁显示完整编码。通配结果不自动上屏、不顶字。"
 
 [[item]]
 page = "scheme_form"
@@ -778,7 +800,8 @@ key = "schema.codetable.wildcard_key"
 source = "engine"
 type = "select"
 title = "通配键"
-summary = "选字母键会占掉该码元，仅建议用在闲置的键上；符号键在首位也作通配"
+summary = "符号键在第一码也能通配"
+detail = "选字母键会占掉该码元，只宜用本方案闲置的键（如五笔的 z），且首位可能让给其它功能。选符号键时，该符号本身改用快捷输入或短语打出。"
 options = [
   { value = "z", label = "z" },
   { value = "?", label = "?" },
@@ -794,6 +817,7 @@ key = "schema.codetable.wildcard_single_only"
 source = "engine"
 type = "toggle"
 title = "通配仅出单字"
+summary = "通配和反查只列单字"
 
 [[item]]
 page = "scheme_form"
@@ -802,8 +826,9 @@ schemes = ["codetable"]
 key = "schema.codetable.z_key_repeat"
 source = "engine"
 type = "toggle"
-title = "z 键重复上屏"
-summary = "空码时按 z 重复上一次上屏的内容（五笔 z 键）"
+title = "z 键重复输入"
+summary = "按 z 重复上一次上屏的内容"
+detail = "空码时生效。与「z 键引导功能」同时开时本项先生效。"
 
 [[item]]
 page = "scheme_form"
@@ -812,8 +837,9 @@ schemes = ["codetable"]
 key = "schema.codetable.z_key_action"
 source = "engine"
 type = "select"
-title = "z 键功能"
-summary = "z 在本方案没有编码时，按它进入的模式"
+title = "z 键引导功能"
+summary = "按 z 进入临时拼音或临时英文"
+detail = "只在 z 不是本方案编码时可用（如五笔 86），空码时按 z 进入所选模式。与「z 键重复输入」同时开时后者先生效。"
 options = [
   { value = "", label = "不启用" },
   { value = "temp_pinyin", label = "临时拼音" },
@@ -828,6 +854,7 @@ key = "schema.codetable.frequency.enabled"
 source = "engine"
 type = "toggle"
 title = "词频调整"
+summary = "按使用次数调整候选顺序"
 
 [[item]]
 page = "scheme_form"
@@ -837,6 +864,8 @@ key = "schema.codetable.frequency.strategy"
 source = "engine"
 type = "select"
 title = "调频策略"
+summary = "用过的字词怎样往前排"
+detail = "置顶：用过一次即到首位；步进：按累计次数上升；位次渐进：每用一次前移一半位次，逐步靠前。"
 options = [
   { value = "top", label = "置顶" },
   { value = "step", label = "步进" },
@@ -851,7 +880,8 @@ key = "schema.codetable.frequency.record_always"
 source = "engine"
 type = "toggle"
 title = "仅记录次数"
-summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
+summary = "不改候选顺序，只记上屏次数"
+detail = "次数可在词库管理的「词频」中查看和导出。之后开启词频调整，已记的次数立刻参与排序。"
 
 [[item]]
 page = "scheme_form"
@@ -861,7 +891,8 @@ key = "schema.codetable.frequency.promote_prefix"
 source = "engine"
 type = "select"
 title = "补全词参与调频"
-summary = "仅「位次渐进」策略下生效。英文等以前缀匹配为主的方案建议选「全部」"
+summary = "前缀匹配出的候选是否也调频"
+detail = "仅「位次渐进」策略下生效。英文等以前缀匹配为主的方案宜选「全部」。"
 enabled_when = "schema.codetable.frequency.enabled"
 options = [
   { value = "none", label = "不参与" },
@@ -877,7 +908,8 @@ key = "schema.codetable.frequency.half_life"
 source = "engine"
 type = "int"
 title = "热度衰减半衰期"
-summary = "使用记录衰减到一半所需的时间，仅「位次渐进」策略下生效。0 = 默认 72 小时"
+summary = "多久不用，使用记录的分量减半"
+detail = "仅「位次渐进」策略下生效。0 = 默认 72 小时。"
 enabled_when = "schema.codetable.frequency.enabled"
 min = 0
 max = 8760
@@ -892,7 +924,8 @@ key = "schema.codetable.frequency.protect_top_n_len1"
 source = "engine"
 type = "int"
 title = "一简位保护前 N 项"
-summary = "只输入 1 个编码时（如五笔一简），词典前 N 项不参与调频。一简每个编码通常只有两个字，误选一次就会永久换掉首选，故默认保护"
+summary = "一码时词典前几项不参与调频"
+detail = "如五笔一简，每个编码通常只有两个字，误选一次就会换掉首选，故默认保护。"
 enabled_when = "schema.codetable.frequency.enabled"
 min = 0
 max = 100
@@ -905,7 +938,8 @@ key = "schema.codetable.frequency.protect_top_n_len2"
 source = "engine"
 type = "int"
 title = "二简位保护前 N 项"
-summary = "输入 2 个编码时，词典前 N 项不参与调频（0 = 不保护）"
+summary = "两码时词典前几项不参与调频"
+detail = "0 = 不保护。"
 enabled_when = "schema.codetable.frequency.enabled"
 min = 0
 max = 100
@@ -918,7 +952,8 @@ key = "schema.codetable.frequency.protect_top_n_len3"
 source = "engine"
 type = "int"
 title = "三简位保护前 N 项"
-summary = "输入 3 个编码时，词典前 N 项不参与调频。默认不保护——三简的固定程度弱于一二简"
+summary = "三码时词典前几项不参与调频"
+detail = "三简不如一二简固定，默认不保护。"
 enabled_when = "schema.codetable.frequency.enabled"
 min = 0
 max = 100
@@ -931,7 +966,8 @@ key = "schema.codetable.frequency.protect_top_n"
 source = "engine"
 type = "int"
 title = "全码位保护前 N 项"
-summary = "输入 4 个及以上编码时，词典前 N 项不参与调频。默认 0 = 不保护，让调频在全码位正常起作用"
+summary = "四码及以上时词典前几项不调频"
+detail = "默认 0 = 不保护，让调频在全码位正常起作用。"
 enabled_when = "schema.codetable.frequency.enabled"
 min = 0
 max = 100
@@ -944,6 +980,8 @@ key = "schema.codetable.auto_phrase.enabled"
 source = "engine"
 type = "toggle"
 title = "自动造词"
+summary = "自动记下连续打出的词组"
+detail = "用过一次即存入临时词库。"
 
 [[item]]
 page = "scheme_form"
@@ -953,7 +991,8 @@ key = "schema.codetable.auto_phrase.promote_count"
 source = "engine"
 type = "int"
 title = "转入用户词库次数"
-summary = "用满几次后永久收录进用户词库；0 = 不收录，一直留在临时词库"
+summary = "用满几次后永久收进用户词库"
+detail = "0 = 不收录，一直留在临时词库。"
 enabled_when = "schema.codetable.auto_phrase.enabled"
 min = 0
 max = 20
@@ -992,6 +1031,8 @@ key = "schema.codetable.english_merge.enable"
 source = "engine"
 type = "toggle"
 title = "英文候选"
+summary = "码表候选里混入英文单词"
+detail = "整串恰好是英文词时给出它（打 hello 出 hello）；没有中文候选时按前缀补全英文。"
 
 [[item]]
 page = "scheme_form"
@@ -1001,7 +1042,8 @@ key = "schema.codetable.english_merge.min_length"
 source = "engine"
 type = "int"
 title = "英文最小触发长度"
-summary = "有中文候选时，编码达到此长度才查英文（0 = 默认 3）；中文候选为空时不受本项约束，2 码起就给英文补全"
+summary = "有中文候选时，打够几码才查英文"
+detail = "0 = 默认 3。没有中文候选时不受此限，2 码起就补全英文。"
 enabled_when = "schema.codetable.english_merge.enable"
 min = 0
 max = 10
@@ -1014,7 +1056,8 @@ key = "schema.codetable.english_merge.complete_min_length"
 source = "engine"
 type = "int"
 title = "英文补全最小码长"
-summary = "有中文候选时，编码达到此长度也按前缀补全英文（如设 4，打 gith 出 github）；0 = 只在没有中文候选时补全"
+summary = "有中文候选时，打够几码补全英文"
+detail = "如设 4，打 gith 出 github。0 = 只在没有中文候选时补全。"
 enabled_when = "schema.codetable.english_merge.enable"
 min = 0
 max = 10
@@ -1027,7 +1070,8 @@ key = "schema.codetable.english_merge.exact_position"
 source = "engine"
 type = "int"
 title = "英文单词最前位置"
-summary = "整串恰好是英文单词时，英文最靠前排在第几位；仍先让过开头的完整匹配中文，只会更靠后（1 = 不另加限制）"
+summary = "整串是英文单词时最靠前排第几"
+detail = "开头完整匹配的中文仍排在它前面。1 = 不另加限制。"
 enabled_when = "schema.codetable.english_merge.enable"
 min = 1
 max = 10
@@ -1040,7 +1084,8 @@ key = "schema.codetable.english_merge.complete_position"
 source = "engine"
 type = "int"
 title = "英文补全最前位置"
-summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
+summary = "补全出的英文最靠前排第几"
+detail = "开头完整匹配的中文仍排在它前面，且总在英文单词之后。"
 enabled_when = "schema.codetable.english_merge.enable"
 min = 1
 max = 10
@@ -1053,7 +1098,8 @@ key = "schema.codetable.english_merge.max_count"
 source = "engine"
 type = "int"
 title = "英文最多条数"
-summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
+summary = "有中文候选时英文最多显示几条"
+detail = "完整单词优先，再补前缀补全。没有中文候选时不受此限。"
 enabled_when = "schema.codetable.english_merge.enable"
 min = 1
 max = 10
@@ -1066,7 +1112,8 @@ key = "schema.codetable.english_merge.block_commit"
 source = "engine"
 type = "toggle"
 title = "有英文候选时否决上屏"
-summary = "满码自动上屏与顶码上屏前，只要有英文词以当前编码开头就不自动上屏（打 gith 时 github 还没出现也算）；关掉的话打 github 到第 4 键就被顶出中文。开启时已涵盖下一项"
+summary = "有英文词以此开头就不自动上屏"
+detail = "管满码自动上屏和顶码上屏：打 gith 时 github 还没出现也算，关掉的话打 github 到第 4 键就被顶出中文。开启时已涵盖下一项。"
 enabled_when = "schema.codetable.english_merge.enable"
 
 [[item]]
@@ -1077,7 +1124,8 @@ key = "schema.codetable.english_merge.block_commit_on_word"
 source = "engine"
 type = "toggle"
 title = "整串是英文单词时否决上屏"
-summary = "整串恰好是一个英文单词时不自动上屏、不顶码，保留英文供选择；只是英文词开头的编码照常上屏。上一项开启时本项无需单独开"
+summary = "保留英文供选，不自动上屏或顶码"
+detail = "只是英文词开头的编码照常上屏。上一项开启时本项不必单独开。"
 enabled_when = "schema.codetable.english_merge.enable"
 
 # 码表整句的调参项：开关是方案属性（schema_settings 的 engine.codetable.sentence_input），由代码画在
@@ -1091,7 +1139,8 @@ key = "schema.codetable.sentence_count"
 source = "engine"
 type = "int"
 title = "整句显示条数"
-summary = "候选里同时列出几种整句解读，1 = 只出一条"
+summary = "候选里同时列出几种整句"
+detail = "1 = 只出一条。只在方案开了整句输入时生效。"
 min = 1
 max = 8
 
@@ -1103,7 +1152,8 @@ key = "schema.codetable.sentence_grammar_weight"
 source = "engine"
 type = "select"
 title = "语法模型权重"
-summary = "整句挂语法模型的力度，0 = 不挂；出厂 0.5，调到 1 反而会把逐字打的句子带偏"
+summary = "整句挑通顺结果的力度（谨慎修改）"
+detail = "0 = 不用语法模型。出厂 0.5；调到 1 反而会把逐字打的句子带偏。"
 options = [
   { value = "0.0", label = "0（不挂）" },
   { value = "0.2", label = "0.2" },
@@ -1122,6 +1172,7 @@ key = "schema.mix.show_source_hint"
 source = "engine"
 type = "toggle"
 title = "显示候选来源标记"
+summary = "候选旁标出来自码表还是拼音"
 
 [[item]]
 page = "scheme_form"
@@ -1131,7 +1182,8 @@ key = "schema.mix.top_code_override_pinyin"
 source = "engine"
 type = "toggle"
 title = "顶码优先（覆盖拼音）"
-summary = "顶码上屏时优先选择码表词条而非拼音候选"
+summary = "顶码时优先上屏码表词而非拼音"
+detail = "开启时「有拼音候选时否决上屏」不再起作用。"
 
 [[item]]
 page = "scheme_form"
@@ -1141,6 +1193,8 @@ key = "schema.mix.enable_pinyin_abbrev"
 source = "engine"
 type = "toggle"
 title = "启用拼音简拼"
+summary = "拼音部分只打声母也能出词"
+detail = "如 nh → 你好。关闭则只认全拼、候选更精简，且满码后继续输入才会顶码上屏码表词。"
 
 [[item]]
 page = "scheme_form"
@@ -1150,7 +1204,8 @@ key = "schema.mix.min_pinyin_length"
 source = "engine"
 type = "int"
 title = "拼音最小触发长度"
-summary = "编码达到此长度才开始查拼音候选（0 表示跟随方案默认值 2）"
+summary = "打够几码才查拼音候选"
+detail = "0 = 跟随方案默认值 2。"
 min = 0
 max = 10
 
@@ -1162,7 +1217,8 @@ key = "schema.mix.pinyin_partial_candidates"
 source = "engine"
 type = "toggle"
 title = "显示拼音前缀匹配"
-summary = "只有编码开头能读成拼音时（gedw 的 ge），显示这些读不完整的候选"
+summary = "编码只有开头像拼音时也出拼音候选"
+detail = "如 gedw 只有 ge 能读成拼音，也列出这类读不完整的候选。"
 
 [[item]]
 page = "scheme_form"
@@ -1172,7 +1228,8 @@ key = "schema.mix.pinyin_partial_candidates_overflow"
 source = "engine"
 type = "toggle"
 title = "超码长时显示拼音前缀匹配"
-summary = "编码超过最大码长后同上；开着可先选前半段上屏，剩余接着打"
+summary = "超码长后也显示前半段的拼音候选"
+detail = "可先选前半段上屏，剩下的接着打。"
 
 [[item]]
 page = "scheme_form"
@@ -1182,7 +1239,7 @@ key = "schema.mix.pinyin_only_overflow"
 source = "engine"
 type = "toggle"
 title = "超码长时仅查拼音"
-summary = "编码超过最大码长时只显示拼音候选，不再查码表"
+summary = "超码长后不再查码表"
 
 [[item]]
 page = "scheme_form"
@@ -1192,7 +1249,8 @@ key = "schema.mix.auto_commit_block_on_pinyin"
 source = "engine"
 type = "toggle"
 title = "有拼音候选时否决上屏"
-summary = "满码自动上屏与顶码上屏前，若整串仍能查出拼音候选则不自动上屏（不看拼音是否成词）；「顶码优先」开启时无视本项。本项同时管「满码无候选清空」：开启时有拼音候选或拼音还没打完都不清空，关闭则满码无匹配即清空"
+summary = "还能查出拼音就不自动上屏"
+detail = "管满码自动上屏和顶码上屏，不看拼音是否成词；开启时有拼音候选或拼音没打完也不清空编码。「顶码优先」开启时本项无效。"
 
 [[item]]
 page = "scheme_form"
@@ -1202,7 +1260,8 @@ key = "schema.mix.block_commit_on_pinyin_word"
 source = "engine"
 type = "toggle"
 title = "整串是拼音词时否决上屏"
-summary = "整串是完整拼音且拼音首选为真实词（如 wangba→网吧）时，不自动/顶码上屏五笔，保留拼音词供选择；aipu→落实 等无强词的仍正常上屏"
+summary = "整串拼成真实词时保留拼音词"
+detail = "如 wangba 保留「网吧」，不自动上屏或顶码上屏五笔；aipu 这类拼不出真实词的照常上屏「落实」。"
 
 [[item]]
 page = "scheme_form"
@@ -1212,6 +1271,7 @@ key = "schema.mix.enable_english"
 source = "engine"
 type = "toggle"
 title = "启用英文候选"
+summary = "混输候选里也列英文单词"
 
 [[item]]
 page = "scheme_form"
@@ -1221,7 +1281,8 @@ key = "schema.mix.min_english_length"
 source = "engine"
 type = "int"
 title = "英文最小触发长度"
-summary = "编码达到此长度才开始查英文候选（0 表示跟随默认值 3，即 2 字符以内不查）"
+summary = "打够几码才查英文候选"
+detail = "0 = 跟随默认值 3，即 2 码以内不查。"
 min = 0
 max = 10
 
@@ -1233,7 +1294,8 @@ key = "schema.mix.english_complete_min_length"
 source = "engine"
 type = "int"
 title = "英文补全最小码长"
-summary = "有中文候选时，编码达到此长度也按前缀补全英文（如设 4，打 gith 出 github）；0 = 只在没有中文候选时补全"
+summary = "有中文候选时，打够几码补全英文"
+detail = "如设 4，打 gith 出 github。0 = 只在没有中文候选时补全。"
 enabled_when = "schema.mix.enable_english"
 min = 0
 max = 10
@@ -1246,7 +1308,8 @@ key = "schema.mix.english_exact_position"
 source = "engine"
 type = "int"
 title = "英文单词最前位置"
-summary = "整串恰好是英文单词时，英文最靠前排在第几位；仍先让过开头的完整匹配中文，只会更靠后（1 = 不另加限制）"
+summary = "整串是英文单词时最靠前排第几"
+detail = "开头完整匹配的中文仍排在它前面。1 = 不另加限制。"
 enabled_when = "schema.mix.enable_english"
 min = 1
 max = 10
@@ -1259,7 +1322,8 @@ key = "schema.mix.english_complete_position"
 source = "engine"
 type = "int"
 title = "英文补全最前位置"
-summary = "按前缀补全出来的英文最靠前排在第几位；仍先让过开头的完整匹配中文，且总在英文单词之后"
+summary = "补全出的英文最靠前排第几"
+detail = "开头完整匹配的中文仍排在它前面，且总在英文单词之后。"
 enabled_when = "schema.mix.enable_english"
 min = 1
 max = 10
@@ -1272,7 +1336,8 @@ key = "schema.mix.english_max_count"
 source = "engine"
 type = "int"
 title = "英文最多条数"
-summary = "有中文候选时英文最多显示几条（完整单词优先，再补前缀补全）；没有中文候选时不受此限"
+summary = "有中文候选时英文最多显示几条"
+detail = "完整单词优先，再补前缀补全。没有中文候选时不受此限。"
 enabled_when = "schema.mix.enable_english"
 min = 1
 max = 10
@@ -1285,7 +1350,8 @@ key = "schema.mix.auto_commit_block_on_english"
 source = "engine"
 type = "toggle"
 title = "有英文候选时否决上屏"
-summary = "满码自动上屏与顶码上屏前，只要有英文词以当前编码开头就不自动上屏（打 gith 时 github 还没出现也算）。开启时已涵盖下一项"
+summary = "有英文词以此开头就不自动上屏"
+detail = "管满码自动上屏和顶码上屏：打 gith 时 github 还没出现也算。开启时已涵盖下一项。"
 enabled_when = "schema.mix.enable_english"
 
 [[item]]
@@ -1296,7 +1362,8 @@ key = "schema.mix.block_commit_on_english_word"
 source = "engine"
 type = "toggle"
 title = "整串是英文单词时否决上屏"
-summary = "整串恰好是一个英文单词时不自动上屏、不顶码，保留英文供选择；只是英文词开头的编码照常上屏。上一项开启时本项无需单独开"
+summary = "保留英文供选，不自动上屏或顶码"
+detail = "只是英文词开头的编码照常上屏。上一项开启时本项不必单独开。"
 enabled_when = "schema.mix.enable_english"
 
 [[item]]
@@ -1307,6 +1374,8 @@ key = "schema.english.raw_candidate"
 source = "engine"
 type = "select"
 title = "首候选为输入原文"
+summary = "何时把打的字母串排在首位"
+detail = "「仅词库词」：字母串本身是词库词时才排首位，打 hel 不多出一条 hel，打 hell 时它恒在第一。打 usa 会出 USA，想要小写按回车。"
 options = [
   { value = "always", label = "总是" },
   { value = "in_dict", label = "仅词库词" },
@@ -1321,6 +1390,8 @@ key = "schema.english.case_variants"
 source = "engine"
 type = "toggle"
 title = "生成大小写变形候选"
+summary = "补出小写、首字母大写、全大写"
+detail = "三种形态各占一个候选位。临时英文的同名开关另设。"
 
 [[item]]
 page = "scheme_form"
@@ -1330,7 +1401,8 @@ key = "schema.english.case_follow_input"
 source = "engine"
 type = "toggle"
 title = "候选跟随输入的大小写"
-summary = "打 Hi 出 Hill，打 WoW 出 WoWed；只跟大写，打小写时 China、iPhone 这类词保持词库原样"
+summary = "打了大写字母，候选也跟着大写"
+detail = "如打 Hi 出 Hill，打 WoW 出 WoWed。只跟大写，打小写时 China、iPhone 这类词保持原样。"
 
 [[item]]
 page = "scheme_form"
@@ -1340,7 +1412,8 @@ key = "schema.english.phrase_seg"
 source = "engine"
 type = "toggle"
 title = "用 ' 分词打英文词组"
-summary = "各段只打前缀：bue'air 出 Buenos Aires，ip'max 出 iPhone 15 Pro Max。可跳词，ip'pro 也能打出 iPhone 15 Pro。开启后 ' 不再是第三候选键，改用数字 3。只管英文方案；临时英文与快捷输入里的英文另设"
+summary = "每段只打前缀就能出整个词组"
+detail = "如 bue'air 出 Buenos Aires，ip'max 出 iPhone 15 Pro Max，可跳词。开启后 ' 不再是第三候选键，改用数字 3。临时英文与快捷输入另设。"
 
 [[item]]
 page = "scheme_form"
@@ -1350,7 +1423,8 @@ key = "schema.english.commit_space"
 source = "engine"
 type = "toggle"
 title = "上屏后自动加空格"
-summary = "上屏英文词后补一个空格，连续打词不必手动按；回车上屏不补"
+summary = "上屏英文词后补一个空格"
+detail = "连续打词不必手动按空格；回车上屏不补。"
 
 # 英文卡里手机才有的三项（键盘侧开关）。引擎的 schema.english.commit_space 不放进来：
 # 触摸键盘的补空格由核心触摸层做（wind-mobile touch.rs，还会把空格挪到句末标点后面），
@@ -1363,7 +1437,8 @@ key = "ui.android.auto_cap"
 source = "android"
 type = "toggle"
 title = "句首自动大写"
-summary = "在句首、输入框开头自动切大写（输入框要求大写时才生效，密码 / 网址 / 邮箱框不生效）（所有英文方案共用）"
+summary = "句首和输入框开头自动切大写"
+detail = "只在输入框要求大写时生效，密码、网址、邮箱框不生效。所有英文方案共用。"
 default = true
 
 [[item]]
@@ -1374,7 +1449,8 @@ key = "ui.android.auto_space"
 source = "android"
 type = "toggle"
 title = "选词后自动加空格"
-summary = "上屏一个英文词后自动补空格；紧接着打句末标点时，空格挪到标点后面（所有英文方案共用）"
+summary = "上屏英文词后补空格"
+detail = "紧接着打句末标点时，空格挪到标点后面。所有英文方案共用。"
 default = true
 
 [[item]]
@@ -1385,7 +1461,7 @@ key = "schema.english.frequency.enabled"
 source = "engine"
 type = "toggle"
 title = "词频调整"
-summary = "按使用频率调整英文候选顺序"
+summary = "按使用次数调整英文候选顺序"
 
 [[item]]
 page = "scheme_form"
@@ -1395,7 +1471,8 @@ key = "schema.english.frequency.record_always"
 source = "engine"
 type = "toggle"
 title = "仅记录次数"
-summary = "不调整候选顺序，只记录每个字词的上屏次数，可在词库管理的「词频」中查看和导出。之后若开启词频调整，已记录的次数会立刻参与排序"
+summary = "不改候选顺序，只记上屏次数"
+detail = "次数可在词库管理的「词频」中查看和导出。之后开启词频调整，已记的次数立刻参与排序。"
 
 [[item]]
 page = "scheme_form"
@@ -1405,7 +1482,8 @@ key = "schema.english.frequency.strategy"
 source = "engine"
 type = "select"
 title = "调频策略"
-summary = "位次渐进：每用一次前移一半，久不用回落；一次到顶 / 逐次提升：用过即排到未用过的之前"
+summary = "用过的词怎样往前排"
+detail = "位次渐进：每用一次前移一半，久不用回落；一次到顶、逐次提升：用过的排到没用过的之前。"
 enabled_when = "schema.english.frequency.enabled"
 options = [
   { value = "position", label = "位次渐进" },
@@ -1421,7 +1499,8 @@ key = "schema.english.frequency.promote_prefix"
 source = "engine"
 type = "select"
 title = "补全词参与调频"
-summary = "打 hel 选中 hello 这类前缀补全的候选是否参与调频，仅「位次渐进」策略下生效"
+summary = "前缀补全出的词是否也调频"
+detail = "如打 hel 选中 hello。仅「位次渐进」策略下生效。"
 enabled_when = "schema.english.frequency.enabled"
 options = [
   { value = "all", label = "全部" },
@@ -1437,7 +1516,8 @@ key = "schema.english.frequency.half_life"
 source = "engine"
 type = "int"
 title = "热度衰减半衰期"
-summary = "使用记录衰减到一半所需的时间，仅「位次渐进」策略下生效。0 = 默认 72 小时"
+summary = "多久不用，使用记录的分量减半"
+detail = "仅「位次渐进」策略下生效。0 = 默认 72 小时。"
 enabled_when = "schema.english.frequency.enabled"
 min = 0
 max = 8760
@@ -1452,7 +1532,8 @@ key = "schema.english.frequency.code_scope"
 source = "engine"
 type = "select"
 title = "调频记账方式"
-summary = "按整词：打 hel 选过 hello 后，打 he 也受益；按编码：各前缀独立学习"
+summary = "调频按整词还是按编码累计"
+detail = "按整词：打 hel 选过 hello 后，打 he 也受益；按编码：各前缀分开学习。"
 enabled_when = "schema.english.frequency.enabled"
 options = [
   { value = "candidate", label = "按整词" },
@@ -1467,7 +1548,8 @@ key = "schema.english.auto_learn.enabled"
 source = "engine"
 type = "toggle"
 title = "自动造词"
-summary = "上屏了词库里没有的原文就记下来（选中原文候选、回车或空格上屏原码、标点顶屏原文都算），先存入临时词库，用够次数再转入用户词库。英文方案与临时英文共用此开关；快捷输入里的英文不在此列（那里有快捷输入历史）"
+summary = "上屏词库里没有的词就记下来"
+detail = "选原文候选、回车或空格上屏、标点顶屏都算。先存临时词库，用够次数转入用户词库。与临时英文共用此开关，快捷输入不在此列。"
 
 [[item]]
 page = "scheme_form"
@@ -1477,7 +1559,8 @@ key = "schema.english.auto_learn.promote_count"
 source = "engine"
 type = "int"
 title = "转入用户词库次数"
-summary = "用满几次后永久收录进用户词库（含记下的那一次）；0 = 不收录，一直留在临时词库"
+summary = "用满几次后永久收进用户词库"
+detail = "含记下的那一次。0 = 不收录，一直留在临时词库。"
 enabled_when = "schema.english.auto_learn.enabled"
 min = 0
 max = 20
@@ -1491,6 +1574,8 @@ key = "input.default.remember_last_state"
 source = "engine"
 type = "toggle"
 title = "记忆前次状态"
+summary = "恢复上次的中英文、全半角和标点状态"
+detail = "开启后下面三项初始状态不生效。"
 
 [[item]]
 page = "input"
@@ -1499,6 +1584,8 @@ key = "input.default.chinese_mode"
 source = "engine"
 type = "select"
 title = "初始语言模式"
+summary = "激活输入法时默认中文还是英文"
+detail = "开启「记忆前次状态」后此项不生效。"
 options = [
   { value = "true", label = "中文" },
   { value = "false", label = "英文" },
@@ -1511,6 +1598,8 @@ key = "input.default.full_width"
 source = "engine"
 type = "select"
 title = "初始字符宽度"
+summary = "激活输入法时默认半角还是全角"
+detail = "开启「记忆前次状态」后此项不生效。"
 options = [
   { value = "false", label = "半角" },
   { value = "true", label = "全角" },
@@ -1523,6 +1612,8 @@ key = "input.default.chinese_punct"
 source = "engine"
 type = "select"
 title = "初始标点模式"
+summary = "激活输入法时默认中文还是英文标点"
+detail = "开启「记忆前次状态」后此项不生效。"
 options = [
   { value = "true", label = "中文标点" },
   { value = "false", label = "英文标点" },
@@ -1535,6 +1626,8 @@ key = "input.filter_mode"
 source = "engine"
 type = "select"
 title = "候选检索范围"
+summary = "控制候选里是否出现生僻字"
+detail = "智能：同编码下有常用字时才隐藏生僻字。常用字：只出常用字。全部字符：不过滤。"
 options = [
   { value = "smart", label = "智能" },
   { value = "general", label = "常用字" },
@@ -1548,7 +1641,8 @@ key = "input.scope_relax.always_append"
 source = "engine"
 type = "toggle"
 title = "智能档末尾显示生僻字"
-summary = "候选检索范围为「智能」时，把被过滤的生僻字放在候选最后（带「·」标记），否则同码有常用字的生僻字打不出来"
+summary = "被过滤的生僻字放到候选最后"
+detail = "只在候选检索范围为「智能」时生效，追加的候选带「·」标记。不开的话，同码有常用字的生僻字打不出来。"
 
 [[item]]
 page = "input"
@@ -1557,6 +1651,8 @@ key = "input.punct.smart_after_digit"
 source = "engine"
 type = "toggle"
 title = "数字后智能标点"
+summary = "数字后的句号、逗号保持英文形态"
+detail = "如 3.14、1,000。参与的标点在「数字后保持英文的标点」里设置。"
 
 [[item]]
 page = "input"
@@ -1564,8 +1660,9 @@ section = "字符与标点"
 key = "input.spacing.cjk_latin"
 source = "engine"
 type = "toggle"
-title = "中英文之间自动加空格"
-summary = "打中文后接英文、或英文后接中文时，自动补一个空格"
+title = "中英文自动加空格"
+summary = "汉字和英文相接处自动补一个空格"
+detail = "接标点时不补；英文词之间的空格请开英文的「上屏后自动加空格」。英文模式下直接打的字母暂不处理。"
 
 [[item]]
 page = "input"
@@ -1573,7 +1670,9 @@ section = "字符与标点"
 key = "input.spacing.cjk_digit"
 source = "engine"
 type = "toggle"
-title = "中文与数字之间自动加空格"
+title = "中文与数字自动加空格"
+summary = "汉字和数字相接处自动补一个空格"
+detail = "如「共 3 个」。汉字后直接打的数字也会补，其余规则同中英文自动加空格。"
 
 [[item]]
 page = "input"
@@ -1581,8 +1680,9 @@ section = "字符与标点"
 key = "input.punct.smart_after_latin"
 source = "engine"
 type = "toggle"
-title = "英文后保持英文标点"
-summary = "紧跟在英文字母后打的标点保持英文形态，如 hello, world"
+title = "英文后智能标点"
+summary = "英文字母后的标点保持英文形态"
+detail = "如 Node.js、a/b、snake_case。参与的标点在「英文后保持英文的标点」里设置；按过空格后不再算英文后。"
 
 [[item]]
 page = "input"
@@ -1591,7 +1691,8 @@ key = "input.punct.smart_list"
 source = "engine"
 type = "text"
 title = "数字后保持英文的标点"
-summary = "数字后打这些标点时保持英文形态，如 3.14；直接写在一起，默认 .,:"
+summary = "参与数字后智能标点的符号"
+detail = "默认为 . , : 三个。"
 enabled_when = "input.punct.smart_after_digit"
 advanced = true
 
@@ -1602,7 +1703,8 @@ key = "input.punct.latin_smart_list"
 source = "engine"
 type = "text"
 title = "英文后保持英文的标点"
-summary = "英文后保持英文形态的标点，默认 ./_:@；不含逗号，因为中文句子里英文词后常接中文逗号"
+summary = "参与英文后智能标点的符号"
+detail = "默认为 ./_:@。不含逗号，因为中文句子里英文词后常接中文逗号。"
 enabled_when = "input.punct.smart_after_latin"
 advanced = true
 
@@ -1613,6 +1715,8 @@ key = "input.auto_pair.chinese"
 source = "engine"
 type = "toggle"
 title = "中文标点自动配对"
+summary = "输入左括号类标点时自动补全右标点"
+detail = "参与的标点对在「中文配对字符」里设置。"
 
 [[item]]
 page = "input"
@@ -1621,6 +1725,8 @@ key = "input.auto_pair.english"
 source = "engine"
 type = "toggle"
 title = "英文标点自动配对"
+summary = "英文标点下自动补上右括号"
+detail = "英文模式或英文标点下生效，参与的括号在「英文配对字符」里设置。"
 
 [[item]]
 page = "input"
@@ -1629,7 +1735,8 @@ key = "input.auto_pair.chinese_pairs"
 source = "engine"
 type = "text"
 title = "中文配对字符"
-summary = "参与自动配对的中文标点对，用空格隔开，每对两个字符，如 （） 【】 《》 “” ‘’"
+summary = "哪些中文标点对参与自动配对"
+detail = "如（）【】《》“”‘’。"
 enabled_when = "input.auto_pair.chinese"
 advanced = true
 
@@ -1640,7 +1747,8 @@ key = "input.auto_pair.english_pairs"
 source = "engine"
 type = "text"
 title = "英文配对字符"
-summary = "用空格隔开，每对两个字符，如 () [] {}。不建议放引号：撇号和收尾的双引号会被当成再开一对"
+summary = "哪些英文括号参与自动配对"
+detail = "如 () [] {}。不建议加引号：撇号和收尾的双引号会被当成新开一对。"
 enabled_when = "input.auto_pair.english"
 advanced = true
 
@@ -1651,7 +1759,8 @@ key = "input.auto_pair.jump_out_keys"
 source = "engine"
 type = "text"
 title = "配对跳出键"
-summary = "配对状态下按这些键跳到右符号之后，用空格隔开：right_symbol（右符号本身）、tab、enter、space、escape；留空则不启用"
+summary = "按这些键跳到右半边符号之后"
+detail = "可选右符号本身、Tab、回车、空格、Esc，留空不启用。引号这类左右同形的配对不能用右符号本身跳出，只能用 Tab 或回车。"
 advanced = true
 
 [[item]]
@@ -1661,7 +1770,8 @@ key = "input.symbol.smart_mode"
 source = "engine"
 type = "toggle"
 title = "中文标点智能符号"
-summary = "连按两次同一中文标点转英文；数字后的标点方向相反（先出英文，再按转中文）"
+summary = "快速连按两次同一中文标点转成英文"
+detail = "数字后的标点方向相反：先出英文，再按一次转中文。参与的标点在「中文符号字符集」里设置。"
 
 [[item]]
 page = "input"
@@ -1670,7 +1780,8 @@ key = "input.symbol.english_punct_mode"
 source = "engine"
 type = "toggle"
 title = "英文标点智能符号"
-summary = "标点切到英文时，连按两次同一英文标点转中文"
+summary = "英文标点下快速连按两次转成中文"
+detail = "参与的标点用「英文符号字符集」。"
 
 [[item]]
 page = "input"
@@ -1679,7 +1790,8 @@ key = "input.symbol.english_mode"
 source = "engine"
 type = "toggle"
 title = "英文模式智能符号"
-summary = "英文输入模式下，连按两次同一英文标点转中文；开启后输入法会接管这些标点键"
+summary = "英文模式下连按两次标点转成中文"
+detail = "开启后输入法会接管这些标点键（原本直接交给应用），所以默认关闭。"
 
 [[item]]
 page = "input"
@@ -1688,7 +1800,8 @@ key = "input.symbol.smart_timeout_ms"
 source = "engine"
 type = "int"
 title = "智能符号时限"
-summary = "两次按键的最大间隔，三种场景共用"
+summary = "两次按键算连按的最长间隔"
+detail = "单位毫秒，三种智能符号场景共用。"
 min = 100
 max = 2000
 step = 50
@@ -1697,25 +1810,11 @@ unit = "ms"
 [[item]]
 page = "input"
 section = "智能符号"
-key = "input.symbol.smart_method"
-source = "engine"
-type = "select"
-title = "智能符号上屏方式"
-summary = "直接替换：第一次直接上屏，再按时删掉改成另一形态，所见即所得；组合态预览：先以预览态显示，超时或再按才定型，兼容性好，适合直接替换表现异常的应用"
-advanced = true
-options = [
-  { value = "delete_replace", label = "直接替换（推荐）" },
-  { value = "hold_composition", label = "组合态预览（兼容性好）" },
-]
-
-[[item]]
-page = "input"
-section = "智能符号"
 key = "input.symbol.smart_chars"
 source = "engine"
 type = "text"
 title = "中文符号字符集"
-summary = "参与转换的中文标点"
+summary = "参与智能符号转换的中文标点"
 enabled_when = "input.symbol.smart_mode"
 advanced = true
 
@@ -1726,7 +1825,8 @@ key = "input.symbol.english_chars"
 source = "engine"
 type = "text"
 title = "英文符号字符集"
-summary = "两个英文场景共用，填按键本身的英文标点（如 . 而非 。）；不建议放括号引号"
+summary = "参与智能符号转换的英文标点"
+detail = "两个英文场景共用，填按键本身的标点（如 . 而不是 。）。不建议放括号引号：英文模式下这些键被接管后，Tab 跳出配对会失效。"
 advanced = true
 
 # 快捷输入（日期 / 计算 / 拼音 / 英文融合）：电脑版另有触发键多选、候选窗布局、自由输入等
@@ -1739,7 +1839,8 @@ key = "input.temp_pinyin.enabled"
 source = "engine"
 type = "toggle"
 title = "临时拼音"
-summary = "码表方案（如五笔）里临时打一个拼音字，打完回到原方案；也可点工具栏的「拼」进入"
+summary = "码表方案里临时打一个拼音字"
+detail = "如五笔里拆不出的字，打完回到原方案。也可点工具栏的「拼」进入。"
 
 [[item]]
 page = "input"
@@ -1747,9 +1848,10 @@ section = "临时拼音"
 key = "input.temp_pinyin.trigger_keys"
 source = "engine"
 type = "select"
-title = "符号触发键"
+title = "临时拼音触发键"
+summary = "空码时按这个符号键进入临时拼音"
+detail = "该符号本身就不再单独打出。字母键（如五笔的 z）在方案设置里配置。"
 hardware = true
-summary = "空码时点键盘上这个符号键即进入临时拼音（该符号本身就不再单独打出）；五笔的 z 键在「方案 → 码表」里设置"
 enabled_when = "input.temp_pinyin.enabled"
 options = [
   { value = "", label = "不用符号键" },
@@ -1767,7 +1869,8 @@ key = "input.temp_english.enabled"
 source = "engine"
 type = "toggle"
 title = "临时英文"
-summary = "中文方案里点 ⇧ 再点字母，临时打一个英文词，打完回到中文"
+summary = "中文里临时打一个英文词"
+detail = "点 ⇧ 再点字母进入，打完回到中文。"
 
 [[item]]
 page = "input"
@@ -1775,8 +1878,8 @@ section = "临时英文"
 key = "input.temp_english.shift_behavior"
 source = "engine"
 type = "select"
-title = "⇧ + 字母的行为"
-summary = "中文模式下点 ⇧ 再点字母时做什么"
+title = "Shift+字母行为"
+summary = "中文模式下按 Shift 加字母时做什么"
 enabled_when = "input.temp_english.enabled"
 options = [
   { value = "temp_english", label = "进入临时英文" },
@@ -1790,7 +1893,8 @@ key = "input.temp_english.show_candidates"
 source = "engine"
 type = "toggle"
 title = "显示英文候选"
-summary = "关闭则只留所打原文一条"
+summary = "临时英文时查英文词库给出候选"
+detail = "关闭则只留所打原文一条。"
 enabled_when = "input.temp_english.enabled"
 
 [[item]]
@@ -1800,7 +1904,8 @@ key = "input.temp_english.raw_candidate"
 source = "engine"
 type = "select"
 title = "首候选为输入原文"
-summary = "「仅词库词」= 所打字母串本身是词库里的词才作首候选"
+summary = "把所打的字母原样放在首选"
+detail = "「仅词库词」= 字母串本身是词库里的词才作首选。临时英文常用来插专名或缩写，词库里多半没有，所以「总是」通常更合适。与英文方案的同名项各自独立。"
 enabled_when = "input.temp_english.enabled"
 options = [
   { value = "always", label = "总是" },
@@ -1815,6 +1920,8 @@ key = "input.temp_english.commit_space"
 source = "engine"
 type = "toggle"
 title = "上屏后自动加空格"
+summary = "临时英文选词上屏后补一个空格"
+detail = "回车上屏不补。与英文方案的同名项各自独立；中文里插英文词时，补的空格常要退格删掉。"
 enabled_when = "input.temp_english.enabled"
 
 [[item]]
@@ -1824,7 +1931,8 @@ key = "input.temp_english.case_variants"
 source = "engine"
 type = "toggle"
 title = "生成大小写变形候选"
-summary = "全小写 / 首字母大写 / 全大写，各占一个候选位"
+summary = "补出全小写、首字母大写、全大写"
+detail = "三种形态各占一个候选位，只要词库补全时可关闭。快捷输入里的英文同样生效。"
 enabled_when = "input.temp_english.enabled"
 advanced = true
 
@@ -1835,7 +1943,8 @@ key = "input.temp_english.case_follow_input"
 source = "engine"
 type = "toggle"
 title = "候选跟随输入的大小写"
-summary = "⇧ 进入时首字母恒大写，开着时词库候选恒为首字母大写"
+summary = "首字母大写时候选也首字母大写"
+detail = "由 Shift 进入时首字母恒为大写，开启后候选随之首字母大写。只跟大写，词库自带的大写不受影响。"
 enabled_when = "input.temp_english.enabled"
 advanced = true
 
@@ -1846,7 +1955,8 @@ key = "input.temp_english.phrase_seg"
 source = "engine"
 type = "toggle"
 title = "用 ' 分词打英文词组"
-summary = "各段只打前缀。开启后 ' 不再作第三候选键"
+summary = "用 ' 隔开各词，每段只打前缀"
+detail = "规则同英文方案（可跳词）。开启后 ' 在临时英文和快捷输入里不再选第三候选，改用数字 3。"
 enabled_when = "input.temp_english.enabled"
 advanced = true
 
@@ -1857,7 +1967,8 @@ key = "input.temp_english.allow_symbols"
 source = "engine"
 type = "toggle"
 title = "允许输入符号与数字"
-summary = "数字和符号进入缓冲而不是上屏或选词，便于打 C++、x64 一类标识符"
+summary = "数字符号留在编码里，便于打 C++、x64"
+detail = "否则符号会上屏并退出、数字会选词。放行哪些字符在「可输入的字符集」里设置。"
 enabled_when = "input.temp_english.enabled"
 advanced = true
 
@@ -1868,7 +1979,8 @@ key = "input.temp_english.symbol_chars"
 source = "engine"
 type = "text"
 title = "可输入的字符集"
-summary = "允许进入缓冲的符号和数字，逐字符填写，不支持 a-z 这类范围。未列入的字符保持原职责：符号上屏退出、数字选词。留空则一个都不放行"
+summary = "允许进入编码的符号和数字"
+detail = "逐字符填写，不支持 a-z 这类范围写法。未列入的字符保持原职责：符号上屏退出、数字选词等；留空则都不放行。"
 enabled_when = "input.temp_english.allow_symbols"
 advanced = true
 
@@ -1878,8 +1990,9 @@ section = "临时英文"
 key = "input.temp_english.shift_when_composing"
 source = "engine"
 type = "select"
-title = "打码时点 ⇧ + 字母"
-summary = "已经打了编码时再点 ⇧ 加字母"
+title = "输入编码时按 Shift+字母"
+summary = "已有编码时按 Shift 加字母怎么处理"
+detail = "「上屏候选并进入临时英文」会先上屏高亮候选，再以该字母进入临时英文。英文方案下不生效。"
 enabled_when = "input.temp_english.enabled"
 advanced = true
 options = [
@@ -1893,8 +2006,9 @@ section = "临时英文"
 key = "input.temp_english.trigger_keys"
 source = "engine"
 type = "select"
-title = "符号触发键"
-summary = "实体键盘：空码时按这个符号键进入临时英文"
+title = "临时英文触发键"
+summary = "空码时按这个符号键进入临时英文"
+detail = "留空也能用 Shift+字母进入。"
 enabled_when = "input.temp_english.enabled"
 hardware = true
 options = [
@@ -1911,7 +2025,8 @@ key = "ui.android.touch_quick_input"
 source = "android"
 type = "toggle"
 title = "触摸键盘 ; 进快捷输入"
-summary = "开着时，没有编码时按触摸键盘上的 ; 进入快捷输入（同电脑版）；关着时 ; 当标点输入，快捷输入用工具栏的闪电按钮。外接物理键盘不受影响"
+summary = "没有编码时点 ; 进入快捷输入"
+detail = "关闭时 ; 当标点输入，快捷输入改用工具栏的闪电按钮。外接实体键盘不受影响。"
 default = false
 
 [[item]]
@@ -1921,7 +2036,8 @@ key = "schema.quick_input.decimal_places"
 source = "engine"
 type = "int"
 title = "小数保留位数"
-summary = "计算结果最多保留的小数位数（0 表示取整）"
+summary = "快捷输入计算结果最多几位小数"
+detail = "0 表示取整。"
 min = 0
 max = 6
 
@@ -1933,6 +2049,8 @@ key = "mobile.association.kind"
 source = "engine"
 type = "select"
 title = "联想类型"
+summary = "上屏后接着推荐下一个词"
+detail = "智能联想：按上文猜下一个词和标点。词语联想：只出以上文开头的更长的词，如「中」→「国」「间」，不含标点。"
 options = [
   { value = "smart", label = "智能联想" },
   { value = "word", label = "词语联想" },
@@ -1946,6 +2064,8 @@ key = "mobile.association.mode"
 source = "engine"
 type = "select"
 title = "连续联想"
+summary = "选了联想后是否接着往下联想"
+detail = "持续联想：选中的词作为新上文继续给联想。一次性：只出一次，做别的操作即退出。"
 options = [
   { value = "continuous", label = "持续联想" },
   { value = "one_shot", label = "一次性" },
@@ -1958,7 +2078,7 @@ key = "mobile.association.punct"
 source = "engine"
 type = "toggle"
 title = "标点联想"
-summary = "上屏后在联想里给出常接的标点，省去切到符号键盘"
+summary = "联想里给出常接的标点"
 
 [[item]]
 page = "input"
@@ -1967,7 +2087,8 @@ key = "mobile.association.space_commits"
 source = "engine"
 type = "toggle"
 title = "空格选首个联想"
-summary = "关闭时联想态按空格出空格并收起联想（汉字后双击空格出「。」）"
+summary = "联想出现时按空格上屏首个联想"
+detail = "关闭时按空格照常出空格并收起联想；汉字后双击空格出「。」需要保持关闭。"
 
 [[item]]
 page = "input"
@@ -1976,6 +2097,7 @@ key = "input.association.max_count"
 source = "engine"
 type = "int"
 title = "候选条数上限"
+summary = "联想候选最多显示几条"
 min = 1
 max = 20
 advanced = true
@@ -1987,7 +2109,8 @@ key = "mobile.association.backspace_cancels_only"
 source = "engine"
 type = "toggle"
 title = "退格仅取消联想"
-summary = "关闭时联想态按退格直接删字；打开则第一下只收起联想"
+summary = "联想出现时第一下退格只收起联想"
+detail = "关闭时按退格直接删字。"
 advanced = true
 
 [[item]]
@@ -1997,7 +2120,8 @@ key = "mobile.association.enter_cancels_only"
 source = "engine"
 type = "toggle"
 title = "回车仅取消联想"
-summary = "关闭时联想态按回车直接换行或发送；打开则第一下只收起联想"
+summary = "联想出现时第一下回车只收起联想"
+detail = "关闭时按回车直接换行或发送。"
 advanced = true
 
 [[item]]
@@ -2007,7 +2131,8 @@ key = "mobile.association.select_keys_commit"
 source = "engine"
 type = "toggle"
 title = "分号、单引号选联想"
-summary = "打开后联想态按 ; 或 ' 选第二、三个联想；关闭时只点候选选词"
+summary = "联想出现时按 ; ' 选第二、三个"
+detail = "关闭时这两个键照常出标点，联想只能点选。"
 advanced = true
 
 # 简繁两个方向互斥（exclusive_with，开一个自动关另一个），同卡三行才看得出是二选一。
@@ -2018,7 +2143,8 @@ key = "input.s2t.enabled"
 source = "engine"
 type = "toggle"
 title = "启用简入繁出"
-summary = "候选与上屏均输出繁体。开启会自动关闭「繁入简出」"
+summary = "候选和上屏都输出繁体"
+detail = "基于 OpenCC 词典转换。开启会自动关闭「繁入简出」。"
 exclusive_with = "input.t2s.enabled"
 
 [[item]]
@@ -2028,6 +2154,7 @@ key = "input.s2t.variant"
 source = "engine"
 type = "select"
 title = "转换变体"
+summary = "繁体的字形与用词风格"
 enabled_when = "input.s2t.enabled"
 options = [
   { value = "s2t", label = "标准繁体" },
@@ -2043,7 +2170,8 @@ key = "input.t2s.enabled"
 source = "engine"
 type = "toggle"
 title = "启用繁入简出"
-summary = "词库和候选是繁体时，上屏转成简体。开启会自动关闭「简入繁出」"
+summary = "繁体词库的候选上屏时转成简体"
+detail = "开启会自动关闭「简入繁出」。"
 exclusive_with = "input.s2t.enabled"
 
 [[item]]
@@ -2053,7 +2181,8 @@ key = "input.emoji.enabled"
 source = "engine"
 type = "toggle"
 title = "启用 Emoji/OpenCC 候选"
-summary = "打出词语后，在候选中追加对应的 emoji（如「开心」→ 😄）。首次开启时建立索引，稍候片刻"
+summary = "打出词语后在候选里追加 emoji"
+detail = "如「开心」→ 😄。首次开启时要建立索引。"
 
 [[item]]
 page = "input"
@@ -2062,6 +2191,8 @@ key = "input.emoji.show_as"
 source = "engine"
 type = "select"
 title = "显示位置"
+summary = "追加的 emoji 放在哪里"
+detail = "紧随词后：插在对应词之后，后面候选的序号顺延。列表末尾：放在常用候选之后，原有序号不变。"
 enabled_when = "input.emoji.enabled"
 options = [
   { value = "after", label = "紧随词后" },
@@ -2075,7 +2206,7 @@ key = "input.emoji.max_per_word"
 source = "engine"
 type = "int"
 title = "每词上限"
-summary = "一个词最多追加的 emoji 个数"
+summary = "一个词最多追加几个 emoji"
 min = 1
 max = 10
 enabled_when = "input.emoji.enabled"
@@ -2087,7 +2218,8 @@ key = "input.emoji.categories"
 source = "engine"
 type = "toggle"
 title = "启用分类词"
-summary = "「动物」「水果」等分类词会带出整组 emoji，数量受每词上限约束"
+summary = "「动物」「水果」等词带出整组 emoji"
+detail = "数量受每词上限约束。"
 enabled_when = "input.emoji.enabled"
 
 [[item]]
@@ -2097,7 +2229,8 @@ key = "input.emoji.block_auto_commit"
 source = "engine"
 type = "toggle"
 title = "有追加时不自动上屏"
-summary = "全码唯一自动上屏时，若候选追加了 emoji 或附加模块的符号（如「提手旁」→ 扌），不自动上屏，留出选择的机会"
+summary = "追加了 emoji 时不触发自动上屏"
+detail = "全码唯一自动上屏时，若候选追加了 emoji 或附加符号（如「提手旁」→ 扌），先不上屏，留出选择的机会。"
 enabled_when = "input.emoji.enabled"
 
 [[item]]
@@ -2107,6 +2240,8 @@ key = "input.emoji.scope"
 source = "engine"
 type = "select"
 title = "适用范围"
+summary = "哪些候选会追加 emoji"
+detail = "仅完整词：只为完整匹配的词追加。全部候选：补全和部分匹配的候选也追加。"
 advanced = true
 enabled_when = "input.emoji.enabled"
 options = [
@@ -2122,7 +2257,8 @@ key = "input.emoji.min_word_chars"
 source = "engine"
 type = "int"
 title = "最少字数"
-summary = "候选少于此字数时不追加。默认 2，即不为单字追加"
+summary = "少于这个字数的候选不追加"
+detail = "默认 2，即不为单字追加。"
 min = 1
 max = 8
 advanced = true
@@ -2138,7 +2274,8 @@ key = "input.correction.enabled"
 source = "engine"
 type = "toggle"
 title = "拼写纠错"
-summary = "打错的拼音按纠正后的拼写也出候选，如 gogn 出「公」"
+summary = "打错的拼音也能出正确候选"
+detail = "如漏了 g 的 gonping 出「公平」。纠哪些错在下面的纠错规则里选。"
 
 [[item]]
 page = "input"
@@ -2160,6 +2297,7 @@ source = "engine"
 type = "toggle"
 title = "漏 g：on→ong"
 summary = "冲突：lone 也可是 lo+ne"
+detail = "ion 也会纠成 iong。"
 enabled_when = "input.correction.enabled"
 
 [[item]]
@@ -2170,7 +2308,7 @@ key = "input.correction.rules.vowel_swap"
 source = "engine"
 type = "toggle"
 title = "韵母字母颠倒"
-summary = "ia↔ai、ie↔ei 等；无已知冲突"
+summary = "如 ia↔ai、ie↔ei"
 enabled_when = "input.correction.enabled"
 
 [[item]]
@@ -2182,6 +2320,7 @@ source = "engine"
 type = "toggle"
 title = "旧式拼写 uei/iou/uen"
 summary = "冲突：liou 也可是 li+ou"
+detail = "uei、iou、uen 纠成 ui、iu、un。"
 enabled_when = "input.correction.enabled"
 
 [[item]]
@@ -2215,6 +2354,7 @@ source = "engine"
 type = "toggle"
 title = "ng 打成 nag 类"
 summary = "冲突：nage 也可是 na+ge"
+detail = "nag、neg、nig、nog 纠成 ang、eng、ing、ong。"
 enabled_when = "input.correction.enabled"
 
 [[item]]
@@ -2226,6 +2366,7 @@ source = "engine"
 type = "toggle"
 title = "简拼冲突类"
 summary = "冲突：x'ai 喜爱 会被纠成 xia"
+detail = "包括 qai/xai→qia/xia、nu→un、na/ne/ni→an/en/in。"
 enabled_when = "input.correction.enabled"
 
 [[item]]
@@ -2236,7 +2377,8 @@ key = "input.correction.hint.enabled"
 source = "engine"
 type = "toggle"
 title = "显示正确拼音"
-summary = "带提示的候选在正文里内嵌正确拼音，如「苹(ping)果」；上屏不受影响"
+summary = "在候选里内嵌标出正确拼音"
+detail = "如「苹(ping)果」，上屏不受影响。下面几项决定哪些候选带提示。"
 
 [[item]]
 page = "input"
@@ -2246,7 +2388,8 @@ key = "input.correction.hint.fuzzy"
 source = "engine"
 type = "toggle"
 title = "模糊音提示"
-summary = "靠模糊音匹配上的字（模糊音开着才有）"
+summary = "模糊音匹配上的字标出正确拼音"
+detail = "模糊音开着才有。"
 
 [[item]]
 page = "input"
@@ -2256,7 +2399,8 @@ key = "input.correction.hint.misread"
 source = "engine"
 type = "toggle"
 title = "误读提示"
-summary = "易读错的词，打错误读音时也带出，如 tiaoyan 带出「调(diao)研」"
+summary = "易读错的词按误读音也能打出"
+detail = "同时标出正确拼音，如 tiaoyan 带出「调(diao)研」。"
 
 [[item]]
 page = "input"
@@ -2266,7 +2410,8 @@ key = "input.correction.hint.correction"
 source = "engine"
 type = "toggle"
 title = "纠错提示"
-summary = "经拼写纠错得到的候选（拼写纠错开着才有）"
+summary = "拼写纠错得到的候选标出正确拼音"
+detail = "拼写纠错开着才有。"
 
 [[item]]
 page = "input"
@@ -2290,7 +2435,8 @@ key = "input.correction.hint.tone"
 source = "engine"
 type = "toggle"
 title = "提示带声调"
-summary = "作用于正文提示与注释变量 ${correct_pinyin}，如「苹(píng)果」"
+summary = "正确拼音带上声调"
+detail = "如「苹(píng)果」，同音异调的字取最常用读音。也作用于注释变量 ${correct_pinyin}。"
 
 # ═══ 外观 ═══════════════════════════════════════════════════════
 # 主题暂用键盘自己的深浅色（键盘配色还没接核心的主题系统，接上后改走 ui.theme.*）
@@ -2302,6 +2448,8 @@ key = "ui.android.theme"
 source = "android"
 type = "select"
 title = "主题风格"
+summary = "键盘用浅色还是深色"
+detail = "「跟随系统」随手机的深色模式自动切换。"
 default = "system"
 options = [
   { value = "system", label = "跟随系统" },
@@ -2316,6 +2464,7 @@ key = "ui.android.candidate_text_sp"
 source = "android"
 type = "int"
 title = "候选字号"
+summary = "候选栏里字的大小"
 default = 21
 min = 15
 max = 24
@@ -2329,7 +2478,8 @@ key = "ui.android.candidate_page_no"
 source = "android"
 type = "toggle"
 title = "显示候选页码"
-summary = "编码行右侧的「1/3」；主流输入法都不显示，候选可左右滑动翻看"
+summary = "编码行右侧显示「1/3」这样的页码"
+detail = "候选可以左右滑动翻看，多数人不需要页码。"
 default = false
 
 [[item]]
@@ -2338,8 +2488,9 @@ section = "候选字体"
 key = "ui.android.candidate_divider"
 source = "android"
 type = "toggle"
-title = "候选之间的分隔线"
-summary = "候选词之间的淡色竖线；关掉后只靠间距分开"
+title = "候选分隔线"
+summary = "候选词之间画一道淡色竖线"
+detail = "关掉后候选只靠间距分开。"
 default = true
 
 [[item]]
@@ -2348,8 +2499,9 @@ section = "候选字体"
 key = "ui.android.candidate_comment"
 source = "android"
 type = "toggle"
-title = "候选显示编码提示"
-summary = "候选后面的小字：五笔显示剩余编码，拼音候选显示五笔码（与电脑版候选右侧灰字相同）"
+title = "候选编码提示"
+summary = "候选后面用小字显示编码"
+detail = "五笔候选显示剩余编码，拼音候选显示对应的五笔码，与电脑版候选右侧的灰字相同。"
 default = true
 
 # ═══ 统计（概览由代码画）═══════════════════════════════════════
@@ -2360,8 +2512,9 @@ section = "主题"
 key = "ui.android.toolbar_icon_chip"
 source = "android"
 type = "toggle"
-title = "工具栏图标圆形底托"
-summary = "空闲工具栏的图标是否衬一个白色圆底（微信、豆包是圆底，小米是无底）"
+title = "工具栏图标圆底"
+summary = "空闲工具栏的图标衬一个白色圆底"
+detail = "关掉后图标直接画在工具栏上，没有底托。"
 default = false
 
 [[item]]
@@ -2371,6 +2524,7 @@ key = "stats.enabled"
 source = "engine"
 type = "toggle"
 title = "启用输入统计"
+summary = "记录输入字数等数据，在统计页查看"
 
 [[item]]
 page = "stats"
@@ -2379,7 +2533,7 @@ key = "stats.track_english"
 source = "engine"
 type = "toggle"
 title = "统计英文输入"
-summary = "是否统计英文模式下的输入"
+summary = "英文模式下打的字也计入统计"
 enabled_when = "stats.enabled"
 
 # ═══ 键盘布局 ═══════════════════════════════════════════════════
@@ -2390,8 +2544,8 @@ section = "键盘高度"
 key = "ui.android.row_height_portrait"
 source = "android"
 type = "int"
-title = "竖屏"
-summary = "每一行键的高度"
+title = "竖屏键盘高度"
+summary = "竖屏时每一行键的高度"
 default = 60
 min = 40
 max = 72
@@ -2405,8 +2559,8 @@ section = "键盘高度"
 key = "ui.android.row_height_landscape"
 source = "android"
 type = "int"
-title = "横屏"
-summary = "每一行键的高度"
+title = "横屏键盘高度"
+summary = "横屏时每一行键的高度"
 default = 44
 min = 36
 max = 64
@@ -2421,7 +2575,7 @@ key = "ui.android.keyboard_bottom_gap"
 source = "android"
 type = "int"
 title = "底部留空"
-summary = "键盘离屏幕底部（手势条）再远一点，防误触"
+summary = "键盘离屏幕底部远一点，防止误触手势条"
 default = 0
 min = 0
 max = 48
@@ -2435,7 +2589,7 @@ key = "ui.android.keyboard_side_gap"
 source = "android"
 type = "int"
 title = "左右留边"
-summary = "大屏手机上把键盘往中间收一点"
+summary = "键盘两侧往中间收，适合大屏手机"
 default = 0
 min = 0
 max = 32
@@ -2449,7 +2603,8 @@ key = "ui.android.one_hand"
 source = "android"
 type = "select"
 title = "单手模式"
-summary = "键盘收窄靠向一侧，空出的一侧可换边或退出；快捷面板里也能开关"
+summary = "键盘收窄靠向一侧，方便单手打字"
+detail = "空出的一侧有按钮可换边或退出。快捷面板里也能随时开关。"
 default = "off"
 options = [
   { value = "off", label = "关闭" },
@@ -2464,7 +2619,8 @@ key = "ui.android.number_page"
 source = "android"
 type = "select"
 title = "「123」键先进哪一页"
-summary = "全键盘数字页带常用符号，九宫数字页适合只输数字；数字框、电话框始终直接进九宫"
+summary = "点「123」键时先打开的数字页"
+detail = "全键盘数字页带常用符号，九宫数字页适合只输数字。数字框、电话框始终直接进九宫数字页。"
 default = "pad9"
 options = [
   { value = "full", label = "全键盘数字" },
@@ -2478,7 +2634,7 @@ key = "ui.android.bottom_row"
 source = "android"
 type = "select"
 title = "字母页底行"
-summary = "逗号、句号和符号键怎么排（与豆包「26 键键盘布局」三项一致）"
+summary = "逗号、句号和符号键的排法"
 default = "split"
 options = [
   { value = "split", label = "逗句号键分开" },
@@ -2493,7 +2649,8 @@ key = "ui.android.keymap_preset"
 source = "android"
 type = "select"
 title = "上滑 / 下滑符号方案"
-summary = "默认是出厂键位，一个键都不改。其它方案只改上滑符号或加下滑编辑；mobile/keymap.toml 里手写的改动优先于方案"
+summary = "字母键上滑、下滑输入的内容"
+detail = "「默认」不改任何键位；其它方案只换上滑符号或加下滑编辑操作。在 mobile/keymap.toml 里手写的改动优先于方案。"
 default = "default"
 options = [
   { value = "default", label = "默认" },
@@ -2508,8 +2665,20 @@ section = "键位"
 key = "ui.android.second_candidate_swipe"
 source = "android"
 type = "toggle"
-title = "空格 / 中英键上滑选第二候选"
-summary = "有编码时，在空格键或中英键上向上滑，等于选第二个候选（原本这两个键的上滑是空的）。没有编码时不起作用；默认关闭"
+title = "空格上滑选第二候选"
+summary = "有编码时在空格键上滑，选第二候选"
+detail = "没有编码时不起作用。空格键原本没有上滑功能，打开后不影响其它操作。默认关闭。"
+default = false
+
+[[item]]
+page = "keyboard"
+section = "键位"
+key = "ui.android.third_candidate_swipe"
+source = "android"
+type = "toggle"
+title = "中英键上滑选第三候选"
+summary = "有编码时在中英键上滑，选第三候选"
+detail = "没有编码或候选不足三个时不起作用。中英键原本没有上滑功能，打开后不影响其它操作。默认关闭。"
 default = false
 
 [[item]]
@@ -2518,8 +2687,9 @@ section = "编码与按键"
 key = "ui.android.inline_preedit"
 source = "android"
 type = "toggle"
-title = "嵌入编码（写在输入框里）"
-summary = "开启后编码直接写进输入框（带下划线），候选栏上方不再单独显示编码行，键盘也矮一截"
+title = "嵌入编码"
+summary = "编码直接写进输入框，不单独占一行"
+detail = "编码带下划线显示在输入框里，候选栏上方不再有编码行。"
 default = false
 
 [[item]]
@@ -2529,7 +2699,7 @@ key = "ui.android.show_swipe_hints"
 source = "android"
 type = "toggle"
 title = "字母键显示上滑符号"
-summary = "在字母键顶上用小字标出上滑能输入的数字或符号"
+summary = "字母键顶上用小字标出上滑能输入的内容"
 default = true
 
 # ═══ 按键与手势 ═════════════════════════════════════════════════
@@ -2550,7 +2720,7 @@ key = "ui.android.haptic_strength"
 source = "android"
 type = "int"
 title = "振动强度"
-summary = "越小越轻；手机不支持调幅时改为缩短振动时长"
+detail = "手机不支持调节振动幅度时，改为缩短振动时长来变轻。"
 enabled_when = "ui.android.haptic"
 default = 30
 min = 5
@@ -2565,7 +2735,8 @@ key = "ui.android.sound"
 source = "android"
 type = "toggle"
 title = "按键声音"
-summary = "音量随系统触摸音量"
+summary = "按键时发出点按声"
+detail = "音量跟随系统的触摸提示音音量。"
 default = false
 
 [[item]]
@@ -2585,7 +2756,7 @@ key = "ui.android.long_press_delay"
 source = "android"
 type = "select"
 title = "长按速度"
-summary = "按住多久弹出符号气泡、开始连续删除"
+summary = "按住多久弹出符号、开始连续删除"
 default = 300
 options = [
   { value = "200", label = "快" },
@@ -2600,6 +2771,7 @@ key = "ui.android.gesture_space_cursor"
 source = "android"
 type = "toggle"
 title = "空格左右滑动移光标"
+summary = "在空格键上左右滑，光标跟着移动"
 default = true
 
 [[item]]
@@ -2609,7 +2781,8 @@ key = "ui.android.space_long_press"
 source = "android"
 type = "select"
 title = "长按空格"
-summary = "切换输入法也在中英键的长按里。语音输入要求系统里装了带语音的输入法，没有时退回切换输入法"
+summary = "按住空格键时做的事"
+detail = "长按中英键也能切换输入法。语音输入需要系统里装有带语音的输入法，没有时改为切换输入法。"
 default = "none"
 options = [
   { value = "none", label = "不做什么" },
@@ -2624,7 +2797,8 @@ key = "ui.android.gesture_backspace_select"
 source = "android"
 type = "toggle"
 title = "退格滑动删除"
-summary = "左滑选中光标前的文字后删除，上滑清空整个输入框；有编码时都只清空编码。误删可在「文本编辑」里撤销"
+summary = "在退格键上滑动，一次删掉一段文字"
+detail = "左滑选中光标前的文字后删除，上滑清空整个输入框；有编码时都只清空编码。误删可在「文本编辑」里撤销。"
 default = true
 
 [[item]]
@@ -2633,8 +2807,9 @@ section = "手势"
 key = "ui.android.gesture_swipe_symbols"
 source = "android"
 type = "toggle"
-title = "字母键上滑出符号"
-summary = "在字母键上往上滑，输入数字或符号"
+title = "字母键上滑/下滑出符号"
+summary = "在字母键上往上滑/下滑时，输入数字或符号"
+detail = "具体符号由「上滑 / 下滑符号方案」决定。"
 default = true
 
 # ═══ 工具栏与剪贴板 ═════════════════════════════════════════════
@@ -2646,7 +2821,8 @@ key = "ui.android.clip_suggestion"
 source = "android"
 type = "toggle"
 title = "复制后提示粘贴"
-summary = "复制新内容后在候选栏位置显示一条粘贴建议，30 秒后自动消失"
+summary = "复制新内容后，候选栏出现一条粘贴建议"
+detail = "30 秒后自动消失。"
 default = true
 
 # ═══ 高级 ═══════════════════════════════════════════════════════
@@ -2658,7 +2834,8 @@ key = "ui.android.show_hardware_options"
 source = "android"
 type = "toggle"
 title = "显示实体键盘设置"
-summary = "外接键盘 / 平板用户打开：显示只有实体键盘才用得上的项，如各种模式的符号触发键"
+summary = "显示只有外接键盘才用得上的设置项"
+detail = "适合外接键盘或平板用户，例如各种模式的符号触发键。"
 default = false
 
 [[item]]
@@ -2668,7 +2845,8 @@ key = "debug.log_level"
 source = "engine"
 type = "select"
 title = "输入法服务日志级别"
-summary = "写进系统日志（logcat）的详细程度，出厂为「警告」。「调试」「跟踪」会记下输入的文字，排查完请改回。改后要重启输入法进程才生效（在系统应用信息里强行停止，或重启手机）"
+summary = "日志记录的详细程度，排查问题时调高"
+detail = "「调试」「跟踪」会记下输入的文字，排查完请改回。重启输入法后生效（手机上需在应用信息里强行停止或重启手机）。"
 options = [
   { value = "off", label = "关闭" },
   { value = "error", label = "错误" },
@@ -2687,7 +2865,8 @@ key = "input.phrase.prefix_match"
 source = "engine"
 type = "toggle"
 title = "短语前缀匹配"
-summary = "敲短语编码的前几位时，列出以它开头的短语（如敲 co 列出 cobd、coad…）。关闭后只有编码完全相同的短语才出。纯码表方案开启「精确匹配」时本来就不列前缀，不受此项影响"
+summary = "敲编码前几位就列出以它开头的短语"
+detail = "如敲 co 列出 cobd、coad…；关闭后只出编码完全相同的短语。纯码表方案开了「精确匹配」时本来就不列前缀。"
 
 [[item]]
 page = "input"
@@ -2696,7 +2875,7 @@ key = "input.phrase.min_prefix"
 source = "engine"
 type = "int"
 title = "前缀匹配最少键入"
-summary = "至少敲几位编码才列出前缀匹配的短语"
+summary = "至少敲几位编码才列出前缀短语"
 enabled_when = "input.phrase.prefix_match"
 advanced = true
 min = 1
@@ -2710,7 +2889,8 @@ key = "input.reverse.lookup_disabled_dicts"
 source = "engine"
 type = "toggle"
 title = "通配与反查含扩展词库"
-summary = "反查模式、行内通配（如 uui?）和命令栏剪贴板反查里也查没启用的扩展词库（如五笔的行政区域），排在已启用词库之后，码前带 * 标明；不影响普通候选与候选注释。反查模式需先绑定进入键才用得上"
+summary = "反查和通配也查未启用的扩展词库"
+detail = "如五笔的行政区域，结果排在已启用词库之后、码前带 * 标明；不影响普通候选。行内通配如 uui?，反查模式需先绑定进入键。"
 advanced = true
 
 [[item]]
@@ -2720,7 +2900,8 @@ key = "input.url.enabled"
 source = "engine"
 type = "toggle"
 title = "网址输入模式"
-summary = "打出完整前缀（如 http、www.）即进入网址输入模式，可自由输入网址，空格或回车上屏"
+summary = "打出 http、www. 等前缀即可输入网址"
+detail = "进入后可自由输入网址，空格或回车上屏。"
 
 [[item]]
 page = "input"
@@ -2729,7 +2910,8 @@ key = "input.url.prefixes"
 source = "engine"
 type = "text"
 title = "触发前缀"
-summary = "识别为网址的前缀（如 www. http https ftp.），按空格分隔"
+summary = "识别为网址开头的前缀"
+detail = "如 www. http https ftp.，用空格分隔。"
 advanced = true
 
 [[item]]
@@ -2739,7 +2921,8 @@ key = "input.url.history_enabled"
 source = "engine"
 type = "toggle"
 title = "记住输入过的网址"
-summary = "把上屏过的网址记下来，下次打前几个字符即可补全。记录可在「词库 → 网址历史」查看和清空"
+summary = "下次打前几个字符即可补全网址"
+detail = "记录可在「词库 → 网址历史」查看和清空。"
 enabled_when = "input.url.enabled"
 advanced = true
 
@@ -2750,7 +2933,8 @@ key = "input.url.history_max"
 source = "engine"
 type = "int"
 title = "历史条数上限"
-summary = "超出后按「用得少、用得旧」自动清理。0 = 不限"
+summary = "最多记住多少条网址"
+detail = "超出后先清理用得少、用得旧的。0 表示不限。"
 enabled_when = "input.url.enabled"
 advanced = true
 min = 0
@@ -2765,7 +2949,8 @@ key = "input.email.enabled"
 source = "engine"
 type = "toggle"
 title = "邮箱输入模式"
-summary = "打了字之后按 @ 即进入，候选给出常用后缀拼成的完整邮箱。空缓冲按 @ 不触发，照常出标点"
+summary = "打了字后按 @ 补全常用邮箱后缀"
+detail = "没打字时按 @ 照常出标点。"
 
 [[item]]
 page = "input"
@@ -2774,7 +2959,8 @@ key = "input.email.suffixes"
 source = "engine"
 type = "text"
 title = "邮箱后缀"
-summary = "预置的后缀列表（写 @ 之后的部分，如 qq.com gmail.com），按空格分隔。表外的后缀也能直接打，用过一次就会被记住并排到前面"
+summary = "候选里预置的邮箱后缀"
+detail = "写 @ 之后的部分，如 qq.com gmail.com，用空格分隔。表外的后缀也能直接打，用过一次就会记住并排到前面。"
 advanced = true
 
 [[item]]
@@ -2784,7 +2970,8 @@ key = "input.unicode.enabled"
 source = "engine"
 type = "toggle"
 title = "Unicode 输入模式"
-summary = "打出 u+ 再接十六进制码点即可出该字符（u+4e00 → 一），空格或回车上屏"
+summary = "打 u+ 加十六进制码点出对应字符"
+detail = "如 u+4e00 → 一，空格或回车上屏。"
 
 [[item]]
 page = "input"
@@ -2793,5 +2980,6 @@ key = "input.unicode.prefixes"
 source = "engine"
 type = "text"
 title = "触发前缀"
-summary = "识别为码点输入的前缀（如 u+ U+），按空格分隔。区分大小写；不要填单个字母，那会占掉该字母开头的所有编码"
+summary = "识别为码点输入的前缀"
+detail = "如 u+ U+，用空格分隔，区分大小写。不要填单个字母，那会占掉该字母开头的所有编码。"
 advanced = true
