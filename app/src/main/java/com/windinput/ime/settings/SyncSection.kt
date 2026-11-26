@@ -118,6 +118,12 @@ private fun MainPage(ui: SyncUiState) {
         return
     }
 
+    // ── 向导 ──
+    SectionTitle("向导")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        NavRow("重新配置…", "已配置；要换一个同步库可重新配置") { if (!ui.busy) ui.openWizard() }
+    }
+
     // ── 状态 ──
     SectionTitle("状态")
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -239,12 +245,6 @@ private fun MainPage(ui: SyncUiState) {
             if (!ui.busy) ui.openKeyView()
         }
         NavRow("重置远端…", SyncModel.RESET_DESC, icon = SettingsIcons.clear) { if (!ui.busy) ui.openReset() }
-    }
-
-    // ── 向导 ──
-    SectionTitle("向导")
-    Card(modifier = Modifier.fillMaxWidth()) {
-        NavRow("重新配置…", "已配置；要换一个同步库可重新配置") { if (!ui.busy) ui.openWizard() }
     }
 }
 
