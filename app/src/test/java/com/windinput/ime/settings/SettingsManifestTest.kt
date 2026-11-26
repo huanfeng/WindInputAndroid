@@ -284,7 +284,7 @@ class SettingsManifestTest {
     @Test
     fun otherTypesHaveGroups() {
         assertEquals(
-            listOf("上屏", "匹配", "通配与 z 键", "调频", "自动造词", "英文候选"),
+            listOf("上屏", "匹配", "通配与 z 键", "调频", "自动造词", "英文候选", "整句输入（实验性）"),
             bundled.schemeGroups("codetable").map { it.first },
         )
         assertEquals(listOf("基本", "拼音部分", "英文部分"), bundled.schemeGroups("mixed").map { it.first })

@@ -24,8 +24,9 @@
 #   advanced true = 收进卡片底部的「进阶」折叠区（工程参数）
 #   schemes  方案表单项（page = "scheme_form"）适用的方案类型：pinyin / shuangpin / codetable / mixed / english
 #   exclusive_with  另一个开关键：本项打开时把它关掉（二选一，照电脑版清单）
-#   enabled_when    另一个开关键：它开着时本项才显示（电脑版写 "键 == true"，这里只写键）；
-#            依赖链逐级生效：A 依赖 B、B 依赖 C，C 关着时 A、B 都不显示
+#   enabled_when    另一个开关键：它开着时本项才可用（电脑版写 "键 == true"，这里只写键）；
+#            依赖链逐级生效：A 依赖 B、B 依赖 C，C 关着时 A、B 都不可用。
+#            方案表单照电脑版灰着显示；其它页不显示
 
 #   card     二级页里再分卡片：同 section 内按 card 首次出现序各成一张带标题的卡（缺省 = 无标题的头一张）
 #   hardware true = 只对实体键盘有意义的项（触发键、快捷键），「高级 → 显示实体键盘设置」打开才显示
@@ -1078,6 +1079,40 @@ type = "toggle"
 title = "整串是英文单词时否决上屏"
 summary = "整串恰好是一个英文单词时不自动上屏、不顶码，保留英文供选择；只是英文词开头的编码照常上屏。上一项开启时本项无需单独开"
 enabled_when = "schema.codetable.english_merge.enable"
+
+# 码表整句的调参项：开关是方案属性（schema_settings 的 engine.codetable.sentence_input），由代码画在
+# 本组顶上，这两项随它灰显。电脑版另有「整句备选条数 / 整句切换键」：备选只能靠 Tab / 反引号
+# 轮换，软键盘没有这两个键，不放。
+[[item]]
+page = "scheme_form"
+section = "整句输入（实验性）"
+schemes = ["codetable"]
+key = "schema.codetable.sentence_count"
+source = "engine"
+type = "int"
+title = "整句显示条数"
+summary = "候选里同时列出几种整句解读，1 = 只出一条"
+min = 1
+max = 8
+
+[[item]]
+page = "scheme_form"
+section = "整句输入（实验性）"
+schemes = ["codetable"]
+key = "schema.codetable.sentence_grammar_weight"
+source = "engine"
+type = "select"
+title = "语法模型权重"
+summary = "整句挂语法模型的力度，0 = 不挂；出厂 0.5，调到 1 反而会把逐字打的句子带偏"
+options = [
+  { value = "0.0", label = "0（不挂）" },
+  { value = "0.2", label = "0.2" },
+  { value = "0.4", label = "0.4" },
+  { value = "0.5", label = "0.5（出厂）" },
+  { value = "0.6", label = "0.6" },
+  { value = "0.8", label = "0.8" },
+  { value = "1.0", label = "1" },
+]
 
 [[item]]
 page = "scheme_form"

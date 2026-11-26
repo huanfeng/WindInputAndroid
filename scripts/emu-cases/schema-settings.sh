@@ -52,7 +52,7 @@ section "[58] 方案设置页：方案列表每行有齿轮，分组按方案类
 ss_open_detail 五笔
 check "信息头：类型 · 来源 · 版本" "yes" "$(dump_xml | grep -q '码表 · 应用自带 · 版本' && echo yes || echo no)"
 check "码表方案有「上屏」组" "yes" "$(row_y_of 上屏 >/dev/null && echo yes || echo no)"
-check "码表方案有「整句输入」组" "yes" "$(row_y_of 整句输入 >/dev/null && echo yes || echo no)"
+check "码表方案有「整句输入（实验性）」组" "yes" "$(row_y_of 整句输入（实验性） >/dev/null && echo yes || echo no)"
 ss_open_group 调频
 check "调频组列出全部参数（不折叠）" "yes" "$(has_text 调频策略)"
 check "未改时没有「已自定义」" "no" "$(dump_xml | grep -q '已自定义' && echo yes || echo no)"
@@ -60,7 +60,7 @@ ss_back
 ss_back
 check "返回回到方案列表" "yes" "$(has_text 导入方案)"
 ss_tap_desc "「清风英文」的设置"
-check "英文方案没有整句输入" "no" "$(dump_xml | grep -q 'text="整句输入"' && echo yes || echo no)"
+check "英文方案没有整句输入" "no" "$(dump_xml | grep -q 'text="整句输入（实验性）"' && echo yes || echo no)"
 ss_open_group 自定义行为
 check "英文方案：标点显示方案自带的英文标点" "yes" "$(has_text 英文标点)"
 check "手机上不列候选横竖排" "no" "$(dump_xml | grep -q 'text="候选排列"' && echo yes || echo no)"
@@ -130,8 +130,8 @@ ss_tap_row 标点
 tap_text 英文标点
 sleep 1
 ss_back
-ss_open_group 整句输入
-ss_tap_row 整句输入
+ss_open_group 整句输入（实验性）
+ss_tap_row 启用整句输入
 ss_back
 check "两项都写进了覆盖文件" "yes" "$(ov="$(ss_ov wubi86)"; grep -q 'mode = "english"' <<< "$ov" && grep -q 'sentence_input = true' <<< "$ov" && echo yes || echo no)"
 y="$(row_y_of 全部恢复默认)" || die "详情页找不到「全部恢复默认」"

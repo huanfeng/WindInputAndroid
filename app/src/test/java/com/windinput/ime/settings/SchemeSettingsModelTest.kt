@@ -42,9 +42,24 @@ class SchemeSettingsModelTest {
     fun codetableGroupsIncludeSentence() {
         val sentence = prop(KEY_SENTENCE, SchemaSettingGroup.EXPERIMENTAL)
         assertEquals(
-            listOf("上屏", "匹配", "通配与 z 键", "调频", "自动造词", "英文候选", "整句输入", "自定义行为"),
+            listOf("上屏", "匹配", "通配与 z 键", "调频", "自动造词", "英文候选", "整句输入（实验性）", "自定义行为"),
             names("codetable", behavior + sentence),
         )
+    }
+
+    @Test
+    fun sentenceGroupCarriesTuningItems() {
+        val sentence = prop(KEY_SENTENCE, SchemaSettingGroup.EXPERIMENTAL)
+        val g = schemeGroups("codetable", manifest, behavior + sentence, false, false, false).first { it.kind == SchemeGroup.Kind.SENTENCE }
+        assertEquals(
+            listOf("schema.codetable.sentence_count", "schema.codetable.sentence_grammar_weight"),
+            g.items.map { it.key },
+        )
+    }
+
+    @Test
+    fun noSentenceGroupWithoutTheProp() {
+        assertTrue(schemeGroups("codetable", manifest, behavior, false, false, false).none { it.name.startsWith("整句") })
     }
 
     @Test

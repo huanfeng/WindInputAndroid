@@ -75,13 +75,13 @@ data class SchemeGroup(val name: String, val kind: Kind, val items: List<Setting
 }
 
 internal const val GROUP_T9 = "九宫格键盘"
-private const val GROUP_AUX = "辅助码"
+internal const val GROUP_AUX = "辅助码"
 
 /** 双拼布局画在这一组的顶上 */
 private const val GROUP_BASIC = "基本"
 private const val GROUP_DICTS = "扩展词库"
 private const val GROUP_BEHAVIOR = "自定义行为"
-private const val GROUP_SENTENCE = "整句输入"
+internal const val GROUP_SENTENCE = "整句输入（实验性）"
 private const val GROUP_MEMBERS = "成员方案"
 
 /**
@@ -103,13 +103,17 @@ internal fun schemeGroups(
             GROUP_AUX -> if (auxUsable) out += SchemeGroup(name, SchemeGroup.Kind.AUX, items)
             // 清单里九宫格组只有随开关显示的项（全拼的读法栏）；组本身由代码定位在「基本」之后
             GROUP_T9 -> Unit
+            // 整句的调参项挂在代码画的整句组里（开关是方案属性，不在清单）
+            GROUP_SENTENCE -> Unit
             else -> out += SchemeGroup(name, SchemeGroup.Kind.FORM, items)
         }
         if (out.size == 1 && t9Capable && out.none { it.kind == SchemeGroup.Kind.T9 }) {
             out += SchemeGroup(GROUP_T9, SchemeGroup.Kind.T9, manifest.schemeGroups(engineType).toMap()[GROUP_T9].orEmpty())
         }
     }
-    if (props.any { it.key == KEY_SENTENCE }) out += SchemeGroup(GROUP_SENTENCE, SchemeGroup.Kind.SENTENCE)
+    if (props.any { it.key == KEY_SENTENCE }) {
+        out += SchemeGroup(GROUP_SENTENCE, SchemeGroup.Kind.SENTENCE, manifest.schemeGroups(engineType).toMap()[GROUP_SENTENCE].orEmpty())
+    }
     if (hasDicts) out += SchemeGroup(GROUP_DICTS, SchemeGroup.Kind.DICTS)
     if (props.any { it.key in BEHAVIOR_ROWS }) out += SchemeGroup(GROUP_BEHAVIOR, SchemeGroup.Kind.BEHAVIOR)
     if (hasMembers) out += SchemeGroup(GROUP_MEMBERS, SchemeGroup.Kind.MEMBERS)
@@ -128,6 +132,8 @@ private class SchemeData(
     val t9Capable: Boolean,
     /** 「启用九宫格键盘布局」此刻开着 */
     var t9Enabled: Boolean,
+    /** 能复制设置过去的同类方案（不含自己） */
+    val copyTargets: List<SchemeCopy.Target>,
 )
 
 private sealed interface SchemeLoad {
@@ -144,6 +150,11 @@ private fun loadScheme(context: android.content.Context, schemeId: String, globa
         val name = { id: String -> installed.firstOrNull { it.id == id }?.name?.ifEmpty { id } ?: id }
         val props = core.schemaSettings(schemeId)
         val keyboard = global.keyboardValues()
+        val family = SchemeCopy.family(props.engineType)
+        val copyTargets = installed.filter { it.id != schemeId }.mapNotNull { s ->
+            val type = runCatching { core.schemaSettings(s.id).engineType }.getOrNull() ?: return@mapNotNull null
+            SchemeCopy.Target(s.id, s.name.ifEmpty { s.id }, type).takeIf { SchemeCopy.family(type) == family }
+        }
         SchemeLoad.Ok(
             SchemeData(
                 form = form,
@@ -160,6 +171,7 @@ private fun loadScheme(context: android.content.Context, schemeId: String, globa
                     schemeId,
                     props.engineType,
                 ),
+                copyTargets = copyTargets,
             ),
         )
     } catch (e: ConfigException) {
@@ -270,11 +282,35 @@ private fun SchemeFirstScreen(
     val formItems = manifest.schemeGroups(type).flatMap { it.second }
     val changed = d.form.changedCount(formItems) + d.props.items.count { it.overridden }
     var confirm by remember { mutableStateOf(false) }
+    var copying by remember { mutableStateOf(false) }
+    val copyBlocks = remember(type) { SchemeCopy.blocks(type, manifest) }
     Card(modifier = Modifier.fillMaxWidth()) {
+        if (d.copyTargets.isNotEmpty() && copyBlocks.isNotEmpty()) {
+            NavRow(
+                title = "复制到其它方案",
+                summary = "把本方案的设置一次性写给同类方案（${d.copyTargets.joinToString("、") { it.name }}）",
+            ) { copying = true }
+        }
         NavRow(
             title = "全部恢复默认",
             summary = if (changed > 0) "已自定义 $changed 项" else "没有自定义的项",
             onClick = if (changed > 0) ({ confirm = true }) else null,
+        )
+    }
+    if (copying) {
+        SchemeCopyDialog(
+            sourceName = d.props.name.ifEmpty { d.props.id },
+            blocks = copyBlocks,
+            targets = d.copyTargets,
+            copy = { items, targets ->
+                val core = CoreAccess.obtainCore(context)
+                if (core == null) {
+                    SchemeCopy.Result(emptyList(), targets.map { it.name to "输入法核心未就绪" })
+                } else {
+                    SchemeCopy.copy(d.props.id, items, targets, CoreSchemeFormIo(core), d.global::typeOf)
+                }
+            },
+            onDismiss = { copying = false },
         )
     }
     if (confirm) {
@@ -318,8 +354,11 @@ private fun groupSummary(g: SchemeGroup, d: SchemeData): String =
         SchemeGroup.Kind.T9 -> if (d.t9Enabled) "已开启：键盘列表里有「${d.props.name.ifEmpty { d.props.id }} · 九宫格」" else "未开启"
         SchemeGroup.Kind.DICTS -> "本方案的扩展词库开关"
         SchemeGroup.Kind.BEHAVIOR -> "标点、命令短语"
-        SchemeGroup.Kind.SENTENCE ->
-            if (d.props.items.firstOrNull { it.key == KEY_SENTENCE }?.value == "true") "已开启" else "未开启"
+        SchemeGroup.Kind.SENTENCE -> {
+            val n = d.form.changedCount(g.items)
+            (if (d.props.items.firstOrNull { it.key == KEY_SENTENCE }?.value == "true") "已开启" else "未开启") +
+                if (n > 0) " · 已自定义 $n 项" else ""
+        }
         SchemeGroup.Kind.MEMBERS -> d.memberNames.joinToString(" · ") { it.second }
     }
 
@@ -385,8 +424,15 @@ private fun SchemeGroupScreen(
         }
         SchemeGroup.Kind.SENTENCE -> d.props.items.firstOrNull { it.key == KEY_SENTENCE }?.let { sentence ->
             Card(modifier = Modifier.fillMaxWidth()) {
-                BoolSettingRow("整句输入", "码长超过上限时按码表拼整句（实验性）", sentence, writeProp)
+                BoolSettingRow(
+                    "启用整句输入",
+                    "实验性功能：超过码长的编码自动切分并组句。简码歧义下切分可能出错，需用分隔符（如 q'j）划定边界；" +
+                        "开启后顶码上屏、全码唯一自动上屏、满码空码清空不再生效",
+                    sentence,
+                    writeProp,
+                )
             }
+            FormCard(g.items, d.form, enabled = sentence.value == "true")
         }
         SchemeGroup.Kind.MEMBERS -> Card(modifier = Modifier.fillMaxWidth()) {
             d.memberNames.forEachIndexed { i, (id, name) ->
@@ -399,13 +445,21 @@ private fun SchemeGroupScreen(
     }
 }
 
-/** 表单项一张卡：按 enabled_when 显隐（依赖项在 [all] 里找） */
+/**
+ * 表单项一张卡。依赖的开关（enabled_when，依赖项在 [all] 里找）关着的项照电脑版灰着显示，不藏：
+ * 藏起来的话总开关关着时一组只剩一行，看着像比电脑版少了项。[enabled] = false 时整卡灰着。
+ */
 @Composable
-private fun FormCard(items: List<SettingItem>, values: SchemeFormValues, all: List<SettingItem> = items) {
-    val shown = items.filter { values.available(it) && values.visible(it, all) }
+private fun FormCard(
+    items: List<SettingItem>,
+    values: SchemeFormValues,
+    all: List<SettingItem> = items,
+    enabled: Boolean = true,
+) {
+    val shown = items.filter { values.available(it) }
     if (shown.isEmpty()) return
     Card(modifier = Modifier.fillMaxWidth()) {
-        for (item in shown) key(item.key) { ItemRow(item, values) }
+        for (item in shown) key(item.key) { ItemRow(item, values, enabled && values.visible(item, all)) }
     }
 }
 

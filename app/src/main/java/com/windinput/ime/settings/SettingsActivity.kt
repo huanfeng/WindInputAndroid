@@ -57,6 +57,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -873,7 +874,8 @@ private fun GridChip(text: String, checked: Boolean, modifier: Modifier, onClick
 }
 
 @Composable
-internal fun ItemRow(raw: SettingItem, values: ItemValues) {
+/** [enabled] = false：依赖的开关关着，照电脑版灰着显示、不能改（不藏起来，免得看着像少了项） */
+internal fun ItemRow(raw: SettingItem, values: ItemValues, enabled: Boolean = true) {
     val scope = rememberCoroutineScope()
     @Suppress("UNUSED_EXPRESSION") values.version // 写入后重组
     val item = raw.copy(summary = values.summary(raw))
@@ -881,9 +883,9 @@ internal fun ItemRow(raw: SettingItem, values: ItemValues) {
         scope.launch { withContext(Dispatchers.IO) { values.set(raw, v) } }
     }
     when (item.type) {
-        "toggle" -> ToggleLine(item.title, item.summary, values.bool(item)) { write(it) }
-        "int" -> IntRow(item, values.int(item)) { write(it) }
-        "select" -> SelectRow(item, values.choice(item)) { write(it) }
+        "toggle" -> ToggleLine(item.title, item.summary, values.bool(item), enabled) { write(it) }
+        "int" -> IntRow(item, values.int(item), enabled) { write(it) }
+        "select" -> SelectRow(item, values.choice(item), enabled) { write(it) }
         "text" -> TextRow(item, values.text(item)) { v ->
             withContext(Dispatchers.IO) { values.set(item, v) }
         }
@@ -1176,7 +1178,7 @@ private fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit, sum
  * 一个三选一就占四行，二级页一屏装不下；下拉保持一项一行。
  */
 @Composable
-private fun SelectRow(item: SettingItem, value: String, onValueChange: (String) -> Unit) {
+private fun SelectRow(item: SettingItem, value: String, enabled: Boolean = true, onValueChange: (String) -> Unit) {
     val labels = item.options.map { it.second }
     val index = item.options.indexOfFirst { it.first == value }.coerceAtLeast(0)
     WindowDropdownPreference(
@@ -1184,6 +1186,7 @@ private fun SelectRow(item: SettingItem, value: String, onValueChange: (String) 
         selectedIndex = index,
         title = item.title,
         summary = item.summary,
+        enabled = enabled,
         onSelectedIndexChange = { i -> item.options.getOrNull(i)?.let { onValueChange(it.first) } },
     )
 }
@@ -1194,12 +1197,12 @@ private fun SelectRow(item: SettingItem, value: String, onValueChange: (String) 
  * 带 [SettingItem.preview] 的项在拖动后显示预览：行高画出四行键，字号写一行候选。
  */
 @Composable
-private fun IntRow(item: SettingItem, value: Int, onValueChange: (Int) -> Unit) {
+private fun IntRow(item: SettingItem, value: Int, enabled: Boolean = true, onValueChange: (Int) -> Unit) {
     val min = item.min ?: 0
     val max = item.max ?: 100
     var draft by remember(value) { mutableIntStateOf(value) }
     var touched by remember { mutableStateOf(false) }
-    Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+    Column(modifier = Modifier.fillMaxWidth().padding(16.dp).alpha(if (enabled) 1f else DISABLED_ALPHA)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = item.title)
@@ -1220,6 +1223,7 @@ private fun IntRow(item: SettingItem, value: Int, onValueChange: (Int) -> Unit) 
                 touched = true
             },
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            enabled = enabled,
             valueRange = min.toFloat()..max.toFloat(),
             steps = ((max - min) / item.step - 1).coerceAtLeast(0),
             onValueChangeFinished = { if (draft != value) onValueChange(draft) },
@@ -1278,11 +1282,21 @@ private fun CandidateTextPreview(textSp: Int) {
 
 /** 标题 + 说明 + 开关的一行；整行可点 */
 @Composable
-internal fun ToggleLine(title: String, summary: String?, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+internal fun ToggleLine(
+    title: String,
+    summary: String?,
+    checked: Boolean,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) {
     SwitchPreference(
         checked = checked,
         onCheckedChange = onCheckedChange,
         title = title,
         summary = summary,
+        enabled = enabled,
     )
 }
+
+/** 不可用行（数值行自己画，没有组件自带的灰态）的透明度 */
+private const val DISABLED_ALPHA = 0.4f
