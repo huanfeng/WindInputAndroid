@@ -4,6 +4,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -382,6 +383,8 @@ private fun SettingsApp(
     //   加载出来）总时长被重算，进度随之重排，快到位的页面又往回跳一截再滑进来
     //   （「点进下一级会再弹一下」）。进度单调了，位置就只会往前走。
     val transitionState = remember { SeekableTransitionState(route) }
+    // 顶栏返回箭头与系统返回走同一条分发链：页面内的 BackHandler（如同步页未保存密钥时拦住关闭）对两者都生效
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     // 放弃手势后的收尾协程：新手势、路由变化时先取消它，免得两边抢同一个 transitionState
     val cancelBackJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
     LaunchedEffect(route) {
@@ -449,7 +452,7 @@ private fun SettingsApp(
         Screen(
             route = r,
             title = r.detail?.let { detailTitles[it] ?: it } ?: screenTitle(manifest, r),
-            onBack = if (r.depth > 0) ({ go(r.up()) }) else null,
+            onBack = if (r.depth > 0) ({ backDispatcher?.onBackPressed() ?: go(r.up()) }) else null,
         ) {
             val page = manifest.pages.firstOrNull { it.id == r.page }
             when {

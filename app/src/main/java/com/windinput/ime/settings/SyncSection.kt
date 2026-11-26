@@ -77,7 +77,8 @@ internal fun SyncSection() {
         ui.reload()
         while (isActive) {
             delay(POLL_MS)
-            ui.refreshStatus()
+            // 首次读取失败（核心还没就绪）时接着重试，别一直停在「读取中…」
+            if (ui.loaded) ui.refreshStatus() else ui.reload()
         }
     }
     BackHandler(enabled = ui.flow != null) { ui.closeFlow() }
@@ -314,7 +315,7 @@ private fun WizardFlow(ui: SyncUiState) {
         else -> true
     }
     Buttons {
-        if (step != WizStep.DONE && ui.newKey.isEmpty()) Btn("取消", Modifier.weight(1f)) { ui.closeFlow() }
+        if (step != WizStep.DONE && ui.newKey.isEmpty()) Btn("取消", Modifier.weight(1f), enabled = !ui.keyPending) { ui.closeFlow() }
         if (SyncModel.backStep(step) != null && ui.newKey.isEmpty()) {
             Btn("上一步", Modifier.weight(1f), enabled = !ui.busy) { ui.wizardBack() }
         }
@@ -348,7 +349,7 @@ private fun StorageFlow(ui: SyncUiState) {
         if (stage == StorageStage.CREATED) NewKeyBlock(ui)
     }
     Buttons {
-        if (stage != StorageStage.CREATED) Btn("取消", Modifier.weight(1f)) { ui.closeFlow() }
+        if (stage != StorageStage.CREATED) Btn("取消", Modifier.weight(1f), enabled = !ui.keyPending) { ui.closeFlow() }
         when (stage) {
             StorageStage.FORM -> Btn("保存", Modifier.weight(1f), enabled = !ui.busy) { ui.saveStorage() }
             StorageStage.CREATE -> Btn("在新位置创建同步库", Modifier.weight(1f), enabled = !ui.busy) { ui.createStorageLibrary() }
@@ -547,6 +548,12 @@ private fun Field(label: String, value: String, secret: Boolean = false, onChang
         modifier = Modifier.fillMaxWidth(),
         singleLine = true,
         visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
+        // 密码键盘：别让输入法把存储密码记进联想或云端词库
+        keyboardOptions = if (secret) {
+            KeyboardOptions(autoCorrectEnabled = false, keyboardType = KeyboardType.Password)
+        } else {
+            KeyboardOptions.Default
+        },
     )
 }
 
@@ -677,6 +684,8 @@ private class SyncUiState(private val context: Context, private val scope: Corou
     var devices by mutableStateOf<List<SyncModel.Device>>(emptyList())
     var devicesErr by mutableStateOf("")
     var busy by mutableStateOf(false)
+    /** 会带回新同步密钥的命令在途（建库、建库撞库后的取回）：回执回来前不许关流程，否则密钥被丢、用户从没见过 */
+    var keyPending by mutableStateOf(false)
     var message by mutableStateOf<String?>(null)
     var messageError by mutableStateOf(false)
     var flow by mutableStateOf<Flow?>(null)
@@ -770,10 +779,11 @@ private class SyncUiState(private val context: Context, private val scope: Corou
     suspend fun reload() {
         val got = withContext(Dispatchers.IO) {
             handle()?.let { h ->
-                // 本机名称默认取机型名：首次进页就写下，别的设备的列表里才认得出
+                // 本机名称默认取机型名，别的设备的列表里才认得出。只在已加入后写：没配置过同步的用户
+                // 只是打开这一页，不该落下设置文件（SyncHub 靠它判断要不要建句柄）
                 var json = h.getSettings()
                 val f = SyncModel.parseForm(json)
-                if (f.deviceName.isBlank()) {
+                if (f.deviceName.isBlank() && SyncModel.parseStatus(h.status()).configured) {
                     val named = SyncModel.defaultDeviceName(f.deviceName, Build.MODEL)
                     if (named.isNotEmpty()) {
                         runCatching { h.setSettings(f.copy(deviceName = named).toSettingsJson()) }
@@ -850,14 +860,21 @@ private class SyncUiState(private val context: Context, private val scope: Corou
     // ── 执行 ──
 
     /** 后台依次执行，遇错即停；结果回主线程交给 [done]，之后兜底刷新 */
-    private fun run(steps: List<Step>, refresh: Boolean = true, done: (StepsResult) -> Unit) {
+    private fun run(
+        steps: List<Step>,
+        refresh: Boolean = true,
+        yieldsKey: Boolean = false,
+        done: (StepsResult) -> Unit,
+    ) {
         if (busy) return
         busy = true
+        keyPending = yieldsKey
         scope.launch {
             val r = withContext(Dispatchers.IO) {
                 handle()?.let { execute(it, steps) } ?: StepsResult.Failed(0, "输入法核心未就绪")
             }
             busy = false
+            keyPending = false
             done(r)
             if (refresh) refreshAll()
         }
@@ -932,6 +949,10 @@ private class SyncUiState(private val context: Context, private val scope: Corou
 
     /** 关流程（取消、返回键、完成）：已完成的步骤不回滚，输入的机密与读到的密钥清掉 */
     fun closeFlow() {
+        if (keyPending) {
+            showMessage("正在生成同步密钥，请稍候")
+            return
+        }
         if (keyUnacked()) {
             showMessage("请先保存同步密钥并勾选「${SyncModel.KEY_ACK}」", error = true)
             return
@@ -1157,7 +1178,7 @@ private class SyncUiState(private val context: Context, private val scope: Corou
     /** 新位置还没有同步库：在那里建库 */
     fun createStorageLibrary() {
         storageErr = ""
-        run(SyncModel.createKeySteps()) { r ->
+        run(SyncModel.createKeySteps(), yieldsKey = true) { r ->
             if (flow != Flow.STORAGE) return@run
             when (r) {
                 is StepsResult.Ok -> SyncModel.keyFromReply(r.replies.first())?.let { showNewKey(true, it) } ?: closeFlow()
@@ -1289,7 +1310,7 @@ private class SyncUiState(private val context: Context, private val scope: Corou
     }
 
     private fun runWizardCreate(steps: List<Step>) {
-        run(steps) { r ->
+        run(steps, yieldsKey = true) { r ->
             if (flow != Flow.WIZARD) return@run
             when (r) {
                 // 库已建好但没拿到密钥：直接完成，可在「安全」里查看
@@ -1331,7 +1352,7 @@ private class SyncUiState(private val context: Context, private val scope: Corou
             if (storage) storageErr = t else wizErr = t
             return
         }
-        run(listOf(Step.Command("test_connection"))) { r ->
+        run(listOf(Step.Command("test_connection")), yieldsKey = true) { r ->
             if (flow != myFlow) return@run
             val joined = r is StepsResult.Ok && runCatching { JSONObject(r.replies.first()).optBoolean("joined") }.getOrDefault(false)
             if (r is StepsResult.Failed) {
@@ -1340,7 +1361,7 @@ private class SyncUiState(private val context: Context, private val scope: Corou
             } else if (!joined) {
                 keyForm(storage, join = true, why = SyncModel.REMOTE_TAKEN_MSG)
             } else {
-                run(listOf(Step.Command("export_key"))) { x ->
+                run(listOf(Step.Command("export_key")), yieldsKey = true) { x ->
                     if (flow != myFlow) return@run
                     val key = (x as? StepsResult.Ok)?.let { SyncModel.keyFromReply(it.replies.first()) }
                     if (key != null) showNewKey(storage, key) else keyForm(storage, join = true, why = SyncModel.REMOTE_TAKEN_MSG)
