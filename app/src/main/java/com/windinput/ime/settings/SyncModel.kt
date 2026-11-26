@@ -265,7 +265,7 @@ internal object SyncModel {
 
     /** 机密输入框的占位：只反映「本机有没有」，从不带内容 */
     fun secretPlaceholder(hasSecret: Boolean, savedBackend: Boolean): String = when {
-        hasSecret -> "已保存（留空则不修改）"
+        hasSecret -> "已保存，留空则不修改"
         // 只存了密码、还没同步密钥时 has_secret 也为假
         savedBackend -> "如已保存过密码可留空"
         else -> "未设置"

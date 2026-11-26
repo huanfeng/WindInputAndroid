@@ -151,7 +151,7 @@ class SyncModelTest {
     fun secretArgsAndPlaceholderNeverCarryContent() {
         assertNull(SyncModel.secretArgs(""))
         assertEquals("pw", JSONObject(SyncModel.secretArgs("pw")!!).getString("password"))
-        assertEquals("已保存（留空则不修改）", SyncModel.secretPlaceholder(true, true))
+        assertEquals("已保存，留空则不修改", SyncModel.secretPlaceholder(true, true))
         assertEquals("如已保存过密码可留空", SyncModel.secretPlaceholder(false, true))
         assertEquals("未设置", SyncModel.secretPlaceholder(false, false))
     }
