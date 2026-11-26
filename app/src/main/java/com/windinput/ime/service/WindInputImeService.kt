@@ -584,7 +584,7 @@ class WindInputImeService :
             setInputView(onCreateInputView())
         }
         session.candidateComments = userConfig.getBoolean("ui.android.candidate_comment", true)
-        // 数据同步：到期（距上次 ≥10 分钟）才起一轮，全程在后台线程，不碰主线程
+        // 数据同步：到期（距上次满同步间隔）才起一轮，全程在后台线程，不碰主线程
         SyncHub.syncIfDue(this)
         applyOneHand() // 设置页改了单手模式：弹键盘时按新配置摆
         KeyHaptics.init(this)

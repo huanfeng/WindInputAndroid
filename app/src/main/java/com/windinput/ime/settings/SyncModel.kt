@@ -279,6 +279,10 @@ internal object SyncModel {
 
     fun clampInterval(text: String): Int = clampInterval(text.trim().toDoubleOrNull() ?: Double.NaN)
 
+    /** 键盘弹出时两轮同步的最小间隔（秒）：取 `get_settings` 回执里的同步间隔，夹到 1–1440 分钟 */
+    fun intervalSecs(settingsJson: String): ULong =
+        clampInterval(parseForm(settingsJson).intervalMin.toDouble()).toULong() * 60uL
+
     /** 同步间隔改了才要保存：返回带新间隔的表单，其余原样 */
     fun intervalChange(saved: Form, v: Double): Form? {
         val n = clampInterval(v)

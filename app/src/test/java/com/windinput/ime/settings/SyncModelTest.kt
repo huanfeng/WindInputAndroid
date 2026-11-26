@@ -376,4 +376,13 @@ class SyncModelTest {
         assertEquals(listOf("me", "a"), list.map { it.id })
         assertEquals("组", list.first().groupName)
     }
+
+    @Test
+    fun keyboardSyncIntervalFollowsSettings() {
+        assertEquals(15uL * 60uL, SyncModel.intervalSecs("""{"settings":{"enabled":true}}"""))
+        assertEquals(30uL * 60uL, SyncModel.intervalSecs("""{"settings":{"interval_min":30}}"""))
+        assertEquals(1440uL * 60uL, SyncModel.intervalSecs("""{"settings":{"interval_min":99999}}"""))
+        assertEquals(60uL, SyncModel.intervalSecs("""{"settings":{"interval_min":0}}"""))
+        assertEquals(15uL * 60uL, SyncModel.intervalSecs("不是 JSON"))
+    }
 }

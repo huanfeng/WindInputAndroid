@@ -3,6 +3,7 @@ package com.windinput.ime.core
 import android.content.Context
 import com.windinput.ime.WindInputApp
 import com.windinput.ime.settings.CoreAccess
+import com.windinput.ime.settings.SyncModel
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import uniffi.wind_android.MobileSyncHandle
@@ -17,9 +18,6 @@ import uniffi.wind_android.WindCore
  */
 object SyncHub {
 
-    /** 键盘每次弹出最多触发一轮同步的最小间隔（秒） */
-    const val MIN_INTERVAL_SECS = 600uL
-
     @Volatile
     private var handle: MobileSyncHandle? = null
     private val kicking = AtomicBoolean(false)
@@ -32,7 +30,7 @@ object SyncHub {
     }
 
     /**
-     * 键盘弹出时调用：到期则后台起一轮同步。自己切后台线程，不阻塞调用方（主线程）；
+     * 键盘弹出时调用：距上次同步满同步间隔（设置里的分钟数）则后台起一轮同步。自己切后台线程，不阻塞调用方（主线程）；
      * 上一次调用还没返回时直接略过。
      */
     fun syncIfDue(context: Context) {
@@ -44,7 +42,8 @@ object SyncHub {
             try {
                 // 核心可能还在构造：取用会等它（同一把单例锁），所以必须在后台线程
                 val core = CoreAccess.obtainCore(context) ?: return@Thread
-                get(core, dirs).syncIfDue(MIN_INTERVAL_SECS)
+                val h = get(core, dirs)
+                h.syncIfDue(SyncModel.intervalSecs(h.getSettings()))
             } catch (_: Throwable) {
                 // 同步失败不能影响输入
             } finally {
