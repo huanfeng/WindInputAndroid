@@ -613,7 +613,7 @@ private fun pageSummary(
             ?: schemaState?.activeName?.let { "当前：$it" }
             ?: sectionList(manifest, page.id)
         "dict" -> "我的词条 · 添加词条 · 命令短语 · 词库统计"
-        "sync" -> "WebDAV / S3 · 口令加密 · 多设备"
+        "sync" -> "WebDAV / S3 · 同步密钥加密 · 设备组"
         "about" -> "版本 $versionName"
         else -> sectionList(manifest, page.id)
     }
