@@ -242,6 +242,10 @@ internal object SyncModel {
     fun purgeSteps(devs: List<String>): List<Step> =
         devs.map { Step.Command("purge_device", JSONObject().put("device", it).toString()) }
 
+    /** 逐个清除中途失败：已清几台、哪台失败（同桌面 step_failure_for） */
+    fun purgeFailure(index: Int, devs: List<String>, e: String): String =
+        "已清除 $index 台，${devs.getOrNull(index) ?: "?"} 失败：$e"
+
     // ───────────────────────────── 同步内容 ─────────────────────────────
 
     /** 各类内容是否参与同步（本机设置，不随同步传播），缺省全开 */

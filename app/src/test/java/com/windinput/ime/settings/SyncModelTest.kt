@@ -522,6 +522,14 @@ class SyncModelTest {
     }
 
     @Test
+    fun purgeFailureTextNamesProgressAndDevice() {
+        val devs = listOf("old-a", "old-b", "old-c")
+        assertEquals("已清除 1 台，old-b 失败：网络错误", SyncModel.purgeFailure(1, devs, "网络错误"))
+        assertEquals("已清除 0 台，old-a 失败：x", SyncModel.purgeFailure(0, devs, "x"))
+        assertEquals("已清除 0 台，? 失败：x", SyncModel.purgeFailure(0, emptyList(), "x"))
+    }
+
+    @Test
     fun refreshUsageEnabledOnlyWhenIdle() {
         val idle = SyncModel.Status(phase = "idle")
         assertTrue(SyncModel.canRefreshUsage(idle, busy = false))

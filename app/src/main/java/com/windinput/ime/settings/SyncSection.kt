@@ -242,18 +242,21 @@ private fun MainPage(ui: SyncUiState) {
         val c = ui.saved.content
         SwitchPreference(
             checked = c.learned,
+            enabled = !ui.busy,
             onCheckedChange = { ui.setContent(c.copy(learned = it)) },
             title = "学习数据",
             summary = "临时词、选词计数、联想历史",
         )
         SwitchPreference(
             checked = c.completion,
+            enabled = !ui.busy,
             onCheckedChange = { ui.setContent(c.copy(completion = it)) },
             title = "补全历史",
             summary = "邮箱后缀、网址、快捷输入历史",
         )
         SwitchPreference(
             checked = c.stats,
+            enabled = !ui.busy,
             onCheckedChange = { ui.setContent(c.copy(stats = it)) },
             title = "打字统计",
             summary = "本机统计上传、其他设备统计下载",
@@ -266,9 +269,10 @@ private fun MainPage(ui: SyncUiState) {
         NavRow("更换存储…", SyncModel.storageSummary(ui.saved)) { if (!ui.busy) ui.openStorage() }
         val desc = SyncModel.usageDesc(st, LocalDate.now())
         NavRow("已用空间", listOf(SyncModel.usageLine(st), desc).filter { it.isNotEmpty() }.joinToString("\n"))
+        val canRefresh = SyncModel.canRefreshUsage(st, ui.busy)
         NavRow(
             "刷新",
-            null,
+            if (canRefresh) null else "统计或同步进行中，稍后可刷新",
             icon = SettingsIcons.refresh,
             onClick = if (SyncModel.canRefreshUsage(st, ui.busy)) ({ ui.refreshUsage() }) else null,
         )
@@ -1020,7 +1024,16 @@ private class SyncUiState(private val context: Context, private val scope: Corou
     fun confirmPurge() {
         val devs = status.removedWithData
         if (devs.isEmpty()) return
-        runSimple("清除已移除设备的数据", SyncModel.purgeSteps(devs), "已清除") { flow = null }
+        message = null
+        run(SyncModel.purgeSteps(devs)) { r ->
+            when (r) {
+                is StepsResult.Ok -> {
+                    showMessage("已清除")
+                    if (flow == Flow.PURGE) flow = null
+                }
+                is StepsResult.Failed -> failed("清除已移除设备的数据", SyncModel.purgeFailure(r.at, devs, r.error))
+            }
+        }
     }
 
     fun confirmMassDelete() =
