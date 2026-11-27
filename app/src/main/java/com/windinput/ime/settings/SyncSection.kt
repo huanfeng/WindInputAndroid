@@ -92,11 +92,13 @@ internal fun SyncSection() {
         Flow.GROUP -> GroupFlow(ui)
         Flow.KEY_VIEW -> KeyViewFlow(ui)
         Flow.RESET -> ResetFlow(ui)
+        Flow.PURGE -> PurgeFlow(ui)
+        Flow.USAGE -> UsageFlow(ui)
     }
 }
 
 /** 替换页面内容的流程（对应电脑版的各个对话框） */
-private enum class Flow { WIZARD, STORAGE, IDENTITY, RENAME, GROUP, KEY_VIEW, RESET }
+private enum class Flow { WIZARD, STORAGE, IDENTITY, RENAME, GROUP, KEY_VIEW, RESET, PURGE, USAGE }
 
 // ───────────────────────────── 主页面 ─────────────────────────────
 
@@ -230,12 +232,47 @@ private fun MainPage(ui: SyncUiState) {
             }
         }
         NavRow("刷新设备列表", null, icon = SettingsIcons.refresh) { ui.loadDevices() }
+        val purge = SyncModel.purgeSummary(st.removedWithData)
+        if (purge.isNotEmpty()) NavRow(purge, "点按清除…", icon = SettingsIcons.clear) { if (!ui.busy) ui.openPurge() }
+    }
+
+    // ── 同步内容 ──
+    SectionTitle("同步内容")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        val c = ui.saved.content
+        SwitchPreference(
+            checked = c.learned,
+            onCheckedChange = { ui.setContent(c.copy(learned = it)) },
+            title = "学习数据",
+            summary = "临时词、选词计数、联想历史",
+        )
+        SwitchPreference(
+            checked = c.completion,
+            onCheckedChange = { ui.setContent(c.copy(completion = it)) },
+            title = "补全历史",
+            summary = "邮箱后缀、网址、快捷输入历史",
+        )
+        SwitchPreference(
+            checked = c.stats,
+            onCheckedChange = { ui.setContent(c.copy(stats = it)) },
+            title = "打字统计",
+            summary = "本机统计上传、其他设备统计下载",
+        )
     }
 
     // ── 存储 ──
     SectionTitle("存储")
     Card(modifier = Modifier.fillMaxWidth()) {
         NavRow("更换存储…", SyncModel.storageSummary(ui.saved)) { if (!ui.busy) ui.openStorage() }
+        val desc = SyncModel.usageDesc(st, LocalDate.now())
+        NavRow("已用空间", listOf(SyncModel.usageLine(st), desc).filter { it.isNotEmpty() }.joinToString("\n"))
+        NavRow(
+            "刷新",
+            null,
+            icon = SettingsIcons.refresh,
+            onClick = if (SyncModel.canRefreshUsage(st, ui.busy)) ({ ui.refreshUsage() }) else null,
+        )
+        if (st.usage != null) NavRow("明细…", null) { ui.openUsage() }
     }
 
     // ── 安全 ──
@@ -492,6 +529,43 @@ private fun ResetFlow(ui: SyncUiState) {
         }
     }
     MessageLine(ui)
+}
+
+/** 清除已移除设备的数据：列出设备号与后果，确认后逐个清除 */
+@Composable
+private fun PurgeFlow(ui: SyncUiState) {
+    SectionTitle("清除已移除设备的数据")
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Body {
+            Text(text = "设备：${ui.status.removedWithData.joinToString("、")}")
+            Text(text = SyncModel.PURGE_WARN, color = MiuixTheme.colorScheme.error)
+        }
+    }
+    Buttons {
+        Btn("取消", Modifier.weight(1f), enabled = !ui.busy) { ui.closeFlow() }
+        Btn("清除", Modifier.weight(1f), enabled = !ui.busy && ui.status.removedWithData.isNotEmpty()) { ui.confirmPurge() }
+    }
+    MessageLine(ui)
+}
+
+/** 空间占用明细：分类、各设备、存储服务给出的用量 */
+@Composable
+private fun UsageFlow(ui: SyncUiState) {
+    SectionTitle("空间占用")
+    val u = ui.status.usage
+    Card(modifier = Modifier.fillMaxWidth()) {
+        if (u == null) {
+            Body { Muted("未统计") }
+        } else {
+            for ((label, value) in SyncModel.usageRows(u, ui.devices)) NavRow(label, value)
+            val desc = SyncModel.usageDesc(ui.status, LocalDate.now())
+            Body {
+                if (desc.isNotEmpty()) Muted(desc)
+                Muted(SyncModel.USAGE_NOTE)
+            }
+        }
+    }
+    Buttons { Btn("关闭", Modifier.weight(1f)) { ui.closeFlow() } }
 }
 
 // ───────────────────────────── 小部件 ─────────────────────────────
@@ -924,6 +998,29 @@ private class SyncUiState(private val context: Context, private val scope: Corou
         if (f == null) return
         saved = f
         runSimple("保存同步间隔", listOf(Step.SetSettings(f.toSettingsJson())), "")
+    }
+
+    /** 同步内容开关：只改 content，改了即存；忙时不发，开关仍显示已保存的状态 */
+    fun setContent(c: SyncModel.Content) {
+        if (busy || c == saved.content) return
+        val steps = SyncModel.contentSwitchSteps(saved, c)
+        runSimple("保存同步内容", steps, "") { saved = saved.copy(content = c) }
+    }
+
+    /** 重算远端空间占用；核心后台进行，结果见状态里的 usage */
+    fun refreshUsage() {
+        if (!SyncModel.canRefreshUsage(status, busy)) return
+        runSimple("统计空间占用", listOf(Step.Command("refresh_usage")), "")
+    }
+
+    fun openPurge() = open(Flow.PURGE)
+
+    fun openUsage() = open(Flow.USAGE)
+
+    fun confirmPurge() {
+        val devs = status.removedWithData
+        if (devs.isEmpty()) return
+        runSimple("清除已移除设备的数据", SyncModel.purgeSteps(devs), "已清除") { flow = null }
     }
 
     fun confirmMassDelete() =

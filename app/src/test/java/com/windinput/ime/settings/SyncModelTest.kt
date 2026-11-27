@@ -385,4 +385,183 @@ class SyncModelTest {
         assertEquals(60uL, SyncModel.intervalSecs("""{"settings":{"interval_min":0}}"""))
         assertEquals(15uL * 60uL, SyncModel.intervalSecs("不是 JSON"))
     }
+
+    // ── 同步内容、已移除设备、空间占用 ──
+
+    private val usageJson = """
+        {"installed":true,"joined":true,
+         "removed_with_data":["old1","old2"],
+         "usage":{"computed_at":1000,"total":1536,"blobs":2048,"blobs_unreferenced":512,
+           "devices":[{"id":"d1","learned":1024,"stats":10},{"id":"gone","learned":0,"stats":2048}],
+           "other":100,
+           "provider":{"used":3145728,"available":1073741824}},
+         "usage_busy":true,"usage_error":"超时"}
+    """.trimIndent()
+
+    @Test
+    fun statusParsesRemovedAndUsage() {
+        val s = SyncModel.parseStatus(usageJson)
+        assertEquals(listOf("old1", "old2"), s.removedWithData)
+        assertTrue(s.usageBusy)
+        assertEquals("超时", s.usageError)
+        val u = s.usage!!
+        assertEquals(1536L, u.total)
+        assertEquals(512L, u.blobsUnreferenced)
+        assertEquals(listOf("d1", "gone"), u.devices.map { it.id })
+        assertEquals(1073741824L, u.provider!!.available)
+        assertNull(u.provider.quota)
+    }
+
+    @Test
+    fun statusWithoutNewFieldsIsEmpty() {
+        val s = SyncModel.parseStatus("""{"joined":true}""")
+        assertTrue(s.removedWithData.isEmpty())
+        assertNull(s.usage)
+        assertFalse(s.usageBusy)
+        assertNull(s.usageError)
+    }
+
+    @Test
+    fun usageSizeUnits() {
+        assertEquals("0 B", SyncModel.usageSize(0))
+        assertEquals("1023 B", SyncModel.usageSize(1023))
+        assertEquals("1.0 KB", SyncModel.usageSize(1024))
+        assertEquals("1.5 KB", SyncModel.usageSize(1536))
+        assertEquals("3.0 MB", SyncModel.usageSize(3L * 1024 * 1024))
+        assertEquals("2.0 GB", SyncModel.usageSize(2L * 1024 * 1024 * 1024))
+        assertEquals("2048.0 GB", SyncModel.usageSize(2048L * 1024 * 1024 * 1024))
+    }
+
+    @Test
+    fun usageLineRules() {
+        val base = SyncModel.parseStatus(usageJson)
+        assertEquals("统计中…", SyncModel.usageLine(base))
+        val idle = base.copy(usageBusy = false)
+        assertEquals("已用 1.5 KB · 网盘剩余 1.0 GB", SyncModel.usageLine(idle))
+        assertEquals("未统计", SyncModel.usageLine(idle.copy(usage = null)))
+        // 没有剩余：只给已用
+        val noFree = idle.copy(usage = idle.usage!!.copy(provider = null))
+        assertEquals("已用 1.5 KB", SyncModel.usageLine(noFree))
+        // 只有总容量：剩余 = 容量 - 已用
+        val quota = idle.usage.copy(provider = SyncModel.ProviderUsage(used = 1024, available = null, quota = 3072))
+        assertEquals("已用 1.5 KB · 网盘剩余 2.0 KB", SyncModel.usageLine(idle.copy(usage = quota)))
+    }
+
+    @Test
+    fun usageDescShowsTimeAndError() {
+        val zone = ZoneOffset.UTC
+        val today = LocalDate.of(2026, 1, 2)
+        val noon = today.atTime(12, 30).toEpochSecond(zone)
+        val s = SyncModel.parseStatus(usageJson).let { it.copy(usage = it.usage!!.copy(computedAt = noon)) }
+        assertEquals("统计于今天 12:30；上次统计失败：超时", SyncModel.usageDesc(s, today, zone))
+        assertEquals("统计于今天 12:30", SyncModel.usageDesc(s.copy(usageError = null), today, zone))
+        assertEquals("上次统计失败：超时", SyncModel.usageDesc(s.copy(usage = null), today, zone))
+        assertEquals("", SyncModel.usageDesc(s.copy(usage = null, usageError = null), today, zone))
+    }
+
+    @Test
+    fun usageRowsFullDetail() {
+        val u = SyncModel.parseStatus(usageJson).usage!!
+        val roster = listOf(Device("d1", "我的手机"))
+        assertEquals(
+            listOf(
+                "合计" to "1.5 KB",
+                "文件数据（全组共享、已去重）" to "2.0 KB",
+                "其中等待回收的旧版本" to "512 B",
+                "我的手机" to "学习数据 1.0 KB · 打字统计 10 B",
+                "已移除的设备（gone）" to "学习数据 0 B · 打字统计 2.0 KB",
+                "设备清单等" to "100 B",
+                "此目录已用" to "3.0 MB",
+                "网盘剩余" to "1.0 GB",
+            ),
+            SyncModel.usageRows(u, roster),
+        )
+    }
+
+    @Test
+    fun usageRowsUnknownUnreferencedAndNoProvider() {
+        val u = SyncModel.Usage(total = 1, blobs = 1, blobsUnreferenced = null, devices = emptyList(), other = 0, provider = null)
+        val rows = SyncModel.usageRows(u, emptyList())
+        assertEquals("无法确定（有设备清单解不开）", rows.first { it.first == "其中等待回收的旧版本" }.second)
+        assertFalse(rows.any { it.first == "此目录已用" })
+    }
+
+    @Test
+    fun usageRowsWebdavOnlyUsedAndFree() {
+        val webdav = SyncModel.Usage(provider = SyncModel.ProviderUsage(used = 1024, available = 2048, quota = null))
+        val labels = SyncModel.usageRows(webdav, emptyList()).map { it.first }
+        assertTrue("此目录已用" in labels && "网盘剩余" in labels)
+        assertFalse("总容量" in labels)
+        val official = SyncModel.Usage(provider = SyncModel.ProviderUsage(used = 1024, available = null, quota = 4096))
+        assertEquals("总容量", SyncModel.usageRows(official, emptyList()).last().first)
+    }
+
+    @Test
+    fun deviceUsageLabelRules() {
+        val roster = listOf(Device("a", "手机"), Device("b", "", readable = false), Device("c", "  "))
+        assertEquals("手机", SyncModel.deviceUsageLabel("a", roster))
+        assertEquals("b", SyncModel.deviceUsageLabel("b", roster))
+        assertEquals("c", SyncModel.deviceUsageLabel("c", roster))
+        assertEquals("已移除的设备（x）", SyncModel.deviceUsageLabel("x", roster))
+        // 名册没取到：只显示设备号
+        assertEquals("x", SyncModel.deviceUsageLabel("x", emptyList()))
+    }
+
+    @Test
+    fun purgeSummaryHidesWhenEmpty() {
+        assertEquals("", SyncModel.purgeSummary(emptyList()))
+        assertEquals("已移除设备的数据：2 台", SyncModel.purgeSummary(listOf("a", "b")))
+    }
+
+    @Test
+    fun purgeCommandsOnePerDevice() {
+        val steps = SyncModel.purgeSteps(listOf("a", "b"))
+        assertEquals(listOf("purge_device", "purge_device"), steps.map { cmd(it).op })
+        assertEquals(listOf("a", "b"), steps.map { args(it).getString("device") })
+        assertTrue("无法恢复" in SyncModel.PURGE_WARN)
+    }
+
+    @Test
+    fun refreshUsageEnabledOnlyWhenIdle() {
+        val idle = SyncModel.Status(phase = "idle")
+        assertTrue(SyncModel.canRefreshUsage(idle, busy = false))
+        assertFalse(SyncModel.canRefreshUsage(idle, busy = true))
+        assertFalse(SyncModel.canRefreshUsage(idle.copy(usageBusy = true), busy = false))
+        assertFalse(SyncModel.canRefreshUsage(idle.copy(phase = "syncing"), busy = false))
+    }
+
+    @Test
+    fun intervalDescMentionsLearnedLimit() {
+        assertTrue(SyncModel.INTERVAL_DESC.endsWith("学习数据最多每 30 分钟同步一次"))
+    }
+
+    @Test
+    fun contentDefaultsAllOnAndIsOmittedWhenAllOn() {
+        val f = SyncModel.parseForm("""{"settings":{"enabled":true}}""")
+        assertEquals(SyncModel.Content(), f.content)
+        assertFalse(JSONObject(f.toSettingsJson()).has("content"))
+        // 全开时原先写过的 content 也被清掉
+        val withOld = SyncModel.parseForm("""{"settings":{"content":{"learned":false}}}""")
+        assertFalse(withOld.content.learned)
+        assertFalse(JSONObject(withOld.copy(content = SyncModel.Content()).toSettingsJson()).has("content"))
+    }
+
+    @Test
+    fun contentSwitchOnlyChangesContent() {
+        val saved = SyncModel.parseForm(
+            """{"settings":{"enabled":true,"interval_min":20,"device_name":"我的手机","future":1,"backend":{"type":"webdav","url":"https://d/","user":"u"}}}""",
+        )
+        val steps = SyncModel.contentSwitchSteps(saved, SyncModel.Content(stats = false))
+        assertEquals(1, steps.size)
+        val out = JSONObject((steps[0] as Step.SetSettings).json)
+        val c = out.getJSONObject("content")
+        assertTrue(c.getBoolean("learned") && c.getBoolean("completion"))
+        assertFalse(c.getBoolean("stats"))
+        assertEquals(20, out.getInt("interval_min"))
+        assertEquals("我的手机", out.getString("device_name"))
+        assertEquals(1, out.getInt("future"))
+        assertEquals("https://d/", out.getJSONObject("backend").getString("url"))
+        // 保存后读回
+        assertFalse(SyncModel.parseForm(out.toString()).content.stats)
+    }
 }

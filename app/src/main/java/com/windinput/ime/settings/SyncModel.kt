@@ -77,6 +77,13 @@ internal object SyncModel {
         val groupName: String = "",
         /** 加入远端后还没确认本机身份：确认前核心不同步 */
         val needsIdentity: Boolean = false,
+        /** 已移除（不在名册里）但远端仍有学习数据的设备号 */
+        val removedWithData: List<String> = emptyList(),
+        /** 远端空间占用的缓存；从未统计过为 null */
+        val usage: Usage? = null,
+        val usageBusy: Boolean = false,
+        /** 上次统计失败的原因 */
+        val usageError: String? = null,
     ) {
         val errorKind: ErrorKind get() = classifyError(phase, lastError)
 
@@ -103,10 +110,146 @@ internal object SyncModel {
             group = o.optString("group"),
             groupName = o.optString("group_name"),
             needsIdentity = o.optBoolean("needs_identity"),
+            removedWithData = o.optJSONArray("removed_with_data")?.let { a ->
+                (0 until a.length()).map { a.optString(it) }.filter { it.isNotEmpty() }
+            } ?: emptyList(),
+            usage = o.optJSONObject("usage")?.let(::parseUsage),
+            usageBusy = o.optBoolean("usage_busy"),
+            usageError = if (o.isNull("usage_error")) null else o.optString("usage_error").ifEmpty { null },
         )
     } catch (e: JSONException) {
         Status()
     }
+
+    // ───────────────────────────── 空间占用 ─────────────────────────────
+
+    /** 远端空间占用（核心 `status.usage`），单位字节 */
+    data class Usage(
+        val computedAt: Long = 0,
+        val total: Long = 0,
+        /** 文件数据：各设备共用、按内容去重 */
+        val blobs: Long = 0,
+        /** 其中等待回收的旧版本；有设备清单解不开时无法确定（null） */
+        val blobsUnreferenced: Long? = null,
+        val devices: List<DeviceUsage> = emptyList(),
+        /** 设备清单等小项 */
+        val other: Long = 0,
+        val provider: ProviderUsage? = null,
+    ) {
+        /** 存储服务的剩余空间；没有总容量也没有剩余为 null */
+        val providerFree: Long?
+            get() = provider?.let { p -> p.available ?: p.quota?.let { maxOf(it - p.used, 0L) } }
+    }
+
+    /** 存储服务口径：WebDAV 只有此目录已用与剩余，总容量只有官方服务给 */
+    data class ProviderUsage(val used: Long = 0, val available: Long? = null, val quota: Long? = null)
+
+    data class DeviceUsage(val id: String, val learned: Long = 0, val stats: Long = 0)
+
+    private fun JSONObject.optLongOrNull(key: String): Long? = if (has(key) && !isNull(key)) optLong(key) else null
+
+    private fun parseUsage(o: JSONObject): Usage {
+        val devs = o.optJSONArray("devices")?.let { a ->
+            (0 until a.length()).mapNotNull { a.optJSONObject(it) }.map {
+                DeviceUsage(it.optString("id"), it.optLong("learned"), it.optLong("stats"))
+            }.filter { it.id.isNotEmpty() }
+        } ?: emptyList()
+        return Usage(
+            computedAt = o.optLong("computed_at"),
+            total = o.optLong("total"),
+            blobs = o.optLong("blobs"),
+            blobsUnreferenced = o.optLongOrNull("blobs_unreferenced"),
+            devices = devs,
+            other = o.optLong("other"),
+            provider = o.optJSONObject("provider")?.let {
+                ProviderUsage(it.optLong("used"), it.optLongOrNull("available"), it.optLongOrNull("quota"))
+            },
+        )
+    }
+
+    /** 等待回收量无法确定时的显示 */
+    const val UNREFERENCED_UNKNOWN = "无法确定（有设备清单解不开）"
+
+    /** 明细页底部的说明 */
+    const val USAGE_NOTE = "按加密后的大小统计。等待回收的旧版本放满 7 天、且仍没有设备用到时，会在同步时自动删除。"
+
+    /** 空间大小：1024 进制，B 取整，KB 起一位小数 */
+    fun usageSize(n: Long): String {
+        if (n < 1024) return "$n B"
+        val units = arrayOf("KB", "MB", "GB")
+        var v = n / 1024.0
+        var i = 0
+        while (v >= 1024.0 && i + 1 < units.size) {
+            v /= 1024.0
+            i++
+        }
+        return String.format(java.util.Locale.ROOT, "%.1f %s", v, units[i])
+    }
+
+    /** 存储卡「已用空间」行的值 */
+    fun usageLine(s: Status): String {
+        if (s.usageBusy) return "统计中…"
+        val u = s.usage ?: return "未统计"
+        val free = u.providerFree
+        return "已用 ${usageSize(u.total)}" + (if (free != null) " · 网盘剩余 ${usageSize(free)}" else "")
+    }
+
+    /** 「已用空间」行的说明：统计时间与上次失败原因 */
+    fun usageDesc(s: Status, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): String {
+        val parts = mutableListOf<String>()
+        s.usage?.let { parts += "统计于" + lastSeenText(it.computedAt, today, zone) }
+        s.usageError?.let { parts += "上次统计失败：$it" }
+        return parts.joinToString("；")
+    }
+
+    /** 「刷新」可点：没有命令在途、不在统计、也不在同步 */
+    fun canRefreshUsage(s: Status, busy: Boolean): Boolean = !busy && !s.usageBusy && s.phase != "syncing"
+
+    /** 明细里的设备名：名册显示名；名册没取到显示设备号；取到但没有它的标为已移除 */
+    fun deviceUsageLabel(id: String, roster: List<Device>): String {
+        if (roster.isEmpty()) return id
+        val d = roster.firstOrNull { it.id == id } ?: return "已移除的设备（$id）"
+        return if (d.readable && d.name.isNotBlank()) d.name else id
+    }
+
+    /** 明细页的各行 (名称, 值) */
+    fun usageRows(u: Usage, roster: List<Device>): List<Pair<String, String>> {
+        val rows = mutableListOf(
+            "合计" to usageSize(u.total),
+            "文件数据（全组共享、已去重）" to usageSize(u.blobs),
+            "其中等待回收的旧版本" to (u.blobsUnreferenced?.let(::usageSize) ?: UNREFERENCED_UNKNOWN),
+        )
+        for (d in u.devices) {
+            rows += deviceUsageLabel(d.id, roster) to "学习数据 ${usageSize(d.learned)} · 打字统计 ${usageSize(d.stats)}"
+        }
+        rows += "设备清单等" to usageSize(u.other)
+        u.provider?.let { p ->
+            rows += "此目录已用" to usageSize(p.used)
+            u.providerFree?.let { rows += "网盘剩余" to usageSize(it) }
+            p.quota?.let { rows += "总容量" to usageSize(it) }
+        }
+        return rows
+    }
+
+    // ───────────────────────────── 已移除设备的数据 ─────────────────────────────
+
+    /** 设备卡末行的值；没有已移除设备的数据返回空串（行隐藏） */
+    fun purgeSummary(devs: List<String>): String = if (devs.isEmpty()) "" else "已移除设备的数据：${devs.size} 台"
+
+    const val PURGE_WARN = "清除后其他设备的次数会减去它们的部分，无法恢复"
+
+    /** 逐个清除：每台设备一条 `purge_device` */
+    fun purgeSteps(devs: List<String>): List<Step> =
+        devs.map { Step.Command("purge_device", JSONObject().put("device", it).toString()) }
+
+    // ───────────────────────────── 同步内容 ─────────────────────────────
+
+    /** 各类内容是否参与同步（本机设置，不随同步传播），缺省全开 */
+    data class Content(val learned: Boolean = true, val completion: Boolean = true, val stats: Boolean = true)
+
+    /** 内容开关改动：只改 content，其余设置原样（setSettings 是整份覆盖） */
+    fun contentSwitchSteps(saved: Form, content: Content): List<Step> =
+        listOf(Step.SetSettings(saved.copy(content = content).toSettingsJson()))
 
     /** 状态行的值：等确认身份或撞号时核心不同步，不能照阶段写「已是最新」 */
     fun statusValue(s: Status): String = when {
@@ -137,7 +280,7 @@ internal object SyncModel {
     /** 同步间隔上限（分钟），与核心 MAX_INTERVAL_MIN 一致 */
     const val MAX_INTERVAL_MIN = 24 * 60
 
-    const val INTERVAL_DESC = "1 到 1440 分钟（24 小时）"
+    const val INTERVAL_DESC = "1 到 1440 分钟（24 小时）；本机有改动时会很快同步；学习数据最多每 30 分钟同步一次"
 
     /**
      * 同步设置的纯数据形态，对应核心 `SyncSettings`。**不含机密**。
@@ -160,6 +303,8 @@ internal object SyncModel {
         val intervalMin: Int = DEFAULT_INTERVAL_MIN,
         /** 本机在设备名册里显示的名称；设备本地，不随同步传播 */
         val deviceName: String = "",
+        /** 各类内容是否参与同步 */
+        val content: Content = Content(),
         val raw: String = "{}",
     ) {
         /** 选中后端的必填项是否全空 */
@@ -177,6 +322,12 @@ internal object SyncModel {
             s.put("interval_min", intervalMin)
             s.put("device_name", deviceName.trim())
             if (skipCertVerify) s.put("skip_cert_verify", true) else s.remove("skip_cert_verify")
+            // 全开是缺省，不写
+            if (content != Content()) {
+                s.put("content", JSONObject().put("learned", content.learned).put("completion", content.completion).put("stats", content.stats))
+            } else {
+                s.remove("content")
+            }
             // 旧版安卓页写过的范围开关，核心已不认
             s.remove("scope")
             if (enabled || !backendBlank) {
@@ -211,6 +362,9 @@ internal object SyncModel {
             intervalMin = interval,
             deviceName = s.optString("device_name"),
             skipCertVerify = s.optBoolean("skip_cert_verify"),
+            content = s.optJSONObject("content")?.let {
+                Content(it.optBoolean("learned", true), it.optBoolean("completion", true), it.optBoolean("stats", true))
+            } ?: Content(),
             raw = s.toString(),
         )
         val b = s.optJSONObject("backend")
