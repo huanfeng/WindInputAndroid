@@ -66,23 +66,37 @@ internal fun StatsSection() {
             device = sel
             return@LaunchedEffect
         }
-        withContext(Dispatchers.IO) {
+        // IO 块只返回结果：被取消的旧效果在此抛 CancellationException，结果自然丢弃；
+        // 汇总与日表回主线程一次性赋值，不会一新一旧
+        val got = withContext(Dispatchers.IO) {
             val core = CoreAccess.obtainCore(context)
             val to = LocalDate.now()
             val from = to.minusDays(CHART_DAYS - 1)
             try {
-                summary = core?.statsSummaryFor(device)
-                days = core?.statsDailyFor(from.toString(), to.toString(), device).orEmpty()
+                core?.statsSummaryFor(device) to core?.statsDailyFor(from.toString(), to.toString(), device).orEmpty()
             } catch (e: ConfigException) {
-                summary = core?.statsSummary()
-                days = core?.statsDaily(from.toString(), to.toString()).orEmpty()
+                null
             }
         }
+        if (got == null) {
+            // 设备在取数间隙被清除：回到全部设备重取，不拿别的口径的数据配着当前下拉
+            if (device != STATS_DEVICE_ALL) {
+                device = STATS_DEVICE_ALL
+                return@LaunchedEffect
+            }
+            // 全部设备也失败：按不可用显示，避免一直停在「正在读取」
+            summary = null
+            days = emptyList()
+            loaded = true
+            return@LaunchedEffect
+        }
+        summary = got.first
+        days = got.second
         loaded = true
     }
 
     // 设备名册：后台取，取不到就只按设备号显示
-    LaunchedEffect(deviceIds) {
+    LaunchedEffect(reload, deviceIds) {
         if (deviceIds.isEmpty()) return@LaunchedEffect
         roster = withContext(Dispatchers.IO) { fetchSyncRoster(context) }
     }
