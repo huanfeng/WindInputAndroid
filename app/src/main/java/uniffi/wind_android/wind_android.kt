@@ -833,7 +833,13 @@ internal object IntegrityCheckingUniffiLib {
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_stats_daily(
     ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_stats_daily_for(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_stats_devices(
+    ): Int
     external fun uniffi_wind_android_checksum_method_windcore_stats_summary(
+    ): Int
+    external fun uniffi_wind_android_checksum_method_windcore_stats_summary_for(
     ): Int
     external fun uniffi_wind_android_checksum_method_windcore_tooltip_sections(
     ): Int
@@ -1010,7 +1016,13 @@ internal object UniffiLib {
     ): Unit
     external fun uniffi_wind_android_fn_method_windcore_stats_daily(`ptr`: Long,`from`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_stats_daily_for(`ptr`: Long,`from`: RustBuffer.ByValue,`to`: RustBuffer.ByValue,`device`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_stats_devices(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_stats_summary(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
+    ): RustBuffer.ByValue
+    external fun uniffi_wind_android_fn_method_windcore_stats_summary_for(`ptr`: Long,`device`: RustBuffer.ByValue,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
     external fun uniffi_wind_android_fn_method_windcore_tooltip_sections(`ptr`: Long,uniffi_out_err: UniffiRustCallStatus, 
     ): RustBuffer.ByValue
@@ -1341,7 +1353,16 @@ private fun uniffiCheckApiChecksums(lib: IntegrityCheckingUniffiLib) {
     if (lib.uniffi_wind_android_checksum_method_windcore_stats_daily() != 53830) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
+    if (lib.uniffi_wind_android_checksum_method_windcore_stats_daily_for() != 30949) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_stats_devices() != 56204) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
     if (lib.uniffi_wind_android_checksum_method_windcore_stats_summary() != 63898) {
+        throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
+    }
+    if (lib.uniffi_wind_android_checksum_method_windcore_stats_summary_for() != 22754) {
         throw RuntimeException("UniFFI API checksum mismatch: try cleaning and rebuilding your project")
     }
     if (lib.uniffi_wind_android_checksum_method_windcore_tooltip_sections() != 33354) {
@@ -3033,9 +3054,24 @@ public interface WindCoreInterface {
     fun `statsDaily`(`from`: kotlin.String, `to`: kotlin.String): List<DailyTotalInfo>
     
     /**
+     * 按设备的每日字数，口径同 [`Self::stats_daily`]。
+     */
+    fun `statsDailyFor`(`from`: kotlin.String, `to`: kotlin.String, `device`: kotlin.String): List<DailyTotalInfo>
+    
+    /**
+     * 有统计数据的他机设备号（不含本机）；没有他机统计时为空。
+     */
+    fun `statsDevices`(): List<kotlin.String>
+    
+    /**
      * 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
      */
     fun `statsSummary`(): StatsSummaryInfo?
+    
+    /**
+     * 按设备的概览汇总：`device` 取 `all` / `self` / 设备号，未知设备报错。
+     */
+    fun `statsSummaryFor`(`device`: kotlin.String): StatsSummaryInfo?
     
     /**
      * 候选提示（长按候选那张卡）的各段及当前开关，顺序即显示顺序。
@@ -4184,6 +4220,42 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
 
     
     /**
+     * 按设备的每日字数，口径同 [`Self::stats_daily`]。
+     */
+    @Throws(ConfigException::class)override fun `statsDailyFor`(`from`: kotlin.String, `to`: kotlin.String, `device`: kotlin.String): List<DailyTotalInfo> {
+            return FfiConverterSequenceTypeDailyTotalInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_stats_daily_for(
+        it,
+        
+        FfiConverterString.lower(`from`),
+        FfiConverterString.lower(`to`),
+        FfiConverterString.lower(`device`),_status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 有统计数据的他机设备号（不含本机）；没有他机统计时为空。
+     */override fun `statsDevices`(): List<kotlin.String> {
+            return FfiConverterSequenceString.lift(
+    callWithHandle {
+    uniffiRustCall() { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_stats_devices(
+        it,
+        _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
      * 概览汇总；没有用户库时为 `None`。算法与电脑版设置页同一份。
      */override fun `statsSummary`(): StatsSummaryInfo? {
             return FfiConverterOptionalTypeStatsSummaryInfo.lift(
@@ -4192,6 +4264,24 @@ open class WindCore: Disposable, AutoCloseable, WindCoreInterface
     UniffiLib.uniffi_wind_android_fn_method_windcore_stats_summary(
         it,
         _status)
+}
+    }
+    )
+    }
+    
+
+    
+    /**
+     * 按设备的概览汇总：`device` 取 `all` / `self` / 设备号，未知设备报错。
+     */
+    @Throws(ConfigException::class)override fun `statsSummaryFor`(`device`: kotlin.String): StatsSummaryInfo? {
+            return FfiConverterOptionalTypeStatsSummaryInfo.lift(
+    callWithHandle {
+    uniffiRustCallWithError(ConfigException) { _status ->
+    UniffiLib.uniffi_wind_android_fn_method_windcore_stats_summary_for(
+        it,
+        
+        FfiConverterString.lower(`device`),_status)
 }
     }
     )
