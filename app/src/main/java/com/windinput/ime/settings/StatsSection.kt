@@ -25,9 +25,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.windinput.ime.WindInputApp
+import com.windinput.ime.core.SyncHub
+import uniffi.wind_android.ConfigException
 import uniffi.wind_android.DailyTotalInfo
 import uniffi.wind_android.StatsSummaryInfo
+import java.io.File
 import java.time.LocalDate
 
 /** 每日图覆盖的天数 */
@@ -47,16 +52,53 @@ internal fun StatsSection() {
     var loaded by remember { mutableStateOf(false) }
     var reload by remember { mutableIntStateOf(0) }
     var confirmClear by remember { mutableStateOf(false) }
+    // 设备下拉：不持久化，每次进页面回到「全部设备」
+    var device by remember { mutableStateOf(STATS_DEVICE_ALL) }
+    var deviceIds by remember { mutableStateOf<List<String>>(emptyList()) }
+    var roster by remember { mutableStateOf<List<SyncModel.Device>?>(null) }
 
-    LaunchedEffect(reload) {
-        withContext(Dispatchers.IO) {
+    LaunchedEffect(reload, device) {
+        val ids = withContext(Dispatchers.IO) { CoreAccess.obtainCore(context)?.statsDevices().orEmpty() }
+        deviceIds = ids
+        // 选中的设备被清除了：回到全部设备（改 device 会重启本效果）
+        val sel = statsDeviceOrAll(device, statsDeviceOptions(ids, null))
+        if (sel != device) {
+            device = sel
+            return@LaunchedEffect
+        }
+        // IO 块只返回结果：被取消的旧效果在此抛 CancellationException，结果自然丢弃；
+        // 汇总与日表回主线程一次性赋值，不会一新一旧
+        val got = withContext(Dispatchers.IO) {
             val core = CoreAccess.obtainCore(context)
             val to = LocalDate.now()
             val from = to.minusDays(CHART_DAYS - 1)
-            summary = core?.statsSummary()
-            days = core?.statsDaily(from.toString(), to.toString()).orEmpty()
+            try {
+                core?.statsSummaryFor(device) to core?.statsDailyFor(from.toString(), to.toString(), device).orEmpty()
+            } catch (e: ConfigException) {
+                null
+            }
         }
+        if (got == null) {
+            // 设备在取数间隙被清除：回到全部设备重取，不拿别的口径的数据配着当前下拉
+            if (device != STATS_DEVICE_ALL) {
+                device = STATS_DEVICE_ALL
+                return@LaunchedEffect
+            }
+            // 全部设备也失败：按不可用显示，避免一直停在「正在读取」
+            summary = null
+            days = emptyList()
+            loaded = true
+            return@LaunchedEffect
+        }
+        summary = got.first
+        days = got.second
         loaded = true
+    }
+
+    // 设备名册：后台取，取不到就只按设备号显示
+    LaunchedEffect(reload, deviceIds) {
+        if (deviceIds.isEmpty()) return@LaunchedEffect
+        roster = withContext(Dispatchers.IO) { fetchSyncRoster(context) }
     }
 
     if (!loaded) {
@@ -67,6 +109,18 @@ internal fun StatsSection() {
     if (s == null) {
         SectionTitle("统计暂不可用（输入法核心未就绪）")
         return
+    }
+
+    val options = statsDeviceOptions(deviceIds, roster)
+    if (options.isNotEmpty()) {
+        Card(modifier = Modifier.fillMaxWidth()) {
+            WindowDropdownPreference(
+                items = options.map { it.label },
+                selectedIndex = options.indexOfFirst { it.value == device }.coerceAtLeast(0),
+                title = "设备",
+                onSelectedIndexChange = { i -> options.getOrNull(i)?.let { device = it.value } },
+            )
+        }
     }
 
     SectionTitle("概览")
@@ -118,6 +172,20 @@ internal fun StatsSection() {
             }
         }
     }
+}
+
+/** 取同步设备名册；同步没配置过、命令失败或名册为空时为 null（必须在后台线程调） */
+private fun fetchSyncRoster(context: android.content.Context): List<SyncModel.Device>? = try {
+    val dirs = (context.applicationContext as WindInputApp).dataDirs
+    if (!File(dirs.localRoot, "sync/settings.toml").isFile) {
+        null
+    } else {
+        CoreAccess.obtainCore(context)?.let { core ->
+            SyncModel.parseDevices(SyncHub.get(core, dirs).command("list_devices", "")).ifEmpty { null }
+        }
+    }
+} catch (e: Exception) {
+    null
 }
 
 @Composable

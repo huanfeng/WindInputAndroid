@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -390,6 +391,8 @@ private fun SettingsApp(
     //   加载出来）总时长被重算，进度随之重排，快到位的页面又往回跳一截再滑进来
     //   （「点进下一级会再弹一下」）。进度单调了，位置就只会往前走。
     val transitionState = remember { SeekableTransitionState(route) }
+    // 顶栏返回箭头与系统返回走同一条分发链：页面内的 BackHandler（如同步页未保存密钥时拦住关闭）对两者都生效
+    val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     // 放弃手势后的收尾协程：新手势、路由变化时先取消它，免得两边抢同一个 transitionState
     val cancelBackJob = remember { arrayOfNulls<kotlinx.coroutines.Job>(1) }
     LaunchedEffect(route) {
@@ -457,7 +460,7 @@ private fun SettingsApp(
         Screen(
             route = r,
             title = r.detail?.let { detailTitles[it] ?: it } ?: screenTitle(manifest, r, detailTitles),
-            onBack = if (r.depth > 0) ({ go(r.up()) }) else null,
+            onBack = if (r.depth > 0) ({ backDispatcher?.onBackPressed() ?: go(r.up()) }) else null,
         ) {
             val page = manifest.pages.firstOrNull { it.id == r.page }
             val schemeId = schemeIdOf(r.sub)
@@ -663,6 +666,7 @@ private fun pageSummary(
             ?: schemaState?.let { schemaHomeSummary(it.activeName, it.schemas.size) }
             ?: sectionList(manifest, page.id)
         "dict" -> "我的词条 · 添加词条 · 命令短语 · 词库统计"
+        "sync" -> "WebDAV / S3 · 同步密钥加密 · 设备组"
         "about" -> "版本 $versionName"
         else -> sectionList(manifest, page.id)
     }
@@ -694,6 +698,7 @@ private fun PageScreen(
         "schema" -> SchemaSection(schemaState, onOpenScheme)
         "stats" -> StatsSection()
         "dict" -> DictOverview(session, onOpen = onOpenSub)
+        "sync" -> SyncSection()
         "about" -> AboutSection(versionName, onOpenSub)
     }
     @Suppress("UNUSED_EXPRESSION") values.version // 开关变了，依赖它的项跟着显示 / 隐藏
@@ -1098,7 +1103,7 @@ private fun AboutSection(versionName: String, onOpenSub: (String) -> Unit) {
             summary = "版本 $versionName",
             startAction = { WindInputLogo(Modifier.padding(end = 14.dp).size(40.dp)) },
         )
-        NavRow(SUB_PRIVACY, "输入与词库只存在本机，仅检查更新时联网；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
+        NavRow(SUB_PRIVACY, "输入与词库只存在本机；检查更新、启用数据同步后才联网；权限用途、数据删除方式", icon = SettingsIcons.privacy) {
             onOpenSub(SUB_PRIVACY)
         }
         NavRow(

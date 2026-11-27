@@ -32,7 +32,9 @@ use wind_mobile::{
 };
 
 pub mod scheme;
+pub mod sync;
 pub use scheme::{SchemeDeleteInfo, SchemeImportInfo, SchemePreviewInfo};
+pub use sync::{MobileSyncHandle, SyncError};
 
 uniffi::setup_scaffolding!();
 
@@ -1008,6 +1010,44 @@ impl WindCore {
                 english: d.english,
             })
             .collect()
+    }
+
+    /// 有统计数据的他机设备号（不含本机）；没有他机统计时为空。
+    pub fn stats_devices(&self) -> Vec<String> {
+        self.core.stats_devices()
+    }
+
+    /// 按设备的概览汇总：`device` 取 `all` / `self` / 设备号，未知设备报错。
+    pub fn stats_summary_for(
+        &self,
+        device: String,
+    ) -> Result<Option<StatsSummaryInfo>, ConfigError> {
+        self.core
+            .stats_summary_for(&device)
+            .map(|s| s.map(StatsSummaryInfo::from))
+            .map_err(|reason| ConfigError::Rejected { reason })
+    }
+
+    /// 按设备的每日字数，口径同 [`Self::stats_daily`]。
+    pub fn stats_daily_for(
+        &self,
+        from: String,
+        to: String,
+        device: String,
+    ) -> Result<Vec<DailyTotalInfo>, ConfigError> {
+        self.core
+            .stats_daily_for(&from, &to, &device)
+            .map(|v| {
+                v.into_iter()
+                    .map(|d| DailyTotalInfo {
+                        date: d.date,
+                        total: d.total,
+                        chinese: d.chinese,
+                        english: d.english,
+                    })
+                    .collect()
+            })
+            .map_err(|reason| ConfigError::Rejected { reason })
     }
 
     /// 清空全部输入统计。

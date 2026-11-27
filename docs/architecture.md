@@ -181,6 +181,31 @@ PC 端已有配套工具站（主题编辑器、主题市场、码表编辑）�
 语音仅保留「转发系统语音输入法」入口。完整范围见
 [android-ime-features.md](android-ime-features.md)。
 
+### 3.9 数据同步（进程内运行）
+
+手机端的数据同步与电脑版**同一套协议与加密**（主仓 `docs/design/data-sync.md`、`sync-messaging.md` §3a），
+在输入法进程里跑，没有常驻后台进程：
+
+- **绑定**：`rust/wind-android/src/sync.rs` 的 `MobileSyncHandle` 投影主仓 `wind-mobile::sync::MobileSync`；
+  设置、状态、命令回执都是 JSON 字符串，形状同桌面 `sync.getSettings` / `sync.status` / `sync.command`，
+  错误为 `SyncException.Failed(reason)`（原文中文，可直接展示）。
+- **生命周期**：`SyncHub` 持有进程内唯一句柄，与核心单例同生命周期。状态目录 = 核心的 `localRoot`
+  （`filesDir/rust/data/WindInput`），用户目录 = 核心的 `userRoot`；同步的设置、状态与机密在 `<localRoot>/sync/`。
+- **触发**：不监听文件、不用 WorkManager。键盘每次弹出（`onStartInputView`）在后台线程调
+  `sync_if_due(同步间隔秒数)`——间隔取同步设置的 `interval_min`（默认 15 分钟），距上次成功或尝试满这么久才起一轮；没进过同步设置页（无 `sync/settings.toml`）的用户零开销。
+  设置页的「立即同步」与其余命令（测试连接、生成 / 粘贴同步密钥、确认身份、设备组…）同样走后台线程，最长等 60 秒。
+- **平台类别与设备组**：词库、短语、方案与桌面**共用**；主题按设备类别各一份；设置按设备组同步，
+  组只含同类设备（核心只把 `android` 平台算作手机），所以手机的设置不会改到电脑。没有范围开关。
+- **设置页**（`SyncSection` + 纯逻辑 `SyncModel`）照桌面设置端 `wind-setting/src/pages/sync/` 的流程与文案：
+  未加入时只有「开始配置…」；向导为存储 → 测试连接 → 同步密钥（远端空则生成，须勾「我已保存」；
+  已有则粘贴）→ 本机身份（只列 android 设备与组；首台设备跳过）→ 完成。粘贴加入后身份须由用户选择，
+  确认前核心不同步。桌面的对话框在这里是替换整页的流程，返回键先关流程。
+- **机密**：存储密码与加密密钥在 `sync/secrets.bin`（0600），连同整个 `sync/` 目录排除出系统备份与换机迁移
+  （`backup_rules.xml` / `data_extraction_rules.xml`，`BackupRulesTest` 核对）；换机后需重新粘贴同步密钥加入。
+  界面上存储密码只写不回显；同步密钥只在刚生成或点「查看…」时显示，关掉即清。
+- **隐私**：联网只有「检查更新」与用户自己启用的同步（连用户配置的 WebDAV / S3），同步内容在本机加密后才上传；
+  隐私政策文本与此一致（`PrivacySection`）。
+
 ## 4. 需全新编写（Kotlin 侧）
 
 1. **软键盘布局系统**：qwerty/符号/数字层、布局定义文件（建议 TOML，与配置家族

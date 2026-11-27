@@ -35,7 +35,7 @@ class BackupRulesTest {
     @Test
     fun clipboardHistoryAndCachesAreExcluded() {
         val rules = excludes("backup_rules.xml")
-        for (must in listOf("file:clipboard.json", "file:data/", "file:rust/data/WindInput/cache/")) {
+        for (must in listOf("file:clipboard.json", "file:data/", "file:rust/data/WindInput/cache/", "file:rust/data/WindInput/sync/")) {
             assertTrue("缺少排除项 $must", must in rules)
         }
     }
